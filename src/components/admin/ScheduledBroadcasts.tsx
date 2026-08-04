@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -20,6 +20,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import RichTextEditor from './RichTextEditor';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Country {
   code: string;
@@ -29,6 +31,7 @@ interface Country {
 
 interface ScheduledBroadcast {
   id: string;
+  channel: 'push' | 'email';
   title: string;
   message: string;
   target_countries: string[];
@@ -42,6 +45,12 @@ interface ScheduledBroadcast {
   created_at: string;
   admin_id: string;
 }
+
+const htmlToPlainText = (html: string): string => {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+};
 
 const getCountryName = (code: string): string => {
   const countryNames: { [key: string]: string } = {
@@ -68,6 +77,7 @@ export default function ScheduledBroadcasts() {
   const { toast } = useToast();
 
   // Form state
+  const [channel, setChannel] = useState<'push' | 'email'>('push');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
@@ -140,6 +150,7 @@ export default function ScheduledBroadcasts() {
 
   const openCreateDialog = () => {
     setEditingBroadcast(null);
+    setChannel('push');
     setTitle('');
     setMessage('');
     setSelectedCountries([]);
@@ -152,6 +163,7 @@ export default function ScheduledBroadcasts() {
 
   const openEditDialog = (broadcast: ScheduledBroadcast) => {
     setEditingBroadcast(broadcast);
+    setChannel(broadcast.channel || 'push');
     setTitle(broadcast.title);
     setMessage(broadcast.message);
     setSelectedCountries(broadcast.target_countries || []);
@@ -213,10 +225,11 @@ export default function ScheduledBroadcasts() {
   };
 
   const handleSave = async () => {
-    if (!title.trim() || !message.trim()) {
+    const bodyIsEmpty = channel === 'email' ? !htmlToPlainText(message) : !message.trim();
+    if (!title.trim() || bodyIsEmpty) {
       toast({
         title: 'Error',
-        description: 'Please fill in title and message',
+        description: `Please fill in ${channel === 'email' ? 'subject and message' : 'title and message'}`,
         variant: 'destructive',
       });
       return;
@@ -228,8 +241,9 @@ export default function ScheduledBroadcasts() {
     const nextSendAt = calculateNextSendTime(repeatType, specificDay, timeToSend);
 
     const broadcastData = {
+      channel,
       title: title.trim(),
-      message: message.trim(),
+      message: channel === 'email' ? message : message.trim(),
       target_countries: selectedCountries.length > 0 ? selectedCountries : null,
       repeat_type: repeatType,
       specific_day: repeatType === 'specific_day' ? specificDay : null,
@@ -347,11 +361,15 @@ export default function ScheduledBroadcasts() {
   };
 
   const toggleCountry = (countryCode: string) => {
-    setSelectedCountries(prev => 
+    setSelectedCountries(prev =>
       prev.includes(countryCode)
         ? prev.filter(c => c !== countryCode)
         : [...prev, countryCode]
     );
+  };
+
+  const toggleAllCountries = () => {
+    setSelectedCountries(prev => (prev.length === countries.length ? [] : countries.map(c => c.code)));
   };
 
   return (
@@ -391,6 +409,19 @@ export default function ScheduledBroadcasts() {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] h-4 px-1.5 ${
+                              broadcast.channel === 'email' ? 'border-purple-400 text-purple-600' : 'border-blue-400 text-blue-600'
+                            }`}
+                          >
+                            {broadcast.channel === 'email' ? (
+                              <Mail className="w-2 h-2 mr-0.5" />
+                            ) : (
+                              <Bell className="w-2 h-2 mr-0.5" />
+                            )}
+                            {broadcast.channel === 'email' ? 'Email' : 'Push'}
+                          </Badge>
                           <h4 className="font-semibold text-sm">{broadcast.title}</h4>
                           {broadcast.is_active ? (
                             <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge>
@@ -398,7 +429,9 @@ export default function ScheduledBroadcasts() {
                             <Badge variant="outline" className="text-xs">Inactive</Badge>
                           )}
                         </div>
-                        <p className="text-xs text-gray-600 mb-2">{broadcast.message}</p>
+                        <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                          {broadcast.channel === 'email' ? htmlToPlainText(broadcast.message) : broadcast.message}
+                        </p>
                       </div>
                     </div>
 
@@ -437,11 +470,14 @@ export default function ScheduledBroadcasts() {
                       </Badge>
                     </div>
 
-                    {broadcast.next_send_at && (
-                      <p className="text-xs text-gray-500 mb-3">
-                        Next send: {new Date(broadcast.next_send_at).toLocaleString()}
+                    <div className="text-xs text-gray-500 mb-3 space-y-0.5">
+                      {broadcast.next_send_at && (
+                        <p>Next send: {new Date(broadcast.next_send_at).toLocaleString()}</p>
+                      )}
+                      <p>
+                        Last sent: {broadcast.last_sent_at ? new Date(broadcast.last_sent_at).toLocaleString() : 'Never'}
                       </p>
-                    )}
+                    </div>
 
                     <div className="flex gap-2">
                       <Button
@@ -494,35 +530,62 @@ export default function ScheduledBroadcasts() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingBroadcast ? 'Edit Scheduled Broadcast' : 'Create Scheduled Broadcast'}
+              {editingBroadcast ? 'Edit Schedule' : 'Create Schedule'}
             </DialogTitle>
             <DialogDescription>
-              Set up a recurring push notification to be sent automatically
+              Set up a recurring push notification or email to be sent automatically
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title *</Label>
+              <Label>Send As *</Label>
+              <Select value={channel} onValueChange={(v) => setChannel(v as 'push' | 'email')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="push">
+                    <span className="flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" /> Push Notification</span>
+                  </SelectItem>
+                  <SelectItem value="email">
+                    <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Email</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="title">{channel === 'email' ? 'Subject *' : 'Title *'}</Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Notification title"
+                placeholder={channel === 'email' ? 'Email subject' : 'Notification title'}
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="message">Message *</Label>
-              <Textarea
-                id="message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Notification message"
-                rows={5}
-                maxLength={3000}
-              />
-              <p className="text-xs text-gray-500">{message.length}/3000 characters</p>
+              {channel === 'email' ? (
+                <RichTextEditor
+                  value={message}
+                  onChange={setMessage}
+                  placeholder="Write your email message..."
+                />
+              ) : (
+                <>
+                  <Textarea
+                    id="message"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Notification message"
+                    rows={5}
+                    maxLength={3000}
+                  />
+                  <p className="text-xs text-gray-500">{message.length}/3000 characters</p>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -572,7 +635,19 @@ export default function ScheduledBroadcasts() {
             </div>
 
             <div className="space-y-2">
-              <Label>Target Countries ({selectedCountries.length} selected)</Label>
+              <div className="flex items-center justify-between">
+                <Label>Target Countries ({selectedCountries.length} selected)</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleAllCountries}
+                  disabled={isLoadingCountries || countries.length === 0}
+                  className="h-6 text-[11px] px-2"
+                >
+                  {selectedCountries.length === countries.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
               {isLoadingCountries ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -591,11 +666,10 @@ export default function ScheduledBroadcasts() {
                         onClick={() => toggleCountry(country.code)}
                       >
                         <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selectedCountries.includes(country.code)}
-                            onChange={() => toggleCountry(country.code)}
-                            className="w-4 h-4 rounded"
+                            onCheckedChange={() => toggleCountry(country.code)}
+                            className="data-[state=checked]:bg-purple-600"
                           />
                           <span className={`text-sm ${
                             selectedCountries.includes(country.code) ? 'font-medium' : ''
@@ -609,11 +683,11 @@ export default function ScheduledBroadcasts() {
                   </div>
                 </ScrollArea>
               )}
-              {selectedCountries.length === 0 && (
-                <p className="text-xs text-gray-500 mt-1 italic">
-                  No countries selected (broadcast will go to all countries)
-                </p>
-              )}
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedCountries.length === 0
+                  ? 'No countries selected — this will send to all countries.'
+                  : "New users who sign up in these countries after this schedule is created are automatically included on every future send."}
+              </p>
             </div>
 
             <div className="flex items-center justify-between p-3 border rounded-md">

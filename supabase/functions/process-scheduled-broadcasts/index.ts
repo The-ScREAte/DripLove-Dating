@@ -8,7 +8,6 @@ const corsHeaders = {
 
 const BATCH_SIZE = 1000; // Supabase default limit
 
-// Helper to chunk arrays
 const chunkArray = <T,>(arr: T[], size: number): T[][] => {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -23,10 +22,9 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Get all active scheduled broadcasts that are due to be sent
     const now = new Date()
@@ -55,19 +53,18 @@ serve(async (req) => {
     for (const broadcast of broadcasts) {
       try {
         // Fetch ALL target users in batches (bypass 1000 limit)
-        const allProfiles: { id: string; first_name: string; last_name: string }[] = [];
+        const allProfiles: { id: string; email: string | null }[] = [];
         let offset = 0;
         let hasMore = true;
 
         while (hasMore) {
           let query = supabase
             .from('profiles')
-            .select('id, first_name, last_name')
+            .select('id, email')
             .eq('account_status', 'active')
             .eq('is_admin', false)
             .range(offset, offset + BATCH_SIZE - 1);
 
-          // Filter by countries if specified
           if (broadcast.target_countries && broadcast.target_countries.length > 0) {
             query = query.in('country', broadcast.target_countries)
           }
@@ -95,81 +92,127 @@ serve(async (req) => {
           continue
         }
 
-        // Get push tokens for ALL users in chunks to avoid URL limits
-        const allTokens: { user_id: string; token: string; platform: string }[] = [];
-        const userIdChunks = chunkArray(allProfiles.map(p => p.id), 100);
+        const channel = broadcast.channel === 'email' ? 'email' : 'push';
+        let successful = 0;
+        let failed = 0;
+        let totalRecipients = 0;
 
-        for (const chunk of userIdChunks) {
-          const { data: tokens } = await supabase
-            .from('push_tokens')
-            .select('user_id, token, platform')
-            .in('user_id', chunk);
+        if (channel === 'push') {
+          // Reuse the same reliable pipeline as immediate broadcasts (New tab):
+          // create a broadcast_campaigns/broadcast_recipients row, then let
+          // process-broadcast-queue deliver via the real FCM v1 sender. This also makes
+          // scheduled sends show up automatically in the unified History tab.
+          const userIds = allProfiles.map((p) => p.id);
 
-          if (tokens) {
-            allTokens.push(...tokens);
+          const allTokens: { user_id: string }[] = [];
+          for (const chunk of chunkArray(userIds, 100)) {
+            const { data: tokens } = await supabase
+              .from('push_tokens')
+              .select('user_id')
+              .in('user_id', chunk);
+            if (tokens) allTokens.push(...tokens);
+          }
+
+          const tokenUserIds = new Set(allTokens.map((t) => t.user_id));
+          const deliverableUserIds = userIds.filter((id) => tokenUserIds.has(id));
+
+          if (deliverableUserIds.length === 0) {
+            console.log(`No push tokens found for broadcast: ${broadcast.title}`)
+          } else {
+            const { data: campaign, error: campaignError } = await supabase
+              .from('broadcast_campaigns')
+              .insert({
+                admin_id: broadcast.admin_id,
+                title: broadcast.title,
+                message: broadcast.message,
+                notification_type: 'system',
+                target_countries: broadcast.target_countries,
+                total_recipients: deliverableUserIds.length,
+                successful_sends: 0,
+                failed_sends: 0,
+                status: 'queued',
+                save_to_profile: true,
+              })
+              .select()
+              .single();
+
+            if (campaignError) {
+              console.error('Error creating campaign for scheduled push:', campaignError);
+            } else {
+              const recipientsToInsert = deliverableUserIds.map((userId) => ({
+                campaign_id: campaign.id,
+                user_id: userId,
+                status: 'pending',
+                retry_count: 0,
+              }));
+
+              for (let i = 0; i < recipientsToInsert.length; i += 500) {
+                const batch = recipientsToInsert.slice(i, i + 500);
+                const { error: recipientsError } = await supabase
+                  .from('broadcast_recipients')
+                  .insert(batch);
+                if (recipientsError) {
+                  console.error('Error inserting scheduled push recipients:', recipientsError);
+                }
+              }
+
+              totalRecipients = deliverableUserIds.length;
+
+              // Kick off delivery in the background; it self-chains until complete.
+              supabase.functions
+                .invoke('process-broadcast-queue', { body: { campaignId: campaign.id, depth: 0 } })
+                .catch((err) => console.warn('Failed to trigger queue processor:', err));
+
+              successful = deliverableUserIds.length; // Queued successfully; actual delivery tracked on the campaign itself.
+            }
+          }
+        } else {
+          // Email channel: title = subject, message = HTML body.
+          const recipientEmails = Array.from(
+            new Set(allProfiles.map((p) => p.email).filter((e): e is string => !!e))
+          );
+
+          if (recipientEmails.length === 0) {
+            console.log(`No emails found for broadcast: ${broadcast.title}`)
+          } else {
+            const { data: emailData, error: emailError } = await supabase.functions.invoke(
+              'send-broadcast-email-smtp',
+              {
+                body: {
+                  recipients: recipientEmails,
+                  subject: broadcast.title,
+                  htmlContent: broadcast.message,
+                },
+              }
+            );
+
+            if (emailError) {
+              console.error('Error sending scheduled email:', emailError);
+              failed = recipientEmails.length;
+            } else {
+              const emailResults = (emailData as any)?.results;
+              successful = emailResults?.sent || 0;
+              failed = emailResults?.failed || 0;
+            }
+
+            totalRecipients = recipientEmails.length;
+
+            await supabase.from('email_broadcast_history').insert({
+              subject: broadcast.title,
+              message: broadcast.message,
+              recipient_count: recipientEmails.length,
+              successful_sends: successful,
+              failed_sends: failed,
+              target_countries: broadcast.target_countries,
+              recipient_filter: 'scheduled',
+              status: failed > 0 && successful === 0 ? 'failed' : 'completed',
+              admin_id: broadcast.admin_id,
+            });
           }
         }
 
-        if (allTokens.length === 0) {
-          console.log(`No push tokens found for broadcast: ${broadcast.title}`)
-          continue
-        }
-
-        console.log(`Sending to ${allTokens.length} users for: ${broadcast.title}`)
-
-        // Send push notifications in parallel batches
-        let successful = 0
-        let failed = 0
-        const sendBatchSize = 50; // Send 50 at a time
-
-        for (let i = 0; i < allTokens.length; i += sendBatchSize) {
-          const tokenBatch = allTokens.slice(i, i + sendBatchSize);
-          
-          const batchResults = await Promise.allSettled(
-            tokenBatch.map(async (tokenData) => {
-              try {
-                const payload = {
-                  to: tokenData.token,
-                  title: broadcast.title,
-                  body: broadcast.message,
-                  sound: 'default',
-                  priority: 'high',
-                }
-
-                const response = await fetch('https://exp.host/--/api/v2/push/send', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(payload),
-                })
-
-                return response.ok;
-              } catch (error) {
-                console.error('Error sending push notification:', error)
-                return false;
-              }
-            })
-          );
-
-          batchResults.forEach((result) => {
-            if (result.status === 'fulfilled' && result.value) {
-              successful++;
-            } else {
-              failed++;
-            }
-          });
-        }
-
-        // Record execution in history
-        await supabase
-          .from('scheduled_broadcast_history')
-          .insert({
-            scheduled_broadcast_id: broadcast.id,
-            total_recipients: allTokens.length,
-            successful_sends: successful,
-            failed_sends: failed,
-          })
+        // Recurring schedules fire often, so we don't keep a per-execution log —
+        // last_sent_at/total_sends on the schedule row itself is the record of "last sent".
 
         // Calculate next send time
         const nextSend = calculateNextSendTime(
@@ -179,7 +222,6 @@ serve(async (req) => {
           broadcast.time_to_send
         )
 
-        // Update broadcast
         await supabase
           .from('scheduled_broadcasts')
           .update({
@@ -192,14 +234,14 @@ serve(async (req) => {
         results.push({
           id: broadcast.id,
           title: broadcast.title,
-          totalUsers: allProfiles.length,
-          usersWithTokens: allTokens.length,
+          channel,
+          totalRecipients,
           successful,
           failed,
           nextSend: nextSend.toISOString(),
         })
 
-        console.log(`Completed broadcast: ${broadcast.title} - ${successful} sent, ${failed} failed out of ${allTokens.length} tokens`)
+        console.log(`Completed ${channel} broadcast: ${broadcast.title} - ${successful} sent, ${failed} failed out of ${totalRecipients}`)
       } catch (error: unknown) {
         console.error(`Error processing broadcast ${broadcast.id}:`, error)
         results.push({

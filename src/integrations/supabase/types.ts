@@ -1436,6 +1436,7 @@ export type Database = {
       scheduled_broadcasts: {
         Row: {
           admin_id: string
+          channel: string
           created_at: string | null
           id: string
           is_active: boolean | null
@@ -1452,6 +1453,7 @@ export type Database = {
         }
         Insert: {
           admin_id: string
+          channel?: string
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -1468,6 +1470,7 @@ export type Database = {
         }
         Update: {
           admin_id?: string
+          channel?: string
           created_at?: string | null
           id?: string
           is_active?: boolean | null

@@ -3,16 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, Mail, AlertCircle } from 'lucide-react';
+import { Loader2, Send, Users, Globe } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchAllRows, applyDebugFilter, fetchAllProfiles } from '@/hooks/useBatchFetch';
+import RichTextEditor from './RichTextEditor';
+import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctionError';
 
 interface Country {
   code: string;
@@ -30,6 +29,12 @@ interface User {
 }
 
 type RecipientFilter = 'all' | 'premium' | 'free';
+
+const htmlToPlainText = (html: string): string => {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || '').replace(/\s+\n/g, '\n').trim();
+};
 
 const getCountryName = (code: string): string => {
   const countryNames: Record<string, string> = {
@@ -227,7 +232,7 @@ export default function EmailBroadcast() {
       return;
     }
 
-    if (!emailSubject.trim() || !emailBody.trim()) {
+    if (!emailSubject.trim() || !htmlToPlainText(emailBody)) {
       toast({
         title: 'Missing Information',
         description: 'Please enter both subject and message for the email.',
@@ -253,56 +258,59 @@ export default function EmailBroadcast() {
         return;
       }
 
-      const htmlContent = `<p>${emailBody.replace(/\n/g, '<br>')}</p>`;
+      const htmlContent = emailBody;
+      const textContent = htmlToPlainText(emailBody);
 
-      const configuredEmailServiceUrl = import.meta.env.VITE_EMAIL_SERVICE_URL as string | undefined;
-      const emailServiceApiKey = import.meta.env.VITE_EMAIL_SERVICE_API_KEY as string | undefined;
-
-      const hostname = window.location.hostname;
-      const isCurrentHostLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-      const isConfiguredUrlLocal =
-        !!configuredEmailServiceUrl &&
-        /https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(configuredEmailServiceUrl);
-
-      const emailServiceBaseUrl = configuredEmailServiceUrl
-        ? (isConfiguredUrlLocal && !isCurrentHostLocal ? window.location.origin : configuredEmailServiceUrl)
-        : (isCurrentHostLocal ? 'http://localhost:3001' : window.location.origin);
-
-      const endpoint = `${emailServiceBaseUrl.replace(/\/$/, '')}/api/email/send-broadcast-email-smtp`;
-      const smtpResponse = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(emailServiceApiKey ? { 'x-email-api-key': emailServiceApiKey } : {}),
-        },
-        body: JSON.stringify({
+      // Sent via a Supabase Edge Function (same approach as push notifications) so this
+      // works identically on web, Android and iOS regardless of where the admin panel is hosted —
+      // no dependency on a separately-deployed Express/SMTP server URL.
+      const { data: smtpData, error: smtpError } = await supabase.functions.invoke('send-broadcast-email-smtp', {
+        body: {
           recipients: selectedUserEmails,
           subject: emailSubject,
           htmlContent,
-          textContent: emailBody,
-          targetCountries: Array.from(selectedCountries),
-          recipientFilter,
-        }),
+          textContent,
+        },
       });
 
-      const smtpData = await smtpResponse.json().catch(() => ({}));
-      if (!smtpResponse.ok) {
-        throw new Error(smtpData?.error || 'SMTP email request failed');
+      if (smtpError) {
+        throw new Error(await getEdgeFunctionErrorMessage(smtpError, 'SMTP email request failed'));
       }
 
-      const results: { sent?: number; failed?: number; details?: { failed?: Array<{ email: string; error: string }> } } | undefined = smtpData?.results;
-      
-      if (results?.failed > 0) {
+      const results: { sent?: number; failed?: number; details?: { failed?: Array<{ email: string; error: string }> } } | undefined = (smtpData as any)?.results;
+      const sentCount = results?.sent || 0;
+      const failedCount = results?.failed || 0;
+
+      // Log this send to email broadcast history so it shows up in the History sub-tab.
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        await supabase.from('email_broadcast_history').insert({
+          subject: emailSubject,
+          message: emailBody,
+          recipient_count: selectedUserEmails.length,
+          successful_sends: sentCount,
+          failed_sends: failedCount,
+          target_countries: Array.from(selectedCountries),
+          recipient_filter: recipientFilter,
+          status: failedCount > 0 && sentCount === 0 ? 'failed' : 'completed',
+          error_details: results?.details?.failed?.length ? results.details.failed : null,
+          admin_id: userData?.user?.id || null,
+        });
+      } catch (logError) {
+        console.error('Failed to log email broadcast history:', logError);
+      }
+
+      if (failedCount > 0) {
         toast({
           title: 'Emails Sent with Issues',
-          description: `Sent: ${results.sent}, Failed: ${results.failed}. Check console for details.`,
+          description: `Sent: ${sentCount}, Failed: ${failedCount}. Check console for details.`,
           duration: 5000,
         });
         console.log('Failed emails:', results.details?.failed);
       } else {
         toast({
           title: 'Emails Sent Successfully',
-          description: `Successfully sent ${results?.sent || 0} email(s).`,
+          description: `Successfully sent ${sentCount} email(s).`,
           duration: 5000,
         });
       }
@@ -336,51 +344,39 @@ export default function EmailBroadcast() {
   });
 
   return (
-    <div className="space-y-4">
-      <Alert>
-        <Mail className="h-4 w-4" />
-        <AlertDescription>
-          Send custom emails to selected users. All messages now use the DripLove SMTP integration.
-        </AlertDescription>
-      </Alert>
-
+    <div className="space-y-3">
       {/* Country Selection */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-xs">
-                <Globe className="w-3 h-3" />
-                <span className="text-xs">Select Countries</span>
-              </CardTitle>
-              <CardDescription className="text-[10px]">
-                Choose which countries to target ({selectedCountries.size} selected)
-              </CardDescription>
-            </div>
+            <CardTitle className="flex items-center gap-1.5 text-xs">
+              <Globe className="w-3.5 h-3.5" />
+              Countries ({selectedCountries.size} selected)
+            </CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={toggleAllCountries}
               disabled={isLoadingCountries}
-              className="h-7 text-xs"
+              className="h-6 text-[11px] px-2"
             >
               {selectedCountries.size === countries.length ? 'Deselect All' : 'Select All'}
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {isLoadingCountries ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin" />
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin" />
             </div>
           ) : countries.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">No countries found</p>
+            <p className="text-center text-gray-500 text-xs py-6">No countries found</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {countries.map((country) => (
                 <div
                   key={country.code}
-                  className={`flex items-center space-x-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border cursor-pointer transition-colors ${
                     selectedCountries.has(country.code)
                       ? 'border-purple-500 bg-purple-50'
                       : 'border-gray-200 hover:border-gray-300'
@@ -390,11 +386,11 @@ export default function EmailBroadcast() {
                   <Checkbox
                     checked={selectedCountries.has(country.code)}
                     onCheckedChange={() => toggleCountry(country.code)}
-                    className="rounded-sm data-[state=checked]:bg-purple-600"
+                    className="h-3.5 w-3.5 data-[state=checked]:bg-purple-600"
                   />
-                  <div className="flex-1">
-                    <div className="font-medium text-xs">{country.name}</div>
-                    <div className="text-[10px] text-gray-500">{country.userCount} users</div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-[11px] truncate">{country.name}</div>
+                    <div className="text-[9px] text-gray-500">{country.userCount} users</div>
                   </div>
                 </div>
               ))}
@@ -406,35 +402,30 @@ export default function EmailBroadcast() {
       {/* User Selection */}
       {selectedCountries.size > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-xs">
-                  <Users className="w-3 h-3" />
-                  <span className="text-xs">Select Recipients</span>
-                </CardTitle>
-                <CardDescription className="text-[10px]">
-                  {filteredUsers.length} users shown, {selectedUsers.size} selected
-                </CardDescription>
-              </div>
+              <CardTitle className="flex items-center gap-1.5 text-xs">
+                <Users className="w-3.5 h-3.5" />
+                Recipients ({filteredUsers.length})
+              </CardTitle>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={toggleAllUsers}
                 disabled={isLoadingUsers || users.length === 0}
-                className="h-7 text-xs"
+                className="h-6 text-[11px] px-2"
               >
                 {selectedUsers.size === filteredUsers.length ? 'Deselect All' : 'Select All'}
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="mb-3 space-y-2">
-              <div className="grid grid-cols-3 gap-2">
+          <CardContent className="pt-0">
+            <div className="mb-2 space-y-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 <div>
-                  <Label className="text-[10px] mb-1">Gender</Label>
+                  <Label className="text-[10px] mb-0.5 block">Gender</Label>
                   <Select value={genderFilter} onValueChange={setGenderFilter}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -446,9 +437,9 @@ export default function EmailBroadcast() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-[10px] mb-1">Looking For</Label>
+                  <Label className="text-[10px] mb-0.5 block">Looking For</Label>
                   <Select value={preferenceFilter} onValueChange={setPreferenceFilter}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -460,9 +451,9 @@ export default function EmailBroadcast() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-[10px] mb-1">Relationship Intent</Label>
+                  <Label className="text-[10px] mb-0.5 block">Intent</Label>
                   <Select value={intentFilter} onValueChange={setIntentFilter}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -476,11 +467,11 @@ export default function EmailBroadcast() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 <div>
-                  <Label className="text-[10px] mb-1">Subscription</Label>
+                  <Label className="text-[10px] mb-0.5 block">Subscription</Label>
                   <Select value={recipientFilter} onValueChange={(v) => setRecipientFilter(v as RecipientFilter)}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -491,9 +482,9 @@ export default function EmailBroadcast() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-[10px] mb-1">Account Status</Label>
+                  <Label className="text-[10px] mb-0.5 block">Status</Label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -505,13 +496,13 @@ export default function EmailBroadcast() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-[10px] mb-1">Debug Filter</Label>
+                  <Label className="text-[10px] mb-0.5 block">Debug Filter</Label>
                   <Select value={debugFilter} onValueChange={setDebugFilter}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-7 text-[11px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">No Debug Filter</SelectItem>
+                      <SelectItem value="all">None</SelectItem>
                       <SelectItem value="no_photo">No Photo</SelectItem>
                       <SelectItem value="never_seen">Never Seen</SelectItem>
                       <SelectItem value="incomplete">Incomplete</SelectItem>
@@ -522,9 +513,9 @@ export default function EmailBroadcast() {
               </div>
 
               <div>
-                <Label className="text-[10px] mb-1">Archive Status</Label>
+                <Label className="text-[10px] mb-0.5 block">Archive Status</Label>
                 <Select value={archiveFilter} onValueChange={setArchiveFilter}>
-                  <SelectTrigger className="h-8 text-xs">
+                  <SelectTrigger className="h-7 text-[11px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -536,27 +527,27 @@ export default function EmailBroadcast() {
               </div>
             </div>
 
-            <div className="mb-3">
+            <div className="mb-2">
               <Input
                 placeholder="Search by name, email, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="text-xs h-8"
+                className="text-xs h-7"
               />
             </div>
             {isLoadingUsers ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-5 h-5 animate-spin" />
               </div>
             ) : users.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No users found with email addresses</p>
+              <p className="text-center text-gray-500 text-xs py-6">No users found with email addresses</p>
             ) : (
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="space-y-2">
+              <ScrollArea className="h-[260px] pr-3">
+                <div className="space-y-1">
                   {filteredUsers.map((user) => (
                     <div
                       key={user.id}
-                      className={`flex items-center space-x-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border cursor-pointer transition-colors ${
                         selectedUsers.has(user.id)
                           ? 'border-purple-500 bg-purple-50'
                           : 'border-gray-200 hover:border-gray-300'
@@ -566,19 +557,14 @@ export default function EmailBroadcast() {
                       <Checkbox
                         checked={selectedUsers.has(user.id)}
                         onCheckedChange={() => toggleUser(user.id)}
-                        className="rounded-sm data-[state=checked]:bg-purple-600"
+                        className="h-3.5 w-3.5 data-[state=checked]:bg-purple-600"
                       />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-xs">
-                            {user.first_name} {user.last_name}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-gray-500">
-                          {user.email}
-                        </div>
-                        <div className="text-[10px] text-gray-400">
-                          {user.city}, {getCountryName(user.country)}
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-[11px] truncate block">
+                          {user.first_name} {user.last_name}
+                        </span>
+                        <div className="text-[9px] text-gray-500 truncate">
+                          {user.email} · {user.city}, {getCountryName(user.country)}
                         </div>
                       </div>
                     </div>
@@ -593,45 +579,33 @@ export default function EmailBroadcast() {
       {/* Email Composition */}
       {selectedUsers.size > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-xs">Compose Email</CardTitle>
-            <CardDescription className="text-[10px]">
-              Write your email to send to {selectedUsers.size} selected user(s)
-            </CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs">Compose Email ({selectedUsers.size} recipients)</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
               <Label htmlFor="email-subject" className="text-xs">Subject</Label>
               <Input
                 id="email-subject"
                 placeholder="Enter email subject..."
                 value={emailSubject}
                 onChange={(e) => setEmailSubject(e.target.value)}
-                className="text-xs"
+                className="text-xs h-8"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="email-body" className="text-xs">Message</Label>
-              <Textarea
-                id="email-body"
-                placeholder="Enter your email message..."
+              <RichTextEditor
                 value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                rows={8}
-                className="text-xs resize-none"
+                onChange={setEmailBody}
+                placeholder="Write your email message..."
               />
-              <p className="text-[10px] text-gray-500">
-                Your message will be formatted in a branded email template.
-              </p>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="text-[10px] text-gray-600">
-                Sending to {selectedUsers.size} recipient(s)
-              </div>
+            <div className="flex items-center justify-end pt-1">
               <Button
                 onClick={sendEmails}
-                disabled={isSending || !emailSubject.trim() || !emailBody.trim()}
-                className="bg-purple-600 hover:bg-purple-700"
+                disabled={isSending || !emailSubject.trim() || !htmlToPlainText(emailBody)}
+                className="h-8 text-xs bg-purple-600 hover:bg-purple-700"
               >
                 {isSending ? (
                   <>

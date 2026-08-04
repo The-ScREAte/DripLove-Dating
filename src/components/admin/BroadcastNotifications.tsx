@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, MessageCircle } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, Bell, Download } from 'lucide-react';
 import EmailExport from './EmailExport';
 import EmailBroadcast from './EmailBroadcast';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { fetchAllRows, applyDebugFilter } from '@/hooks/useBatchFetch';
+import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctionError';
 
 interface Country {
   code: string;
@@ -57,21 +58,56 @@ interface Campaign {
   save_to_profile: boolean;
 }
 
+interface EmailCampaign {
+  id: string;
+  subject: string;
+  message: string;
+  recipient_count: number;
+  successful_sends: number;
+  failed_sends: number;
+  target_countries: string[] | null;
+  recipient_filter: string | null;
+  status: string;
+  error_details: Array<{ email: string; error: string }> | null;
+  created_at: string;
+}
+
+interface HistoryItem {
+  id: string;
+  type: 'push' | 'email';
+  title: string;
+  preview: string;
+  totalRecipients: number;
+  successful: number;
+  failed: number;
+  targetCountries: string[] | null;
+  status: string;
+  createdAt: string;
+  push?: Campaign;
+  email?: EmailCampaign;
+}
+
+const htmlToPlainText = (html: string): string => {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+};
+
 // Collapsible countries badge component
-const CountriesBadge = ({ countries }: { countries: string[] }) => {
+const CountriesBadge = ({ countries }: { countries: string[] | null }) => {
   const [expanded, setExpanded] = useState(false);
-  
+
   if (!countries || countries.length === 0) {
     return <Badge variant="outline" className="text-[10px] h-4 bg-white">All countries</Badge>;
   }
-  
+
   if (countries.length === 1) {
     return <Badge variant="outline" className="text-[10px] h-4 bg-white">{countries[0]}</Badge>;
   }
-  
+
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className="text-[10px] h-4 cursor-pointer hover:bg-gray-50 transition-colors bg-white"
       onClick={(e) => {
         e.stopPropagation();
@@ -100,34 +136,6 @@ interface Recipient {
   };
 }
 
-const getEdgeFunctionErrorMessage = (err: unknown): string => {
-  if (err && typeof err === 'object') {
-    const anyErr = err as any;
-
-    // Supabase FunctionsHttpError often includes a JSON string body in context
-    const body = anyErr?.context?.body;
-    if (body) {
-      if (typeof body === 'string' && body.trim().length > 0) {
-        try {
-          const parsed = JSON.parse(body);
-          const msg = parsed?.error || parsed?.message;
-          if (typeof msg === 'string' && msg.trim().length > 0) return msg;
-        } catch {
-          // ignore JSON parse errors
-        }
-      } else if (typeof body === 'object') {
-        const msg = (body as any)?.error || (body as any)?.message;
-        if (typeof msg === 'string' && msg.trim().length > 0) return msg;
-      }
-    }
-
-    const message = anyErr?.message;
-    if (typeof message === 'string' && message.trim().length > 0) return message;
-  }
-
-  return 'Failed to start broadcast campaign';
-};
-
 export default function BroadcastNotifications() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set());
@@ -141,20 +149,23 @@ export default function BroadcastNotifications() {
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('new');
+  const [activeTab, setActiveTab] = useState('email');
   const [recipientFilter, setRecipientFilter] = useState<RecipientFilter>('all');
-  
-  // Campaign history
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+
+  // History (unified push + email)
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [campaignRecipients, setCampaignRecipients] = useState<Recipient[]>([]);
   const [isLoadingRecipients, setIsLoadingRecipients] = useState(false);
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
+  const [selectedEmailCampaign, setSelectedEmailCampaign] = useState<EmailCampaign | null>(null);
+  const [showEmailDetails, setShowEmailDetails] = useState(false);
 
-  const lastCampaignsSignatureRef = useRef<string>('');
+  const lastHistorySignatureRef = useRef<string>('');
   const historyPollIntervalRef = useRef<number | null>(null);
-  const campaignsRef = useRef<Campaign[]>([]);
+  const historyRef = useRef<HistoryItem[]>([]);
 
   useEffect(() => {
     loadCountries();
@@ -185,15 +196,15 @@ export default function BroadcastNotifications() {
     }
 
     // Initial load can show the spinner.
-    loadCampaigns({ silent: false });
+    loadHistory({ silent: false });
 
-    // Poll silently while there are active campaigns.
+    // Poll silently while there are active push campaigns.
     historyPollIntervalRef.current = window.setInterval(() => {
-      const hasActive = campaignsRef.current.some(
-        (c) => c.status === 'queued' || c.status === 'processing'
+      const hasActive = historyRef.current.some(
+        (c) => c.type === 'push' && (c.status === 'queued' || c.status === 'processing')
       );
       if (!hasActive) return;
-      void loadCampaigns({ silent: true });
+      void loadHistory({ silent: true });
     }, 4000);
 
     return () => {
@@ -260,7 +271,7 @@ export default function BroadcastNotifications() {
         bio?: string | null;
         account_status?: string | null;
       }> = [];
-      
+
       for (let page = 0; ; page++) {
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
@@ -317,45 +328,72 @@ export default function BroadcastNotifications() {
     }
   };
 
-  const loadCampaigns = async (opts?: { silent?: boolean }) => {
+  const loadHistory = async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
-    if (!silent) setIsLoadingCampaigns(true);
+    if (!silent) setIsLoadingHistory(true);
     try {
-      const { data, error } = await supabase
-        .from('broadcast_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const [{ data: pushData, error: pushError }, { data: emailData, error: emailError }] = await Promise.all([
+        supabase.from('broadcast_campaigns').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('email_broadcast_history').select('*').order('created_at', { ascending: false }).limit(50),
+      ]);
 
-      if (error) throw error;
+      if (pushError) throw pushError;
+      if (emailError) throw emailError;
 
-      const next = (data || []) as Campaign[];
+      const pushItems: HistoryItem[] = ((pushData || []) as Campaign[]).map((c) => ({
+        id: `push-${c.id}`,
+        type: 'push',
+        title: c.title,
+        preview: c.message,
+        totalRecipients: c.total_recipients,
+        successful: c.successful_sends,
+        failed: c.failed_sends,
+        targetCountries: c.target_countries,
+        status: c.status,
+        createdAt: c.created_at,
+        push: c,
+      }));
 
-      // Prevent re-renders (and scroll jumps) when nothing meaningful changed.
+      const emailItems: HistoryItem[] = ((emailData || []) as unknown as EmailCampaign[]).map((c) => ({
+        id: `email-${c.id}`,
+        type: 'email',
+        title: c.subject,
+        preview: htmlToPlainText(c.message),
+        totalRecipients: c.recipient_count,
+        successful: c.successful_sends,
+        failed: c.failed_sends,
+        targetCountries: c.target_countries,
+        status: c.status,
+        createdAt: c.created_at,
+        email: c,
+      }));
+
+      const next = [...pushItems, ...emailItems].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
       const signature = next
-        .map((c) => `${c.id}:${c.status}:${c.successful_sends}:${c.failed_sends}:${c.total_recipients}`)
+        .map((c) => `${c.id}:${c.status}:${c.successful}:${c.failed}:${c.totalRecipients}`)
         .join('|');
 
-      if (signature !== lastCampaignsSignatureRef.current) {
-        lastCampaignsSignatureRef.current = signature;
-        campaignsRef.current = next;
-        setCampaigns(next);
+      if (signature !== lastHistorySignatureRef.current) {
+        lastHistorySignatureRef.current = signature;
+        historyRef.current = next;
+        setHistoryItems(next);
       } else {
-        // Still keep ref current in case other code reads it.
-        campaignsRef.current = next;
+        historyRef.current = next;
       }
     } catch (error) {
-      console.error('Error loading campaigns:', error);
-      // Avoid spamming toast on silent refresh.
+      console.error('Error loading history:', error);
       if (!silent) {
         toast({
           title: 'Error',
-          description: 'Failed to load campaign history',
+          description: 'Failed to load broadcast history',
           variant: 'destructive',
         });
       }
     } finally {
-      if (!silent) setIsLoadingCampaigns(false);
+      if (!silent) setIsLoadingHistory(false);
     }
   };
 
@@ -492,7 +530,7 @@ export default function BroadcastNotifications() {
 
       toast({
         title: 'Broadcast Queued',
-        description: `Sending to ${totalRecipients} users. Processing in background. Check History tab for progress.`,
+        description: `Sending to ${totalRecipients} users. Check History for progress.`,
         duration: 5000,
       });
 
@@ -501,14 +539,14 @@ export default function BroadcastNotifications() {
       setNotificationMessage('');
       setSaveToProfile(true);
       setSelectedUsers(new Set());
-      
+
       // Switch to history tab to show progress
       setActiveTab('history');
     } catch (error) {
       console.error('Error starting broadcast:', error);
       toast({
         title: 'Error',
-        description: getEdgeFunctionErrorMessage(error),
+        description: await getEdgeFunctionErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -516,41 +554,8 @@ export default function BroadcastNotifications() {
     }
   };
 
-  // Poll for broadcast progress
-  const startProgressPolling = (campaignId: string) => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const { data: campaign, error } = await supabase
-          .from('broadcast_campaigns')
-          .select('status, successful_sends, failed_sends, total_recipients')
-          .eq('id', campaignId)
-          .single();
-
-        if (error) throw error;
-
-        if (campaign.status === 'completed') {
-          clearInterval(pollInterval);
-          toast({
-            title: 'Broadcast Complete',
-            description: `Sent: ${campaign.successful_sends}, Failed: ${campaign.failed_sends} out of ${campaign.total_recipients} total`,
-            duration: 5000,
-          });
-          loadCampaigns();
-        } else if (campaign.successful_sends + campaign.failed_sends > 0) {
-          // Progress update happening silently
-        }
-      } catch (error) {
-        console.error('Error polling progress:', error);
-        clearInterval(pollInterval);
-      }
-    }, 3000); // Poll every 3 seconds
-
-    // Stop polling after 5 minutes
-    setTimeout(() => clearInterval(pollInterval), 300000);
-  };
-
   const deleteCampaign = async (campaignId: string) => {
-    if (!confirm('Are you sure you want to delete this campaign? This will also delete all recipient records.')) {
+    if (!confirm('Delete this campaign? This will also delete all recipient records.')) {
       return;
     }
 
@@ -562,12 +567,8 @@ export default function BroadcastNotifications() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Campaign Deleted',
-        description: 'The campaign has been successfully deleted.',
-      });
-
-      loadCampaigns();
+      toast({ title: 'Deleted', description: 'Campaign removed from history.' });
+      loadHistory();
     } catch (error) {
       console.error('Error deleting campaign:', error);
       toast({
@@ -575,6 +576,19 @@ export default function BroadcastNotifications() {
         description: 'Failed to delete campaign',
         variant: 'destructive',
       });
+    }
+  };
+
+  const deleteEmailCampaign = async (id: string) => {
+    if (!confirm('Delete this email campaign? This only removes the history entry.')) return;
+    try {
+      const { error } = await supabase.from('email_broadcast_history').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: 'Deleted', description: 'Email campaign removed from history.' });
+      loadHistory();
+    } catch (error) {
+      console.error('Error deleting email campaign:', error);
+      toast({ title: 'Error', description: 'Failed to delete campaign', variant: 'destructive' });
     }
   };
 
@@ -604,8 +618,8 @@ export default function BroadcastNotifications() {
     setSelectedUsers(new Set(failedUserIds));
     setNotificationTitle(campaign.title);
     setNotificationMessage(campaign.message);
-    setActiveTab('new');
-    
+    setActiveTab('push');
+
     toast({
       title: 'Retry Prepared',
       description: `${failedUserIds.length} failed recipients loaded. Click Send to retry.`,
@@ -616,7 +630,7 @@ export default function BroadcastNotifications() {
     // Set the notification content
     setNotificationTitle(campaign.title);
     setNotificationMessage(campaign.message);
-    
+
     if (useSameAudience) {
       // Load all original recipients (successful + failed)
       const { data: recipients } = await supabase
@@ -626,15 +640,15 @@ export default function BroadcastNotifications() {
 
       if (recipients && recipients.length > 0) {
         const userIds = recipients.map(r => r.user_id);
-        
+
         // Select the target countries from the campaign
         setSelectedCountries(new Set(campaign.target_countries));
-        
+
         // Wait for users to load, then select them
         setTimeout(() => {
           setSelectedUsers(new Set(userIds));
         }, 500);
-        
+
         toast({
           title: 'Campaign Loaded',
           description: `Using same audience: ${recipients.length} recipients. Click Send when ready.`,
@@ -644,15 +658,15 @@ export default function BroadcastNotifications() {
       // Load countries but let user select new audience
       setSelectedCountries(new Set(campaign.target_countries));
       setSelectedUsers(new Set());
-      
+
       toast({
         title: 'Campaign Loaded',
         description: 'Select your new audience and click Send.',
       });
     }
-    
-    // Switch to new broadcast tab
-    setActiveTab('new');
+
+    // Switch to push broadcast tab
+    setActiveTab('push');
   };
 
   const filteredUsers = users.filter(u => {
@@ -665,72 +679,80 @@ export default function BroadcastNotifications() {
     );
   });
 
-  const usersWithPushTokens = users.filter(u => u.has_push_token).length;
   const filteredUsersWithPushTokens = filteredUsers.filter(u => u.has_push_token).length;
   const selectedUsersWithTokens = users.filter(u => selectedUsers.has(u.id) && u.has_push_token).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
-        <h2 className="text-base font-semibold mb-1">Broadcast Notifications</h2>
-        <p className="text-xs text-gray-600">Send and manage push notifications to users</p>
+        <h2 className="text-base font-semibold">Broadcast Notifications</h2>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="new">New</TabsTrigger>
-          <TabsTrigger value="scheduled">
-            <Calendar className="w-4 h-4 mr-2" />
-            Scheduled
+          <TabsTrigger value="email" className="text-xs">
+            <Mail className="w-3.5 h-3.5 mr-1.5" />
+            Email
           </TabsTrigger>
-          <TabsTrigger value="history">
-            <History className="w-4 h-4 mr-2" />
+          <TabsTrigger value="push" className="text-xs">
+            <Bell className="w-3.5 h-3.5 mr-1.5" />
+            Push Not.
+          </TabsTrigger>
+          <TabsTrigger value="schedule" className="text-xs">
+            <Calendar className="w-3.5 h-3.5 mr-1.5" />
+            Schedule Msg
+          </TabsTrigger>
+          <TabsTrigger value="history" className="text-xs">
+            <History className="w-3.5 h-3.5 mr-1.5" />
             History
-          </TabsTrigger>
-          <TabsTrigger value="emailing">
-            <Mail className="w-4 h-4 mr-2" />
-            Emailing
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="new" className="space-y-4">
+        {/* EMAIL TAB */}
+        <TabsContent value="email" className="space-y-3 mt-3">
+          <EmailBroadcast />
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={() => setShowExport(true)} className="h-7 text-xs text-gray-500">
+              <Download className="w-3 h-3 mr-1.5" />
+              Export email list
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* PUSH NOTIFICATION TAB */}
+        <TabsContent value="push" className="space-y-3 mt-3">
           {/* Country Selection */}
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-xs">
-                    <Globe className="w-3 h-3" />
-                    <span className="text-xs">Select Countries</span>
-                  </CardTitle>
-                  <CardDescription className="text-[10px]">
-                    Choose which countries to target ({selectedCountries.size} selected)
-                  </CardDescription>
-                </div>
+                <CardTitle className="flex items-center gap-1.5 text-xs">
+                  <Globe className="w-3.5 h-3.5" />
+                  Countries ({selectedCountries.size} selected)
+                </CardTitle>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={toggleAllCountries}
                   disabled={isLoadingCountries}
-                  className="h-7 text-xs"
+                  className="h-6 text-[11px] px-2"
                 >
                   {selectedCountries.size === countries.length ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {isLoadingCountries ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin" />
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 </div>
               ) : countries.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">No countries found</p>
+                <p className="text-center text-gray-500 text-xs py-6">No countries found</p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {countries.map((country) => (
                     <div
                       key={country.code}
-                      className={`flex items-center space-x-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                      className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border cursor-pointer transition-colors ${
                         selectedCountries.has(country.code)
                           ? 'border-purple-500 bg-purple-50'
                           : 'border-gray-200 hover:border-gray-300'
@@ -740,11 +762,11 @@ export default function BroadcastNotifications() {
                       <Checkbox
                         checked={selectedCountries.has(country.code)}
                         onCheckedChange={() => toggleCountry(country.code)}
-                        className="rounded-sm data-[state=checked]:bg-purple-600"
+                        className="h-3.5 w-3.5 data-[state=checked]:bg-purple-600"
                       />
-                      <div className="flex-1">
-                        <div className="font-medium text-xs">{country.name}</div>
-                        <div className="text-[10px] text-gray-500">{country.userCount} users</div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-[11px] truncate">{country.name}</div>
+                        <div className="text-[9px] text-gray-500">{country.userCount} users</div>
                       </div>
                     </div>
                   ))}
@@ -756,85 +778,69 @@ export default function BroadcastNotifications() {
           {/* User Selection */}
           {selectedCountries.size > 0 && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-xs">
-                      <Users className="w-3 h-3" />
-                      <span className="text-xs">Select Users</span>
-                    </CardTitle>
-                    <CardDescription className="text-[10px]">
-                      {recipientFilter !== 'all' ? (
-                        <span className="text-purple-600 font-medium">
-                          Filtered: {recipientFilter === 'no_images' ? 'Users without photos' : 
-                                    recipientFilter === 'never_seen' ? 'Users never seen' :
-                                    recipientFilter === 'incomplete_profile' ? 'Incomplete profiles' :
-                                    recipientFilter === 'active_accounts' ? 'Active accounts' :
-                                    recipientFilter === 'premium_users' ? 'Premium users' : 'All users'} • 
-                        </span>
-                      ) : null}
-                      {' '}{filteredUsers.length} users shown ({filteredUsersWithPushTokens} with push notifications enabled)
-                    </CardDescription>
-                  </div>
+                  <CardTitle className="flex items-center gap-1.5 text-xs">
+                    <Users className="w-3.5 h-3.5" />
+                    Recipients ({filteredUsers.length})
+                  </CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={toggleAllUsers}
                     disabled={isLoadingUsers || users.length === 0}
-                    className="h-7 text-xs"
+                    className="h-6 text-[11px] px-2"
                   >
                     {selectedUsers.size === users.length ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="mb-3 flex items-center gap-2">
-                  <div className="flex-1">
-                    <Select value={recipientFilter} onValueChange={(v) => setRecipientFilter(v as RecipientFilter)}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Audience filter" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All users</SelectItem>
-                        <SelectItem value="no_images">No images (users without photos)</SelectItem>
-                        <SelectItem value="never_seen">Never seen (no likes/passes)</SelectItem>
-                        <SelectItem value="incomplete_profile">Incomplete profiles</SelectItem>
-                        <SelectItem value="active_accounts">Active accounts only</SelectItem>
-                        <SelectItem value="premium_users">Premium users only</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <CardContent className="pt-0">
+                <div className="mb-2 flex items-center gap-2">
+                  <Select value={recipientFilter} onValueChange={(v) => setRecipientFilter(v as RecipientFilter)}>
+                    <SelectTrigger className="h-7 text-[11px]">
+                      <SelectValue placeholder="Audience filter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All users</SelectItem>
+                      <SelectItem value="no_images">No photos</SelectItem>
+                      <SelectItem value="never_seen">Never seen</SelectItem>
+                      <SelectItem value="incomplete_profile">Incomplete profiles</SelectItem>
+                      <SelectItem value="active_accounts">Active accounts only</SelectItem>
+                      <SelectItem value="premium_users">Premium users only</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="mb-3">
+                <div className="mb-2">
                   <Input
-                    placeholder="Search users by name, city or country..."
+                    placeholder="Search by name, city or country..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="text-xs h-8"
+                    className="text-xs h-7"
                   />
                 </div>
                 {isLoadingUsers ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin" />
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   </div>
                 ) : users.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No users found in selected countries</p>
+                  <p className="text-center text-gray-500 text-xs py-6">No users found in selected countries</p>
                 ) : (
                   <>
                     {filteredUsersWithPushTokens === 0 && (
-                      <Alert className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          None of the users in selected countries have push notifications enabled.
+                      <Alert className="mb-2 py-2">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <AlertDescription className="text-[11px]">
+                          None of these users have push notifications enabled.
                         </AlertDescription>
                       </Alert>
                     )}
-                    <ScrollArea className="h-[300px] pr-4">
-                      <div className="space-y-2">
+                    <ScrollArea className="h-[260px] pr-3">
+                      <div className="space-y-1">
                         {filteredUsers.map((user) => (
                           <div
                             key={user.id}
-                            className={`flex items-center space-x-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border cursor-pointer transition-colors ${
                               selectedUsers.has(user.id)
                                 ? 'border-purple-500 bg-purple-50'
                                 : 'border-gray-200 hover:border-gray-300'
@@ -844,25 +850,20 @@ export default function BroadcastNotifications() {
                             <Checkbox
                               checked={selectedUsers.has(user.id)}
                               onCheckedChange={() => toggleUser(user.id)}
-                              className="rounded-sm data-[state=checked]:bg-purple-600"
+                              className="h-3.5 w-3.5 data-[state=checked]:bg-purple-600"
                             />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-xs">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-medium text-[11px] truncate">
                                   {user.first_name} {user.last_name}
                                 </span>
                                 {user.has_push_token ? (
-                                  <Badge variant="outline" className="text-green-600 border-green-600 text-[10px] h-4">
-                                    <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
-                                    Push Enabled
-                                  </Badge>
+                                  <CheckCircle2 className="w-3 h-3 text-green-600 shrink-0" />
                                 ) : (
-                                  <Badge variant="outline" className="text-gray-400 border-gray-400 text-[10px] h-4">
-                                    No Push Token
-                                  </Badge>
+                                  <span className="text-[9px] text-gray-400 shrink-0">no token</span>
                                 )}
                               </div>
-                              <div className="text-[10px] text-gray-500">
+                              <div className="text-[9px] text-gray-500 truncate">
                                 {user.city}, {getCountryName(user.country)}
                               </div>
                             </div>
@@ -879,15 +880,12 @@ export default function BroadcastNotifications() {
           {/* Notification Form */}
           {selectedUsers.size > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Notification Content</CardTitle>
-                <CardDescription className="text-xs">
-                  Compose your notification message
-                </CardDescription>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs">Notification Content</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title" className="text-xs">Notification Title</Label>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="title" className="text-xs">Title</Label>
                   <Input
                     id="title"
                     placeholder="e.g., New Features Available!"
@@ -896,54 +894,44 @@ export default function BroadcastNotifications() {
                     maxLength={100}
                     className="text-xs h-8"
                   />
-                  <p className="text-[10px] text-gray-500">{notificationTitle.length}/100 characters</p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="message" className="text-xs">Notification Message</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="message" className="text-xs">Message</Label>
                   <Textarea
                     id="message"
                     placeholder="e.g., Check out the new updates we've added to improve your experience..."
                     value={notificationMessage}
                     onChange={(e) => setNotificationMessage(e.target.value)}
-                    rows={6}
+                    rows={5}
                     maxLength={3000}
                     className="text-xs"
                   />
-                  <p className="text-[10px] text-gray-500">{notificationMessage.length}/3000 characters</p>
+                  <p className="text-[10px] text-gray-400 text-right">{notificationMessage.length}/3000</p>
                 </div>
 
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    This notification will open the Discover page when users tap on it.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex items-center space-x-2 pt-2">
+                <div className="flex items-center space-x-2">
                   <Checkbox
                     id="saveToProfile"
                     checked={saveToProfile}
                     onCheckedChange={(checked) => setSaveToProfile(checked as boolean)}
+                    className="h-3.5 w-3.5"
                   />
                   <label
                     htmlFor="saveToProfile"
-                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    className="text-xs font-medium leading-none cursor-pointer"
                   >
-                    Save to Profile Messages
+                    Also save to profile messages
                   </label>
                 </div>
-                <p className="text-[10px] text-gray-500 ml-6">
-                  When enabled, this notification will also be saved as a profile message for each recipient
-                </p>
 
-                <div className="flex items-center justify-between pt-4 border-t gap-2">
+                <div className="flex items-center justify-between pt-3 border-t gap-2">
                   <div>
                     <p className="text-xs font-medium">
-                      Sending to {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''}
+                      {selectedUsers.size} recipient{selectedUsers.size !== 1 ? 's' : ''}
                     </p>
                     <p className="text-[10px] text-gray-500">
-                      {selectedUsersWithTokens} will receive push notification
+                      {selectedUsersWithTokens} will receive a push notification
                     </p>
                   </div>
                   <Button
@@ -954,7 +942,7 @@ export default function BroadcastNotifications() {
                     {isSending ? (
                       <>
                         <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                        Starting...
+                        Sending...
                       </>
                     ) : (
                       <>
@@ -969,154 +957,156 @@ export default function BroadcastNotifications() {
           )}
         </TabsContent>
 
-        <TabsContent value="scheduled">
+        {/* SCHEDULE TAB */}
+        <TabsContent value="schedule" className="mt-3">
           <ScheduledBroadcasts />
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
+        {/* HISTORY TAB (unified push + email) */}
+        <TabsContent value="history" className="mt-3">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <History className="w-4 h-4" />
-                    Campaign History
-                  </CardTitle>
-                  <CardDescription className="text-[10px]">
-                    {campaigns.length} campaigns • Click any campaign for details
-                  </CardDescription>
-                </div>
+                <CardTitle className="text-xs flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5" />
+                  {historyItems.length} sent
+                </CardTitle>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => loadCampaigns({ silent: false })}
-                  disabled={isLoadingCampaigns}
-                  className="h-7 text-xs"
+                  onClick={() => loadHistory({ silent: false })}
+                  disabled={isLoadingHistory}
+                  className="h-6 text-[11px] px-2"
                 >
-                  <RotateCw className={`w-3 h-3 mr-1 ${isLoadingCampaigns ? 'animate-spin' : ''}`} />
+                  <RotateCw className={`w-3 h-3 mr-1 ${isLoadingHistory ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              {isLoadingCampaigns ? (
-                <div className="flex items-center justify-center py-12">
+              {isLoadingHistory ? (
+                <div className="flex items-center justify-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
                 </div>
-              ) : campaigns.length === 0 ? (
-                <div className="text-center py-12">
-                  <MessageCircle className="w-10 h-10 mx-auto text-gray-300 mb-3" />
-                  <p className="text-gray-500 text-sm">No campaigns yet</p>
-                  <p className="text-gray-400 text-xs mt-1">Create your first broadcast in the New tab</p>
+              ) : historyItems.length === 0 ? (
+                <div className="text-center py-10">
+                  <History className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500 text-xs">Nothing sent yet</p>
                 </div>
               ) : (
                 <ScrollArea className="h-[480px]">
-                  <div className="space-y-2 pr-3">
-                    {campaigns.map((campaign) => {
-                      const isActive = campaign.status === 'queued' || campaign.status === 'processing';
-                      const progress = campaign.total_recipients > 0 
-                        ? ((campaign.successful_sends + campaign.failed_sends) / campaign.total_recipients) * 100 
+                  <div className="space-y-1.5 pr-3">
+                    {historyItems.map((item) => {
+                      const isActive = item.type === 'push' && (item.status === 'queued' || item.status === 'processing');
+                      const progress = item.totalRecipients > 0
+                        ? ((item.successful + item.failed) / item.totalRecipients) * 100
                         : 0;
-                      
+
                       return (
                         <div
-                          key={campaign.id}
-                          className={`p-3 border rounded-lg transition-all hover:shadow-sm ${
+                          key={item.id}
+                          className={`p-2.5 border rounded-lg transition-all hover:shadow-sm ${
                             isActive ? 'border-purple-200 bg-purple-50/50' : 'hover:border-gray-300'
                           }`}
                         >
-                          {/* Header row */}
-                          <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-xs truncate">{campaign.title}</h4>
+                              <div className="flex items-center gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[9px] h-4 px-1.5 shrink-0 ${
+                                    item.type === 'push'
+                                      ? 'border-blue-400 text-blue-600'
+                                      : 'border-purple-400 text-purple-600'
+                                  }`}
+                                >
+                                  {item.type === 'push' ? (
+                                    <Bell className="w-2 h-2 mr-0.5" />
+                                  ) : (
+                                    <Mail className="w-2 h-2 mr-0.5" />
+                                  )}
+                                  {item.type === 'push' ? 'Push' : 'Email'}
+                                </Badge>
+                                <h4 className="font-medium text-xs truncate">{item.title}</h4>
                                 {isActive && (
                                   <Badge className="bg-purple-100 text-purple-700 text-[9px] h-4 px-1.5 shrink-0">
                                     <Loader2 className="w-2 h-2 mr-0.5 animate-spin" />
                                     Live
                                   </Badge>
                                 )}
-                                {campaign.status === 'completed' && (
-                                  <Badge className="bg-green-100 text-green-700 text-[9px] h-4 px-1.5 shrink-0">
-                                    <CheckCircle2 className="w-2 h-2 mr-0.5" />
-                                    Done
-                                  </Badge>
-                                )}
                               </div>
-                              <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{campaign.message}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{item.preview}</p>
                             </div>
                             <span className="text-[9px] text-gray-400 whitespace-nowrap shrink-0">
-                              {new Date(campaign.created_at).toLocaleDateString()}
+                              {new Date(item.createdAt).toLocaleDateString()}
                             </span>
                           </div>
 
-                          {/* Progress bar for active campaigns */}
-                          {isActive && campaign.total_recipients > 0 && (
-                            <div className="mb-2">
+                          {isActive && item.totalRecipients > 0 && (
+                            <div className="mb-1.5">
                               <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                <div 
+                                <div
                                   className="bg-purple-600 h-1.5 transition-all duration-300"
                                   style={{ width: `${Math.min(100, progress)}%` }}
                                 />
                               </div>
-                              <p className="text-[9px] text-gray-500 mt-0.5">
-                                {campaign.successful_sends + campaign.failed_sends} / {campaign.total_recipients} processed
-                              </p>
                             </div>
                           )}
 
-                          {/* Stats row */}
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                              {campaign.total_recipients} recipients
+                              {item.totalRecipients} recipients
                             </span>
                             <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                              ✓ {campaign.successful_sends}
+                              ✓ {item.successful}
                             </span>
-                            {campaign.failed_sends > 0 && (
+                            {item.failed > 0 && (
                               <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
-                                ✗ {campaign.failed_sends}
+                                ✗ {item.failed}
                               </span>
                             )}
-                            <CountriesBadge countries={campaign.target_countries} />
+                            <CountriesBadge countries={item.targetCountries} />
                           </div>
 
-                          {/* Actions row */}
-                          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-gray-100">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => viewCampaignDetails(campaign)}
+                              onClick={() =>
+                                item.type === 'push' ? viewCampaignDetails(item.push!) : (setSelectedEmailCampaign(item.email!), setShowEmailDetails(true))
+                              }
                               className="h-6 text-[10px] px-2 hover:bg-gray-100"
                             >
                               <Eye className="w-2.5 h-2.5 mr-1" />
                               View
                             </Button>
-                            {campaign.failed_sends > 0 && (
+                            {item.type === 'push' && item.failed > 0 && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => retryFailedNotifications(campaign)}
+                                onClick={() => retryFailedNotifications(item.push!)}
                                 className="h-6 text-[10px] px-2 text-orange-600 hover:bg-orange-50"
                               >
                                 <RotateCw className="w-2.5 h-2.5 mr-1" />
-                                Retry Failed
+                                Retry
                               </Button>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => repeatCampaign(campaign, true)}
-                              className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50"
-                            >
-                              <Copy className="w-2.5 h-2.5 mr-1" />
-                              Clone
-                            </Button>
+                            {item.type === 'push' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => repeatCampaign(item.push!, true)}
+                                className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50"
+                              >
+                                <Copy className="w-2.5 h-2.5 mr-1" />
+                                Clone
+                              </Button>
+                            )}
                             <div className="flex-1" />
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => deleteCampaign(campaign.id)}
+                              onClick={() => (item.type === 'push' ? deleteCampaign(item.push!.id) : deleteEmailCampaign(item.email!.id))}
                               className="h-6 text-[10px] px-2 text-red-500 hover:bg-red-50 hover:text-red-600"
                             >
                               <Trash2 className="w-2.5 h-2.5" />
@@ -1131,37 +1121,18 @@ export default function BroadcastNotifications() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="emailing">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Send Email Broadcast</h3>
-              <p className="text-xs text-gray-600 mb-4">
-                Send custom emails to selected users using DripLove SMTP service
-              </p>
-            </div>
-            <EmailBroadcast />
-            <div className="border-t pt-4 mt-6">
-              <h3 className="text-sm font-semibold mb-2">Export Email List</h3>
-              <p className="text-xs text-gray-600 mb-4">
-                Export user emails for external email campaigns
-              </p>
-              <EmailExport />
-            </div>
-          </div>
-        </TabsContent>
       </Tabs>
 
-      {/* Campaign Details Dialog */}
+      {/* Push Campaign Details Dialog */}
       <Dialog open={showCampaignDetails} onOpenChange={setShowCampaignDetails}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>{selectedCampaign?.title}</DialogTitle>
             <DialogDescription>
-              Campaign details and recipient delivery status
+              Recipient delivery status
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedCampaign && (
               <div className="space-y-4">
               <div>
@@ -1177,7 +1148,8 @@ export default function BroadcastNotifications() {
                     {selectedCampaign.failed_sends} failed
                   </Badge>
                 </div>
-              </div>              <ScrollArea className="h-[400px] pr-4">
+              </div>
+              <ScrollArea className="h-[400px] pr-4">
                 {isLoadingRecipients ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -1222,6 +1194,64 @@ export default function BroadcastNotifications() {
               </ScrollArea>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Campaign Details Dialog */}
+      <Dialog open={showEmailDetails} onOpenChange={setShowEmailDetails}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{selectedEmailCampaign?.subject}</DialogTitle>
+            <DialogDescription>
+              Sent {selectedEmailCampaign ? new Date(selectedEmailCampaign.created_at).toLocaleString() : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEmailCampaign && (
+            <div className="space-y-4">
+              <div className="flex gap-2 flex-wrap">
+                <Badge variant="outline" className="text-[10px] h-4">
+                  {selectedEmailCampaign.recipient_count} total
+                </Badge>
+                <Badge variant="outline" className="text-green-600 border-green-600 text-[10px] h-4">
+                  {selectedEmailCampaign.successful_sends} successful
+                </Badge>
+                <Badge variant="outline" className="text-red-600 border-red-600 text-[10px] h-4">
+                  {selectedEmailCampaign.failed_sends} failed
+                </Badge>
+              </div>
+              <ScrollArea className="max-h-[240px] rounded border p-3">
+                <div
+                  className="text-xs [&_a]:text-purple-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_img]:max-w-full"
+                  dangerouslySetInnerHTML={{ __html: selectedEmailCampaign.message }}
+                />
+              </ScrollArea>
+              {selectedEmailCampaign.error_details && selectedEmailCampaign.error_details.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-medium text-red-600 mb-1">Failed recipients</p>
+                  <ScrollArea className="h-[120px] rounded border p-2">
+                    <div className="space-y-1">
+                      {selectedEmailCampaign.error_details.map((f, i) => (
+                        <div key={i} className="text-[10px] text-gray-600">
+                          {f.email} — <span className="text-red-500">{f.error}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Email List Dialog */}
+      <Dialog open={showExport} onOpenChange={setShowExport}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Export Email List</DialogTitle>
+            <DialogDescription>Export user emails for external campaigns</DialogDescription>
+          </DialogHeader>
+          <EmailExport />
         </DialogContent>
       </Dialog>
     </div>
