@@ -116,7 +116,7 @@ function buildDripLoveHtml({ subject, htmlContent }) {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
