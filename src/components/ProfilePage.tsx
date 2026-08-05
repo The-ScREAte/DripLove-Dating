@@ -30,6 +30,7 @@ import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
+import { occupationOptions, industryOptions, educationLevelOptions } from '@/constants/professionOptions';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -266,8 +267,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     exercise_level: '',
     sleeping_schedule: '',
     occupation: '',
+    occupationCustom: '',
     industry: '',
+    industryCustom: '',
     education_level: '',
+    education_level_custom: '',
     zip_code: '',
     latitude: null as number | null,
     longitude: null as number | null,
@@ -355,9 +359,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           drinking: profile.drinking || '',
           exercise_level: profile.exercise_level || '',
           sleeping_schedule: profile.sleeping_schedule || '',
-          occupation: profile.occupation || '',
-          industry: profile.industry || '',
-          education_level: profile.education_level || '',
+          occupation: profile.occupation && !occupationOptions.includes(profile.occupation) ? 'Other' : (profile.occupation || ''),
+          occupationCustom: profile.occupation && !occupationOptions.includes(profile.occupation) ? profile.occupation : '',
+          industry: profile.industry && !industryOptions.includes(profile.industry) ? 'Other' : (profile.industry || ''),
+          industryCustom: profile.industry && !industryOptions.includes(profile.industry) ? profile.industry : '',
+          education_level: profile.education_level && !educationLevelOptions.includes(profile.education_level) ? 'Other' : (profile.education_level || ''),
+          education_level_custom: profile.education_level && !educationLevelOptions.includes(profile.education_level) ? profile.education_level : '',
           zip_code: profile.zip_code || '',
           latitude: profile.latitude || null,
           longitude: profile.longitude || null,
@@ -395,8 +402,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           exercise_level: '',
           sleeping_schedule: '',
           occupation: '',
+          occupationCustom: '',
           industry: '',
+          industryCustom: '',
           education_level: '',
+          education_level_custom: '',
           zip_code: '',
           latitude: null,
           longitude: null,
@@ -524,9 +534,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         drinking: editedProfile.drinking || 'not_specified',
         exercise_level: editedProfile.exercise_level || 'not_specified',
         sleeping_schedule: editedProfile.sleeping_schedule || 'not_specified',
-        occupation: editedProfile.occupation?.trim() || null,
-        industry: editedProfile.industry?.trim() || null,
-        education_level: editedProfile.education_level || null,
+        occupation: (editedProfile.occupation === 'Other'
+          ? editedProfile.occupationCustom?.trim()
+          : editedProfile.occupation?.trim()) || null,
+        industry: (editedProfile.industry === 'Other'
+          ? editedProfile.industryCustom?.trim()
+          : editedProfile.industry?.trim()) || null,
+        education_level: (editedProfile.education_level === 'Other'
+          ? editedProfile.education_level_custom?.trim()
+          : editedProfile.education_level) || null,
         zip_code: editedProfile.zip_code?.trim() || null,
         latitude: editedProfile.latitude || null,
         longitude: editedProfile.longitude || null,
@@ -660,9 +676,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         drinking: profile.drinking || '',
         exercise_level: profile.exercise_level || '',
         sleeping_schedule: profile.sleeping_schedule || '',
-        occupation: profile.occupation || '',
-        industry: profile.industry || '',
-        education_level: profile.education_level || '',
+        occupation: profile.occupation && !occupationOptions.includes(profile.occupation) ? 'Other' : (profile.occupation || ''),
+        occupationCustom: profile.occupation && !occupationOptions.includes(profile.occupation) ? profile.occupation : '',
+        industry: profile.industry && !industryOptions.includes(profile.industry) ? 'Other' : (profile.industry || ''),
+        industryCustom: profile.industry && !industryOptions.includes(profile.industry) ? profile.industry : '',
+        education_level: profile.education_level && !educationLevelOptions.includes(profile.education_level) ? 'Other' : (profile.education_level || ''),
+        education_level_custom: profile.education_level && !educationLevelOptions.includes(profile.education_level) ? profile.education_level : '',
         zip_code: profile.zip_code || '',
         latitude: profile.latitude || null,
         longitude: profile.longitude || null,

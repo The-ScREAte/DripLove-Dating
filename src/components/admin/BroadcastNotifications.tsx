@@ -997,7 +997,8 @@ export default function BroadcastNotifications() {
                 <ScrollArea className="h-[480px]">
                   <div className="space-y-1.5 pr-3">
                     {historyItems.map((item) => {
-                      const isActive = item.type === 'push' && (item.status === 'queued' || item.status === 'processing');
+                      const isActive = item.status === 'queued' || item.status === 'processing';
+                      const isPartial = item.status === 'partial';
                       const progress = item.totalRecipients > 0
                         ? ((item.successful + item.failed) / item.totalRecipients) * 100
                         : 0;
@@ -1006,7 +1007,7 @@ export default function BroadcastNotifications() {
                         <div
                           key={item.id}
                           className={`p-2.5 border rounded-lg transition-all hover:shadow-sm ${
-                            isActive ? 'border-purple-200 bg-purple-50/50' : 'hover:border-gray-300'
+                            isActive ? 'border-purple-200 bg-purple-50/50' : isPartial ? 'border-amber-200 bg-amber-50/40' : 'hover:border-gray-300'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -1032,6 +1033,11 @@ export default function BroadcastNotifications() {
                                   <Badge className="bg-purple-100 text-purple-700 text-[9px] h-4 px-1.5 shrink-0">
                                     <Loader2 className="w-2 h-2 mr-0.5 animate-spin" />
                                     Live
+                                  </Badge>
+                                )}
+                                {isPartial && (
+                                  <Badge className="bg-amber-100 text-amber-700 text-[9px] h-4 px-1.5 shrink-0">
+                                    Queued — resumes automatically
                                   </Badge>
                                 )}
                               </div>

@@ -1010,20 +1010,42 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Header - always visible */}
           {/* Fixed Header */}
           {!showTerms && !showPrivacy && (
-            <div data-driplove-global-header className="fixed top-0 left-0 right-0 w-full bg-pink-50 shadow-sm z-50 border-2 border-pink-300 rounded-b-2xl" style={{ margin: 0, padding: 0, top: 0 }}>
-              <div 
-                className="px-2 py-2 flex justify-between items-center"
+            <div
+              data-driplove-global-header
+              className="fixed top-0 left-0 right-0 w-full z-50 rounded-b-[22px]"
+              style={{
+                margin: 0,
+                padding: 0,
+                top: 0,
+                background: 'linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,240,246,0.08))',
+                backdropFilter: 'blur(14px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+                borderBottom: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 4px 20px -10px rgba(236, 72, 153, 0.12)',
+                // The header has no interactive controls of its own — it must never intercept
+                // touch/mouse events meant for the swipe card underneath it.
+                pointerEvents: 'none',
+              }}
+            >
+              <div
+                className="px-4 py-2 flex justify-between items-center"
                 style={{
-                  paddingTop: getPlatformSync() === 'ios' 
-                    ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)' 
+                  paddingTop: getPlatformSync() === 'ios'
+                    ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)'
                     : getPlatformSync() === 'android'
                     ? '24px'
                     : '8px'
                 }}
               >
-                <img src="/driplove-logo.webp" alt="DripLove Logo" className="h-10" loading="lazy" decoding="async" />
+                <img src="/driplove-logo.webp" alt="DripLove Logo" className="h-10" loading="lazy" decoding="async" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))' }} />
                 <div className="text-right">
-                  <div className="text-sm font-bold text-black leading-tight">
+                  <div
+                    className="text-sm font-bold leading-tight"
+                    style={{
+                      color: '#241521',
+                      textShadow: '0 1px 2px rgba(255,255,255,0.85), 0 0 10px rgba(255,255,255,0.6)',
+                    }}
+                  >
                     <div>{t('common.findYour')}</div>
                     <div>{t('common.perfectMatch')}</div>
                   </div>
@@ -1095,29 +1117,38 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Bottom Nav - always visible */}
   {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
-            className="fixed bottom-0 left-0 right-0 w-full bg-pink-50 z-[99999] rounded-t-2xl border-2 border-pink-300"
-            style={{ 
-              paddingBottom: getPlatformSync() === 'android' 
-                ? '24px' 
-                : 'clamp(4px, env(safe-area-inset-bottom, 0px), 8px)' 
+            className="fixed left-3 right-3 z-[99999] rounded-[28px]"
+            style={{
+              bottom: getPlatformSync() === 'android'
+                ? '30px'
+                : 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,240,246,0.3))',
+              backdropFilter: 'blur(22px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(22px) saturate(180%)',
+              border: '1px solid rgba(255,255,255,0.45)',
+              boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.2), 0 2px 8px rgba(0,0,0,0.05)',
             }}
           >
-            <div className={`flex justify-around items-center ${getPlatformSync() === 'ios' ? 'pb-5' : ''}`}>
+            <div className="flex justify-around items-center py-1.5 px-1">
               {[
-                { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon }, 
-                { label: t('chat.title'), value: 'chat', icon: MessageCircle }, 
-                { label: t('matches.liked'), value: 'liked', icon: Users }, 
+                { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon },
+                { label: t('chat.title'), value: 'chat', icon: MessageCircle },
+                { label: t('matches.liked'), value: 'liked', icon: Users },
                 { label: t('profile.title'), value: 'profile', icon: User }
               ].map(({ label, value, icon: Icon }) => (
                 <button
                   key={value}
                   onClick={() => handleTabChange(value)}
-                  className={`flex flex-col items-center space-y-1 py-1 px-2 rounded-lg transition-colors relative ${
-                    activeTab === value ? 'text-pink-600' : 'text-gray-500'
+                  className={`flex flex-col items-center gap-0.5 py-1.5 px-4 rounded-full transition-all duration-200 relative ${
+                    activeTab === value ? 'text-pink-600 scale-105' : 'text-gray-500'
                   }`}
+                  style={activeTab === value ? {
+                    background: 'linear-gradient(to bottom, rgba(244,114,182,0.22), rgba(244,114,182,0.12))',
+                    boxShadow: 'inset 0 0 0 1px rgba(236,72,153,0.25)',
+                  } : undefined}
                 >
-                  <Icon className="w-6 h-6 shrink-0" />
-                  <span className="text-xs font-medium">{label}</span>
+                  <Icon className="w-[18px] h-[18px] shrink-0" />
+                  <span className="text-[10px] font-medium">{label}</span>
                    {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
                        <span className="text-xs text-white font-bold">

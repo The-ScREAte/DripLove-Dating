@@ -175,6 +175,9 @@ serve(async (req) => {
           if (recipientEmails.length === 0) {
             console.log(`No emails found for broadcast: ${broadcast.title}`)
           } else {
+            // send-broadcast-email-smtp creates and owns its own email_broadcast_history row
+            // (with multi-account rotation + automatic queueing for anything over the daily
+            // sending limit), so we just read back its counts here rather than logging our own.
             const { data: emailData, error: emailError } = await supabase.functions.invoke(
               'send-broadcast-email-smtp',
               {
@@ -182,6 +185,9 @@ serve(async (req) => {
                   recipients: recipientEmails,
                   subject: broadcast.title,
                   htmlContent: broadcast.message,
+                  targetCountries: broadcast.target_countries,
+                  recipientFilter: 'scheduled',
+                  adminId: broadcast.admin_id,
                 },
               }
             );
@@ -196,18 +202,6 @@ serve(async (req) => {
             }
 
             totalRecipients = recipientEmails.length;
-
-            await supabase.from('email_broadcast_history').insert({
-              subject: broadcast.title,
-              message: broadcast.message,
-              recipient_count: recipientEmails.length,
-              successful_sends: successful,
-              failed_sends: failed,
-              target_countries: broadcast.target_countries,
-              recipient_filter: 'scheduled',
-              status: failed > 0 && successful === 0 ? 'failed' : 'completed',
-              admin_id: broadcast.admin_id,
-            });
           }
         }
 

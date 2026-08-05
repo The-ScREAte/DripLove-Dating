@@ -15,9 +15,9 @@ const AdinkraSymbol: React.FC<{ svgContent: string }> = ({ svgContent }) => {
     .replace(/<\/svg>/, ''); // Remove closing svg tag
 
   return (
-    <svg 
-      width="20" 
-      height="20" 
+    <svg
+      width="100%"
+      height="100%"
       viewBox="0 0 48 48"
       dangerouslySetInnerHTML={{ __html: innerContent }}
     />
@@ -140,9 +140,9 @@ const AdinkraBar: React.FC<AdinkraBarProps> = ({ userCountry }) => {
   return (
     <div
       ref={barRef}
-      className="w-full flex justify-center items-center gap-1.5 relative select-none z-40 leading-none overflow-visible -translate-y-2"
+      className="w-full flex justify-center items-center gap-1.5 relative select-none z-40 leading-none overflow-visible"
       style={{
-        backgroundColor: 'rgb(253 242 248)',
+        backgroundColor: 'rgb(var(--app-light-bg-rgb))',
         backgroundImage: `url('data:image/svg+xml;utf8,<svg width="240" height="36" viewBox="0 0 240 36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="36" fill="%23007bdb"/><g><rect x="0" y="0" width="24" height="36" fill="%23ffc72c"/><rect x="24" y="0" width="24" height="36" fill="%23007bdb"/><rect x="48" y="0" width="24" height="36" fill="%23ffc72c"/><rect x="72" y="0" width="24" height="36" fill="%23007bdb"/><rect x="96" y="0" width="24" height="36" fill="%23ffc72c"/><rect x="120" y="0" width="24" height="36" fill="%23007bdb"/><rect x="144" y="0" width="24" height="36" fill="%23ffc72c"/><rect x="168" y="0" width="24" height="36" fill="%23007bdb"/><rect x="192" y="0" width="24" height="36" fill="%23ffc72c"/><rect x="216" y="0" width="24" height="36" fill="%23007bdb"/></g><g><polygon points="24,0 36,18 24,36 48,36 36,18 48,0" fill="%23e63946"/><polygon points="72,0 84,18 72,36 96,36 84,18 96,0" fill="%2300b159"/><polygon points="120,0 132,18 120,36 144,36 132,18 144,0" fill="%23e63946"/><polygon points="168,0 180,18 168,36 192,36 180,18 192,0" fill="%2300b159"/></g><g><rect x="0" y="0" width="240" height="6" fill="%23fff" fill-opacity="0.15"/><rect x="0" y="30" width="240" height="6" fill="%23fff" fill-opacity="0.15"/></g><g><rect x="23" y="0" width="2" height="36" fill="%23fff"/><rect x="47" y="0" width="2" height="36" fill="%23fff"/><rect x="71" y="0" width="2" height="36" fill="%23fff"/><rect x="95" y="0" width="2" height="36" fill="%23fff"/><rect x="119" y="0" width="2" height="36" fill="%23fff"/><rect x="143" y="0" width="2" height="36" fill="%23fff"/><rect x="167" y="0" width="2" height="36" fill="%23fff"/><rect x="191" y="0" width="2" height="36" fill="%23fff"/><rect x="215" y="0" width="2" height="36" fill="%23fff"/></g></svg>')`,
         backgroundRepeat: 'repeat',
         backgroundSize: '200px 30px',
@@ -153,8 +153,14 @@ const AdinkraBar: React.FC<AdinkraBarProps> = ({ userCountry }) => {
       {visibleSymbols.map((symbol, idx) => (
         <button
           key={`${symbol.name}-${idx}`}
-          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-transform border border-yellow-300"
-          style={{ width: 26, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          className="focus:outline-none bg-white rounded-full shadow hover:scale-110 transition-transform border border-yellow-300 shrink-0"
+          style={{
+            width: 'clamp(20px, 5.8vw, 26px)',
+            height: 'clamp(17px, 5vw, 22px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
           onClick={(e) => {
             const buttonRect = e.currentTarget.getBoundingClientRect();
             const barRect = barRef.current?.getBoundingClientRect();
@@ -173,7 +179,7 @@ const AdinkraBar: React.FC<AdinkraBarProps> = ({ userCountry }) => {
           tabIndex={0}
           aria-label={symbol.name + ' symbol'}
         >
-          <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '76%', height: '76%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AdinkraSymbol svgContent={symbol.svg} />
           </div>
         </button>

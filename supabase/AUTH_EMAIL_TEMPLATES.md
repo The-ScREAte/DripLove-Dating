@@ -6,14 +6,14 @@ Apply these templates in Supabase Dashboard:
 Authentication -> Emails -> Templates
 
 Important:
-- Keep the same sender identity as SMTP: DripLove <info@managira.com>
+- Keep the same sender identity as SMTP: DripLove <driploveofficial@gmail.com>
 - Use the same social links in all templates
 - Save each template after paste
 
 ## Shared Footer Links
 
 Instagram: https://www.instagram.com/driplove_official?utm_source=qr
-TikTok: https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG
+TikTok: https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc
 Facebook: https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr
 
 ## Confirm Signup Template
@@ -41,7 +41,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -68,7 +68,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
@@ -106,7 +106,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -133,7 +133,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
@@ -171,7 +171,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -198,7 +198,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
@@ -236,7 +236,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -263,7 +263,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
@@ -301,7 +301,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -328,7 +328,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
@@ -366,7 +366,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -390,7 +390,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>
@@ -428,7 +428,7 @@ Body HTML:
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;width:40px;">
-                    <img src="https://driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
+                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
                   </td>
                   <td style="vertical-align:middle;padding-left:10px;">
                     <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
@@ -455,7 +455,7 @@ Body HTML:
               <div>
                 <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
                 <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@silencewin3?_r=1&_t=ZN-988z4wA6UnG" style="color:#0b5cff;text-decoration:none;">TikTok</a>
+                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
                 <span style="color:#9ca3af;"> | </span>
                 <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
               </div>

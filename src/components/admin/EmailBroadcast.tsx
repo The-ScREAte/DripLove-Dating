@@ -270,6 +270,8 @@ export default function EmailBroadcast() {
           subject: emailSubject,
           htmlContent,
           textContent,
+          targetCountries: Array.from(selectedCountries),
+          recipientFilter,
         },
       });
 
@@ -277,36 +279,26 @@ export default function EmailBroadcast() {
         throw new Error(await getEdgeFunctionErrorMessage(smtpError, 'SMTP email request failed'));
       }
 
-      const results: { sent?: number; failed?: number; details?: { failed?: Array<{ email: string; error: string }> } } | undefined = (smtpData as any)?.results;
+      // The edge function creates and owns the email_broadcast_history row itself now
+      // (same pattern as push broadcasts), so it shows up in the unified History tab automatically.
+      const results: { sent?: number; failed?: number; queued?: number; details?: { failed?: Array<{ email: string; error: string }> } } | undefined = (smtpData as any)?.results;
       const sentCount = results?.sent || 0;
       const failedCount = results?.failed || 0;
+      const queuedCount = results?.queued || 0;
 
-      // Log this send to email broadcast history so it shows up in the History sub-tab.
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        await supabase.from('email_broadcast_history').insert({
-          subject: emailSubject,
-          message: emailBody,
-          recipient_count: selectedUserEmails.length,
-          successful_sends: sentCount,
-          failed_sends: failedCount,
-          target_countries: Array.from(selectedCountries),
-          recipient_filter: recipientFilter,
-          status: failedCount > 0 && sentCount === 0 ? 'failed' : 'completed',
-          error_details: results?.details?.failed?.length ? results.details.failed : null,
-          admin_id: userData?.user?.id || null,
+      if (queuedCount > 0) {
+        toast({
+          title: 'Sent — some queued for later',
+          description: `Sent: ${sentCount}, Failed: ${failedCount}, Queued: ${queuedCount} (daily sending limit reached — these will go out automatically once quota resets).`,
+          duration: 7000,
         });
-      } catch (logError) {
-        console.error('Failed to log email broadcast history:', logError);
-      }
-
-      if (failedCount > 0) {
+      } else if (failedCount > 0) {
         toast({
           title: 'Emails Sent with Issues',
           description: `Sent: ${sentCount}, Failed: ${failedCount}. Check console for details.`,
           duration: 5000,
         });
-        console.log('Failed emails:', results.details?.failed);
+        console.log('Failed emails:', results?.details?.failed);
       } else {
         toast({
           title: 'Emails Sent Successfully',

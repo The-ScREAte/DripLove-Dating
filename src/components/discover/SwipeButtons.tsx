@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Undo2 } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 
 interface SwipeButtonsProps {
@@ -23,12 +23,12 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const isIOS = platform === 'ios';
   const isAndroid = platform === 'android';
   
-  // Adjust bottom position based on platform
-  const bottomClass = isAndroid 
-    ? 'bottom-24 sm:bottom-24' 
-    : isIOS 
-    ? 'bottom-24 sm:bottom-24' 
-    : 'bottom-16 sm:bottom-16';
+  // Adjust bottom position based on platform — lifted to clear the floating pill nav
+  const bottomClass = isAndroid
+    ? 'bottom-32 sm:bottom-32'
+    : isIOS
+    ? 'bottom-32 sm:bottom-32'
+    : 'bottom-24 sm:bottom-24';
 
   return (
   <div className={`fixed right-6 z-30 sm:absolute sm:right-6 ${bottomClass}`}>
@@ -37,13 +37,13 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
           onClick={onReverse}
           variant="outline"
           disabled={!canReverse}
-          className="rounded-full border-2 border-yellow-500 bg-yellow-500/20 hover:bg-yellow-500/30 disabled:opacity-30 backdrop-blur-sm shadow-lg hover:border-yellow-400 transition-all duration-200 w-8 h-8 sm:w-10 sm:h-8 min-w-8 min-h-8 sm:min-w-10 sm:min-h-8 p-0"
+          className="rounded-full border-2 border-white/70 bg-white/20 hover:bg-white/35 disabled:opacity-30 backdrop-blur-md shadow-lg hover:border-white transition-all duration-200 w-9 h-9 sm:w-10 sm:h-10 min-w-9 min-h-9 sm:min-w-10 sm:min-h-10 p-0"
           aria-label="Undo last action"
         >
-          <Undo2 className="w-4 h-4 sm:w-5 sm:h-4 text-yellow-500" />
+          <RotateCcw className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-white" strokeWidth={2.5} />
         </Button>
         {showCount && (
-          <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-500 text-black text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
+          <div className="absolute -top-2 -right-2 w-6 h-6 bg-white text-pink-600 text-xs font-bold rounded-full flex items-center justify-center shadow-lg border border-pink-200">
             {reversesLeft}
           </div>
         )}

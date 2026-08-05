@@ -7,14 +7,19 @@
 :root {
   --keyboard-height: 0px;
   --input-bar-height: 70px;
-  --app-light-bg-rgb: 253 242 248;
+  /* A clean, slightly darker pink than the original near-white tint (#FDF2F8) — no gray
+     mixed in, just more pink. Still light enough that black text stays crisp on it. */
+  --app-light-bg-rgb: 248 214 228;
 }
 
-/* Global app theme override: map white backgrounds to light app tint */
+/* Global app theme override: map white/pink-50 backgrounds to the app's shade */
 @layer utilities {
   .bg-white,
   .hover\:bg-white:hover,
-  .focus\:bg-white:focus {
+  .focus\:bg-white:focus,
+  .bg-pink-50,
+  .hover\:bg-pink-50:hover,
+  .focus\:bg-pink-50:focus {
     --tw-bg-opacity: 1 !important;
     background-color: rgb(var(--app-light-bg-rgb) / var(--tw-bg-opacity)) !important;
   }

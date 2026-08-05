@@ -15,9 +15,9 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isAndroidPlatform, isIOSPlatform } from '@/utils/platformUtils';
+import { isAndroidPlatform } from '@/utils/platformUtils';
 import { preloadImageToBlob } from '@/utils/imageCache';
 import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
@@ -47,23 +47,9 @@ import {
   normalizeCountryCodeList,
 } from './discover/discoverFeedUtils';
 
-const AdinkraBar = lazy(() => import('./discover/AdinkraBar'));
-
-// Loading fallback
-const AdinkraBarFallback = () => (
-  <div className="w-full h-9 bg-gradient-to-r from-blue-500 via-yellow-400 to-blue-500" />
-);
-
-const LazyAdinkraBar = memo(({ userCountry }: { userCountry?: string }) => (
-  <Suspense fallback={<AdinkraBarFallback />}>
-    <AdinkraBar userCountry={userCountry} />
-  </Suspense>
-));
-LazyAdinkraBar.displayName = 'LazyAdinkraBar';
-
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Gamepad2 } from 'lucide-react';
+import { Heart, X, Crown, Gamepad2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -805,12 +791,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     swipeDirection: 'left' | 'right' | null;
     swipeDistance: number;
     dragOffset: number;
-  }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0 });
+    dragOffsetY: number;
+  }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 });
 
   const isDraggingRef = useRef(false);
   const [exitingCard, setExitingCard] = useState(false);
   const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
   const latestDeltaRef = useRef(0);
+  const latestDeltaYRef = useRef(0);
   const rafScheduledRef = useRef(false);
 
   const getGenderFilter = useCallback((userPreference: string) => {
@@ -2910,7 +2898,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentXRef.current = touch.clientX;
     currentYRef.current = touch.clientY;
     isDraggingRef.current = true;
-    setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0 }));
+    setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 }));
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -2920,20 +2908,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentYRef.current = touch.clientY;
 
     const deltaX = currentXRef.current - startXRef.current;
-    const deltaY = Math.abs(currentYRef.current - startYRef.current);
+    const deltaY = currentYRef.current - startYRef.current;
 
-    // Only show swipe feedback if horizontal movement is greater than vertical
-    if (Math.abs(deltaX) > deltaY) {
-      // write latest delta and schedule an rAF update
-      latestDeltaRef.current = deltaX;
-      if (!rafScheduledRef.current) {
-        rafScheduledRef.current = true;
-        requestAnimationFrame(() => {
-          const d = latestDeltaRef.current;
-          setSwipeUI(prev => ({ ...prev, dragOffset: d, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
-          rafScheduledRef.current = false;
-        });
-      }
+    // The card follows the finger freely in both directions (grab-and-move feel).
+    // Only the horizontal component decides the like/pass direction.
+    latestDeltaRef.current = deltaX;
+    latestDeltaYRef.current = deltaY;
+    if (!rafScheduledRef.current) {
+      rafScheduledRef.current = true;
+      requestAnimationFrame(() => {
+        const d = latestDeltaRef.current;
+        const dy = latestDeltaYRef.current;
+        setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+        rafScheduledRef.current = false;
+      });
     }
   };
 
@@ -2956,15 +2944,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Reset visual smear (flush any pending rAF)
     latestDeltaRef.current = 0;
+    latestDeltaYRef.current = 0;
     if (rafScheduledRef.current) rafScheduledRef.current = false;
-    setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0 }));
+    setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0 }));
 
-    if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+    if (Math.abs(deltaX) > minSwipeDistance) {
       // Trigger exit animation
       setExitDirection(deltaX > 0 ? 'right' : 'left');
       setExitingCard(true);
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
-      
+
       // Wait for animation to complete before executing action
       setTimeout(() => {
         if (deltaX > 0) {
@@ -2987,7 +2976,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentXRef.current = e.clientX;
     currentYRef.current = e.clientY;
     isDraggingRef.current = true;
-    setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0 }));
+    setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 }));
 
     // Attach global mouse listeners to ensure we capture mouseup/move even if pointer leaves the element
     const onWindowMouseMove = (ev: MouseEvent) => {
@@ -2995,21 +2984,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       currentXRef.current = ev.clientX;
       currentYRef.current = ev.clientY;
       const deltaX = currentXRef.current - startXRef.current;
-      const deltaY = Math.abs(currentYRef.current - startYRef.current);
-      if (Math.abs(deltaX) > deltaY) {
-        // rAF throttle visual updates
-        latestDeltaRef.current = deltaX;
-        if (!rafScheduledRef.current) {
-          rafScheduledRef.current = true;
-          requestAnimationFrame(() => {
-            const d = latestDeltaRef.current;
-            setSwipeUI(prev => ({ ...prev, dragOffset: d, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
-            rafScheduledRef.current = false;
-          });
-        }
-        // Prevent default to avoid text selection during dragging
-        ev.preventDefault();
+      const deltaY = currentYRef.current - startYRef.current;
+      // rAF throttle visual updates — card follows the cursor freely in both directions
+      latestDeltaRef.current = deltaX;
+      latestDeltaYRef.current = deltaY;
+      if (!rafScheduledRef.current) {
+        rafScheduledRef.current = true;
+        requestAnimationFrame(() => {
+          const d = latestDeltaRef.current;
+          const dy = latestDeltaYRef.current;
+          setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+          rafScheduledRef.current = false;
+        });
       }
+      // Prevent default to avoid text selection during dragging
+      ev.preventDefault();
     };
 
     const onWindowMouseUp = (ev: MouseEvent) => {
@@ -3025,13 +3014,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const minSwipeDistance = SWIPE_MIN_DESKTOP;
       // Reset visual smear (flush any pending rAF)
       latestDeltaRef.current = 0;
+      latestDeltaYRef.current = 0;
       if (rafScheduledRef.current) rafScheduledRef.current = false;
-      setSwipeUI(prev => ({ ...prev, dragOffset: 0, swipeDistance: 0, swipeDirection: null }));
-      if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaX) > deltaY) {
+      setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0, swipeDirection: null }));
+      if (Math.abs(deltaX) > minSwipeDistance) {
         // Trigger exit animation
         setExitDirection(deltaX > 0 ? 'right' : 'left');
         setExitingCard(true);
-        
+
         // Wait for animation to complete before executing action
         setTimeout(() => {
           if (deltaX > 0) handleLike(); else handlePass();
@@ -4296,7 +4286,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              onTouchEnd={handleTouchEnd}
              onMouseDown={handleMouseDown}>
           <AdCard ad={currentMatch} onSwipe={moveToNext} />
-          <LazyAdinkraBar userCountry={currentUser?.country} />
           <SwipeButtons
             onReverse={handleReverse}
             canReverse={false}
@@ -4415,14 +4404,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const screenWidth = window.innerWidth;
       const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
       const exitY = window.innerHeight * 0.3;
-      const rotation = exitDirection === 'right' ? 30 : -30;
-      return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
+      const rotation = exitDirection === 'right' ? 24 : -24;
+      // Card shrinks away as it flies off — reads as receding into the distance, not zooming in
+      return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
     }
     if (swipeUI.isDragging) {
-      return `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)`;
+      // Follow the finger 1:1 in both directions with a natural tilt — a real grab-and-move feel,
+      // not a rail locked to the horizontal axis. No scale change while actively held.
+      return `translate3d(${swipeUI.dragOffset}px, ${swipeUI.dragOffsetY}px, 0) rotate(${swipeUI.dragOffset * 0.06}deg) scale(1)`;
     }
-    return '';
+    return 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
   })();
+
+  // Flush/square while resting so the photo fills the frame edge-to-edge; the moment the card
+  // is picked up (dragging) or flung away, its corners round in like a card lifting off the stack.
+  const cardIsLifted = swipeUI.isDragging || exitingCard;
+  const cardCornerRadius = cardIsLifted ? '26px' : '0px';
 
 
 
@@ -4442,17 +4439,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .discover-image-area {
             /* Ensure image area doesn't get stuck at fixed heights on mobile */
             min-height: 45vh !important;
+          }
+
+          /* When expanded, cap the image so the info panel below has room to grow. */
+          .discover-image-area.expanded {
             max-height: 65vh !important;
           }
-          
-          .discover-info-area {
-            /* Ensure info area is always visible but don't override expansion behavior */
-            min-height: 25vh !important;
-          }
-          
-          /* Specifically target mobile Safari - but preserve expansion functionality */
-          .discover-info-area:not(.expanded) {
-            max-height: 45vh !important;
+
+          /* Collapsed info area should hug its content (name/location/etc.), not force a tall
+             minimum height that leaves a big blank strip above the nav. */
+          .discover-info-area.expanded {
+            min-height: 27vh !important;
+            max-height: 48vh !important;
           }
         }
         
@@ -4465,13 +4463,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           }
         }
       `}</style>
-      
+
       <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
-           style={{ 
-             top: '60px', // Reduced from 65px to eliminate gap
-             height: 'calc(100vh - 110px)', // Adjusted to match new top value
+           style={{
+             top: 0, // Photo now extends to the very top, behind the glassy header
+             height: 'calc(100vh - 78px)', // Reserve room for the floating pill nav (now higher/slimmer)
              // Mobile browser viewport fix
-             minHeight: 'calc(100vh - 110px)',
+             minHeight: 'calc(100vh - 78px)',
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
              overscrollBehavior: 'contain',
              userSelect: 'none',
@@ -4482,71 +4480,123 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       {showSwipeGuide && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.12)', cursor: 'pointer' }}
+          style={{
+            background: 'rgba(20, 10, 20, 0.28)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            cursor: 'pointer',
+          }}
           onClick={() => {
             setShowSwipeGuide(false);
             localStorage.setItem('driplove_swipe_guide_shown', 'true');
           }}
         >
           <style>{`
-            @keyframes fingerSwipeLeft {
-              0% { transform: translateX(0) scale(1); opacity: 1; }
-              25% { transform: translateX(-40px) scale(1.1); opacity: 0.9; }
-              50% { transform: translateX(-20px) scale(1); opacity: 1; }
-              75% { transform: translateX(0) scale(0.95); opacity: 0.8; }
-              100% { transform: translateX(0) scale(1); opacity: 1; }
+            @keyframes swipeGuideIn {
+              0% { opacity: 0; transform: scale(0.9) translateY(12px); }
+              100% { opacity: 1; transform: scale(1) translateY(0); }
             }
-            @keyframes fingerSwipeRight {
-              0% { transform: translateX(0) scale(1); opacity: 1; }
-              25% { transform: translateX(40px) scale(1.1); opacity: 0.9; }
-              50% { transform: translateX(20px) scale(1); opacity: 1; }
-              75% { transform: translateX(0) scale(0.95); opacity: 0.8; }
-              100% { transform: translateX(0) scale(1); opacity: 1; }
+            @keyframes trackSwipeLeft {
+              0%   { transform: translateX(26px); opacity: 0; }
+              15%  { opacity: 1; }
+              85%  { opacity: 1; }
+              100% { transform: translateX(-26px); opacity: 0; }
             }
-            @keyframes pulseGlow {
-              0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
-              70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+            @keyframes trackSwipeRight {
+              0%   { transform: translateX(-26px); opacity: 0; }
+              15%  { opacity: 1; }
+              85%  { opacity: 1; }
+              100% { transform: translateX(26px); opacity: 0; }
             }
-            .finger-left {
-              animation: fingerSwipeLeft 2s ease-in-out infinite;
-              font-size: 2.5rem;
-              display: block;
-              filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+            @keyframes ringPulseRed {
+              0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45); }
+              70% { box-shadow: 0 0 0 14px rgba(244, 63, 94, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
             }
-            .finger-right {
-              animation: fingerSwipeRight 2s ease-in-out infinite;
-              font-size: 2.5rem;
-              display: block;
-              filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+            @keyframes ringPulseGreen {
+              0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+              70% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
             }
-            .swipe-card {
-              animation: pulseGlow 2s infinite;
+            .swipe-guide-card {
+              animation: swipeGuideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             }
+            .swipe-guide-icon-left {
+              animation: ringPulseRed 2.2s ease-out infinite;
+            }
+            .swipe-guide-icon-right {
+              animation: ringPulseGreen 2.2s ease-out infinite;
+            }
+            .swipe-guide-track-left span {
+              animation: trackSwipeLeft 1.6s ease-in-out infinite;
+            }
+            .swipe-guide-track-right span {
+              animation: trackSwipeRight 1.6s ease-in-out infinite;
+            }
+            .swipe-guide-track-left span:nth-child(2) { animation-delay: 0.18s; }
+            .swipe-guide-track-left span:nth-child(1) { animation-delay: 0.36s; }
+            .swipe-guide-track-right span:nth-child(2) { animation-delay: 0.18s; }
+            .swipe-guide-track-right span:nth-child(3) { animation-delay: 0.36s; }
           `}</style>
-          <div className="swipe-card bg-gradient-to-br from-white to-pink-50 rounded-3xl px-8 py-8 flex flex-col items-center shadow-2xl border border-pink-100" style={{ maxWidth: 360, opacity: 0.97 }}>
-            <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">{t('discover.swipeGuide.title')}</h3>
-            <div className="flex flex-row gap-12 mb-4">
+          <div
+            className="swipe-guide-card flex flex-col items-center rounded-[28px] px-8 py-7"
+            style={{
+              maxWidth: 340,
+              width: '90%',
+              background: 'rgba(255, 255, 255, 0.55)',
+              backdropFilter: 'blur(24px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+              border: '1px solid rgba(255, 255, 255, 0.6)',
+              boxShadow: '0 20px 50px -12px rgba(236, 72, 153, 0.35), 0 0 0 1px rgba(255,255,255,0.4) inset',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-bold text-gray-800 mb-5 text-center tracking-tight">
+              {t('discover.swipeGuide.title')}
+            </h3>
+            <div className="flex flex-row items-start gap-10 mb-5">
               {/* Swipe Left */}
               <div className="flex flex-col items-center">
-                <div className="bg-red-50 rounded-full p-3 mb-2 border-2 border-red-200">
-                  <span className="finger-left" role="img" aria-label="finger left">👆</span>
+                <div
+                  className="swipe-guide-icon-left rounded-full flex items-center justify-center mb-3"
+                  style={{
+                    width: 56,
+                    height: 56,
+                    background: 'linear-gradient(135deg, rgba(244,63,94,0.15), rgba(244,63,94,0.05))',
+                    border: '1.5px solid rgba(244,63,94,0.35)',
+                  }}
+                >
+                  <X className="w-6 h-6" style={{ color: '#f43f5e' }} strokeWidth={2.5} />
                 </div>
-                <div className="text-xl mb-1" style={{ color: '#ef4444' }}>← ← ←</div>
-                <span className="text-sm font-semibold text-red-600">{t('discover.swipeGuide.nope')}</span>
-                <span className="text-xs text-gray-500 mt-1">{t('discover.swipeGuide.swipeLeft')}</span>
+                <div className="swipe-guide-track-left flex gap-0.5 mb-1.5 h-4">
+                  <span className="block"><ChevronLeft className="w-4 h-4" style={{ color: '#f43f5e' }} strokeWidth={3} /></span>
+                  <span className="block"><ChevronLeft className="w-4 h-4" style={{ color: '#f43f5e' }} strokeWidth={3} /></span>
+                </div>
+                <span className="text-sm font-bold text-rose-600">{t('discover.swipeGuide.nope')}</span>
+                <span className="text-[11px] text-gray-500 mt-0.5">{t('discover.swipeGuide.swipeLeft')}</span>
               </div>
               {/* Swipe Right */}
               <div className="flex flex-col items-center">
-                <div className="bg-green-50 rounded-full p-3 mb-2 border-2 border-green-200">
-                  <span className="finger-right" role="img" aria-label="finger right">👆</span>
+                <div
+                  className="swipe-guide-icon-right rounded-full flex items-center justify-center mb-3"
+                  style={{
+                    width: 56,
+                    height: 56,
+                    background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))',
+                    border: '1.5px solid rgba(16,185,129,0.35)',
+                  }}
+                >
+                  <Heart className="w-6 h-6" style={{ color: '#10b981' }} strokeWidth={2.5} fill="#10b981" />
                 </div>
-                <div className="text-xl mb-1" style={{ color: '#10b981' }}>→ → →</div>
-                <span className="text-sm font-semibold text-green-600">{t('discover.swipeGuide.like')}</span>
-                <span className="text-xs text-gray-500 mt-1">{t('discover.swipeGuide.swipeRight')}</span>
+                <div className="swipe-guide-track-right flex gap-0.5 mb-1.5 h-4">
+                  <span className="block"><ChevronRight className="w-4 h-4" style={{ color: '#10b981' }} strokeWidth={3} /></span>
+                  <span className="block"><ChevronRight className="w-4 h-4" style={{ color: '#10b981' }} strokeWidth={3} /></span>
+                </div>
+                <span className="text-sm font-bold text-emerald-600">{t('discover.swipeGuide.like')}</span>
+                <span className="text-[11px] text-gray-500 mt-0.5">{t('discover.swipeGuide.swipeRight')}</span>
               </div>
             </div>
-            <p className="text-xs text-gray-600 text-center mt-2">{t('discover.swipeGuide.tapToClose')}</p>
+            <p className="text-[11px] text-gray-500 text-center">{t('discover.swipeGuide.tapToClose')}</p>
           </div>
         </div>
       )}
@@ -4574,8 +4624,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
                 })()}
                 alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-contain rounded-2xl md:rounded-3xl"
-                style={{ borderRadius: '1.25rem', position: 'relative', zIndex: 1 }}
+                className="w-full h-full object-cover"
+                style={{ position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
                 decoding="async"
@@ -4596,22 +4646,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
-            transition: exitingCard 
-              ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' // Smooth exit with slight bounce
-              : swipeUI.isDragging 
-                ? 'none' 
-                : 'transform 0.2s ease-out', // Faster snap-back
+            transformOrigin: 'center center',
+            transition: exitingCard
+              ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-radius 0.3s ease' // Smooth exit with slight bounce
+              : swipeUI.isDragging
+                ? 'border-radius 0.2s ease' // transform tracks the finger instantly; only radius eases
+                : 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease, box-shadow 0.3s ease', // Springy snap-back
             willChange: 'transform',
-            boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)'
+            borderRadius: cardCornerRadius,
+            overflow: 'hidden',
+            boxShadow: swipeUI.isDragging
+              ? '0 14px 34px -8px rgba(0,0,0,0.28)'
+              : exitingCard
+                ? '0 20px 44px -10px rgba(0,0,0,0.3)'
+                : '0 2px 8px rgba(0,0,0,0.08)'
           }}
         >
           {/* Image area - flexible height that fills remaining space */}
           <div
-            className="discover-image-area flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden"
+            className={`discover-image-area flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
             style={{
               // Use flexible height calculation that works better on mobile browsers
-              minHeight: showMoreInfo ? 'max(40vh, 300px)' : 'max(50vh, 350px)',
-              maxHeight: showMoreInfo ? '60vh' : '70vh'
+              // Extra vh reclaimed from the header now offsetting to 0 so the photo reaches the top edge.
+              // Collapsed: no cap — the image (flex-1) absorbs all leftover space itself, so the
+              // compact info panel below just hugs its own content instead of being stretched.
+              // Expanded: capped so the info panel has room to grow and show more detail.
+              minHeight: showMoreInfo ? 'max(48vh, 340px)' : 'max(58vh, 400px)',
+              maxHeight: showMoreInfo ? '72vh' : 'none'
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -4622,78 +4683,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             {/* ...existing code... */}
             {swipeUI.isDragging && swipeUI.swipeDirection && (
               <>
-                {/* Like Overlay - Right Swipe */}
+                {/* Like Overlay - Right Swipe: heart, positioned left, near top */}
                 {swipeUI.swipeDirection === 'right' && (
-                  <div 
-                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                    style={{ 
-                      background: `linear-gradient(135deg, rgba(34, 197, 94, ${swipeOpacity * 0.7}), rgba(74, 222, 128, ${swipeOpacity * 0.5}))`,
-                      transition: 'none'
-                    }}
-                  >
-                    <div 
-                      className="bg-green-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
-                      style={{ 
-                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
-                        transition: 'none'
-                      }}
-                    >
-                      <Heart 
-                        className="w-12 h-12 text-white fill-current" 
-                        style={{ 
-                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                          transform: `rotate(${swipeUI.swipeDistance * 0.1}deg)`
+                  <>
+                    <div className="absolute inset-0 z-20 flex items-start justify-start pl-10 pointer-events-none" style={{ paddingTop: '35%' }}>
+                      <div
+                        className="relative"
+                        style={{
+                          transform: `scale(${Math.min(0.85 + swipeOpacity * 0.5, 1.35)}) rotate(${swipeUI.swipeDistance * 0.08}deg)`,
+                          opacity: Math.min(0.55 + swipeOpacity, 1),
+                          transition: 'none'
                         }}
-                      />
+                      >
+                        {/* Second, softer heart offset behind for a fuller "double love" burst */}
+                        <Heart
+                          className="w-20 h-20 absolute -top-2 -left-2 opacity-50"
+                          style={{ color: '#ef4444', fill: '#ef4444', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.3))' }}
+                        />
+                        <Heart
+                          className="w-20 h-20 relative"
+                          style={{ color: '#dc2626', fill: '#dc2626', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))' }}
+                        />
+                      </div>
                     </div>
-                    <div 
-                      className="absolute bottom-32 bg-green-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
-                      style={{ 
-                        opacity: Math.min(swipeOpacity + 0.2, 1),
-                        transform: `translateY(${-swipeUI.swipeDistance * 0.1}px)`,
-                        transition: 'none'
-                      }}
-                    >
-                      <span className="text-white font-bold text-2xl tracking-wider">{t('discover.likeOverlay')}</span>
-                    </div>
-                  </div>
+                  </>
                 )}
 
-                {/* Pass Overlay - Left Swipe */}
+                {/* Pass Overlay - Left Swipe: white X, positioned right, near top */}
                 {swipeUI.swipeDirection === 'left' && (
-                  <div 
-                    className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-                    style={{ 
-                      background: `linear-gradient(135deg, rgba(239, 68, 68, ${swipeOpacity * 0.7}), rgba(248, 113, 113, ${swipeOpacity * 0.5}))`,
-                      transition: 'none'
-                    }}
-                  >
-                    <div 
-                      className="bg-red-500/90 backdrop-blur-sm rounded-full p-6 shadow-2xl transform"
-                      style={{ 
-                        scale: Math.min(0.8 + (swipeOpacity * 0.4), 1.2),
-                        transition: 'none'
-                      }}
-                    >
-                      <X 
-                        className="w-12 h-12 text-white" 
-                        style={{ 
-                          filter: `drop-shadow(0 4px 8px rgba(0,0,0,0.3))`,
-                          transform: `rotate(${-swipeUI.swipeDistance * 0.1}deg)`
+                  <>
+                    <div className="absolute inset-0 z-20 flex items-start justify-end pr-10 pointer-events-none" style={{ paddingTop: '35%' }}>
+                      <X
+                        className="w-28 h-28"
+                        strokeWidth={3}
+                        style={{
+                          color: '#ffffff',
+                          filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))',
+                          transform: `scale(${Math.min(0.85 + swipeOpacity * 0.5, 1.35)}) rotate(${-swipeUI.swipeDistance * 0.08}deg)`,
+                          opacity: Math.min(0.55 + swipeOpacity, 1),
+                          transition: 'none'
                         }}
                       />
                     </div>
-                    <div 
-                      className="absolute bottom-32 bg-red-500/95 backdrop-blur-sm px-8 py-3 rounded-full shadow-xl"
-                      style={{ 
-                        opacity: Math.min(swipeOpacity + 0.2, 1),
-                        transform: `translateY(${-swipeUI.swipeDistance * 0.1}px)`,
-                        transition: 'none'
-                      }}
-                    >
-                      <span className="text-white font-bold text-2xl tracking-wider">{t('discover.nopeOverlay')}</span>
-                    </div>
-                  </div>
+                  </>
                 )}
               </>
             )}
@@ -4739,30 +4771,47 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               />
             )}
           </div>
-          
-          {/* AdinkraBar - between image and info sections */}
-          <LazyAdinkraBar userCountry={currentUser?.country} />
 
           {/* Info section - dynamic height that fits content exactly */}
-          <div className={`discover-info-area bg-pink-50 transition-all duration-300 flex-shrink-0 -mt-2 ${
-            showMoreInfo ? 'expanded' : 'overflow-hidden'
-          }`}>
-            <div 
+          {/*
+            Always sized to its own content (flex-shrink-0), never stretched:
+            - Collapsed: the image above has no max-height, so it absorbs all leftover
+              vertical space itself, leaving this panel compact and hugging its content.
+            - Expanded: the image is capped, giving this panel room to grow; the inner
+              wrapper below handles the actual scroll/height animation via showMoreInfo.
+          */}
+          {/*
+            No background of its own (transparent) and pulled up slightly over the photo
+            (-mt) so the glassy top of .detailsContainer genuinely overlaps the image and
+            blurs it, instead of just sitting on a second flat pink layer behind it.
+          */}
+          {/*
+            Uses transform (not a negative margin) to visually pull this panel up over the
+            photo — a negative margin here changes how much space this flex item consumes,
+            which lets the image sibling (flex-1) grow to reclaim it, canceling the overlap
+            out. transform is purely visual and doesn't feed back into flex sizing.
+          */}
+          <div
+            className={`discover-info-area relative z-20 transition-all duration-300 flex-shrink-0 ${
+              showMoreInfo ? 'expanded' : 'overflow-hidden'
+            }`}
+            style={{ transform: 'translateY(-130px)', marginBottom: '-130px' }}
+          >
+            <div
               ref={contentRef}
-              className={`w-full pt-1 ${showMoreInfo ? 'overflow-y-scroll px-1' : 'overflow-hidden'}`} 
+              className={`w-full pt-1 ${showMoreInfo ? 'overflow-y-scroll scrollbar-hide' : 'overflow-hidden'}`}
               style={{
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
                 // Restore fixed heights for collapsed/expanded states
-                maxHeight: showMoreInfo ? 'min(45vh, 400px)' : '230px', // Fixed max height when collapsed
+                maxHeight: showMoreInfo ? 'min(48vh, 420px)' : '250px', // Fixed max height when collapsed
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
-                paddingBottom: showMoreInfo 
-                  ? `calc(${
-                      isIOSPlatform() 
-                        ? (vh < 700 ? '190px' : '160px')
-                        : (vh < 700 ? '190px' : '160px')
-                    } + env(safe-area-inset-bottom, 0px))` 
+                // Just enough room for the scrolled content to clear the floating pill nav
+                // (nav sits ~22px/30px off the bottom edge plus its own compact height) —
+                // previously this was 160-190px, tuned for the old full-width nav bar.
+                paddingBottom: showMoreInfo
+                  ? `calc(${vh < 700 ? '110px' : '90px'} + env(safe-area-inset-bottom, 0px))`
                   : '0px'
               }}
             >
@@ -4784,6 +4833,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 calculateDistance={calculateDistance}
                 swipeDirection={swipeUI.swipeDirection}
                 swipeDistance={swipeUI.swipeDistance}
+                isDragging={swipeUI.isDragging}
                 isVerified={!!currentMatch.is_verified}
                 isSwipeAreaOnly={false}
                 isDetailsAreaOnly={true} // Render only details/info area

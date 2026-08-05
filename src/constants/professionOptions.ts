@@ -45,3 +45,10 @@ export const industryOptions = [
   // Other
   'Freelance/Self-Employed', 'Startup', 'Other'
 ];
+
+export const educationLevelOptions = [
+  'No Formal Education', 'Primary School', 'Junior High School', 'High School',
+  'Vocational/Trade School', 'Some College', 'Associate Degree', "Bachelor's Degree",
+  'Postgraduate Diploma', "Master's Degree", 'Doctorate', 'Professional Degree',
+  'Self-Taught', 'Currently Studying', 'Other'
+];

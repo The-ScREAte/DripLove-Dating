@@ -42,18 +42,20 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                type="text"
-                id="occupationCustom"
-                name="occupationCustom"
-                value={editedProfile.occupationCustom || ''}
-                onChange={e => onInputChange({
-                  target: { name: 'occupation', value: e.target.value }
-                } as any)}
-                disabled={!isEditing}
-                className="w-full mt-2"
-                placeholder={t('profile.enterOccupation')}
-              />
+              {editedProfile.occupation === 'Other' && (
+                <Input
+                  type="text"
+                  id="occupationCustom"
+                  name="occupationCustom"
+                  value={editedProfile.occupationCustom || ''}
+                  onChange={e => onInputChange({
+                    target: { name: 'occupationCustom', value: e.target.value }
+                  } as any)}
+                  disabled={!isEditing}
+                  className="w-full mt-2"
+                  placeholder={t('profile.enterOccupation')}
+                />
+              )}
             </div>
             <div>
               <Label htmlFor="industry">{t('profile.industry')}</Label>
@@ -73,18 +75,20 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                type="text"
-                id="industryCustom"
-                name="industryCustom"
-                value={editedProfile.industryCustom || ''}
-                onChange={e => onInputChange({
-                  target: { name: 'industry', value: e.target.value }
-                } as any)}
-                disabled={!isEditing}
-                className="w-full mt-2"
-                placeholder={t('profile.enterIndustry')}
-              />
+              {editedProfile.industry === 'Other' && (
+                <Input
+                  type="text"
+                  id="industryCustom"
+                  name="industryCustom"
+                  value={editedProfile.industryCustom || ''}
+                  onChange={e => onInputChange({
+                    target: { name: 'industryCustom', value: e.target.value }
+                  } as any)}
+                  disabled={!isEditing}
+                  className="w-full mt-2"
+                  placeholder={t('profile.enterIndustry')}
+                />
+              )}
             </div>
           </div>
           <div>
@@ -117,18 +121,20 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 <SelectItem value="Other">{t('profile.educationOptions.other')}</SelectItem>
               </SelectContent>
             </Select>
-            <Input
-              type="text"
-              id="education_level_custom"
-              name="education_level_custom"
-              value={editedProfile.education_level_custom || ''}
-              onChange={e => onInputChange({
-                target: { name: 'education_level', value: e.target.value }
-              } as React.ChangeEvent<HTMLInputElement>)}
-              disabled={!isEditing}
-              className="w-full mt-2"
-              placeholder={t('profile.enterEducation')}
-            />
+            {editedProfile.education_level === 'Other' && (
+              <Input
+                type="text"
+                id="education_level_custom"
+                name="education_level_custom"
+                value={editedProfile.education_level_custom || ''}
+                onChange={e => onInputChange({
+                  target: { name: 'education_level_custom', value: e.target.value }
+                } as React.ChangeEvent<HTMLInputElement>)}
+                disabled={!isEditing}
+                className="w-full mt-2"
+                placeholder={t('profile.enterEducation')}
+              />
+            )}
           </div>
         </div>
       </CardContent>

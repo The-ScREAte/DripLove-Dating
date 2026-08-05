@@ -3,7 +3,7 @@ import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
 import ReportModal from '../modals/ReportModal';
 import styles from './MatchCard.module.css';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ChevronDown, ChevronUp, User, Languages, Heart } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ArrowDown, ArrowUp, User, Languages, Heart } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
@@ -31,6 +31,7 @@ interface MatchCardProps {
   calculateDistance: (lat1: number, lon1: number, lat2: number, lon2: number) => number;
   swipeDirection: 'left' | 'right' | null;
   swipeDistance: number;
+  isDragging?: boolean; // Whether the card is actively being dragged (used to avoid a WebKit mask+backdrop-filter flicker)
   isSwipeAreaOnly?: boolean; // New prop to render only swipeable image area
   isDetailsAreaOnly?: boolean; // New prop to render only details area
   getOptimizedUrl?: (url: string) => string; // New prop for image optimization
@@ -56,6 +57,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   calculateDistance,
   swipeDirection,
   swipeDistance,
+  isDragging = false,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
   getOptimizedUrl = (url: string) => optimizeImageUrl(url, { width: 500, quality: 60 }),
@@ -431,10 +433,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {slides[currentSlide]?.type === 'image' && (
                 <div 
                   className="absolute right-3 z-50"
-                  style={{ 
-                    top: platform === 'android' 
-                      ? '2rem' 
-                      : 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)' 
+                  style={{
+                    top: platform === 'android'
+                      ? 'calc(2rem + 56px)'
+                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 56px)'
                   }}
                 >
                   <button
@@ -453,7 +455,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && (
                 <div 
                   className="absolute left-1/2 transform -translate-x-1/2 z-50"
-                  style={{ top: 'clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem)' }}
+                  style={{ top: 'calc(clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem) + 56px)' }}
                 >
                   <div className="relative flex flex-col items-center">
                     {/* Single optimized glow layer */}
@@ -492,11 +494,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {slides && slides.length > 1 && (
             <div 
               className="absolute left-4 flex space-x-2 z-10"
-              style={{ 
-                top: platform === 'android' 
-                  ? '2rem' 
-                  : 'clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem)', 
-                pointerEvents: 'none' 
+              style={{
+                top: platform === 'android'
+                  ? 'calc(2rem + 56px)'
+                  : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 56px)',
+                pointerEvents: 'none'
               }}
             >
               {slides.map((_, index) => (
@@ -667,17 +669,20 @@ const MatchCard: React.FC<MatchCardProps> = ({
   if (isDetailsAreaOnly) {
     // Render only the non-swipeable details area
     return (
-      <div 
-        className={`w-full ${showMoreInfo ? 'pt-0' : 'pt-0'} px-4 ${styles.detailsContainer}`}
+      <div
+        className={`w-full pt-3 ${styles.detailsContainer} ${isDragging ? styles.detailsContainerDragging : ''}`}
         style={{
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif'
         }}
       >
         {/* Basic Info - Always shown */}
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start mt-2 px-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 leading-tight">
-              <h2 className="text-[18px] font-medium text-gray-900">
+              <h2
+                className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(20px, 8vw, 40px)' }}
+              >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
               {/* Verified badge beside name and age - exact same as ProfilePage */}
@@ -688,16 +693,19 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   src="/images/verified.svg"
                   alt="Verified profile"
                   title="Verified profile"
-                  className="w-6 h-6"
+                  className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
                   aria-hidden="false"
                 />
               )}
             </div>
 
             {match.city && (
-              <div className="flex items-center mt-1.5 text-gray-600 leading-tight">
-                <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-sm font-normal">
+              <div
+                className="flex items-center mt-1.5 text-white/90 leading-tight"
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}
+              >
+                <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                <span className="text-[clamp(12px,3.4vw,14px)] font-normal">
                   {match.city}, {match.country}
                   {match.distance !== undefined ? (
                     <span className="ml-2">
@@ -722,35 +730,44 @@ const MatchCard: React.FC<MatchCardProps> = ({
             )}
             
             {match.relationship_intent && (
-              <div className="flex items-center mt-2 text-gray-600 leading-tight">
-                <Heart className="w-4 h-4 mr-1" />
-                <span className="text-[13px] font-medium">
+              <div
+                className="flex items-center mt-2 text-white/90 leading-tight"
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}
+              >
+                <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                <span className="text-[clamp(11px,3.2vw,13px)] font-medium">
                   {formatRelationshipIntent(match.relationship_intent)}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Expandable info button */}
+          {/* Expandable info button — small, clean, glassy circle so it doesn't compete with the content */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               onToggleInfo();
             }}
-            className="bg-pink-500 hover:bg-pink-600 text-white rounded-full p-3 mt-3 transition-colors shadow-lg"
+            className={`text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] mt-3 transition-all duration-200 shrink-0 backdrop-blur-md ${
+              !showMoreInfo ? styles.chevronHop : ''
+            }`}
+            style={{
+              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+            }}
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
             {showMoreInfo ? (
-              <ChevronUp className="w-5 h-4" />
+              <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
             ) : (
-              <ChevronDown className="w-5 h-4" />
+              <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
             )}
           </button>
         </div>
 
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
-          <div className="mt-4 space-y-3 text-base">
+          <div className="mt-4 px-4 pb-3 space-y-3 text-[clamp(13px,3.6vw,16px)]">
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-gray-50 rounded-lg p-3">
@@ -804,13 +821,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div className="space-y-2">
                   {match.occupation && (
                     <div className="flex items-center text-sm">
-                      <Briefcase className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
+                      <Briefcase className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
                       <span className="text-gray-700">{match.occupation}</span>
                     </div>
                   )}
                   {match.education_level && (
                     <div className="flex items-center text-sm">
-                      <GraduationCap className="w-3 h-3 mr-2 flex-shrink-0 text-pink-500" />
+                      <GraduationCap className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
                       <span className="text-gray-700">{match.education_level}</span>
                     </div>
                   )}
@@ -895,7 +912,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               <div className="bg-gray-50 rounded-lg p-3">
                 <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.language')}</h4>
                 <div className="flex items-center text-sm">
-                  <Languages className="w-4 h-4 mr-2 text-pink-500" />
+                  <Languages className="w-[clamp(12px,3.2vw,14px)] h-[clamp(12px,3.2vw,14px)] mr-2 text-pink-500 shrink-0" />
                   <span className="text-gray-700">{preferredLanguageName}</span>
                 </div>
               </div>

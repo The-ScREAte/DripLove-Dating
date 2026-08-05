@@ -9,15 +9,32 @@ const corsHeaders = {
 
 const DEFAULT_BATCH_SIZE = 15;
 const DEFAULT_BATCH_DELAY_MS = 500;
+// Stay a safety margin under Gmail's real 500/day cap so we stop rotating
+// *before* Gmail starts hard-rejecting mid-batch.
+const DAILY_LIMIT_PER_ACCOUNT = 450;
+
+interface SmtpAccount {
+  email: string;
+  pass: string;
+  fromName: string | null;
+}
 
 interface BroadcastEmailRequest {
   recipients: string[];
   subject: string;
   htmlContent: string;
   textContent?: string;
+  targetCountries?: string[];
+  recipientFilter?: string;
+  adminId?: string; // Only honored for trusted service-role calls (e.g. scheduled broadcasts).
 }
 
 const isValidEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const isQuotaError = (message: string): boolean => {
+  const m = message.toLowerCase();
+  return m.includes('limit') || m.includes('quota') || m.includes('5.4.5') || m.includes('too many login attempts');
+};
 
 const htmlToText = (html: string): string =>
   String(html || '')
@@ -98,6 +115,29 @@ const getErrorMessage = (error: unknown): string => {
   return 'Unknown SMTP error';
 };
 
+// Reads SMTP_USER/SMTP_PASS/EMAIL_FROM_NAME as account 1, then SMTP_USER_2/SMTP_PASS_2/...,
+// SMTP_USER_3/... for as many additional sending accounts as are configured.
+function loadAccounts(): SmtpAccount[] {
+  const accounts: SmtpAccount[] = [];
+  let index = 1;
+
+  while (true) {
+    const suffix = index === 1 ? '' : `_${index}`;
+    const email = Deno.env.get(`SMTP_USER${suffix}`);
+    const pass = Deno.env.get(`SMTP_PASS${suffix}`);
+    if (!email || !pass) break;
+
+    accounts.push({
+      email,
+      pass,
+      fromName: Deno.env.get(`EMAIL_FROM_NAME${suffix}`) || Deno.env.get('EMAIL_FROM_NAME'),
+    });
+    index += 1;
+  }
+
+  return accounts;
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -116,6 +156,7 @@ serve(async (req: Request) => {
     // Trusted server-to-server call (e.g. from process-scheduled-broadcasts) using the
     // service role key directly — skip the admin-user lookup since the caller is already trusted.
     const isServiceRoleCall = token === supabaseServiceKey;
+    let adminId: string | null = null;
 
     if (!isServiceRoleCall) {
       const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -128,10 +169,15 @@ serve(async (req: Request) => {
         .single();
 
       if (profileError || !profile?.is_admin) throw new Error('Forbidden: Admin access required');
+      adminId = user.id;
     }
 
     const body: BroadcastEmailRequest = await req.json();
-    const { recipients, subject, htmlContent, textContent } = body;
+    const { recipients, subject, htmlContent, textContent, targetCountries, recipientFilter } = body;
+
+    if (isServiceRoleCall && body.adminId) {
+      adminId = body.adminId;
+    }
 
     if (!Array.isArray(recipients) || recipients.length === 0) {
       throw new Error('No recipients provided');
@@ -142,82 +188,187 @@ serve(async (req: Request) => {
 
     const host = Deno.env.get('SMTP_HOST');
     const port = Number(Deno.env.get('SMTP_PORT') || 587);
-    const smtpUser = Deno.env.get('SMTP_USER') || Deno.env.get('EMAIL_USER');
-    const smtpPass = Deno.env.get('SMTP_PASS') || Deno.env.get('EMAIL_PASSWORD');
     const secure = (Deno.env.get('SMTP_SECURE') || String(port === 465)).toLowerCase() === 'true';
-    const fromAddress = Deno.env.get('EMAIL_FROM') || smtpUser;
-    const fromName = Deno.env.get('EMAIL_FROM_NAME');
 
-    if (!host || !smtpUser || !smtpPass || !fromAddress) {
-      throw new Error('SMTP is not configured (missing SMTP_HOST, SMTP_USER, SMTP_PASS, or EMAIL_FROM secret in Supabase)');
+    if (!host) {
+      throw new Error('SMTP is not configured (missing SMTP_HOST secret in Supabase)');
     }
 
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
+    const accounts = loadAccounts();
+    if (accounts.length === 0) {
+      throw new Error('SMTP is not configured (missing SMTP_USER/SMTP_PASS secrets in Supabase)');
+    }
 
-    const brandedHtml = buildDripLoveHtml(subject, htmlContent);
-    const brandedText = textContent || htmlToText(normalizeBodyHtml(htmlContent));
-
+    // Dedupe + validate recipients up front.
     const seen = new Set<string>();
     const accepted: string[] = [];
-    const rejected: Array<{ email: string; error: string }> = [];
+    const invalid: Array<{ email: string; error: string }> = [];
 
     for (const raw of recipients) {
       const email = String(raw || '').trim().toLowerCase();
       if (!email || seen.has(email)) continue;
       seen.add(email);
       if (!isValidEmail(email)) {
-        rejected.push({ email, error: 'Invalid email format' });
+        invalid.push({ email, error: 'Invalid email format' });
         continue;
       }
       accepted.push(email);
     }
 
+    // Check how much quota each account has left today, then hand out recipients
+    // to accounts in order until either everyone's assigned or every account is full.
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: usageRows } = await supabase
+      .from('email_account_usage')
+      .select('account_email, sent_count')
+      .in('account_email', accounts.map((a) => a.email))
+      .eq('send_date', today);
+
+    const usedByAccount = new Map<string, number>();
+    (usageRows || []).forEach((row: { account_email: string; sent_count: number }) => {
+      usedByAccount.set(row.account_email, row.sent_count);
+    });
+
+    let cursor = 0;
+    const assignments: Array<{ account: SmtpAccount; batch: string[] }> = [];
+    for (const account of accounts) {
+      const used = usedByAccount.get(account.email) || 0;
+      const remaining = Math.max(0, DAILY_LIMIT_PER_ACCOUNT - used);
+      if (remaining === 0 || cursor >= accepted.length) continue;
+
+      const batch = accepted.slice(cursor, cursor + remaining);
+      cursor += batch.length;
+      if (batch.length > 0) assignments.push({ account, batch });
+    }
+
+    const queued = accepted.slice(cursor); // Nobody had capacity left for these.
+
+    // Create the history row up front so overflow recipients have something to attach to.
+    const { data: historyRow, error: historyInsertError } = await supabase
+      .from('email_broadcast_history')
+      .insert({
+        subject,
+        message: htmlContent,
+        recipient_count: recipients.length,
+        successful_sends: 0,
+        failed_sends: 0,
+        status: 'processing',
+        admin_id: adminId,
+        target_countries: targetCountries && targetCountries.length > 0 ? targetCountries : null,
+        recipient_filter: recipientFilter || null,
+      })
+      .select()
+      .single();
+
+    if (historyInsertError) {
+      console.error('Failed to create email history row:', historyInsertError);
+    }
+    const broadcastId: string | null = historyRow?.id ?? null;
+
+    const brandedHtml = buildDripLoveHtml(subject, htmlContent);
+    const brandedText = textContent || htmlToText(normalizeBodyHtml(htmlContent));
+
     const successful: string[] = [];
-    const failed: Array<{ email: string; error: string }> = [...rejected];
-    const batchSize = DEFAULT_BATCH_SIZE;
+    const failed: Array<{ email: string; error: string }> = [...invalid];
 
-    for (let i = 0; i < accepted.length; i += batchSize) {
-      const batch = accepted.slice(i, i + batchSize);
-
-      const results = await Promise.allSettled(
-        batch.map((to) =>
-          transporter.sendMail({
-            from: fromName ? `${fromName} <${fromAddress}>` : fromAddress,
-            to,
-            subject,
-            html: brandedHtml,
-            text: brandedText,
-          })
-        )
-      );
-
-      results.forEach((result, index) => {
-        const email = batch[index];
-        if (result.status === 'fulfilled') {
-          successful.push(email);
-        } else {
-          failed.push({ email, error: getErrorMessage(result.reason) });
-        }
+    for (const { account, batch } of assignments) {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: { user: account.email, pass: account.pass },
       });
 
-      if (i + batchSize < accepted.length) {
-        await new Promise((resolve) => setTimeout(resolve, DEFAULT_BATCH_DELAY_MS));
+      let sentFromThisAccount = 0;
+      let hitQuota = false;
+      let nextIndex = 0;
+
+      for (; nextIndex < batch.length; nextIndex += DEFAULT_BATCH_SIZE) {
+        if (hitQuota) break; // Stop attempting further chunks once this account is out of quota.
+        const chunk = batch.slice(nextIndex, nextIndex + DEFAULT_BATCH_SIZE);
+
+        // Sent concurrently within the chunk, so a quota rejection here only tells us this
+        // account is now out of quota — it doesn't retroactively change other results in
+        // the same chunk, each of which already got its own real fulfilled/rejected outcome.
+        const results = await Promise.allSettled(
+          chunk.map((to) =>
+            transporter.sendMail({
+              from: account.fromName ? `${account.fromName} <${account.email}>` : account.email,
+              to,
+              subject,
+              html: brandedHtml,
+              text: brandedText,
+            })
+          )
+        );
+
+        results.forEach((result, idx) => {
+          const email = chunk[idx];
+          if (result.status === 'fulfilled') {
+            successful.push(email);
+          } else {
+            const message = getErrorMessage(result.reason);
+            failed.push({ email, error: message });
+            if (isQuotaError(message)) hitQuota = true;
+          }
+          sentFromThisAccount += 1; // Every attempt (success or failure) counts against the account's daily quota.
+        });
+
+        if (!hitQuota && nextIndex + DEFAULT_BATCH_SIZE < batch.length) {
+          await new Promise((resolve) => setTimeout(resolve, DEFAULT_BATCH_DELAY_MS));
+        }
       }
+
+      if (hitQuota) {
+        // Anything not yet attempted for this account goes back into the pool for the next
+        // account (handled by the caller re-pushing to `queued` below).
+        queued.push(...batch.slice(nextIndex));
+      }
+
+      if (sentFromThisAccount > 0) {
+        try {
+          await supabase.rpc('increment_email_account_usage', {
+            p_account_email: account.email,
+            p_amount: sentFromThisAccount,
+          });
+        } catch (usageError) {
+          console.error('Failed to record account usage:', usageError);
+        }
+      }
+    }
+
+    // Anything left over (no account had capacity) goes into the queue for automatic resumption.
+    const uniqueQueued = Array.from(new Set(queued));
+    if (uniqueQueued.length > 0 && broadcastId) {
+      const queueRows = uniqueQueued.map((recipient) => ({ broadcast_id: broadcastId, recipient }));
+      const { error: queueError } = await supabase.from('email_send_queue').insert(queueRows);
+      if (queueError) console.error('Failed to queue overflow recipients:', queueError);
+    }
+
+    const finalStatus = uniqueQueued.length > 0 ? 'partial' : failed.length > 0 && successful.length === 0 ? 'failed' : 'completed';
+
+    if (broadcastId) {
+      await supabase
+        .from('email_broadcast_history')
+        .update({
+          successful_sends: successful.length,
+          failed_sends: failed.length,
+          status: finalStatus,
+          error_details: failed.length > 0 ? failed : null,
+        })
+        .eq('id', broadcastId);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         provider: 'smtp-nodemailer',
+        broadcastId,
         results: {
           sent: successful.length,
           failed: failed.length,
-          details: { successful, failed },
+          queued: uniqueQueued.length,
+          details: { successful, failed, queued: uniqueQueued },
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
