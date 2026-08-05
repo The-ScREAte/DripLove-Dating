@@ -1017,22 +1017,32 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 margin: 0,
                 padding: 0,
                 top: 0,
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.22))',
-                backdropFilter: 'blur(18px) saturate(160%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+                position: 'fixed',
+                // Border/shadow live on this OUTER, unmasked element so they stay crisp — only
+                // the background/blur layer below gets feathered, not the border itself.
                 border: '1px solid rgba(236,72,153,0.7)',
                 boxShadow: '0 4px 20px -10px rgba(236, 72, 153, 0.35)',
-                // Soft feather on the bottom edge so the header blends into the photo below
-                // instead of ending on a hard line.
-                maskImage: 'linear-gradient(to bottom, black 0%, black 78%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 78%, transparent 100%)',
                 // The header has no interactive controls of its own — it must never intercept
                 // touch/mouse events meant for the swipe card underneath it.
                 pointerEvents: 'none',
               }}
             >
+              {/* Background + blur, feathered on the bottom edge so it blends into the photo
+                  below instead of ending on a hard line. Kept on its own layer (behind the
+                  border-carrying parent) so the mask never fades the border/shadow too. */}
               <div
-                className="px-4 py-2 flex justify-between items-center"
+                aria-hidden="true"
+                className="absolute inset-0 rounded-[21px]"
+                style={{
+                  background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.22))',
+                  backdropFilter: 'blur(18px) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+                  maskImage: 'linear-gradient(to bottom, black 0%, black 55%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 55%, transparent 100%)',
+                }}
+              />
+              <div
+                className="relative px-4 py-2 flex justify-between items-center"
                 style={{
                   paddingTop: getPlatformSync() === 'ios'
                     ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)'

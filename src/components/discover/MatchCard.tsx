@@ -455,17 +455,23 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && (
                 <div
                   className="absolute left-1/2 transform -translate-x-1/2 z-50"
-                  style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 70px)' }}
+                  style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 40px)' }}
                 >
                   <div className="relative flex flex-col items-center">
                     {/* Single optimized glow layer */}
                     <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
-                      {/* Single efficient gradient layer */}
+                      {/* Single efficient gradient layer — black, spread horizontally rather
+                          than a circular glow, so it reads as a soft backdrop shadow instead of
+                          a colored halo. */}
                       <div
-                        className="absolute inset-0 w-full h-full"
+                        className="absolute w-full"
                         style={{
-                          background: 'radial-gradient(circle at center, rgba(255, 98, 0, 0.25), transparent 80%)',
-                          filter: 'blur(0px)',
+                          left: 0,
+                          right: 0,
+                          top: '50%',
+                          height: '160%',
+                          transform: 'translateY(-50%)',
+                          background: 'radial-gradient(ellipse 100% 50% at center, rgba(0,0,0,0.45), transparent 75%)',
                         }}
                       ></div>
 
