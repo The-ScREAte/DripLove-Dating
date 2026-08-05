@@ -89,8 +89,8 @@ const FaceVerificationSection = ({
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Shield className="w-5 h-5 text-purple-600" />
+          <h3 className="text-lg font-semibold flex items-center gap-2 text-white">
+            <Shield className="w-5 h-5 text-purple-400" />
             Face Verification
           </h3>
           <Button
@@ -113,34 +113,34 @@ const FaceVerificationSection = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
-        <Shield className="w-5 h-5 text-purple-600" />
-        <h3 className="text-lg font-semibold">Face Verification</h3>
+        <Shield className="w-5 h-5 text-purple-400" />
+        <h3 className="text-lg font-semibold text-white">Face Verification</h3>
       </div>
 
       {isVerified ? (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="bg-black border border-green-500/30 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+            <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-green-500" />
             </div>
             <div>
-              <p className="font-medium text-green-800">Verified</p>
-              <p className="text-sm text-green-600">
+              <p className="font-medium text-green-400">Verified</p>
+              <p className="text-sm text-green-500/80">
                 Your identity has been confirmed. Others can see your verified badge.
               </p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="bg-black border border-purple-500/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Camera className="w-5 h-5 text-purple-600" />
+            <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <Camera className="w-5 h-5 text-purple-400" />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-purple-800">Get Verified</p>
-              <p className="text-sm text-purple-600 mb-3">
-                Verify your identity to build trust and show others you're real. 
+              <p className="font-medium text-purple-300">Get Verified</p>
+              <p className="text-sm text-purple-400/80 mb-3">
+                Verify your identity to build trust and show others you're real.
                 Verified profiles get more matches!
               </p>
               <Button

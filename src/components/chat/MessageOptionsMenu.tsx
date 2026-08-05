@@ -79,7 +79,7 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-0 focus:outline-none text-current opacity-50 hover:opacity-100 transition-opacity"
+        className="p-0 focus:outline-none text-current opacity-60 hover:opacity-100 transition-opacity"
         aria-label="Message options"
       >
         <MoreVertical className="w-3.5 h-3.5" />
@@ -89,30 +89,30 @@ const MessageOptionsMenu: React.FC<MessageOptionsMenuProps> = ({
         <div
           className={`absolute ${showBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${
             isOwnMessage ? 'right-0' : 'left-0'
-          } bg-white rounded-lg shadow-lg border border-gray-200 py-0.5 z-50 w-32 text-sm`}
+          } bg-black rounded-lg shadow-lg border border-pink-500/30 py-0.5 z-50 w-32 text-sm`}
         >
           {onReply && (
             <button
               onClick={handleReply}
-              className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+              className="w-full px-2.5 py-1.5 text-left text-gray-100 hover:bg-pink-500/15 flex items-center gap-1.5 transition-colors text-xs"
             >
               <Reply className="w-3 h-3" />
               {t('chat.reply')}
             </button>
           )}
-          
+
           <button
             onClick={handleDeleteForMe}
-            className="w-full px-2.5 py-1.5 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-1.5 transition-colors text-xs"
+            className="w-full px-2.5 py-1.5 text-left text-gray-100 hover:bg-pink-500/15 flex items-center gap-1.5 transition-colors text-xs"
           >
             <Trash2 className="w-3 h-3" />
             {t('chat.deleteForMe')}
           </button>
-          
+
           {isOwnMessage && (
             <button
               onClick={handleDeleteForEveryone}
-              className="w-full px-2.5 py-1.5 text-left text-red-600 hover:bg-red-50 flex items-center gap-1.5 transition-colors text-xs"
+              className="w-full px-2.5 py-1.5 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-1.5 transition-colors text-xs"
             >
               <Trash2 className="w-3 h-3" />
               {t('chat.deleteForEveryone')}

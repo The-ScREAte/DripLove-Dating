@@ -18,8 +18,8 @@ const NewMatches: React.FC<NewMatchesProps> = ({
   if (matches.length === 0) return null;
 
   return (
-    <div className="px-4 pt-2 pb-3 border-b bg-background">
-      <h3 className="text-sm font-semibold text-foreground mb-2">New Matches</h3>
+    <div className="px-4 pt-2 pb-3 border-b border-pink-500/30 bg-black">
+      <h3 className="text-sm font-semibold text-white mb-2">New Matches</h3>
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
         {matches.map((match) => {
           const partnerId = match.partner?.id || 
@@ -32,7 +32,7 @@ const NewMatches: React.FC<NewMatchesProps> = ({
               onClick={() => onMatchSelect(match)}
             >
               <div className="relative mb-2">
-                <div className="w-16 h-16 rounded-full p-[3px] bg-gradient-to-br from-blue-400 to-blue-600">
+                <div className="w-16 h-16 rounded-full p-[3px] bg-gradient-to-br from-pink-500 to-purple-600">
                   <div onClick={(e) => {
                     e.stopPropagation();
                     onUserProfileOpen(partnerId);
@@ -46,7 +46,7 @@ const NewMatches: React.FC<NewMatchesProps> = ({
                   </div>
                 </div>
               </div>
-              <span className="text-xs text-foreground text-center truncate w-full">
+              <span className="text-xs text-gray-200 text-center truncate w-full">
                 {match.first_name}
               </span>
             </div>

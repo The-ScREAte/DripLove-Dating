@@ -159,10 +159,10 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4">
-      <Card className="shadow-lg border-pink-200 w-full">
+      <Card className="shadow-lg bg-black border-pink-500/40 w-full">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-pink-600" />
+          <CardTitle className="flex items-center space-x-2 text-white">
+            <Users className="w-5 h-5 text-pink-400" />
             <span>{t('profile.yourDripLoveSummary')}</span>
           </CardTitle>
         </CardHeader>
@@ -170,26 +170,26 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
           <div className="grid grid-cols-3 gap-4 text-center">
             <div className="space-y-2">
               <div className="flex justify-center">
-                <Heart className="w-6 h-6 text-red-500" />
+                <Heart className="w-6 h-6 text-red-400" />
               </div>
-              <div className="text-2xl font-bold text-red-500">{stats.totalMatches}</div>
-              <p className="text-xs text-gray-600">{t('profile.totalMatches')}</p>
+              <div className="text-2xl font-bold text-red-400">{stats.totalMatches}</div>
+              <p className="text-xs text-gray-400">{t('profile.totalMatches')}</p>
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-center">
-                <MessageCircle className="w-6 h-6 text-blue-500" />
+                <MessageCircle className="w-6 h-6 text-blue-400" />
               </div>
-              <div className="text-2xl font-bold text-blue-500">{stats.activeChats}</div>
-              <p className="text-xs text-gray-600">{t('profile.activeChats')}</p>
+              <div className="text-2xl font-bold text-blue-400">{stats.activeChats}</div>
+              <p className="text-xs text-gray-400">{t('profile.activeChats')}</p>
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-center">
-                <Users className="w-6 h-6 text-purple-500" />
+                <Users className="w-6 h-6 text-purple-400" />
               </div>
-              <div className="text-2xl font-bold text-purple-500">{stats.totalLikes}</div>
-              <p className="text-xs text-gray-600">{t('profile.likesGiven')}</p>
+              <div className="text-2xl font-bold text-purple-400">{stats.totalLikes}</div>
+              <p className="text-xs text-gray-400">{t('profile.likesGiven')}</p>
             </div>
           </div>
         </CardContent>

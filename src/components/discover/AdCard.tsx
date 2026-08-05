@@ -44,7 +44,7 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-white">
+    <div className="w-full h-full flex flex-col bg-black">
       {/* Full-page Ad Media */}
       <div className="flex-1 relative overflow-hidden">
         {isVideo ? (
@@ -85,9 +85,9 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
       </div>
 
       {/* Ad Info */}
-      <div className="p-2 pb-3 bg-white">
-        <h2 className="text-2xl font-bold mb-">{ad.name}</h2>
-        <p className="text-gray-600 mb-4">{ad.about}</p>
+      <div className="p-2 pb-3 bg-black">
+        <h2 className="text-2xl font-bold mb- text-white">{ad.name}</h2>
+        <p className="text-gray-300 mb-4">{ad.about}</p>
         
         {ad.link && (
           <Button 

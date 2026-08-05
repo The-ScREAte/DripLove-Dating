@@ -171,15 +171,15 @@ const LiveChatFAQ: React.FC = () => {
   return (
     <>
       {/* Chat Button */}
-      <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-lg border border-pink-200">
+      <div className="bg-black p-4 rounded-lg border border-pink-500/30">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full flex items-center justify-center">
               <MessageCircle className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h4 className="font-semibold text-gray-900">Need Help?</h4>
-              <p className="text-sm text-gray-600">Get instant answers</p>
+              <h4 className="font-semibold text-white">Need Help?</h4>
+              <p className="text-sm text-gray-400">Get instant answers</p>
             </div>
           </div>
           <Button 
@@ -194,7 +194,7 @@ const LiveChatFAQ: React.FC = () => {
       {/* Chat Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-white w-full sm:w-96 h-[80vh] sm:h-[600px] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
+          <div className="bg-black border border-pink-500/30 w-full sm:w-96 h-[80vh] sm:h-[600px] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
             {/* Header */}
             <div className="bg-gradient-to-r from-pink-500 to-purple-500 p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -222,22 +222,22 @@ const LiveChatFAQ: React.FC = () => {
               {selectedFAQ ? (
                 // Answer View
                 <div className="space-y-4">
-                  <div className="bg-gray-100 rounded-2xl rounded-tl-sm p-4">
-                    <p className="font-medium text-gray-900">{selectedFAQ.question}</p>
+                  <div className="bg-neutral-900 border border-pink-500/20 rounded-2xl rounded-tl-sm p-4">
+                    <p className="font-medium text-white">{selectedFAQ.question}</p>
                   </div>
                   <div className="bg-gradient-to-r from-pink-500 to-purple-500 rounded-2xl rounded-tr-sm p-4 text-white ml-8">
                     <p className="leading-relaxed">{getAnswer(selectedFAQ)}</p>
                   </div>
-                  
+
                   {/* Quick Actions */}
                   <div className="pt-4 space-y-2">
-                    <p className="text-sm text-gray-500 text-center">Was this helpful?</p>
+                    <p className="text-sm text-gray-400 text-center">Was this helpful?</p>
                     <div className="flex justify-center gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setSelectedFAQ(null)}
-                        className="text-pink-600 border-pink-200 hover:bg-pink-50"
+                        className="text-pink-400 border-pink-500/30 hover:bg-pink-500/10"
                       >
                         Ask another question
                       </Button>
@@ -247,20 +247,20 @@ const LiveChatFAQ: React.FC = () => {
               ) : selectedCategory === 'all' ? (
                 // Category Selection
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-500 mb-4">What can I help you with today?</p>
+                  <p className="text-sm text-gray-400 mb-4">What can I help you with today?</p>
                   {categories.filter(c => c.id !== 'all').map((category) => (
                     <button
                       key={category.id}
                       onClick={() => setSelectedCategory(category.id)}
-                      className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
+                      className="w-full flex items-center justify-between p-4 bg-neutral-900 hover:bg-neutral-800 rounded-xl transition-colors border border-pink-500/10"
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center text-pink-600">
+                        <div className="w-10 h-10 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-full flex items-center justify-center text-pink-400">
                           {category.icon}
                         </div>
-                        <span className="font-medium text-gray-900">{category.label}</span>
+                        <span className="font-medium text-white">{category.label}</span>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                      <ChevronRight className="w-5 h-5 text-gray-500" />
                     </button>
                   ))}
                 </div>
@@ -271,15 +271,15 @@ const LiveChatFAQ: React.FC = () => {
                     <button
                       key={faq.id}
                       onClick={() => setSelectedFAQ(faq)}
-                      className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors text-left"
+                      className="w-full flex items-center justify-between p-4 bg-neutral-900 hover:bg-neutral-800 rounded-xl transition-colors text-left border border-pink-500/10"
                     >
                       <div className="flex items-center space-x-3 flex-1">
-                        <div className="w-8 h-8 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center text-pink-600 flex-shrink-0">
+                        <div className="w-8 h-8 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-full flex items-center justify-center text-pink-400 flex-shrink-0">
                           {faq.icon}
                         </div>
-                        <span className="text-gray-900 text-sm">{faq.question}</span>
+                        <span className="text-gray-100 text-sm">{faq.question}</span>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -287,8 +287,8 @@ const LiveChatFAQ: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="border-t p-4">
-              <p className="text-xs text-gray-500 text-center">
+            <div className="border-t border-pink-500/20 p-4">
+              <p className="text-xs text-gray-400 text-center">
                 Still need help? Email us at{' '}
                 <a href="mailto:driploveinfo@gmail.com" className="text-pink-600 font-medium">
                   driploveinfo@gmail.com

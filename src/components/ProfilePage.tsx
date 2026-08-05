@@ -762,17 +762,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   // Safety check for required data
   if (!currentUser) {
     return (
-      <div className="h-full w-full bg-pink-50 flex items-center justify-center" style={{ minHeight: '100%' }}>
+      <div className="h-full w-full bg-black flex items-center justify-center" style={{ minHeight: '100%' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t('common.loading')}</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">{t('common.loading')}</p>
         </div>
       </div>
     );
   }
 
   return (
-      <div className="h-full w-full bg-pink-50 overflow-x-hidden"
+      <div className="h-full w-full bg-black overflow-x-hidden"
          style={{ 
            touchAction: 'pan-y', // allow horizontal gestures (e.g. slider drags) to be handled by child controls
            userSelect: 'none',
@@ -783,7 +783,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
-        className="fixed left-0 right-0 z-40 bg-pink-50/95 border-b border-gray-200 shadow-sm backdrop-blur-sm"
+        className="fixed left-0 right-0 z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm"
         style={{
           // Start from where main header ends; slightly lowered for cleaner breathing room
           top: platform === 'android' 
@@ -809,14 +809,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <div className="relative">
                   <Button
                     onClick={openProfileMessages}
-                    className="h-9 px-3.5 border-gray-300 text-gray-700 hover:bg-pink-100 disabled:opacity-50 bg-pink-50 border"
+                    className="h-9 px-3.5 border-pink-500/40 text-white hover:bg-pink-900/30 disabled:opacity-50 bg-black border"
                     variant="outline"
                     aria-label="Open profile messages"
                   >
                     <MessageCircle className="w-4 h-4" />
                   </Button>
                   {broadcastUnreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-gray-900 text-white text-[10px] flex items-center justify-center">
+                    <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-600 text-white text-[10px] flex items-center justify-center">
                       {broadcastUnreadCount}
                     </span>
                   )}
@@ -827,7 +827,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {isOwnProfile && (
                 <Button
                   onClick={() => navigate('/games')}
-                  className="h-9 px-3.5 border-purple-300 text-purple-700 hover:bg-purple-50 bg-pink-50 border"
+                  className="h-9 px-3.5 border-pink-500/40 text-purple-300 hover:bg-purple-900/30 bg-black border"
                   variant="outline"
                   size="sm"
                   aria-label="Play games"
@@ -837,14 +837,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               )}
 
               {/* Single toggle button - Edit becomes Cancel */}
-              <Button 
+              <Button
                 onClick={isEditing ? handleCancel : () => setIsEditing(true)}
                 disabled={isSaving}
                 size="sm"
                 className={`h-9 px-3.5 font-medium transition-all duration-200 ${
-                  isEditing 
-                    ? 'border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50 bg-pink-50 border' 
-                    : 'bg-gray-900 hover:bg-gray-800 text-white'
+                  isEditing
+                    ? 'border-red-500/50 text-red-400 hover:bg-red-900/30 disabled:opacity-50 bg-black border'
+                    : 'bg-neutral-800 hover:bg-neutral-700 text-white'
                 }`}
                 variant={isEditing ? 'outline' : 'default'}
               >
@@ -874,15 +874,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           {/* Profile Completion Progress Bar with Verified Badge */}
           <div className="mt-8">
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className={`h-2 transition-all duration-500 rounded-full ${
-                    completion >= 90 ? 'bg-emerald-500' : 'bg-blue-500'
+                    completion >= 90 ? 'bg-emerald-500' : 'bg-blue-400'
                   }`}
                   style={{ width: `${completion}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right flex items-center justify-end gap-2">
+              <span className="text-sm font-semibold text-white min-w-[45px] text-right flex items-center justify-end gap-2">
                 <span>{completion}%</span>
                 {showVerifiedBadge && (
                   <img loading="lazy" decoding="async"
@@ -898,25 +898,25 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             
             {/* Profile completion notice */}
             {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
-              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 relative">
+              <div className="mt-4 bg-blue-950/40 border border-blue-700/50 rounded-lg px-4 py-3 relative">
                 <button
-                  className="absolute top-2 right-3 text-blue-700 hover:text-blue-900 text-lg font-bold focus:outline-none"
+                  className="absolute top-2 right-3 text-blue-300 hover:text-blue-100 text-lg font-bold focus:outline-none"
                   aria-label="Dismiss profile completion"
                   onClick={() => setHideProfileCompletion(true)}
                 >
                   ×
                 </button>
                 <div className="pr-8">
-                  <h4 className="font-semibold text-blue-900 mb-2">{t('profile.completeProfilePrompt')}</h4>
-                  <ul className="text-sm text-blue-800 space-y-1">
+                  <h4 className="font-semibold text-blue-200 mb-2">{t('profile.completeProfilePrompt')}</h4>
+                  <ul className="text-sm text-blue-300 space-y-1">
                     {missingFields.slice(0, 3).map((field, index) => (
                       <li key={index} className="flex items-start">
-                        <span className="text-blue-500 mr-2">•</span>
+                        <span className="text-blue-400 mr-2">•</span>
                         {t(field)}
                       </li>
                     ))}
                     {missingFields.length > 3 && (
-                      <li className="text-blue-600 font-medium">
+                      <li className="text-blue-300 font-medium">
                         +{missingFields.length - 3} {t('profile.moreItems')}
                       </li>
                     )}
@@ -955,10 +955,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
           {isOwnProfile && (
             <Dialog open={isProfileMessagesOpen} onOpenChange={setIsProfileMessagesOpen}>
-              <DialogContent className="sm:max-w-[550px] max-h-[85vh] p-0 gap-0 overflow-hidden">
-                <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-pink-50 to-purple-50">
-                  <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-pink-600" />
+              <DialogContent className="sm:max-w-[550px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-black border-pink-500/30">
+                <DialogHeader className="px-6 py-4 border-b border-pink-500/20 bg-gradient-to-r from-pink-950/40 to-purple-950/40">
+                  <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-pink-400" />
                     {t('profile.updatesTitle', 'Profile Updates')}
                   </DialogTitle>
                 </DialogHeader>
@@ -967,17 +967,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   {isLoadingBroadcastMessages ? (
                     <div className="flex items-center justify-center py-12">
                       <div className="text-center">
-                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-600 mx-auto mb-3"></div>
-                        <p className="text-sm text-gray-500">{t('profile.loadingUpdates', 'Loading updates...')}</p>
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto mb-3"></div>
+                        <p className="text-sm text-gray-400">{t('profile.loadingUpdates', 'Loading updates...')}</p>
                       </div>
                     </div>
                   ) : broadcastMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16">
-                      <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center mb-4">
+                      <div className="w-20 h-20 bg-gradient-to-br from-green-900/40 to-emerald-900/40 rounded-full flex items-center justify-center mb-4">
                         <span className="text-4xl">😊</span>
                       </div>
-                      <p className="text-xl font-semibold text-gray-800 mb-2">{t('profile.allCaughtUp', 'All caught up')}</p>
-                      <p className="text-sm text-gray-500">{t('profile.noNewUpdates', 'No new updates right now.')}</p>
+                      <p className="text-xl font-semibold text-white mb-2">{t('profile.allCaughtUp', 'All caught up')}</p>
+                      <p className="text-sm text-gray-400">{t('profile.noNewUpdates', 'No new updates right now.')}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -989,19 +989,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                           <div 
                             key={msg.recipient_id} 
                             className={`border-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md ${
-                              isUnread 
-                                ? 'border-pink-400 bg-gradient-to-br from-pink-50 to-purple-50'
-                                : 'border-gray-200 bg-white hover:border-gray-300'
+                              isUnread
+                                ? 'border-pink-400/70 bg-gradient-to-br from-pink-950/40 to-purple-950/40'
+                                : 'border-pink-500/20 bg-black hover:border-pink-500/40'
                             }`}
                           >
                             {/* Message Header - Clickable */}
-                            <div 
+                            <div
                               className="flex items-start justify-between p-4 cursor-pointer"
                               onClick={() => toggleMessageExpanded(msg.recipient_id)}
                             >
                               <div className="flex-1 min-w-0 pr-3">
                                 <div className="flex items-center gap-2 mb-1.5">
-                                  <h3 className={`text-base truncate ${isUnread ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                                  <h3 className={`text-base truncate ${isUnread ? 'font-bold text-white' : 'font-semibold text-gray-300'}`}>
                                     {msg.title}
                                   </h3>
                                   {isUnread && (
@@ -1010,7 +1010,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                                     </span>
                                   )}
                                 </div>
-                                <p className={`text-xs ${isUnread ? 'font-semibold text-pink-700' : 'text-gray-500'}`}>
+                                <p className={`text-xs ${isUnread ? 'font-semibold text-pink-300' : 'text-gray-400'}`}>
                                   {new Date(msg.sent_at || msg.created_at).toLocaleDateString('en-US', {
                                     year: 'numeric',
                                     month: 'short',
@@ -1020,17 +1020,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                                   })}
                                 </p>
                               </div>
-                              <ChevronDown 
+                              <ChevronDown
                                 className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
-                                  isUnread ? 'text-pink-600' : 'text-gray-400'
+                                  isUnread ? 'text-pink-400' : 'text-gray-500'
                                 } ${isExpanded ? 'transform rotate-180' : ''}`}
                               />
                             </div>
 
                             {/* Expanded Message Body */}
                             {isExpanded && (
-                              <div className="px-4 pb-4 border-t border-gray-200/50">
-                                <div className="mt-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed bg-white rounded-lg p-4 border border-gray-100">
+                              <div className="px-4 pb-4 border-t border-pink-500/20">
+                                <div className="mt-4 text-sm text-gray-200 whitespace-pre-wrap leading-relaxed bg-black/60 rounded-lg p-4 border border-pink-500/20">
                                   {msg.message}
                                 </div>
                                 <div className="mt-4 flex justify-end">

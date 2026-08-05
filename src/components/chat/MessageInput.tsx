@@ -84,20 +84,20 @@ const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="chat-input-container border-t border-gray-200 shadow-[0_-4px_12px_rgba(15,23,42,0.08)]"
+      className="chat-input-container bg-black border-t border-pink-500/30 shadow-[0_-4px_12px_rgba(0,0,0,0.4)]"
     >
       {/* Reply preview */}
       {replyingTo && (
-        <div className="px-4 pt-3 pb-2 bg-gray-50 border-b border-gray-200">
+        <div className="px-4 pt-3 pb-2 bg-black border-b border-pink-500/20">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2 mb-1">
-                <div className="w-1 h-8 bg-primary rounded-full"></div>
+                <div className="w-1 h-8 bg-pink-500 rounded-full"></div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-600">
+                  <p className="text-xs font-semibold text-gray-300">
                     Replying to {replyingTo.sender?.first_name || 'User'}
                   </p>
-                  <p className="text-sm text-gray-800 truncate">
+                  <p className="text-sm text-gray-100 truncate">
                     {replyingTo.message}
                   </p>
                 </div>
@@ -106,10 +106,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
             {onCancelReply && (
               <button
                 onClick={onCancelReply}
-                className="ml-2 p-1 hover:bg-gray-200 rounded-full"
+                className="ml-2 p-1 hover:bg-white/10 rounded-full"
                 aria-label="Cancel reply"
               >
-                <X className="w-4 h-4 text-gray-600" />
+                <X className="w-4 h-4 text-gray-300" />
               </button>
             )}
           </div>
@@ -118,14 +118,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
       
       <div className="p-2">
         <div className="flex items-center space-x-2">
-          <div className="flex-1 flex items-center space-x-2 bg-gray-100 rounded-full px-4 py-2 border border-pink-200 shadow-sm">
+          <div className="flex-1 flex items-center space-x-2 bg-black rounded-full px-4 py-2 border border-pink-500/30 shadow-sm">
             <Input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={t('chat.typeMessage')}
-              className="flex-1 h-10 rounded-md border border-input text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm flex-1 border-none bg-transparent focus:ring-0 p-0"
+              className="flex-1 h-10 rounded-md border border-input text-base text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm flex-1 border-none bg-transparent focus:ring-0 p-0"
               disabled={disabled}
               style={{ fontSize: '16px' }}
             />

@@ -88,8 +88,8 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onReport }) 
         userSelect: 'none'
       }}
     >
-      <div 
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto" 
+      <div
+        className="bg-black border border-pink-500/50 rounded-2xl shadow-2xl w-full max-w-sm mx-auto"
         onClick={e => e.stopPropagation()}
         style={{
           minHeight: '320px',
@@ -105,28 +105,28 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onReport }) 
         <div className="relative px-4 pt-4 pb-1">
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100"
+            className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-200 transition-colors rounded-full hover:bg-white/10"
             disabled={reporting}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          
-          <h3 className="text-xl font-bold text-red-600 pr-8">Report Image</h3>
+
+          <h3 className="text-xl font-bold text-red-400 pr-8">Report Image</h3>
         </div>
 
         {/* Modal content */}
         <div className="px-4 pb-4 max-h-96 overflow-y-auto">
           {reportSuccess ? (
-            <div className="text-green-600 font-semibold text-center py-8">
+            <div className="text-green-400 font-semibold text-center py-8">
               <div className="mb-2 text-2xl">✓</div>
               <div>Reported! Thank you.</div>
             </div>
           ) : (
             <>
-              <p className="text-gray-700 mb-3 text-sm font-semibold">Please select a reason for reporting this image:</p>
-              
+              <p className="text-gray-300 mb-3 text-sm font-semibold">Please select a reason for reporting this image:</p>
+
               {/* Reason selection with stable layout */}
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {reportReasons.map((reason) => (
@@ -136,13 +136,13 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onReport }) 
                     disabled={reporting}
                     className={`w-full min-h-10 px-3 py-2 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
                       selectedReason === reason
-                        ? 'border-red-500 bg-red-50 text-red-700'
-                        : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+                        ? 'border-red-500 bg-red-950/60 text-red-300'
+                        : 'border-neutral-700 bg-neutral-900 text-gray-300 hover:border-neutral-500 hover:bg-neutral-800'
                     } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
                     <span className="text-xs sm:text-sm font-medium flex-1 pr-1 leading-tight">{reason}</span>
                     {selectedReason === reason && (
-                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -159,18 +159,18 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onReport }) 
                 >
                   {reporting ? 'Reporting...' : 'Report Image'}
                 </button>
-                
+
                 <button
-                  className="w-full h-10 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  className="w-full h-10 bg-neutral-800 hover:bg-neutral-700 text-gray-100 font-semibold text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 border border-pink-500/30"
                   onClick={onClose}
                   disabled={reporting}
                 >
                   Cancel
                 </button>
               </div>
-              
+
               {reportError && (
-                <div className="text-red-500 text-sm mt-4 text-center bg-red-50 p-3 rounded-lg border border-red-200">
+                <div className="text-red-300 text-sm mt-4 text-center bg-red-950/40 p-3 rounded-lg border border-red-500/40">
                   {reportError}
                 </div>
               )}

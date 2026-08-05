@@ -1309,27 +1309,27 @@ const TestYourToast = () => {
 
   if (!selectedLevel) {
     return (
-      <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col">
-        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-black flex flex-col">
+        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
                   <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                  <p className="text-xs text-gray-600">Test Your Toast 🥂</p>
+                  <p className="text-xs text-gray-300">Test Your Toast 🥂</p>
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleClearResults}
-                className="border-gray-300 text-gray-700"
+                className="bg-black border-pink-500/40 text-gray-200 hover:bg-white/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -1339,9 +1339,9 @@ const TestYourToast = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-          <Card>
+          <Card className="bg-neutral-900 border-pink-500/30">
             <CardHeader>
-              <CardTitle>Select a level</CardTitle>
+              <CardTitle className="text-white">Select a level</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {Object.entries(levelConfig).map(([levelStr, config]) => {
@@ -1351,24 +1351,24 @@ const TestYourToast = () => {
                   <Button
                     key={level}
                     onClick={() => startLevel(level)}
-                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all active:scale-95"
+                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all active:scale-95 bg-black/60 border-pink-500/30 text-white hover:bg-white/5"
                     variant="outline"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-lg">Level {level}</span>
-                        <span className="text-sm text-gray-600">- {config.name}</span>
+                        <span className="font-bold text-lg text-white">Level {level}</span>
+                        <span className="text-sm text-gray-300">- {config.name}</span>
                         <div className="flex gap-0.5">
                           {Array.from({ length: level }).map((_, i) => (
                             <Star key={i} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                           ))}
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600">{config.difficulty} • {config.questionCount} questions{level >= 4 ? ' • 💀 Sudden Death' : ''}</p>
+                      <p className="text-sm text-gray-300">{config.difficulty} • {config.questionCount} questions{level >= 4 ? ' • 💀 Sudden Death' : ''}</p>
                     </div>
-                    <div className="text-right text-sm font-semibold text-gray-900 min-w-[80px]">
+                    <div className="text-right text-sm font-semibold text-white min-w-[80px]">
                       {levelBest ? `${levelBest.percentage.toFixed(0)}%` : '—'}
-                      <div className="text-[11px] text-gray-500">Best</div>
+                      <div className="text-[11px] text-gray-400">Best</div>
                     </div>
                   </Button>
                 );
@@ -1377,15 +1377,15 @@ const TestYourToast = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card>
+            <Card className="bg-neutral-900 border-pink-500/30">
               <CardHeader>
-                <CardTitle>Your best 3 (this device)</CardTitle>
+                <CardTitle className="text-white">Your best 3 (this device)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {best3.map((r, idx) => (
                   <div key={`${r.playedAt}-${idx}`} className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700">Level {r.level} • {r.percentage.toFixed(0)}%</div>
-                    <div className="text-gray-500">{new Date(r.playedAt).toLocaleDateString()}</div>
+                    <div className="text-gray-200">Level {r.level} • {r.percentage.toFixed(0)}%</div>
+                    <div className="text-gray-400">{new Date(r.playedAt).toLocaleDateString()}</div>
                   </div>
                 ))}
               </CardContent>
@@ -1404,19 +1404,19 @@ const TestYourToast = () => {
     const bestPct = bestByLevel[selectedLevel ?? -1]?.percentage;
     const isNewBest = bestPct === undefined || percentage >= bestPct;
     return (
-      <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col">
-        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-black flex flex-col">
+        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-xs text-gray-600">Test Your Toast 🥂</p>
+                <p className="text-xs text-gray-300">Test Your Toast 🥂</p>
               </div>
             </div>
           </div>
@@ -1424,16 +1424,16 @@ const TestYourToast = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
           <div className="max-w-2xl mx-auto px-4 py-8">
-          <Card className="text-center">
+          <Card className="text-center bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-8 pb-8">
-              <Trophy className="w-20 h-20 mx-auto mb-6 text-yellow-500" />
-              <h2 className="text-3xl font-bold mb-2">{rating.title}</h2>
-              <p className="text-xl text-gray-600 mb-6">{rating.message}</p>
-              
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <div className="text-5xl font-extrabold text-gray-900 mb-2">{percentage.toFixed(0)}%</div>
-                <p className="text-gray-600 mb-2">Level {selectedLevel} • {score} / {scenarios.length} correct</p>
-                <div className="text-sm text-gray-600">
+              <Trophy className="w-20 h-20 mx-auto mb-6 text-yellow-400" />
+              <h2 className="text-3xl font-bold mb-2 text-white">{rating.title}</h2>
+              <p className="text-xl text-gray-300 mb-6">{rating.message}</p>
+
+              <div className="bg-black/60 border border-pink-500/20 rounded-lg p-6 mb-6">
+                <div className="text-5xl font-extrabold text-white mb-2">{percentage.toFixed(0)}%</div>
+                <p className="text-gray-300 mb-2">Level {selectedLevel} • {score} / {scenarios.length} correct</p>
+                <div className="text-sm text-gray-300">
                   Best for this level: {bestPct !== undefined ? `${bestPct.toFixed(0)}%` : '—'} {isNewBest ? '🎉' : ''}
                 </div>
               </div>
@@ -1448,7 +1448,7 @@ const TestYourToast = () => {
                 <Button
                   onClick={() => navigate('/games')}
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-pink-500/40 text-white hover:bg-white/10"
                 >
                   Back to Games
                 </Button>
@@ -1462,32 +1462,32 @@ const TestYourToast = () => {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-yellow-50 to-orange-50 flex flex-col">
+    <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-sm font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-xs text-gray-600">Test Your Toast • Q{questionIndex + 1}/{scenarios.length}</p>
+                <p className="text-xs text-gray-300">Test Your Toast • Q{questionIndex + 1}/{scenarios.length}</p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500 mb-1">Best</div>
-              <div className="text-lg font-bold text-gray-900">
+              <div className="text-xs text-gray-400 mb-1">Best</div>
+              <div className="text-lg font-bold text-white">
                 {bestByLevel[selectedLevel ?? -1]?.percentage !== undefined
                   ? `${bestByLevel[selectedLevel ?? -1]?.percentage.toFixed(0)}%`
                   : '—'}
               </div>
               {streak > 1 && (
-                <div className="text-[11px] text-orange-600 font-semibold flex items-center gap-1 justify-end mt-1">
+                <div className="text-[11px] text-orange-400 font-semibold flex items-center gap-1 justify-end mt-1">
                   <TrendingUp className="w-3 h-3" />
                   {streak} streak
                 </div>
@@ -1498,9 +1498,9 @@ const TestYourToast = () => {
       </div>
 
       {/* Progress Bar */}
-      <div className="bg-white border-b">
+      <div className="bg-black border-b border-pink-500/20">
         <div className="max-w-2xl mx-auto px-4 py-2">
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-300"
               style={{ width: `${((questionIndex + 1) / Math.max(1, scenarios.length)) * 100}%` }}
@@ -1513,46 +1513,46 @@ const TestYourToast = () => {
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
         <div className="max-w-2xl mx-auto px-4 py-6">
         {loadingScenarios ? (
-          <Card className="mb-6">
+          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
             <CardContent className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-                <p className="text-gray-600">Loading scenarios...</p>
+                <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+                <p className="text-gray-300">Loading scenarios...</p>
               </div>
             </CardContent>
           </Card>
         ) : !currentScenario ? (
-          <Card className="mb-6">
-            <CardContent className="py-12 text-center text-gray-600">
+          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
+            <CardContent className="py-12 text-center text-gray-300">
               No scenarios available
             </CardContent>
           </Card>
         ) : (
           <>
-            <Card className="mb-6">
+            <Card className="mb-6 bg-neutral-900 border-pink-500/30">
               <CardHeader>
-                <div className="inline-block px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold mb-3">
+                <div className="inline-block px-3 py-1 bg-orange-500/20 text-orange-300 rounded-full text-sm font-semibold mb-3">
                   {currentScenario.personality}
                 </div>
-                <CardTitle className="text-lg leading-relaxed">{currentScenario.situation}</CardTitle>
+                <CardTitle className="text-lg leading-relaxed text-white">{currentScenario.situation}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {currentScenario.options.map((option, index) => {
                   const isSelected = selectedOption === index;
                   const isCorrectAnswer = index === correctDisplayedIndex;
-                  
+
                   let buttonClass = "w-full text-left p-4 rounded-lg border-2 transition-all ";
-                  
+
                   if (showFeedback) {
                     if (isCorrectAnswer) {
-                      buttonClass += "border-green-500 bg-green-50 text-green-900 shadow-green-200/50 shadow-md";
+                      buttonClass += "border-green-500/60 bg-green-500/10 text-green-200 shadow-green-500/10 shadow-md";
                     } else if (isSelected && !isCorrectAnswer) {
-                      buttonClass += "border-red-500 bg-red-50 text-red-900";
+                      buttonClass += "border-red-500/60 bg-red-500/10 text-red-200";
                     } else {
-                      buttonClass += "border-gray-200 bg-gray-50 text-gray-500";
+                      buttonClass += "border-white/10 bg-white/5 text-gray-400";
                     }
                   } else {
-                    buttonClass += "border-gray-200 hover:border-orange-400 hover:bg-orange-50 cursor-pointer active:scale-98 transition-transform";
+                    buttonClass += "border-pink-500/20 bg-black/40 text-gray-100 hover:border-orange-400 hover:bg-orange-500/10 cursor-pointer active:scale-98 transition-transform";
                   }
 
                   return (
@@ -1577,9 +1577,9 @@ const TestYourToast = () => {
 
         {/* Feedback Card */}
         {showFeedback && (
-          <Card className={`mb-6 border-2 ${isCorrect ? 'border-green-500 bg-green-50' : 'border-orange-500 bg-orange-50'}`}>
+          <Card className={`mb-6 border-2 bg-neutral-900 ${isCorrect ? 'border-green-500/60' : 'border-orange-500/60'}`}>
             <CardContent className="pt-6">
-              <p className="text-lg leading-relaxed mb-4">
+              <p className="text-lg leading-relaxed mb-4 text-gray-100">
                 {isCorrect ? currentScenario.feedback.correct : currentScenario.feedback.incorrect}
               </p>
               <Button

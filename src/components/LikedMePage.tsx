@@ -1040,8 +1040,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     };
 
     return (
-      <div 
-        className="h-full w-full relative flex flex-col bg-white"
+      <div
+        className="h-full w-full relative flex flex-col bg-black"
         style={{
           paddingTop: platform === 'web' ? '0px' : '0px',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
@@ -1074,16 +1074,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         >
           {/* Placeholder Slide - when no images */}
           {isPlaceholderSlide && (
-            <div 
-              className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center relative"
+            <div
+              className="w-full h-full bg-gradient-to-br from-pink-950 to-purple-950 flex items-center justify-center relative"
               onClick={handleNavigationClick}
               style={{ cursor: 'pointer' }}
             >
               <div className="text-center">
-                <span className="text-6xl font-bold text-gray-700">
+                <span className="text-6xl font-bold text-pink-200">
                   {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
                 </span>
-                <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
+                <p className="text-gray-300 mt-4 text-sm">No photos uploaded yet</p>
               </div>
             </div>
           )}
@@ -1321,12 +1321,12 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
                 {/* Expanded Info */}
                 {showMoreInfo && (
-                  <div className="mt-4 space-y-3 bg-white/90 backdrop-blur-sm rounded-lg p-4 max-h-64 overflow-y-auto text-gray-800">
+                  <div className="mt-4 space-y-3 bg-black/85 border border-pink-500/30 backdrop-blur-sm rounded-lg p-4 max-h-64 overflow-y-auto text-gray-100">
                     {selectedProfile.adinkra_symbols && selectedProfile.adinkra_symbols.length > 0 && (
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">✨</div>
                         <div className="w-full">
-                          <p className="text-xs text-gray-600 mb-1">Cultural Signs</p>
+                          <p className="text-xs text-gray-400 mb-1">Cultural Signs</p>
                           <div className="flex flex-wrap gap-1">
                             {selectedProfile.adinkra_symbols.map((symbol: string, index: number) => (
                               <span key={index} className="px-2 py-1 bg-primary/10 rounded-full text-xs text-primary font-medium">
@@ -1341,7 +1341,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🗣️</div>
                         <div>
-                          <p className="text-xs text-gray-600">Preferred Language</p>
+                          <p className="text-xs text-gray-400">Preferred Language</p>
                           <p className="text-sm font-medium">{selectedProfile.preferred_language}</p>
                         </div>
                       </div>
@@ -1350,7 +1350,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <GraduationCap className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-600">Education</p>
+                          <p className="text-xs text-gray-400">Education</p>
                           <p className="text-sm font-medium">{selectedProfile.education_level}</p>
                         </div>
                       </div>
@@ -1359,7 +1359,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <Briefcase className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-600">Industry</p>
+                          <p className="text-xs text-gray-400">Industry</p>
                           <p className="text-sm font-medium">{selectedProfile.industry}</p>
                         </div>
                       </div>
@@ -1368,7 +1368,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🍷</div>
                         <div>
-                          <p className="text-xs text-gray-600">Drinking</p>
+                          <p className="text-xs text-gray-400">Drinking</p>
                           <p className="text-sm font-medium">{selectedProfile.drinking}</p>
                         </div>
                       </div>
@@ -1377,7 +1377,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🚭</div>
                         <div>
-                          <p className="text-xs text-gray-600">Smoking</p>
+                          <p className="text-xs text-gray-400">Smoking</p>
                           <p className="text-sm font-medium">{selectedProfile.smoking}</p>
                         </div>
                       </div>
@@ -1386,7 +1386,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">💪</div>
                         <div>
-                          <p className="text-xs text-gray-600">Exercise</p>
+                          <p className="text-xs text-gray-400">Exercise</p>
                           <p className="text-sm font-medium">{selectedProfile.exercise_level}</p>
                         </div>
                       </div>
@@ -1395,7 +1395,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">😴</div>
                         <div>
-                          <p className="text-xs text-gray-600">Sleep Schedule</p>
+                          <p className="text-xs text-gray-400">Sleep Schedule</p>
                           <p className="text-sm font-medium">{selectedProfile.sleeping_schedule}</p>
                         </div>
                       </div>
@@ -1404,7 +1404,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                       <div className="flex items-start gap-2">
                         <Heart className="w-4 h-4 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs text-gray-600">Looking For</p>
+                          <p className="text-xs text-gray-400">Looking For</p>
                           <p className="text-sm font-medium">{selectedProfile.relationship_intent}</p>
                         </div>
                       </div>
@@ -1474,8 +1474,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
   if (loading) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-pink-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+      <div className="h-full w-full flex items-center justify-center bg-black">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
       </div>
     );
   }
@@ -1484,8 +1484,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   // Guard must run after all hooks have been declared
   if (!currentUser || !currentUser.id) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-pink-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
+      <div className="h-full w-full flex items-center justify-center bg-black">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
       </div>
     );
   }
@@ -1496,9 +1496,9 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   }
 
   return (
-    <div 
-      className="h-full flex flex-col bg-pink-50"
-      style={{ 
+    <div
+      className="h-full flex flex-col bg-black"
+      style={{
         touchAction: 'pan-x pan-y',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -1510,18 +1510,18 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     >
       {/* Pull to refresh indicator */}
       {pullDistance > 0 && (
-        <div 
-          className="flex items-center justify-center bg-pink-50 transition-all duration-200"
+        <div
+          className="flex items-center justify-center bg-black transition-all duration-200"
           style={{ height: `${pullDistance}px` }}
         >
-          <div className="text-pink-600 text-sm">
+          <div className="text-pink-400 text-sm">
             {pullDistance > 50 ? (isRefreshing ? `🔄 ${t('matches.refreshing')}` : `↓ ${t('matches.releaseToRefresh')}`) : `↓ ${t('matches.pullToRefresh')}`}
           </div>
         </div>
       )}
-      
-  <div 
-    className="flex-shrink-0 bg-pink-50 border-b px-4 py-4 mx-4"
+
+  <div
+    className="flex-shrink-0 bg-black border-b border-pink-500/30 px-4 py-4 mx-4"
     style={{
       marginTop: platform === 'ios' 
         ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
@@ -1532,8 +1532,8 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   >
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center space-x-1.5">
-            <Users className="w-4 h-4 text-pink-600" />
-            <h1 className="text-sm font-bold text-gray-800">{t('matches.peopleWhoLikedYou')}</h1>
+            <Users className="w-4 h-4 text-pink-400" />
+            <h1 className="text-sm font-bold text-white">{t('matches.peopleWhoLikedYou')}</h1>
           </div>
           {!isPremium && (
             <Button
@@ -1546,11 +1546,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             </Button>
           )}
         </div>
-        <p className="text-gray-500 text-xs">({t('matches.peopleCount', { count: likers.length })})</p>
-        
+        <p className="text-gray-400 text-xs">({t('matches.peopleCount', { count: likers.length })})</p>
+
         {!isPremium && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
-            <div className="flex items-center space-x-1.5 text-yellow-800">
+          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-2 mt-2">
+            <div className="flex items-center space-x-1.5 text-yellow-300">
               <Lock className="w-3 h-3" />
               <span className="text-[10px] font-medium">
                 {t('matches.upgradeToPremium')}
@@ -1559,14 +1559,14 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           </div>
         )}
       </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-pink-50" ref={scrollContainerRef}>
+
+      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-black" ref={scrollContainerRef}>
         {likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">{t('matches.noNewLikes')}</h3>
-              <p className="text-gray-600">{t('matches.keepSwiping')}</p>
+              <Users className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">{t('matches.noNewLikes')}</h3>
+              <p className="text-gray-400">{t('matches.keepSwiping')}</p>
             </div>
           </div>
         ) : (
@@ -1607,7 +1607,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                     return (
                     <Card
                       key={liker.id}
-                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col h-full ${isLocked ? 'opacity-75' : ''}`}
+                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col h-full bg-black border-pink-500/30 ${isLocked ? 'opacity-75' : ''}`}
                       onClick={() => handleProfileClick(liker, likerIndex)}
                     >
                       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
@@ -1633,26 +1633,26 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                               }}
                             />
                           ) : (
-                            <div className={`w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
-                              <span className="text-2xl font-bold text-gray-700">
+                            <div className={`w-full h-full bg-gradient-to-br from-pink-950 to-purple-950 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                              <span className="text-2xl font-bold text-pink-200">
                                 {liker.first_name?.[0]}{liker.last_name?.[0]}
                               </span>
                             </div>
                           );
                         })()}
                         {isLocked && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
-                              <Lock className="w-6 h-6 text-gray-700" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <div className="bg-black/80 border border-pink-500/40 backdrop-blur-sm rounded-full p-3">
+                              <Lock className="w-6 h-6 text-pink-300" />
                             </div>
                           </div>
                         )}
                       </div>
-                      <CardContent className="p-3 flex-1 bg-pink-50">
-                        <h3 className={`font-semibold text-gray-800 truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
+                      <CardContent className="p-3 flex-1 bg-black">
+                        <h3 className={`font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
                           {liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}
                         </h3>
-                        <p className="text-xs text-gray-600 truncate">
+                        <p className="text-xs text-gray-400 truncate">
                           {liker.country}, {liker.city}
                         </p>
                       </CardContent>

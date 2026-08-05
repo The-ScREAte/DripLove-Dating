@@ -308,24 +308,24 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md relative">
-        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">✕</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="bg-neutral-900 border border-pink-500/30 rounded-lg shadow-lg p-6 w-full max-w-md relative">
+        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white">✕</button>
         {!isIOS() && (
-          <h2 className="text-xl font-bold mb-4">
+          <h2 className="text-xl font-bold mb-4 text-white">
             {isOneTime ? 'One-Time Premium Payment' : 'Subscribe to Premium'}
           </h2>
         )}
-        
+
         <div className="mb-4">
-          <label className="block font-medium mb-2">Select Payment Method:</label>
+          <label className="block font-medium mb-2 text-gray-200">Select Payment Method:</label>
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setSelectedPaymentMethod('card')}
               className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
-                selectedPaymentMethod === 'card' 
-                  ? 'bg-green-600 text-white border-green-600' 
-                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                selectedPaymentMethod === 'card'
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'bg-white/5 text-gray-300 border-white/15 hover:bg-white/10'
               }`}
             >
               💳 Card
@@ -333,9 +333,9 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
             <button
               onClick={() => setSelectedPaymentMethod('momo')}
               className={`flex-1 px-4 py-2 rounded border text-sm font-medium ${
-                selectedPaymentMethod === 'momo' 
-                  ? 'bg-green-600 text-white border-green-600' 
-                  : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                selectedPaymentMethod === 'momo'
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'bg-white/5 text-gray-300 border-white/15 hover:bg-white/10'
               }`}
             >
               📱 Mobile Money
@@ -343,23 +343,23 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
             {/* Apple In-App Purchase button removed as per request */}
           </div>
         </div>
-        
+
         <div className="mb-4">
-          <label className="block font-medium mb-1">Amount</label>
-          <input 
-            value={`${displayCurrency || 'USD'} ${displayAmount || amount}`} 
-            readOnly 
-            className="w-full border rounded px-2 py-1 font-bold text-lg" 
+          <label className="block font-medium mb-1 text-gray-200">Amount</label>
+          <input
+            value={`${displayCurrency || 'USD'} ${displayAmount || amount}`}
+            readOnly
+            className="w-full border border-pink-500/40 bg-black/40 text-white rounded px-2 py-1 font-bold text-lg placeholder:text-gray-500"
             style={{ fontSize: '16px' }}
           />
           {displayCurrency && displayCurrency !== currency && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               💱 Charged as GHS {amount.toFixed(2)} (equivalent amount in local currency)
             </p>
           )}
         </div>
-        
-        <div className="mb-4 text-sm text-gray-600">
+
+        <div className="mb-4 text-sm text-gray-300">
           {isOneTime ? (
             <div>
               <p>✅ 1 month premium access</p>
@@ -375,14 +375,14 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
             </div>
           )}
         </div>
-        
-        <button 
-          onClick={handlePay} 
+
+        <button
+          onClick={handlePay}
           disabled={isLoading}
           className={`w-full mt-2 py-3 rounded font-bold text-lg ${
             selectedPaymentMethod === 'iap'
               ? (isLoading ? 'bg-yellow-300 text-black cursor-not-allowed' : 'bg-yellow-500 text-black hover:bg-yellow-600')
-              : (isLoading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')
+              : (isLoading ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')
           }`}
         >
           {isLoading

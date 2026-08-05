@@ -288,28 +288,28 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   const reasonStyles = [
     {
-      selected: 'border-rose-500 bg-rose-50 text-rose-700 ring-1 ring-rose-100',
-      badge: 'bg-rose-100 text-rose-700'
+      selected: 'border-rose-500 bg-rose-950/50 text-rose-300 ring-1 ring-rose-500/30',
+      badge: 'bg-rose-500/20 text-rose-300'
     },
     {
-      selected: 'border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-100',
-      badge: 'bg-orange-100 text-orange-700'
+      selected: 'border-orange-500 bg-orange-950/50 text-orange-300 ring-1 ring-orange-500/30',
+      badge: 'bg-orange-500/20 text-orange-300'
     },
     {
-      selected: 'border-amber-500 bg-amber-50 text-amber-700 ring-1 ring-amber-100',
-      badge: 'bg-amber-100 text-amber-700'
+      selected: 'border-amber-500 bg-amber-950/50 text-amber-300 ring-1 ring-amber-500/30',
+      badge: 'bg-amber-500/20 text-amber-300'
     },
     {
-      selected: 'border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-100',
-      badge: 'bg-fuchsia-100 text-fuchsia-700'
+      selected: 'border-fuchsia-500 bg-fuchsia-950/50 text-fuchsia-300 ring-1 ring-fuchsia-500/30',
+      badge: 'bg-fuchsia-500/20 text-fuchsia-300'
     },
     {
-      selected: 'border-red-500 bg-red-50 text-red-700 ring-1 ring-red-100',
-      badge: 'bg-red-100 text-red-700'
+      selected: 'border-red-500 bg-red-950/50 text-red-300 ring-1 ring-red-500/30',
+      badge: 'bg-red-500/20 text-red-300'
     },
     {
-      selected: 'border-slate-500 bg-slate-50 text-slate-700 ring-1 ring-slate-100',
-      badge: 'bg-slate-100 text-slate-700'
+      selected: 'border-slate-400 bg-slate-800/60 text-slate-200 ring-1 ring-slate-500/30',
+      badge: 'bg-slate-500/20 text-slate-200'
     }
   ];
 
@@ -453,13 +453,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
               {/* Optimized cultural sign glow effect */}
               {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && (
-                <div 
+                <div
                   className="absolute left-1/2 transform -translate-x-1/2 z-50"
-                  style={{ top: 'calc(clamp(-0.25rem, env(safe-area-inset-top, -0.25rem) + 0.125rem, 1rem) + 56px)' }}
+                  style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 44px)' }}
                 >
                   <div className="relative flex flex-col items-center">
                     {/* Single optimized glow layer */}
-                    <div className="relative w-24 h-24 flex items-center justify-center overflow-visible">
+                    <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
                       {/* Single efficient gradient layer */}
                       <div
                         className="absolute inset-0 w-full h-full"
@@ -537,8 +537,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   userSelect: 'none'
                 }}
               >
-                <div 
-                  className="bg-white rounded-2xl shadow-2xl border border-rose-100/70 w-full max-w-sm mx-auto" 
+                <div
+                  className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto"
                   onClick={e => e.stopPropagation()}
                   style={{
                     minHeight: '350px',
@@ -551,10 +551,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   }}
                 >
                   {/* Modal header with close button */}
-                  <div className="relative px-4 pt-4 pb-3 border-b border-rose-100 bg-gradient-to-r from-rose-50 via-orange-50 to-white">
+                  <div className="relative px-4 pt-4 pb-3 border-b border-pink-500/20 bg-black">
                     <button
                       onClick={closeReportModal}
-                      className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors rounded-full bg-white/90 border border-slate-200 hover:bg-white"
+                      className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
                       disabled={reporting}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -563,22 +563,22 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     </button>
 
                     <div className="pr-10">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-rose-500 font-semibold">Safety Center</p>
-                      <h3 className="text-lg font-bold text-slate-900 mt-1">{t('reportModal.title')}</h3>
-                      <p className="text-xs text-slate-600 mt-1">{t('reportModal.instruction')}</p>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
+                      <h3 className="text-lg font-bold text-white mt-1">{t('reportModal.title')}</h3>
+                      <p className="text-xs text-gray-300 mt-1">{t('reportModal.instruction')}</p>
                     </div>
                   </div>
 
                   {/* Modal content */}
                   <div className="px-4 pb-4 pt-3 max-h-96 overflow-y-auto">
                     {isBlockSuccess ? (
-                      <div className="text-green-600 font-semibold text-center py-8">
+                      <div className="text-green-400 font-semibold text-center py-8">
                         <div className="mb-2 text-3xl">🚫</div>
                         <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
-                        <div className="text-sm text-gray-600">{t('reportModal.blockSuccess.message')}</div>
+                        <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
                       </div>
                     ) : reportSuccess ? (
-                      <div className="text-green-600 font-semibold text-center py-8">
+                      <div className="text-green-400 font-semibold text-center py-8">
                         <div className="mb-2 text-2xl">✓</div>
                         <div>{t('reportModal.success')}</div>
                       </div>
@@ -596,7 +596,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                               className={`w-full min-h-11 px-3 py-2 text-left rounded-xl border-2 transition-all duration-200 flex items-center justify-between ${
                                 selectedReason === reason
                                   ? tone.selected
-                                  : 'border-slate-200 bg-slate-50/80 text-slate-700 hover:border-slate-300 hover:bg-white'
+                                  : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
                               } ${(reporting || isBlocking) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
                               <span className="text-xs sm:text-sm font-semibold leading-tight flex-1 pr-1">{reason}</span>
@@ -611,18 +611,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         </div>
 
                         {/* Block section */}
-                        <div className="mb-4 p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200">
-                          <p className="text-slate-700 mb-2 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
+                        <div className="mb-4 p-3 bg-black/60 rounded-xl border border-pink-500/20">
+                          <p className="text-gray-200 mb-2 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
                           <textarea
                             placeholder={t('reportModal.blockSection.placeholder')}
                             value={blockReason}
                             onChange={(e) => setBlockReason(e.target.value)}
                             disabled={reporting || isBlocking}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg text-xs resize-none focus:ring-2 focus:ring-slate-400 focus:border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full p-2.5 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                             rows={2}
                           />
                           <button
-                            className="w-full mt-2 h-9 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-xs"
+                            className="w-full mt-2 h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-xs"
                             onClick={handleBlockUser}
                             disabled={isBlocking || reporting}
                           >
@@ -639,18 +639,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           >
                             {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
                           </button>
-                          
+
                           <button
-                            className="w-full h-10 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-sm rounded-lg border border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            className="w-full h-10 bg-black hover:bg-white/5 text-gray-200 font-semibold text-sm rounded-lg border border-pink-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             onClick={closeReportModal}
                             disabled={reporting || isBlocking}
                           >
                             {t('reportModal.cancel')}
                           </button>
                         </div>
-                        
+
                         {reportError && (
-                          <div className="text-red-600 text-xs mt-3 text-center bg-red-50 p-2.5 rounded-lg border border-red-200">
+                          <div className="text-red-300 text-xs mt-3 text-center bg-red-950/50 p-2.5 rounded-lg border border-red-500/30">
                             {reportError}
                           </div>
                         )}
@@ -681,7 +681,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="flex items-center gap-2 mb-2 leading-tight">
               <h2
                 className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(20px, 8vw, 40px)' }}
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(80px, 10vw, 100px)' }}
               >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
@@ -748,12 +748,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
               e.stopPropagation();
               onToggleInfo();
             }}
-            className={`text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] mt-3 transition-all duration-200 shrink-0 backdrop-blur-md ${
+            className={`text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-all duration-200 shrink-0 backdrop-blur-md ${
               !showMoreInfo ? styles.chevronHop : ''
             }`}
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+              marginTop: '60px',
             }}
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
@@ -767,12 +768,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
-          <div className="mt-4 px-4 pb-3 space-y-3 text-[clamp(13px,3.6vw,16px)]">
+          <div className="mt-4 px-4 pb-16 space-y-3 text-[clamp(13px,3.6vw,16px)]">
             {/* About (Bio) */}
             {match.bio && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-1">{t('discover.matchCard.about')}</h4>
-                <p className="text-gray-700 text-sm leading-relaxed">{match.bio}</p>
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-1">{t('discover.matchCard.about')}</h4>
+                <p className="text-gray-200 text-sm leading-relaxed">{match.bio}</p>
               </div>
             )}
 
@@ -783,31 +784,31 @@ const MatchCard: React.FC<MatchCardProps> = ({
               match.exercise_level,
               match.sleeping_schedule
             ].some(val => val && val !== 'not_specified')) && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.lifestyle')}</h4>
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.lifestyle')}</h4>
                 <div className="space-y-2">
                   {match.smoking && match.smoking !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">{t('discover.matchCard.smoking')}:</span>
-                      <span className="text-gray-700">{match.smoking}</span>
+                      <span className="font-semibold mr-2 text-white">{t('discover.matchCard.smoking')}:</span>
+                      <span className="text-gray-200">{match.smoking}</span>
                     </div>
                   )}
                   {match.drinking && match.drinking !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">{t('discover.matchCard.drinking')}:</span>
-                      <span className="text-gray-700">{match.drinking}</span>
+                      <span className="font-semibold mr-2 text-white">{t('discover.matchCard.drinking')}:</span>
+                      <span className="text-gray-200">{match.drinking}</span>
                     </div>
                   )}
                   {match.exercise_level && match.exercise_level !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">{t('discover.matchCard.exercise')}:</span>
-                      <span className="text-gray-700">{match.exercise_level}</span>
+                      <span className="font-semibold mr-2 text-white">{t('discover.matchCard.exercise')}:</span>
+                      <span className="text-gray-200">{match.exercise_level}</span>
                     </div>
                   )}
                   {match.sleeping_schedule && match.sleeping_schedule !== 'not_specified' && (
                     <div className="flex items-center text-sm">
-                      <span className="font-semibold mr-2">{t('discover.matchCard.sleep')}:</span>
-                      <span className="text-gray-700">{match.sleeping_schedule}</span>
+                      <span className="font-semibold mr-2 text-white">{t('discover.matchCard.sleep')}:</span>
+                      <span className="text-gray-200">{match.sleeping_schedule}</span>
                     </div>
                   )}
                 </div>
@@ -816,19 +817,19 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
             {/* Work & Education */}
             {(match.occupation || match.education_level) && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.workEducation')}</h4>
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.workEducation')}</h4>
                 <div className="space-y-2">
                   {match.occupation && (
                     <div className="flex items-center text-sm">
                       <Briefcase className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
-                      <span className="text-gray-700">{match.occupation}</span>
+                      <span className="text-gray-200">{match.occupation}</span>
                     </div>
                   )}
                   {match.education_level && (
                     <div className="flex items-center text-sm">
                       <GraduationCap className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
-                      <span className="text-gray-700">{match.education_level}</span>
+                      <span className="text-gray-200">{match.education_level}</span>
                     </div>
                   )}
                 </div>
@@ -837,52 +838,52 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
             {/* Personality */}
             {(typeof match.introvert_extrovert === 'number' || typeof match.spontaneous_planner === 'number' || typeof match.messy_organized === 'number') && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-3">{t('discover.matchCard.personality')}</h4>
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-3">{t('discover.matchCard.personality')}</h4>
                 <div className="space-y-4">
                   {typeof match.introvert_extrovert === 'number' && (
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-500">{t('discover.matchCard.introvert')}</span>
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <span className="text-sm text-gray-400">{t('discover.matchCard.introvert')}</span>
+                      <div className="flex-1 bg-white/10 rounded-full h-2">
                         <div 
                           className={`bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full ${styles.dynamicWidth}`}
                           style={{ width: `${match.introvert_extrovert}%` }}
                         ></div>
                       </div>
-                      <span className="text-sm text-gray-500">{t('discover.matchCard.extrovert')}</span>
+                      <span className="text-sm text-gray-400">{t('discover.matchCard.extrovert')}</span>
                     </div>
                   )}
                   {typeof match.spontaneous_planner === 'number' && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-600">{t('discover.matchCard.spontaneousVsPlanner', { percentage: match.spontaneous_planner })}</span>
+                        <span className="text-sm font-medium text-gray-300">{t('discover.matchCard.spontaneousVsPlanner', { percentage: match.spontaneous_planner })}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{t('discover.matchCard.spontaneous')}</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <span className="text-sm text-gray-400">{t('discover.matchCard.spontaneous')}</span>
+                        <div className="flex-1 bg-white/10 rounded-full h-2">
                           <div 
                             className={`bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.spontaneous_planner}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm text-gray-500">{t('discover.matchCard.planner')}</span>
+                        <span className="text-sm text-gray-400">{t('discover.matchCard.planner')}</span>
                       </div>
                     </div>
                   )}
                   {typeof match.messy_organized === 'number' && (
                     <div>
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-gray-600">{t('discover.matchCard.messyVsOrganized', { percentage: match.messy_organized })}</span>
+                        <span className="text-sm font-medium text-gray-300">{t('discover.matchCard.messyVsOrganized', { percentage: match.messy_organized })}</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-500">{t('discover.matchCard.messy')}</span>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <span className="text-sm text-gray-400">{t('discover.matchCard.messy')}</span>
+                        <div className="flex-1 bg-white/10 rounded-full h-2">
                           <div 
                             className={`bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.messy_organized}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm text-gray-500">{t('discover.matchCard.organized')}</span>
+                        <span className="text-sm text-gray-400">{t('discover.matchCard.organized')}</span>
                       </div>
                     </div>
                   )}
@@ -892,13 +893,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
             {/* Interests */}
             {match.interests?.length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.interests')}</h4>
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.interests')}</h4>
                 <div className="flex flex-wrap gap-1">
                   {match.interests.map((interest, index) => (
                     <span
                       key={index}
-                      className="px-2 py-1 bg-pink-100 text-pink-700 rounded-full text-sm"
+                      className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm"
                     >
                       {interest}
                     </span>
@@ -909,11 +910,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
             {/* Language */}
             {preferredLanguageName && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-semibold text-pink-600 mb-2">{t('discover.matchCard.language')}</h4>
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.language')}</h4>
                 <div className="flex items-center text-sm">
                   <Languages className="w-[clamp(12px,3.2vw,14px)] h-[clamp(12px,3.2vw,14px)] mr-2 text-pink-500 shrink-0" />
-                  <span className="text-gray-700">{preferredLanguageName}</span>
+                  <span className="text-gray-200">{preferredLanguageName}</span>
                 </div>
               </div>
             )}

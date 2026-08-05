@@ -158,17 +158,17 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent 
-        className="sm:max-w-md"
+      <DialogContent
+        className="sm:max-w-md bg-black border border-pink-500/50 text-white"
         onClick={(e) => e.stopPropagation()}
       >
         <DialogHeader className="space-y-3 pt-2">
-          <DialogTitle className="text-xl font-semibold text-center text-gray-900 dark:text-gray-100">
+          <DialogTitle className="text-xl font-semibold text-center text-white">
             Rate DripLove
           </DialogTitle>
-          <DialogDescription className="text-center text-gray-600 dark:text-gray-400 leading-relaxed">
+          <DialogDescription className="text-center text-gray-300 leading-relaxed">
             Your feedback helps us improve DripLove.<br />
-            <span className="font-semibold text-pink-600">RATE US TO BE A PRIORITY!</span>
+            <span className="font-semibold text-pink-400">RATE US TO BE A PRIORITY!</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -189,7 +189,7 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
                     className={`w-10 h-10 transition-colors ${
                       star <= (hoveredRating || selectedRating)
                         ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300 dark:text-gray-600'
+                        : 'text-gray-600'
                     }`}
                   />
                 </button>
@@ -215,7 +215,7 @@ const RatingDialog: React.FC<RatingDialogProps> = ({
             <Button
               variant="ghost"
               onClick={handleMaybeLater}
-              className="w-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="w-full text-gray-400 hover:text-gray-200 hover:bg-neutral-800"
             >
               Maybe later
             </Button>

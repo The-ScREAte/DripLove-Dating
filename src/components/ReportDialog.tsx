@@ -73,19 +73,19 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="bg-black border border-pink-500/50 text-white">
         <DialogHeader>
-          <DialogTitle>{t('report.title')}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-white">{t('report.title')}</DialogTitle>
+          <DialogDescription className="text-gray-300">
             {t('report.description')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
           <div>
-            <Label>{t('report.reason')}</Label>
+            <Label className="text-gray-300">{t('report.reason')}</Label>
             <select
-              className="w-full border rounded p-2 mt-1"
+              className="w-full border border-pink-500/40 rounded p-2 mt-1 bg-neutral-900 text-white"
               value={reason}
               onChange={e => setReason(e.target.value)}
             >
@@ -97,19 +97,19 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
           </div>
 
           <div>
-            <Label>{t('report.detailsOptional')}</Label>
+            <Label className="text-gray-300">{t('report.detailsOptional')}</Label>
             <Textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder={t('report.addMoreInfo')}
-              className="mt-1"
+              className="mt-1 bg-neutral-900 border-pink-500/40 text-white placeholder:text-gray-500"
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isReporting}>{t('common.cancel')}</Button>
-          <Button onClick={handleReport} disabled={!reason || isReporting} className="bg-red-500 hover:bg-red-600">
+          <Button variant="outline" onClick={onClose} disabled={isReporting} className="border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">{t('common.cancel')}</Button>
+          <Button onClick={handleReport} disabled={!reason || isReporting} className="bg-red-500 hover:bg-red-600 text-white">
             {isReporting ? t('report.reporting') : t('report.submitReport')}
           </Button>
         </DialogFooter>

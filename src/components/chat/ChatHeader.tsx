@@ -87,7 +87,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   return (
     <div
-      className="relative bg-white/95 backdrop-blur-sm border-b border-pink-200 shadow-[0_6px_14px_rgba(15,23,42,0.10)]"
+      className="relative border-b border-pink-500/30 shadow-[0_6px_14px_rgba(0,0,0,0.4)]"
+      style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}
     >
       <div className="flex items-center px-4 py-2.5 sm:py-3 justify-between">
       <div className="flex items-center space-x-3">
@@ -96,7 +97,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             variant="ghost" 
             size="sm" 
             onClick={onBack}
-            className="p-2 rounded-full hover:bg-pink-100"
+            className="p-2 rounded-full text-white hover:bg-pink-500/20"
             aria-label={t('chat.goBack')}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -109,10 +110,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           onClick={() => onUserProfileOpen(partnerId)}
         />
         <div className="leading-tight">
-          <h3 className="font-semibold text-gray-900 text-[15px] sm:text-base">
+          <h3 className="font-semibold text-white text-[15px] sm:text-base">
             {selectedMatch.first_name} {selectedMatch.last_name}
           </h3>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
             {partnerLanguage ? t('chat.speaks', { language: partnerLanguage }) : t('chat.activeOnDripLove')}
           </p>
         </div>
@@ -122,7 +123,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          className="p-2 rounded-full hover:bg-pink-100"
+          className="p-2 rounded-full text-white hover:bg-pink-500/20"
           onClick={() => setMenuOpen(!menuOpen)}
           onContextMenu={(e) => e.preventDefault()}
           style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'manipulation' }}
@@ -135,9 +136,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
         {menuOpen && (
           <div className="absolute top-14 right-3 z-[999999]">
-              <div className="w-max overflow-hidden rounded-md border border-pink-200 bg-white p-1.5 shadow-lg divide-y divide-pink-200">
+              <div className="w-max overflow-hidden rounded-md border border-pink-500/30 bg-black p-1.5 shadow-lg divide-y divide-pink-500/20">
                 <button
-                  className="block text-left px-2 py-2 text-sm hover:bg-pink-100 whitespace-nowrap"
+                  className="block text-left px-2 py-2 text-sm text-gray-100 hover:bg-pink-500/15 whitespace-nowrap"
                   onClick={() => {
                     setMenuOpen(false);
                     // delegate to parent to open the report dialog; allow undefined message id
@@ -147,8 +148,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   {t('chat.report')}
                 </button>
                 <button
-                  className="block text-left px-2 py-2 text-sm hover:bg-pink-100 whitespace-nowrap"
-                  onClick={() => { 
+                  className="block text-left px-2 py-2 text-sm text-gray-100 hover:bg-pink-500/15 whitespace-nowrap"
+                  onClick={() => {
                     setMenuOpen(false);
                     onDeleteChat();
                   }}
@@ -156,7 +157,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                   {t('chat.deleteChat')}
                 </button>
                 <button
-                  className="block text-left px-2 py-2 text-sm text-red-600 hover:bg-red-50 whitespace-nowrap"
+                  className="block text-left px-2 py-2 text-sm text-red-400 hover:bg-red-500/10 whitespace-nowrap"
                   onClick={() => { onBlockUser(selectedMatch); setMenuOpen(false); }}
                 >
                   {t('chat.blockUser')}

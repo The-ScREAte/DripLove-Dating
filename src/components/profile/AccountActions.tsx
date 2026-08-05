@@ -191,18 +191,18 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   };
 
   return (
-    <Card>
+    <Card className="bg-black border-pink-500/30">
       <CardHeader className={isAndroidNative ? 'p-4' : undefined}>
-        <CardTitle className={isAndroidNative ? 'text-xl' : undefined}>{t('profile.accountActions')}</CardTitle>
+        <CardTitle className={`text-white ${isAndroidNative ? 'text-xl' : ''}`}>{t('profile.accountActions')}</CardTitle>
       </CardHeader>
       <CardContent className={isAndroidNative ? 'p-4 pt-0 space-y-3' : 'space-y-4'}>
         {/* 1. Support & Help - Most important for users */}
-        <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-4 rounded-lg border border-pink-100">
+        <div className="bg-black border border-pink-500/30 p-4 rounded-lg">
           <div className="flex items-center space-x-2 mb-3">
-            <MessageCircle className="w-5 h-5 text-pink-600" />
-            <span className="font-semibold text-gray-800">{t('settings.needHelp')}</span>
+            <MessageCircle className="w-5 h-5 text-pink-500" />
+            <span className="font-semibold text-white">{t('settings.needHelp')}</span>
           </div>
-          
+
           <Button
             onClick={() => setShowLiveChat(true)}
             size={isAndroidNative ? 'sm' : 'default'}
@@ -211,12 +211,12 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             <MessageCircle className="w-4 h-4 mr-2" />
             Chat with Support
           </Button>
-          
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Mail className="w-4 h-4 text-gray-500" />
-            <a 
-              href="mailto:driploveinfo@gmail.com" 
-              className="text-blue-600 hover:text-blue-800 underline"
+
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <Mail className="w-4 h-4 text-gray-400" />
+            <a
+              href="mailto:driploveinfo@gmail.com"
+              className="text-pink-400 hover:text-pink-300 underline"
             >
               driploveinfo@gmail.com
             </a>
@@ -227,7 +227,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
         {/* 2. Language Selector - Common setting */}
         {preferredLanguage && onLanguageChange && (
-          <div className="bg-gray-50 p-4 rounded-lg border">
+          <div className="bg-black p-4 rounded-lg border border-pink-500/20 text-white">
             <LanguageSelector
               value={preferredLanguage}
               onChange={onLanguageChange}
@@ -238,10 +238,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         )}
 
         {/* 3. Rate App - Positive action */}
-        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+        <div className="bg-black p-4 rounded-lg border border-yellow-500/30">
           <div className="flex flex-col space-y-3">
-            <span className="font-medium text-gray-900">{t('settings.enjoyingDripLove')}</span>
-            <p className={isAndroidNative ? 'text-xs text-gray-600' : 'text-sm text-gray-600'}>
+            <span className="font-medium text-white">{t('settings.enjoyingDripLove')}</span>
+            <p className={isAndroidNative ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}>
               {t('settings.rateExperience')}
             </p>
             <RateAppButton className="w-full sm:w-auto" />
@@ -250,24 +250,24 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
         {/* 4. Legal Links - Reference info */}
         {!hideLogoutTermsPrivacy && (onShowTerms || onShowPrivacy) && (
-          <div className="bg-gray-50 p-4 rounded-lg border">
-            <p className="text-xs text-gray-500 mb-2 font-medium">Legal</p>
+          <div className="bg-black p-4 rounded-lg border border-pink-500/20">
+            <p className="text-xs text-gray-400 mb-2 font-medium">Legal</p>
             <div className={isAndroidNative ? 'flex flex-wrap justify-center gap-3 text-xs' : 'flex flex-wrap justify-center gap-4 text-sm'}>
               {onShowTerms && (
-                <button 
+                <button
                   onClick={onShowTerms}
-                  className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
+                  className="text-pink-400 hover:text-pink-300 hover:underline transition-colors"
                 >
                   {t('settings.termsOfService')}
                 </button>
               )}
               {onShowTerms && onShowPrivacy && (
-                <span className="text-gray-400">•</span>
+                <span className="text-gray-500">•</span>
               )}
               {onShowPrivacy && (
-                <button 
+                <button
                   onClick={onShowPrivacy}
-                  className="text-purple-600 hover:text-purple-700 hover:underline transition-colors"
+                  className="text-pink-400 hover:text-pink-300 hover:underline transition-colors"
                 >
                   {t('settings.privacyPolicy')}
                 </button>
@@ -282,7 +282,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             onClick={handleLogout}
             variant="outline"
             size={isAndroidNative ? 'sm' : 'default'}
-            className={`w-full flex items-center justify-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-100 ${isAndroidNative ? 'text-xs' : ''}`}
+            className={`w-full flex items-center justify-center space-x-2 border-pink-500/30 text-gray-200 hover:bg-pink-500/10 ${isAndroidNative ? 'text-xs' : ''}`}
           >
             <LogOut className="w-4 h-4" />
             <span>{t('common.logout')}</span>
@@ -526,11 +526,11 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                 <span>Delete Account</span>
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="sm:max-w-lg">
+            <AlertDialogContent className="sm:max-w-lg bg-black border border-pink-500/30 text-white">
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Account</AlertDialogTitle>
+                <AlertDialogTitle className="text-white">Delete Account</AlertDialogTitle>
                 <AlertDialogDescription asChild>
-                  <div>
+                  <div className="text-gray-300">
                     <p>
                       Are you sure you want to permanently delete your account? This action will:
                     </p>
@@ -541,7 +541,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                       <li>Remove all likes given and received</li>
                     </ul>
                     <p className="mt-2">
-                      <strong>
+                      <strong className="text-gray-100">
                         This action cannot be undone and your profile won't exist anymore.
                       </strong>
                     </p>
@@ -549,8 +549,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>No, Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogCancel className="bg-black border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">No, Cancel</AlertDialogCancel>
+                <AlertDialogAction
                   onClick={handleDeleteAccountRequest}
                   className="bg-red-600 hover:bg-red-700"
                 >
@@ -563,11 +563,11 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
 
         {/* Delete Account Confirmation Dialog */}
         <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
             <DialogHeader>
-              <DialogTitle>Confirm Account Deletion</DialogTitle>
-              <DialogDescription>
-                This action is permanent and cannot be undone. Type <strong>{DELETE_CONFIRMATION_PHRASE}</strong> below to confirm.
+              <DialogTitle className="text-white">Confirm Account Deletion</DialogTitle>
+              <DialogDescription className="text-gray-300">
+                This action is permanent and cannot be undone. Type <strong className="text-gray-100">{DELETE_CONFIRMATION_PHRASE}</strong> below to confirm.
               </DialogDescription>
             </DialogHeader>
             <div>
@@ -579,7 +579,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   setDeleteConfirmText(e.target.value);
                   setDeleteError('');
                 }}
-                className={deleteError ? 'border-red-500' : ''}
+                className={`bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 ${deleteError ? 'border-red-500' : ''}`}
                 autoCapitalize="characters"
                 autoComplete="off"
               />
@@ -596,6 +596,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   setDeleteError('');
                 }}
                 disabled={deletingAccount}
+                className="border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white"
               >
                 Cancel
               </Button>

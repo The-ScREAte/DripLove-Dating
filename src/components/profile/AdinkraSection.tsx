@@ -66,18 +66,18 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
   };
 
   return (
-    <Card>
+    <Card className="bg-black border-pink-500/30">
       <CardHeader>
-        <CardTitle>{t('profile.myAdinkra')}</CardTitle>
+        <CardTitle className="text-white">{t('profile.myAdinkra')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <Label>{t('profile.adinkraDescription')}</Label>
-          
+          <Label className="text-gray-200">{t('profile.adinkraDescription')}</Label>
+
           {/* Selected Symbols */}
           {selectedSymbols.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
+              <p className="text-sm text-gray-400">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                 {selectedSymbols.map((symbolName: string, index: number) => {
                   const symbol = ALL_SYMBOLS.find(s => s.name === symbolName);
@@ -91,7 +91,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                   return (
                     <div key={symbolName} className="relative">
                       <Card
-                        className={`relative border-primary border-2 bg-primary/5 p-1 flex flex-col items-center gap-0.5 transition-all aspect-square ${
+                        className={`relative border-pink-500 border-2 bg-black p-1 flex flex-col items-center gap-0.5 transition-all aspect-square text-white ${
                           isEditing ? 'cursor-pointer hover:scale-105' : ''
                         }`}
                         onClick={() => isEditing && handleRemoveSymbol(symbolName)}
@@ -125,20 +125,20 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                           className="w-6 h-6 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6"
                           dangerouslySetInnerHTML={{ __html: symbol.svg }}
                         />
-                        <p className="text-[9px] font-medium text-center line-clamp-1 leading-tight">{symbol.name}</p>
-                        <div className="w-full h-0.5 bg-primary rounded-full" />
+                        <p className="text-[9px] font-medium text-center line-clamp-1 leading-tight text-white">{symbol.name}</p>
+                        <div className="w-full h-0.5 bg-pink-500 rounded-full" />
                       </Card>
 
                       {/* Symbol Tooltip */}
                       {tooltipSymbol === symbolName && (
                         <div ref={tooltipRef}>
-                          <Card 
-                            className={`absolute bottom-full mb-2 z-[9999] p-3 bg-background border-2 border-primary shadow-lg w-64 ${
+                          <Card
+                            className={`absolute bottom-full mb-2 z-[9999] p-3 bg-black border-2 border-pink-500 shadow-lg w-64 text-white ${
                               isLeftEdge ? 'left-0' : isRightEdge ? 'right-0' : 'left-1/2 transform -translate-x-1/2'
                             }`}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <div className={`absolute -bottom-2 w-4 h-4 bg-background border-r-2 border-b-2 border-primary transform rotate-45 ${
+                            <div className={`absolute -bottom-2 w-4 h-4 bg-black border-r-2 border-b-2 border-pink-500 transform rotate-45 ${
                               isLeftEdge ? 'left-4' : isRightEdge ? 'right-4' : 'left-1/2 -translate-x-1/2'
                             }`} />
                             <p className="text-sm relative z-10">{symbol.meaning}</p>
@@ -155,19 +155,19 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           {/* Available Symbols */}
           {isEditing && (
             <div className="space-y-4">
-              <p className="text-sm font-medium text-muted-foreground">{t('profile.availableSymbols')}</p>
+              <p className="text-sm font-medium text-gray-400">{t('profile.availableSymbols')}</p>
               
               {/* Browse Countries Section */}
               <div className="space-y-2">
                 <button
                   type="button"
                   onClick={() => setShowOtherCountries(!showOtherCountries)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 rounded-lg border border-purple-500/20 transition-all"
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 rounded-lg border border-pink-500/20 transition-all text-white"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🌍</span>
-                    <span className="font-semibold">Browse Other Signs</span>
-                    <span className="text-xs text-muted-foreground">({AFRICAN_SYMBOL_GROUPS.length} groups)</span>
+                    <span className="font-semibold text-white">Browse Other Signs</span>
+                    <span className="text-xs text-gray-400">({AFRICAN_SYMBOL_GROUPS.length} groups)</span>
                   </div>
                   {showOtherCountries ? (
                     <ChevronUp className="w-5 h-5" />
@@ -180,16 +180,16 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                   <div className="space-y-3 pl-2">
                     {AFRICAN_SYMBOL_GROUPS.map((group) => (
                       <div key={group.id} className="space-y-2">
-                        <div className="flex items-center gap-2 px-2 py-1 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                        <div className="flex items-center gap-2 px-2 py-1 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors">
                           <span className="text-xl">{group.flag}</span>
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{group.country}</p>
-                            <p className="text-xs text-muted-foreground">{group.ethnicGroup} • {group.use}</p>
+                            <p className="font-medium text-sm text-white">{group.country}</p>
+                            <p className="text-xs text-gray-400">{group.ethnicGroup} • {group.use}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)}
-                            className="p-2 hover:bg-primary/10 rounded-full transition-colors"
+                            className="p-2 hover:bg-pink-500/10 rounded-full transition-colors text-white"
                           >
                             {expandedGroup === group.id ? (
                               <ChevronUp className="w-4 h-4" />
@@ -210,7 +210,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                               return (
                                 <div key={symbol.name} className="relative">
                                   <Card
-                                    className="cursor-pointer border-border hover:border-primary/50 p-2 flex flex-col items-center gap-1 hover:scale-105 transition-all relative aspect-square"
+                                    className="cursor-pointer bg-black border-pink-500/20 hover:border-pink-500/50 p-2 flex flex-col items-center gap-1 hover:scale-105 transition-all relative aspect-square text-white"
                                     onClick={() => handleToggleSymbol(symbol.name)}
                                   >
                                     <button
@@ -227,19 +227,19 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                                       className="w-9 h-9 flex items-center justify-center [&_svg]:w-9 [&_svg]:h-9"
                                       dangerouslySetInnerHTML={{ __html: symbol.svg }}
                                     />
-                                    <p className="text-[11px] font-medium text-center line-clamp-2 leading-tight">{symbol.name}</p>
+                                    <p className="text-[11px] font-medium text-center line-clamp-2 leading-tight text-white">{symbol.name}</p>
                                   </Card>
 
                                   {/* Symbol Tooltip */}
                                   {tooltipSymbol === symbol.name && (
                                     <div ref={tooltipRef}>
-                                      <Card 
-                                        className={`absolute bottom-full mb-2 z-[9999] p-3 bg-background border-2 border-primary shadow-lg w-64 ${
+                                      <Card
+                                        className={`absolute bottom-full mb-2 z-[9999] p-3 bg-black border-2 border-pink-500 shadow-lg w-64 text-white ${
                                           isLeftEdge ? 'left-0' : isRightEdge ? 'right-0' : 'left-1/2 transform -translate-x-1/2'
                                         }`}
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        <div className={`absolute -bottom-2 w-4 h-4 bg-background border-r-2 border-b-2 border-primary transform rotate-45 ${
+                                        <div className={`absolute -bottom-2 w-4 h-4 bg-black border-r-2 border-b-2 border-pink-500 transform rotate-45 ${
                                           isLeftEdge ? 'left-4' : isRightEdge ? 'right-4' : 'left-1/2 -translate-x-1/2'
                                         }`} />
                                         <p className="text-sm relative z-10">{symbol.meaning}</p>
@@ -260,7 +260,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           )}
 
           {!isEditing && selectedSymbols.length === 0 && (
-            <p className="text-sm text-muted-foreground">{t('profile.noAdinkraSelected')}</p>
+            <p className="text-sm text-gray-400">{t('profile.noAdinkraSelected')}</p>
           )}
         </div>
       </CardContent>

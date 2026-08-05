@@ -18,16 +18,16 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   className = ""
 }) => {
   return (
-    <Card className={`w-full ${className}`}>
-      <CardHeader 
-        className="cursor-pointer hover:bg-gray-50 transition-colors duration-200 px-6 py-4"
+    <Card className={`w-full bg-black border-pink-500/30 ${className}`}>
+      <CardHeader
+        className="cursor-pointer hover:bg-pink-500/10 transition-colors duration-200 px-6 py-4"
         onClick={onToggle}
       >
         <div className="flex justify-between items-center">
-          <CardTitle className="text-lg font-semibold text-gray-900">
+          <CardTitle className="text-lg font-semibold text-white">
             {title}
           </CardTitle>
-          <div className="flex items-center text-gray-500">
+          <div className="flex items-center text-gray-300">
             {isOpen ? (
               <ChevronUp className="w-5 h-5" />
             ) : (

@@ -651,9 +651,9 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   };
 
   return (
-    <Card>
+    <Card className="bg-black border-pink-500/30">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex items-center justify-between text-white">
           <span className="flex items-center gap-2">
             {t('profile.photos')} ({userImages.length}/7)
             {isVerified && (
@@ -671,14 +671,14 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       <CardContent>
         {/* Face Verification Section - Only show if NOT verified */}
         {!isVerified && !showFaceVerification && (
-          <div className="mb-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-3">
+          <div className="mb-4 bg-black border border-purple-500/30 rounded-lg p-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Camera className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                <Camera className="w-5 h-5 text-purple-400" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-purple-800 text-sm">Get Verified</p>
-                <p className="text-xs text-purple-600">Verified profiles get more matches!</p>
+                <p className="font-medium text-purple-300 text-sm">Get Verified</p>
+                <p className="text-xs text-purple-400/80">Verified profiles get more matches!</p>
               </div>
               <Button
                 onClick={() => setShowFaceVerification(true)}
@@ -696,7 +696,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         {showFaceVerification && (
           <div className="mb-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="font-medium text-purple-800 text-sm flex items-center gap-2">
+              <p className="font-medium text-purple-300 text-sm flex items-center gap-2">
                 <Shield className="w-4 h-4" />
                 Face Verification
               </p>
@@ -718,45 +718,45 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
         {/* Verified Badge Display */}
         {isVerified && (
-          <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+          <div className="mb-4 bg-black border border-green-500/30 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="font-medium text-green-800 text-sm">Identity Verified</span>
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-green-400 text-sm">Identity Verified</span>
             </div>
           </div>
         )}
         {userImages.length < 5 && (
           <div className="mb-6">
-            <Label htmlFor="image_upload" className="block mb-2">{t('profile.uploadImage')}</Label>
-            
+            <Label htmlFor="image_upload" className="block mb-2 text-gray-200">{t('profile.uploadImage')}</Label>
+
             {replacingImageUrl && (
-              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 flex items-center justify-between">
+              <div className="mb-2 p-2 bg-black border border-blue-500/30 rounded text-sm text-blue-300 flex items-center justify-between">
                 <span>🔄 Replace mode active - Click to cancel and upload new image instead</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setReplacingImageUrl(null);
-                    toast({ 
-                      title: "Replace cancelled", 
+                    toast({
+                      title: "Replace cancelled",
                       description: "You can now upload a new image normally.",
                       variant: "default"
                     });
                   }}
-                  className="h-6 px-2 text-xs hover:bg-blue-100"
+                  className="h-6 px-2 text-xs text-blue-300 hover:bg-blue-500/10"
                 >
                   Cancel Replace
                 </Button>
               </div>
             )}
-         
-            <Input 
-              type="file" 
-              id="image_upload" 
-              accept="image/*" 
-              onChange={handleImageUpload} 
-              disabled={uploading || moderating} 
-              className="w-full"
+
+            <Input
+              type="file"
+              id="image_upload"
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={uploading || moderating}
+              className="w-full bg-black/40 border-pink-500/30 text-white file:text-white"
               onClick={() => {
                 // Clear replace mode when user clicks the upload button directly
                 if (replacingImageUrl) {
@@ -764,7 +764,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                 }
               }}
             />
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-2">
+            <p className="text-xs text-gray-400 flex items-center gap-1 mt-2">
               <Shield className="w-3 h-3" />
               Pending images will be reviewed and approved within 24 hours or less for security.
             </p>
@@ -775,7 +775,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
               </div>
             )}
             {uploading && (
-              <div className="text-sm text-gray-500 mt-2 flex items-center">
+              <div className="text-sm text-gray-400 mt-2 flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>
                 Uploading...
               </div>
@@ -845,13 +845,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="sm:max-w-md">
+                      <AlertDialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Image</AlertDialogTitle>
-                          <AlertDialogDescription>Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
+                          <AlertDialogTitle className="text-white">Delete Image</AlertDialogTitle>
+                          <AlertDialogDescription className="text-gray-300">Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel className="bg-black border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">Cancel</AlertDialogCancel>
                           <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
                             {deleting ? 'Deleting...' : 'Delete'}
                           </AlertDialogAction>
@@ -866,8 +866,8 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         </div>
 
         {userImages.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center py-8 text-gray-400">
+            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-600" />
             <p>No photos uploaded yet</p>
             <p className="text-sm">Upload your first photo to get started!</p>
           </div>

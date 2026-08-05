@@ -1851,10 +1851,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   // unconditionally called (so don't early-return before them).
   if (!currentUser || !currentUser.id) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-pink-50">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading chats...</p>
+          <p className="text-gray-300">Loading chats...</p>
         </div>
       </div>
     );
@@ -1935,12 +1935,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     );
     
     return (
-  <div className="h-full min-h-0 flex flex-col bg-pink-50" style={{ paddingTop: `${topCompensation}px` }}>
+  <div className="h-full min-h-0 flex flex-col bg-black" style={{ paddingTop: `${topCompensation}px` }}>
         {/* Header */}
-        <div 
-          className="shrink-0 z-30 bg-pink-50 text-gray-900 shadow-sm border-b border-gray-100"
+        <div
+          className="shrink-0 z-30 text-white shadow-sm border-b border-pink-500/30"
+          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}
         >
-          <div 
+          <div
             className="px-4"
             style={{ paddingTop: '12px', paddingBottom: '12px' }}
           >
@@ -1949,14 +1950,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             </h2>
           </div>
         </div>
-        
+
         {/* New Matches Section */}
         {newMatchList.length > 0 && (
-          <div 
-            className="px-4 py-3 border-b bg-white"
+          <div
+            className="px-4 py-3 border-b border-pink-500/30 bg-black/60"
             style={{ marginTop: '0px' }}
           >
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('chat.newMatches')}</h3>
+            <h3 className="text-sm font-semibold text-white mb-3">{t('chat.newMatches')}</h3>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
               {newMatchList.map((match) => {
                 const partnerId = match.partner?.id || 
@@ -1981,7 +1982,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                         onClick={() => handleUserProfileClick(partnerId)}
                       />
                     </div>
-                    <span className="text-xs text-gray-900 text-center truncate w-full">
+                    <span className="text-xs text-gray-200 text-center truncate w-full">
                       {match.first_name}
                     </span>
                   </div>
@@ -2005,10 +2006,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     {/* Pull to refresh indicator */}
     {pullDistance > 0 && (
       <div
-        className="flex items-center justify-center bg-pink-50 transition-all duration-200"
+        className="flex items-center justify-center bg-black transition-all duration-200"
         style={{ height: `${pullDistance}px` }}
       >
-        <div className="text-pink-600 text-sm">
+        <div className="text-pink-400 text-sm">
           {pullDistance > 50 ? (isRefreshing ? `🔄 ${t('chat.refreshing')}` : `↓ ${t('chat.releaseToRefresh')}`) : `↓ ${t('chat.pullToRefresh')}`}
         </div>
       </div>
@@ -2016,20 +2017,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           {activeConversations.length === 0 && dormantConversations.length === 0 && newMatchList.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
               <div className="mb-6">
-                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
                   <span className="text-5xl">💬</span>
                 </div>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-3">
+              <h3 className="text-xl font-bold text-white mb-3">
                 {t('chat.noMatchesYet')}
               </h3>
-              <p className="text-gray-600 mb-2 max-w-sm">
+              <p className="text-gray-300 mb-2 max-w-sm">
                 {t('chat.swipeRightInDripCheck')}
               </p>
-              <p className="text-sm text-gray-500 mb-6">
+              <p className="text-sm text-gray-400 mb-6">
                 {t('chat.moreYouSwipe')}
               </p>
-              <div className="flex items-center gap-2 text-pink-600 font-medium">
+              <div className="flex items-center gap-2 text-pink-400 font-medium">
                 <span>💧</span>
                 <span>{t('chat.startSwipingInDripCheck')}</span>
               </div>
@@ -2037,14 +2038,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           ) : activeConversations.length === 0 && dormantConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
               <div className="mb-6">
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
                   <span className="text-4xl">✨</span>
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-gray-800 mb-2">
+              <h3 className="text-lg font-bold text-white mb-2">
                 {t('chat.newMatchesWaiting')}
               </h3>
-              <p className="text-gray-600 max-w-sm">
+              <p className="text-gray-300 max-w-sm">
                 {t('chat.tapMatchToMessage')}
               </p>
             </div>
@@ -2058,9 +2059,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               return (
                 <div
                   key={match.id}
-                  className={`p-4 border-b border-pink-300 cursor-pointer hover:bg-pink-100 transition-colors ${
-                    selectedMatch?.id === match.id ? 'bg-pink-100 border-pink-200' : 'bg-pink-50'
-                  } ${match.unread_messages > 0 ? 'font-bold bg-pink-100' : ''}`}
+                  className={`p-4 border-b border-pink-500/30 cursor-pointer hover:bg-pink-500/10 transition-colors ${
+                    selectedMatch?.id === match.id ? 'bg-pink-500/15 border-pink-500/40' : 'bg-black'
+                  } ${match.unread_messages > 0 ? 'font-bold bg-pink-500/10' : ''}`}
                   style={{
                     marginTop: index === 0 && newMatchList.length === 0 && getPlatformSync() === 'ios' 
                       ? '0px'
@@ -2085,12 +2086,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                     </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <h3 className={`font-semibold truncate ${match.unread_messages > 0 ? 'text-purple-700' : 'text-gray-900'}`}
+                      <h3 className={`font-semibold truncate ${match.unread_messages > 0 ? 'text-pink-400' : 'text-white'}`}
                         >
                         {match.first_name} {match.last_name}
                       </h3>
                       {match.last_message_time && (
-                        <span className="text-xs text-gray-500 ml-2">
+                        <span className="text-xs text-gray-400 ml-2">
                           {new Date(match.last_message_time).toLocaleTimeString([], {
                             hour: '2-digit',
                             minute: '2-digit'
@@ -2099,7 +2100,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       )}
                     </div>
                     {match.last_message && (
-                      <p className="text-sm text-gray-600 truncate mt-1">
+                      <p className="text-sm text-gray-300 truncate mt-1">
                         {match.last_message}
                       </p>
                     )}
@@ -2114,7 +2115,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               <div className="mt-4">
                 <button
                   onClick={() => setShowDormant(v => !v)}
-                  className="w-full text-sm text-gray-500 px-4 py-2 flex justify-between items-center hover:bg-gray-50 transition-colors"
+                  className="w-full text-sm text-gray-400 px-4 py-2 flex justify-between items-center hover:bg-pink-500/10 transition-colors"
                 >
                   <span>Earlier conversations ({dormantConversations.length})</span>
                   <span>{showDormant ? '▲' : '▼'}</span>
@@ -2123,13 +2124,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                 {showDormant && (
                   <div className="opacity-70">
                     {dormantConversations.map(match => {
-                      const partnerId = match.partner?.id || 
+                      const partnerId = match.partner?.id ||
                                        (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
-                      
+
                       return (
                         <div
                           key={match.id}
-                          className="p-4 border-b border-pink-200 cursor-pointer hover:bg-pink-100 transition-colors bg-pink-50"
+                          className="p-4 border-b border-pink-500/20 cursor-pointer hover:bg-pink-500/10 transition-colors bg-black"
                           onClick={() => setSelectedMatch(match)}
                         >
                           <div className="flex items-center space-x-3">
@@ -2142,16 +2143,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                             />
                             <div className="flex-1 min-w-0">
                               <div className="flex justify-between items-start">
-                                <h3 className="font-medium text-gray-700 truncate">
+                                <h3 className="font-medium text-gray-200 truncate">
                                   {match.first_name} {match.last_name}
                                 </h3>
                                 {match.last_message_time && (
-                                  <span className="text-xs text-gray-400 ml-2">
+                                  <span className="text-xs text-gray-500 ml-2">
                                     {new Date(match.last_message_time).toLocaleDateString()}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-500 truncate mt-1">
+                              <p className="text-xs text-gray-400 truncate mt-1">
                                 {match.last_message}
                               </p>
                             </div>
@@ -2196,9 +2197,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   };
 
   return (
-  <div className="h-full min-h-0 flex flex-col bg-gray-50" style={{ paddingTop: `${topCompensation}px` }}>
+  <div className="h-full min-h-0 flex flex-col bg-black" style={{ paddingTop: `${topCompensation}px` }}>
       {/* Chat Header (below global header) */}
-  <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm z-20 m-0 p-0">
+  <div
+    className="shrink-0 border-b border-pink-500/30 shadow-sm z-20 m-0 p-0"
+    style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}
+  >
         <ChatHeader
           selectedMatch={selectedMatch}
           onBack={handleBackClick}
@@ -2218,7 +2222,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       {/* Scrollable Messages Area (only this area scrolls) */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-pink-50/90 chat-messages-container"
+        className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-black chat-messages-container"
         style={{ 
           WebkitOverflowScrolling: 'touch',
           paddingTop: '0px'
@@ -2230,17 +2234,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full pt-20">
             <div className="mb-6">
-              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-100 to-purple-100 flex items-center justify-center">
+              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
                 <span className="text-4xl">👋</span>
               </div>
             </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">
+            <h3 className="text-lg font-bold text-white mb-2">
               {t('chat.startConversation')}
             </h3>
-            <p className="text-gray-600 text-center px-6 max-w-sm mb-4">
+            <p className="text-gray-300 text-center px-6 max-w-sm mb-4">
               {t('chat.sayHelloTo', { name: selectedMatch?.first_name })}
             </p>
-            <div className="text-sm text-gray-500 text-center px-6">
+            <div className="text-sm text-gray-400 text-center px-6">
               {t('chat.conversationTip')}
             </div>
           </div>

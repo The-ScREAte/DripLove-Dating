@@ -30,7 +30,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
     : '72px'; // Increased from 64px to 72px for consistent header visibility
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col bg-black">
       {/* Sticky Header with gradient background */}
       <div
         className="sticky top-0 z-10 p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex-shrink-0"
@@ -48,9 +48,9 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
       />
       
       {/* Scrollable conversations list */}
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className="flex-1 overflow-y-auto pb-24 bg-black">
         {matches.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground">
+          <div className="p-4 text-center text-gray-400">
             No conversations yet
           </div>
         ) : (
@@ -62,9 +62,9 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
             return (
                 <div
                   key={match.id}
-                  className={`p-4 border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedMatch?.id === match.id ? 'bg-pink-50 border-pink-200' : ''
-                  } ${match.unread_messages > 0 ? 'bg-blue-50/30' : ''}`}
+                  className={`p-4 border-b border-pink-500/20 cursor-pointer hover:bg-pink-500/10 transition-colors ${
+                    selectedMatch?.id === match.id ? 'bg-pink-500/15 border-pink-500/40' : 'bg-black'
+                  } ${match.unread_messages > 0 ? 'bg-pink-500/5' : ''}`}
                   onClick={() => onMatchSelect(match)}
                 >
                 <div className="flex items-center space-x-3">
@@ -83,11 +83,11 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                   </div>
                  <div className="flex-1 min-w-0">
                    <div className="flex justify-between items-start">
-                     <h3 className={`truncate ${match.unread_messages > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
+                     <h3 className={`truncate ${match.unread_messages > 0 ? 'font-bold text-white' : 'font-semibold text-gray-100'}`}>
                        {match.first_name} {match.last_name}
                      </h3>
                     {match.last_message_time && (
-                      <span className="text-xs text-gray-500 ml-2">
+                      <span className="text-xs text-gray-400 ml-2">
                         {new Date(match.last_message_time).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit'
@@ -96,7 +96,7 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
                     )}
                   </div>
                      {match.last_message && (
-                       <p className={`text-sm truncate mt-1 ${match.unread_messages > 0 ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
+                       <p className={`text-sm truncate mt-1 ${match.unread_messages > 0 ? 'font-bold text-gray-200' : 'text-gray-400'}`}>
                          {match.last_message}
                        </p>
                      )}

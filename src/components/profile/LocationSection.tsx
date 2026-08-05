@@ -58,43 +58,43 @@ const LocationSection = ({
     <div className="space-y-6">
       {/* Matching Preferences Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           {t('profile.matchingPreferences')}
         </h3>
         
         {/* Gender and Looking For Preferences */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="gender">{t('profile.gender')}</Label>
+              <Label htmlFor="gender" className="text-gray-200">{t('profile.gender')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('gender', value)} value={editedProfile.gender}>
-                <SelectTrigger id="gender" className="w-full">
+                <SelectTrigger id="gender" className="w-full bg-black/40 border-pink-500/30 text-white">
                   <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">{t('profile.genderOptions.male')}</SelectItem>
-                  <SelectItem value="female">{t('profile.genderOptions.female')}</SelectItem>
-                  <SelectItem value="other">{t('profile.genderOptions.other')}</SelectItem>
+                <SelectContent className="bg-black border-pink-500/30">
+                  <SelectItem className="text-white focus:bg-pink-500/15 focus:text-white" value="male">{t('profile.genderOptions.male')}</SelectItem>
+                  <SelectItem className="text-white focus:bg-pink-500/15 focus:text-white" value="female">{t('profile.genderOptions.female')}</SelectItem>
+                  <SelectItem className="text-white focus:bg-pink-500/15 focus:text-white" value="other">{t('profile.genderOptions.other')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="preference">{t('profile.lookingFor')}</Label>
+              <Label htmlFor="preference" className="text-gray-200">{t('profile.lookingFor')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('preference', value)} value={editedProfile.preference}>
-                <SelectTrigger id="preference" className="w-full">
+                <SelectTrigger id="preference" className="w-full bg-black/40 border-pink-500/30 text-white">
                   <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">{t('profile.genderOptions.male')}</SelectItem>
-                  <SelectItem value="female">{t('profile.genderOptions.female')}</SelectItem>
-                  <SelectItem value="everyone">{t('profile.genderOptions.both')}</SelectItem>
+                <SelectContent className="bg-black border-pink-500/30">
+                  <SelectItem className="text-white focus:bg-pink-500/15 focus:text-white" value="male">{t('profile.genderOptions.male')}</SelectItem>
+                  <SelectItem className="text-white focus:bg-pink-500/15 focus:text-white" value="female">{t('profile.genderOptions.female')}</SelectItem>
+                  <SelectItem className="text-white focus:bg-pink-500/15 focus:text-white" value="everyone">{t('profile.genderOptions.both')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          
+
           {/* Age Range Preference */}
           <div className="space-y-3">
-            <Label>{t('profile.ageRangeForMatches')}</Label>
+            <Label className="text-gray-200">{t('profile.ageRangeForMatches')}</Label>
             <div className="px-3">
               <Slider
                 value={[editedProfile.min_age || 18, editedProfile.max_age || 75]}
@@ -105,7 +105,7 @@ const LocationSection = ({
                 className="w-full"
                 disabled={!isEditing}
               />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
                 <span>{t('profile.ageYears', { age: 18 })}</span>
                 <span className="font-medium">
                   {editedProfile.min_age || 18} - {(editedProfile.max_age || 75) >= 75 ? '75+' : `${editedProfile.max_age} years`}
@@ -118,7 +118,7 @@ const LocationSection = ({
 
       {/* Location Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           {t('profile.location')}
         </h3>
         
@@ -137,7 +137,7 @@ const LocationSection = ({
 
         {/* Distance Preference */}
         <div className="space-y-3">
-          <Label>What max distance do you want to see people?</Label>
+          <Label className="text-gray-200">What max distance do you want to see people?</Label>
           <div className="px-3">
           <Slider
               value={[editedProfile.max_distance || 250]}
@@ -161,27 +161,27 @@ const LocationSection = ({
       {isPremium && userId && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-primary" />
-            <Label className="font-medium">{t('profile.unlockCountries')}</Label>
+            <Globe className="w-4 h-4 text-pink-400" />
+            <Label className="font-medium text-gray-200">{t('profile.unlockCountries')}</Label>
             <Crown className="w-4 h-4 text-yellow-500" />
           </div>
-          
-          <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
-            <p className="text-sm text-muted-foreground mb-3">
+
+          <div className="p-4 bg-black rounded-lg border border-pink-500/20">
+            <p className="text-sm text-gray-400 mb-3">
               {t('profile.unlockCountriesInfo')}
             </p>
-            
+
             {/* Show currently unlocked countries */}
             {unlockedCountries.length > 0 && (
               <div className="mb-3">
-                <div className="text-xs text-muted-foreground mb-1">
+                <div className="text-xs text-gray-400 mb-1">
                   {t('profile.currentlyUnlocked')}:
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {unlockedCountries.map((code: string) => (
-                    <span 
+                    <span
                       key={code}
-                      className="px-2 py-1 bg-primary/20 text-primary text-sm rounded-full"
+                      className="px-2 py-1 bg-pink-500/20 text-pink-300 text-sm rounded-full"
                     >
                       {getCountryName(code)}
                     </span>
@@ -194,17 +194,17 @@ const LocationSection = ({
               variant="outline"
               size="sm"
               onClick={() => setShowCountryDialog(true)}
-              className="w-full flex items-center justify-between"
+              className="w-full flex items-center justify-between border-pink-500/30 text-gray-200 hover:bg-pink-500/10 hover:text-white"
               disabled={!isEditing}
             >
               <span className="flex items-center gap-2">
                 <Globe className="w-4 h-4" />
-                {unlockedCountries.length > 0 
-                  ? t('profile.manageCountries') 
+                {unlockedCountries.length > 0
+                  ? t('profile.manageCountries')
                   : t('profile.selectCountries')}
               </span>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-gray-400">
                   {unlockedCountries.length}/3
                 </span>
                 <ChevronRight className="w-4 h-4" />

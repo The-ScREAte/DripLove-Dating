@@ -4543,15 +4543,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             style={{
               maxWidth: 340,
               width: '90%',
-              background: 'rgba(255, 255, 255, 0.55)',
+              background: 'rgba(0, 0, 0, 0.75)',
               backdropFilter: 'blur(24px) saturate(180%)',
               WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-              border: '1px solid rgba(255, 255, 255, 0.6)',
-              boxShadow: '0 20px 50px -12px rgba(236, 72, 153, 0.35), 0 0 0 1px rgba(255,255,255,0.4) inset',
+              border: '1px solid rgba(236, 72, 153, 0.7)',
+              boxShadow: '0 20px 50px -12px rgba(236, 72, 153, 0.35), 0 0 0 1px rgba(236,72,153,0.25) inset',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-bold text-gray-800 mb-5 text-center tracking-tight">
+            <h3 className="text-base font-bold text-white mb-5 text-center tracking-tight">
               {t('discover.swipeGuide.title')}
             </h3>
             <div className="flex flex-row items-start gap-10 mb-5">
@@ -4572,8 +4572,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   <span className="block"><ChevronLeft className="w-4 h-4" style={{ color: '#f43f5e' }} strokeWidth={3} /></span>
                   <span className="block"><ChevronLeft className="w-4 h-4" style={{ color: '#f43f5e' }} strokeWidth={3} /></span>
                 </div>
-                <span className="text-sm font-bold text-rose-600">{t('discover.swipeGuide.nope')}</span>
-                <span className="text-[11px] text-gray-500 mt-0.5">{t('discover.swipeGuide.swipeLeft')}</span>
+                <span className="text-sm font-bold text-rose-500">{t('discover.swipeGuide.nope')}</span>
+                <span className="text-[11px] text-gray-300 mt-0.5">{t('discover.swipeGuide.swipeLeft')}</span>
               </div>
               {/* Swipe Right */}
               <div className="flex flex-col items-center">
@@ -4592,11 +4592,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   <span className="block"><ChevronRight className="w-4 h-4" style={{ color: '#10b981' }} strokeWidth={3} /></span>
                   <span className="block"><ChevronRight className="w-4 h-4" style={{ color: '#10b981' }} strokeWidth={3} /></span>
                 </div>
-                <span className="text-sm font-bold text-emerald-600">{t('discover.swipeGuide.like')}</span>
-                <span className="text-[11px] text-gray-500 mt-0.5">{t('discover.swipeGuide.swipeRight')}</span>
+                <span className="text-sm font-bold text-emerald-400">{t('discover.swipeGuide.like')}</span>
+                <span className="text-[11px] text-gray-300 mt-0.5">{t('discover.swipeGuide.swipeRight')}</span>
               </div>
             </div>
-            <p className="text-[11px] text-gray-500 text-center">{t('discover.swipeGuide.tapToClose')}</p>
+            <p className="text-[11px] text-gray-300 text-center">{t('discover.swipeGuide.tapToClose')}</p>
           </div>
         </div>
       )}
@@ -4655,6 +4655,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             willChange: 'transform',
             borderRadius: cardCornerRadius,
             overflow: 'hidden',
+            border: '1.5px solid rgba(236,72,153,0.95)',
             boxShadow: swipeUI.isDragging
               ? '0 14px 34px -8px rgba(0,0,0,0.28)'
               : exitingCard
@@ -4804,14 +4805,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 WebkitOverflowScrolling: 'touch',
                 overscrollBehavior: 'contain',
                 scrollBehavior: 'smooth',
-                // Restore fixed heights for collapsed/expanded states
-                maxHeight: showMoreInfo ? 'min(48vh, 420px)' : '250px', // Fixed max height when collapsed
+                // Restore fixed heights for collapsed/expanded states.
+                // The visible window (and its black background) is sized to reach almost all the
+                // way to the bottom of the screen, so there's no gap of photo/transparency below
+                // the panel — but the SCROLLABLE CONTENT inside gets a large paddingBottom (below)
+                // so the actual text always stops clear of the floating nav; only empty black
+                // padding sits behind the nav, never real content.
+                maxHeight: showMoreInfo ? `${Math.max(320, vh - 170)}px` : '320px', // Fixed max height when collapsed
                 minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
-                // Just enough room for the scrolled content to clear the floating pill nav
-                // (nav sits ~22px/30px off the bottom edge plus its own compact height) —
-                // previously this was 160-190px, tuned for the old full-width nav bar.
+                // Large enough that the LAST bit of real content clears the floating pill nav
+                // (nav sits ~22px/30px off the bottom edge plus its own compact height) well
+                // before the panel's own background runs out.
                 paddingBottom: showMoreInfo
-                  ? `calc(${vh < 700 ? '110px' : '90px'} + env(safe-area-inset-bottom, 0px))`
+                  ? `calc(${vh < 700 ? '170px' : '150px'} + env(safe-area-inset-bottom, 0px))`
                   : '0px'
               }}
             >

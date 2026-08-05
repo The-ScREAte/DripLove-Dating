@@ -534,8 +534,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
   return (
   <div
-    className="h-full w-full bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-700 overflow-y-auto"
+    className="h-full w-full overflow-y-auto"
     style={{
+      background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(20,10,20,0.92))',
       // Use clamp to respect the device safe-area inset while keeping
       // a reasonable minimum and maximum top padding for notched devices.
       paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
@@ -560,7 +561,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             onClick={onClose}
             variant="ghost"
             // push down a bit and remove malformed class
-            className="mt-6 text-white hover:bg-white/20 transition-colors"
+            className="mt-6 text-white hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4 mr-2" />
             {t('premium.back')}
@@ -582,54 +583,54 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             
             {/* Premium Plan - Featured */}
             <div className="order-1 md:order-1 w-full">
-              <Card className="border-2 border-yellow-400 relative overflow-hidden shadow-xl bg-gradient-to-br from-white to-yellow-50 transition-all duration-300 w-full">
+              <Card className="border-2 border-yellow-400/70 relative overflow-hidden shadow-xl bg-gradient-to-br from-neutral-900 to-black transition-all duration-300 w-full">
                 {/* Popular Badge */}
                 <div className="absolute -top-1 -right-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-black px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm font-bold rounded-bl-lg shadow-lg responsive-text">
                   {t('premium.mostPopular')}
                 </div>
-              
+
               <CardHeader className="text-center pb-3 md:pb-5 pt-4 md:pt-7 px-2 md:px-4">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center justify-center text-gray-800 responsive-text">
-                  <Crown className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-500 mr-2 sm:mr-3" />
+                <CardTitle className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center justify-center text-white responsive-text">
+                  <Crown className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-400 mr-2 sm:mr-3" />
                   {t('premium.premiumPlan')}
                 </CardTitle>
                 <div className="mt-2 md:mt-3">
                   <div className="space-y-2 md:space-y-3">
                     {/* Monthly payment option - shows localized IAP price */}
-                    <div className="p-1.5 md:p-2 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-lg">
-                      <div className="text-sm sm:text-base md:text-xl font-bold text-gray-800">
+                    <div className="p-1.5 md:p-2 bg-gradient-to-r from-pink-500/10 to-sky-500/10 border border-pink-500/40 rounded-lg">
+                      <div className="text-sm sm:text-base md:text-xl font-bold text-white">
                         {pricingConfig.loading ? '...' : displayPrice}
                       </div>
-                      <div className="text-[9px] md:text-xs text-blue-600 font-medium mt-0.5">📱 {t('premium.monthlySubscription')}</div>
+                      <div className="text-[9px] md:text-xs text-sky-300 font-medium mt-0.5">📱 {t('premium.monthlySubscription')}</div>
                     </div>
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="space-y-1.5 md:space-y-4 px-2 md:px-5 pb-4 md:pb-7">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-white/60 rounded-lg">
-                    <div className="bg-yellow-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
-                      <feature.icon className="w-3.5 h-3.5 md:w-5 md:h-5 text-yellow-600" />
+                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-white/5 rounded-lg">
+                    <div className="bg-yellow-400/20 p-1 md:p-1.5 rounded-full flex-shrink-0">
+                      <feature.icon className="w-3.5 h-3.5 md:w-5 md:h-5 text-yellow-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-800 text-[11px] md:text-base responsive-text truncate">{feature.name}</div>
-                      <div className="text-[10px] md:text-sm text-green-600 font-medium responsive-text">{feature.premium}</div>
+                      <div className="font-semibold text-white text-[11px] md:text-base responsive-text truncate">{feature.name}</div>
+                      <div className="text-[10px] md:text-sm text-green-400 font-medium responsive-text">{feature.premium}</div>
                     </div>
-                    <Check className="w-3.5 h-3.5 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
+                    <Check className="w-3.5 h-3.5 md:w-5 md:h-5 text-green-400 flex-shrink-0" />
                   </div>
                 ))}
-                
+
                 {/* Extra Premium Features */}
-                <div className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200">
-                  <div className="bg-yellow-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
-                    <Crown className="w-3.5 h-3.5 md:w-5 md:h-5 text-yellow-600" />
+                <div className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-gradient-to-r from-yellow-400/10 to-orange-400/10 rounded-lg border border-yellow-400/30">
+                  <div className="bg-yellow-400/20 p-1 md:p-1.5 rounded-full flex-shrink-0">
+                    <Crown className="w-3.5 h-3.5 md:w-5 md:h-5 text-yellow-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800 text-[11px] md:text-base responsive-text truncate">{t('premium.features.allFutureFeatures.name')}</div>
-                    <div className="text-[10px] md:text-sm text-green-600 font-medium responsive-text">{t('premium.features.allFutureFeatures.premium')}</div>
+                    <div className="font-semibold text-white text-[11px] md:text-base responsive-text truncate">{t('premium.features.allFutureFeatures.name')}</div>
+                    <div className="text-[10px] md:text-sm text-green-400 font-medium responsive-text">{t('premium.features.allFutureFeatures.premium')}</div>
                   </div>
-                  <Check className="w-3.5 h-3.5 md:w-5 md:h-5 text-green-500 flex-shrink-0" />
+                  <Check className="w-3.5 h-3.5 md:w-5 md:h-5 text-green-400 flex-shrink-0" />
                 </div>
 
                 {/* CTA Button */}
@@ -647,7 +648,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     <button
                       onClick={handleRestorePurchases}
                       disabled={restoreLoading}
-                      className="mt-3 text-xs md:text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50 transition-colors"
+                      className="mt-3 text-xs md:text-sm text-gray-300 hover:text-white underline disabled:opacity-50 transition-colors"
                     >
                       {restoreLoading ? t('premium.restoringPurchases') : t('premium.restorePurchases')}
                     </button>
@@ -659,29 +660,29 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
           {/* Free Plan */}
           <div className="order-2 md:order-2 w-full">
-            <Card className="border-2 border-gray-200 shadow-md bg-white relative transition-all duration-300 w-full">
+            <Card className="border-2 border-white/15 shadow-md bg-neutral-900 relative transition-all duration-300 w-full">
               <CardHeader className="text-center pb-3 md:pb-5 px-2 md:px-4">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-700 responsive-text">{t('premium.freePlan')}</CardTitle>
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-200 responsive-text">{t('premium.freePlan')}</CardTitle>
                 <div className="mt-2 md:mt-3">
-                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-700">{currencySymbol} 0</div>
-                  <div className="text-[10px] md:text-xs text-gray-500 mt-1">{t('premium.basicFeaturesOnly')}</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-200">{currencySymbol} 0</div>
+                  <div className="text-[10px] md:text-xs text-gray-400 mt-1">{t('premium.basicFeaturesOnly')}</div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-1.5 md:space-y-3 px-2 md:px-5 pb-4 md:pb-7">
                 {features.map((feature, index) => (
-                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-gray-50 rounded-lg">
-                    <div className="bg-gray-100 p-1 md:p-1.5 rounded-full flex-shrink-0">
+                  <div key={index} className="flex items-center space-x-2 md:space-x-3 p-1 md:p-2.5 bg-white/5 rounded-lg">
+                    <div className="bg-white/10 p-1 md:p-1.5 rounded-full flex-shrink-0">
                       <feature.icon className="w-3.5 h-3.5 md:w-5 md:h-5 text-gray-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-700 text-[11px] md:text-base responsive-text truncate">{feature.name}</div>
-                      <div className="text-[10px] md:text-sm text-gray-500 responsive-text">{feature.free}</div>
+                      <div className="font-medium text-gray-200 text-[11px] md:text-base responsive-text truncate">{feature.name}</div>
+                      <div className="text-[10px] md:text-sm text-gray-400 responsive-text">{feature.free}</div>
                     </div>
-                    <X className="w-3.5 h-3.5 md:w-5 md:h-5 text-gray-400 flex-shrink-0" />
+                    <X className="w-3.5 h-3.5 md:w-5 md:h-5 text-gray-500 flex-shrink-0" />
                   </div>
                 ))}
                 <div className="pt-3 md:pt-5 text-center">
-                  <p className="text-gray-500 text-xs md:text-sm mt-2 responsive-text">
+                  <p className="text-gray-400 text-xs md:text-sm mt-2 responsive-text">
                     {t('premium.limitedFeatures')}
                   </p>
                 </div>
@@ -705,20 +706,20 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
       {/* Payment Type Selection Modal */}
       {showPaymentOptions && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-2 sm:px-4">
-          <div className="bg-white rounded-lg shadow-lg p-3 sm:p-5 w-full max-w-md relative">
-            <button 
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-2 sm:px-4">
+          <div className="bg-neutral-900 border border-pink-500/30 rounded-lg shadow-lg p-3 sm:p-5 w-full max-w-md relative">
+            <button
               onClick={() => {
                 setShowPaymentOptions(false);
                 // Reset loading states when modal is closed
                 setIapLoading(false);
                 setGoogleIapLoading(false);
-              }} 
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+              }}
+              className="absolute top-2 right-2 text-gray-400 hover:text-white"
             >
               ✕
             </button>
-            <h2 className="text-base sm:text-lg font-bold mb-3 text-center">
+            <h2 className="text-base sm:text-lg font-bold mb-3 text-center text-white">
               {t('premium.paymentOptions.title')}
             </h2>
             <div className="space-y-3">
@@ -735,7 +736,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   </button>
                   
                   {/* Auto-renewal disclosure */}
-                  <div className="text-[10px] text-gray-600 text-center px-2 -mt-2">
+                  <div className="text-[10px] text-gray-400 text-center px-2 -mt-2">
                     {t('premium.paymentOptions.iap.disclosure')}
                   </div>
                 </>
@@ -743,15 +744,15 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               
               {/* Loading message when IAP is not ready on iOS */}
               {isIosNative && !canBuy && !iapLoadingTimeout && (
-                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-blue-600 mb-1 text-sm font-semibold">{t('premium.paymentOptions.loading.title')}</div>
-                  <div className="text-xs text-blue-500">{t('premium.paymentOptions.loading.message')}</div>
+                <div className="text-center p-3 bg-sky-500/10 rounded-lg border border-sky-500/30">
+                  <div className="text-sky-300 mb-1 text-sm font-semibold">{t('premium.paymentOptions.loading.title')}</div>
+                  <div className="text-xs text-sky-400">{t('premium.paymentOptions.loading.message')}</div>
                 </div>
               )}
               {isIosNative && !canBuy && iapLoadingTimeout && (
-                <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="text-amber-800 mb-1 text-sm font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
-                  <div className="text-xs text-amber-700">
+                <div className="text-center p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                  <div className="text-amber-300 mb-1 text-sm font-semibold">{t('premium.paymentOptions.unavailable.title')}</div>
+                  <div className="text-xs text-amber-400">
                     {t('premium.paymentOptions.unavailable.message')}
                   </div>
                 </div>
@@ -801,13 +802,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   </button>
                   
                   {/* Auto-renewal disclosure */}
-                  <div className="text-[10px] text-gray-600 text-center px-2 -mt-2">
+                  <div className="text-[10px] text-gray-400 text-center px-2 -mt-2">
                     Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.
                   </div>
-                  
+
                   {/* Show status message if Google IAP not available */}
                   {!canBuyGoogle && googleIapLoadingTimeout && (
-                    <div className="text-center text-xs text-gray-500 -mt-1">
+                    <div className="text-center text-xs text-gray-400 -mt-1">
                       Google Play billing may not be configured. Use Paystack above.
                     </div>
                   )}

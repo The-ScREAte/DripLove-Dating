@@ -46,14 +46,14 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
   ) => (
     <div key={questionType}>
       <div className="flex items-center justify-between mb-2">
-        <Label htmlFor={questionType}>{label}</Label>
+        <Label htmlFor={questionType} className="text-gray-200">{label}</Label>
         {isEditing && (
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => toggleSuggestions(questionType)}
-            className="text-xs h-7 px-2"
+            className="text-xs h-7 px-2 border-pink-500/30 text-gray-200 hover:bg-pink-500/10 hover:text-white"
           >
             <Shuffle className="w-3 h-3 mr-1" />
             {t('profile.suggestions')}
@@ -68,13 +68,13 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
         value={editedProfile[questionType] || ''}
         onChange={onInputChange}
         disabled={!isEditing}
-        className="w-full"
+        className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400"
         placeholder={placeholder}
       />
-      
+
       {isEditing && showSuggestions[questionType] && (
-        <div className="mt-2 border rounded-lg bg-gray-50 max-h-40 overflow-y-auto">
-          <div className="p-2 text-xs font-medium text-gray-700 border-b bg-gray-100">
+        <div className="mt-2 border border-pink-500/20 rounded-lg bg-black max-h-40 overflow-y-auto">
+          <div className="p-2 text-xs font-medium text-gray-300 border-b border-pink-500/20 bg-neutral-900">
             {t('profile.selectSuggestion')}
           </div>
           {FUN_QUESTIONS[questionType].map((suggestion, index) => (
@@ -82,7 +82,7 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
               key={index}
               type="button"
               onClick={() => handleSelectSuggestion(questionType, suggestion)}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 border-b border-gray-200 last:border-b-0 focus:outline-none focus:bg-blue-50"
+              className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-pink-500/10 border-b border-pink-500/10 last:border-b-0 focus:outline-none focus:bg-pink-500/15"
             >
               {suggestion}
             </button>
@@ -93,10 +93,10 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
   );
 
   return (
-    <Card>
+    <Card className="bg-black border-pink-500/30">
       <CardHeader>
-        <CardTitle>{t('profile.funQuestions')}</CardTitle>
-        <p className="text-sm text-gray-600">
+        <CardTitle className="text-white">{t('profile.funQuestions')}</CardTitle>
+        <p className="text-sm text-gray-400">
           {t('profile.funQuestionsDescription')}
         </p>
       </CardHeader>

@@ -1003,9 +1003,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }
 
   return (
-    <div className="w-full h-screen bg-gray-100" style={{ margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+    <div className="w-full h-screen bg-black" style={{ margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       {/* Make this parent the scrolling container so sticky children (header/nav) stick relative to it */}
-      <div className="w-full h-full flex flex-col bg-white relative shadow-md" style={{ margin: 0, padding: 0 }}>
+      <div className="w-full h-full flex flex-col bg-black relative shadow-md" style={{ margin: 0, padding: 0 }}>
         
         {/* Fixed Header - always visible */}
           {/* Fixed Header */}
@@ -1017,11 +1017,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 margin: 0,
                 padding: 0,
                 top: 0,
-                background: 'linear-gradient(to bottom, rgba(255,255,255,0.22), rgba(255,240,246,0.08))',
-                backdropFilter: 'blur(14px) saturate(160%)',
-                WebkitBackdropFilter: 'blur(14px) saturate(160%)',
-                borderBottom: '1px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 4px 20px -10px rgba(236, 72, 153, 0.12)',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.22))',
+                backdropFilter: 'blur(18px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+                border: '1px solid rgba(236,72,153,0.7)',
+                boxShadow: '0 4px 20px -10px rgba(236, 72, 153, 0.35)',
                 // The header has no interactive controls of its own — it must never intercept
                 // touch/mouse events meant for the swipe card underneath it.
                 pointerEvents: 'none',
@@ -1042,8 +1042,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   <div
                     className="text-sm font-bold leading-tight"
                     style={{
-                      color: '#241521',
-                      textShadow: '0 1px 2px rgba(255,255,255,0.85), 0 0 10px rgba(255,255,255,0.6)',
+                      color: '#ffffff',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 1px 8px rgba(0,0,0,0.35)',
                     }}
                   >
                     <div>{t('common.findYour')}</div>
@@ -1122,11 +1122,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               bottom: getPlatformSync() === 'android'
                 ? '30px'
                 : 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
-              background: 'linear-gradient(to bottom, rgba(255,255,255,0.4), rgba(255,240,246,0.3))',
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.88))',
               backdropFilter: 'blur(22px) saturate(180%)',
               WebkitBackdropFilter: 'blur(22px) saturate(180%)',
-              border: '1px solid rgba(255,255,255,0.45)',
-              boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.2), 0 2px 8px rgba(0,0,0,0.05)',
+              border: '1px solid rgba(236,72,153,0.55)',
+              boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
             }}
           >
             <div className="flex justify-around items-center py-1.5 px-1">
@@ -1140,7 +1140,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   key={value}
                   onClick={() => handleTabChange(value)}
                   className={`flex flex-col items-center gap-0.5 py-1.5 px-4 rounded-full transition-all duration-200 relative ${
-                    activeTab === value ? 'text-pink-600 scale-105' : 'text-gray-500'
+                    activeTab === value ? 'text-pink-500 scale-105' : 'text-gray-400'
                   }`}
                   style={activeTab === value ? {
                     background: 'linear-gradient(to bottom, rgba(244,114,182,0.22), rgba(244,114,182,0.12))',

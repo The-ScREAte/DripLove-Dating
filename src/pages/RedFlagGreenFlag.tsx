@@ -834,27 +834,27 @@ const RedFlagGreenFlag = () => {
 
   if (!selectedLevel) {
     return (
-      <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col">
-        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-black flex flex-col">
+        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
                   <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                  <p className="text-xs text-gray-600">Red Flag or Green Flag</p>
+                  <p className="text-xs text-gray-300">Red Flag or Green Flag</p>
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleClearResults}
-                className="border-gray-300 text-gray-700"
+                className="bg-black border-pink-500/40 text-gray-200 hover:bg-white/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -864,7 +864,7 @@ const RedFlagGreenFlag = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-          <Card>
+          <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
                 const level = Number(levelStr);
@@ -872,20 +872,20 @@ const RedFlagGreenFlag = () => {
                   <Button
                     key={level}
                     onClick={() => startLevel(level)}
-                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all"
+                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all bg-black/60 border-pink-500/30 text-white hover:bg-white/5"
                     variant="outline"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-lg">Level {level}</span>
-                        <span className="text-sm text-gray-600">- {cfg.name}</span>
+                        <span className="font-bold text-lg text-white">Level {level}</span>
+                        <span className="text-sm text-gray-300">- {cfg.name}</span>
                         <div className="flex gap-0.5">
                           {Array.from({ length: level }).map((_, i) => (
                             <Star key={i} className="w-3 h-3 fill-green-400 text-green-400" />
                           ))}
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600">{cfg.difficulty} • {cfg.scenarios} scenarios</p>
+                      <p className="text-sm text-gray-300">{cfg.difficulty} • {cfg.scenarios} scenarios</p>
                     </div>
                   </Button>
                 );
@@ -894,13 +894,13 @@ const RedFlagGreenFlag = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card>
+            <Card className="bg-neutral-900 border-pink-500/30">
               <CardContent className="pt-6 space-y-2">
-                <div className="font-semibold text-gray-900">Your best 3 (this device)</div>
+                <div className="font-semibold text-white">Your best 3 (this device)</div>
                 {best3.map((r, idx) => (
                   <div key={`${r.playedAt}-${idx}`} className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700">Level {r.level} • {r.percentage.toFixed(0)}%</div>
-                    <div className="text-gray-500">{new Date(r.playedAt).toLocaleDateString()}</div>
+                    <div className="text-gray-200">Level {r.level} • {r.percentage.toFixed(0)}%</div>
+                    <div className="text-gray-400">{new Date(r.playedAt).toLocaleDateString()}</div>
                   </div>
                 ))}
               </CardContent>
@@ -915,19 +915,19 @@ const RedFlagGreenFlag = () => {
   if (gameComplete) {
     const rating = getScoreRating();
     return (
-      <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col">
-        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-black flex flex-col">
+        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-xs text-gray-600">Red Flag or Green Flag</p>
+                <p className="text-xs text-gray-300">Red Flag or Green Flag</p>
               </div>
             </div>
           </div>
@@ -935,20 +935,20 @@ const RedFlagGreenFlag = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
           <div className="max-w-2xl mx-auto px-4 py-8">
-          <Card>
+          <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-8 pb-8">
               <div className="text-6xl mb-6">🎯</div>
-              <h2 className="text-3xl font-bold mb-2">{rating.title}</h2>
-              <p className="text-xl text-gray-600 mb-6">{rating.message}</p>
-              
+              <h2 className="text-3xl font-bold mb-2 text-white">{rating.title}</h2>
+              <p className="text-xl text-gray-300 mb-6">{rating.message}</p>
+
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
-                  <div className="text-3xl font-bold text-green-600">{score.correct}</div>
-                  <p className="text-sm text-gray-600">Correct</p>
+                <div className="bg-green-950/40 rounded-lg p-4 border-2 border-green-500/40">
+                  <div className="text-3xl font-bold text-green-400">{score.correct}</div>
+                  <p className="text-sm text-gray-300">Correct</p>
                 </div>
-                <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200">
-                  <div className="text-3xl font-bold text-red-600">{score.wrong}</div>
-                  <p className="text-sm text-gray-600">Wrong</p>
+                <div className="bg-red-950/40 rounded-lg p-4 border-2 border-red-500/40">
+                  <div className="text-3xl font-bold text-red-400">{score.wrong}</div>
+                  <p className="text-sm text-gray-300">Wrong</p>
                 </div>
               </div>
 
@@ -962,7 +962,7 @@ const RedFlagGreenFlag = () => {
                 <Button
                   onClick={() => navigate('/games')}
                   variant="outline"
-                  className="w-full"
+                  className="w-full border-pink-500/40 text-white hover:bg-white/10"
                 >
                   Back to Games
                 </Button>
@@ -978,32 +978,32 @@ const RedFlagGreenFlag = () => {
   const isCorrect = selectedAnswer === currentScenario.isRedFlag;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-red-50 via-pink-50 to-green-50 flex flex-col">
+    <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-sm font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-xs text-gray-600">Red Flag or Green Flag • {currentIndex + 1}/{levelScenarios.length}</p>
+                <p className="text-xs text-gray-300">Red Flag or Green Flag • {currentIndex + 1}/{levelScenarios.length}</p>
               </div>
             </div>
-            <div className="text-right text-xs text-gray-500">Lvl {selectedLevel}</div>
+            <div className="text-right text-xs text-gray-400">Lvl {selectedLevel}</div>
           </div>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="bg-white border-b">
+      <div className="bg-black border-b border-pink-500/20">
         <div className="max-w-2xl mx-auto px-4 py-2">
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-red-500 to-green-500 transition-all duration-300"
               style={{ width: `${((currentIndex + 1) / Math.max(1, levelScenarios.length)) * 100}%` }}
@@ -1016,26 +1016,26 @@ const RedFlagGreenFlag = () => {
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
         <div className="max-w-2xl mx-auto px-4 py-6">
         {!showExplanation ? (
-          <Card className="mb-6">
+          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-8 pb-8">
               {/* Type Badge */}
               <div className="text-center mb-6">
-                <span className="inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold capitalize mb-6">
-                  {currentScenario.type === 'text' ? '💬 Message' : 
-                   currentScenario.type === 'behavior' ? '👤 Behavior' : 
+                <span className="inline-block px-4 py-2 bg-white/10 text-gray-200 rounded-full text-sm font-semibold capitalize mb-6">
+                  {currentScenario.type === 'text' ? '💬 Message' :
+                   currentScenario.type === 'behavior' ? '👤 Behavior' :
                    '📋 Profile'}
                 </span>
               </div>
 
               {/* Scenario */}
-              <div className="bg-gray-50 rounded-xl p-6 mb-8 min-h-[120px] flex items-center justify-center">
-                <p className="text-lg text-center leading-relaxed text-gray-800">
+              <div className="bg-black/60 border border-pink-500/20 rounded-xl p-6 mb-8 min-h-[120px] flex items-center justify-center">
+                <p className="text-lg text-center leading-relaxed text-gray-100">
                   {currentScenario.content}
                 </p>
               </div>
 
               {/* Question */}
-              <h2 className="text-2xl font-bold text-center mb-8 text-gray-900">
+              <h2 className="text-2xl font-bold text-center mb-8 text-white">
                 Would you date this? 🤔
               </h2>
 
@@ -1059,34 +1059,34 @@ const RedFlagGreenFlag = () => {
             </CardContent>
           </Card>
         ) : (
-          <Card className={`border-2 ${isCorrect ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'}`}>
+          <Card className={`border-2 bg-neutral-900 ${isCorrect ? 'border-green-500/60' : 'border-red-500/60'}`}>
             <CardContent className="pt-8 pb-8">
               <div className="text-center mb-6">
                 <div className="text-6xl mb-4">
                   {isCorrect ? '✅' : '❌'}
                 </div>
-                <h2 className="text-3xl font-bold mb-4">
+                <h2 className="text-3xl font-bold mb-4 text-white">
                   {isCorrect ? 'Correct!' : 'Not quite!'}
                 </h2>
                 <div className={`inline-block px-4 py-2 rounded-full font-bold text-lg mb-4 ${
-                  currentScenario.isRedFlag 
-                    ? 'bg-red-200 text-red-800' 
-                    : 'bg-green-200 text-green-800'
+                  currentScenario.isRedFlag
+                    ? 'bg-red-500/20 text-red-300'
+                    : 'bg-green-500/20 text-green-300'
                 }`}>
                   {currentScenario.isRedFlag ? '🚩 Red Flag' : '💚 Green Flag'}
                 </div>
               </div>
 
               {/* Scenario Reminder */}
-              <div className="bg-white rounded-lg p-4 mb-6 border">
-                <p className="text-gray-700 text-center">
+              <div className="bg-black/60 rounded-lg p-4 mb-6 border border-pink-500/20">
+                <p className="text-gray-200 text-center">
                   {currentScenario.content}
                 </p>
               </div>
 
               {/* Explanation */}
-              <div className="bg-white rounded-lg p-6 mb-6 border-2 border-gray-200">
-                <p className="text-lg leading-relaxed text-gray-800">
+              <div className="bg-black/60 rounded-lg p-6 mb-6 border-2 border-pink-500/20">
+                <p className="text-lg leading-relaxed text-gray-100">
                   {currentScenario.explanation}
                 </p>
               </div>

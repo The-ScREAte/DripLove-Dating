@@ -74,9 +74,9 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
 
   if (!currentUser || !userLocation) {
     return (
-      <Card className="mb-4">
+      <Card className="mb-4 bg-black border border-pink-500/30">
         <CardContent className="p-4">
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-gray-300">
             <MapPin className="w-4 h-4" />
             <span className="text-sm">Set up your location in profile settings for better matches</span>
           </div>
@@ -86,16 +86,16 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-4 bg-black border border-pink-500/30">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Target className="w-5 h-5 text-pink-600" />
+        <CardTitle className="text-lg flex items-center gap-2 text-white">
+          <Target className="w-5 h-5 text-pink-500" />
           Location Matching
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowSettings(!showSettings)}
-            className="ml-auto"
+            className="ml-auto text-gray-300 hover:text-white hover:bg-neutral-800"
           >
             <Settings className="w-4 h-4" />
           </Button>
@@ -103,14 +103,14 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
       </CardHeader>
       <CardContent className="pt-0">
         {/* Current Location Display */}
-        <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 rounded-lg">
-          <MapPin className="w-4 h-4 text-blue-600" />
+        <div className="flex items-center gap-2 mb-4 p-3 bg-blue-950/40 border border-blue-500/30 rounded-lg">
+          <MapPin className="w-4 h-4 text-blue-400" />
           <div className="flex-1">
-            <div className="font-medium text-blue-800">
+            <div className="font-medium text-blue-200">
               📍 {userLocation.city}, {userLocation.country}
             </div>
             {userLocation.latitude && userLocation.longitude && (
-              <div className="text-xs text-blue-600">
+              <div className="text-xs text-blue-300">
                 Exact location • Better matching accuracy
               </div>
             )}
@@ -121,8 +121,8 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium">Maximum Distance</label>
-              <span className="text-sm text-gray-600">{maxDistance} km</span>
+              <label className="text-sm font-medium text-gray-200">Maximum Distance</label>
+              <span className="text-sm text-gray-300">{maxDistance} km</span>
             </div>
             <Slider
               value={[maxDistance]}
@@ -133,46 +133,46 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
               className="w-full"
               disabled={isLoading}
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-gray-400 mt-1">
               <span>1 km</span>
               <span>500 km</span>
             </div>
           </div>
 
           {/* Distance Guide */}
-          <div className="text-xs text-gray-600 space-y-1">
+          <div className="text-xs text-gray-300 space-y-1">
             <div className="flex justify-between">
               <span>• Same city:</span>
-              <span className="text-green-600">~0-25 km</span>
+              <span className="text-green-400">~0-25 km</span>
             </div>
             <div className="flex justify-between">
               <span>• Nearby cities:</span>
-              <span className="text-blue-600">~25-100 km</span>
+              <span className="text-blue-400">~25-100 km</span>
             </div>
             <div className="flex justify-between">
               <span>• Same country:</span>
-              <span className="text-orange-600">~100-500 km</span>
+              <span className="text-orange-400">~100-500 km</span>
             </div>
           </div>
         </div>
 
         {/* Extended Settings */}
         {showSettings && (
-          <div className="mt-4 pt-4 border-t space-y-3">
-            <div className="text-sm font-medium">Location Preferences</div>
-            
+          <div className="mt-4 pt-4 border-t border-neutral-700 space-y-3">
+            <div className="text-sm font-medium text-gray-200">Location Preferences</div>
+
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <Button variant="outline" size="sm" className="h-8">
+              <Button variant="outline" size="sm" className="h-8 bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
                 Same City Only
               </Button>
-              <Button variant="outline" size="sm" className="h-8">
+              <Button variant="outline" size="sm" className="h-8 bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
                 Country Wide
               </Button>
             </div>
 
-            <div className="p-3 bg-yellow-50 rounded-lg">
-              <div className="text-xs text-yellow-800">
-                💡 <strong>Tip:</strong> Users with exact coordinates (from major cities) 
+            <div className="p-3 bg-amber-950/40 border border-amber-500/30 rounded-lg">
+              <div className="text-xs text-amber-200">
+                💡 <strong>Tip:</strong> Users with exact coordinates (from major cities)
                 get more accurate distance calculations and better matches.
               </div>
             </div>

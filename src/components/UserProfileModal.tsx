@@ -227,14 +227,14 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
           <DialogHeader>
-            <DialogTitle>{t('userProfileModal.title', { name: '' })}</DialogTitle>
+            <DialogTitle className="text-white">{t('userProfileModal.title', { name: '' })}</DialogTitle>
             <DialogDescription>{t('userProfileModal.description')}</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">{t('userProfileModal.loading')}</span>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+            <span className="ml-3 text-gray-300">{t('userProfileModal.loading')}</span>
           </div>
         </DialogContent>
       </Dialog>
@@ -244,16 +244,16 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   if (!profile && !loading) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
           <DialogHeader>
-            <DialogTitle>{t('userProfileModal.title', { name: '' })}</DialogTitle>
+            <DialogTitle className="text-white">{t('userProfileModal.title', { name: '' })}</DialogTitle>
             <DialogDescription>{t('userProfileModal.unavailable')}</DialogDescription>
           </DialogHeader>
           <div className="text-center py-8">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-8 h-8 text-gray-400" />
             </div>
-            <p className="text-gray-500 mb-2">{t('userProfileModal.notFound')}</p>
+            <p className="text-gray-300 mb-2">{t('userProfileModal.notFound')}</p>
             <p className="text-sm text-gray-400">{t('userProfileModal.unavailable')}</p>
           </div>
         </DialogContent>
@@ -264,21 +264,21 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
           <DialogHeader className="flex flex-row items-center justify-between">
             <div>
-              <DialogTitle className="text-xl text-gray-800">
+              <DialogTitle className="text-xl text-white">
                 {t('userProfileModal.title', { name: `${profile?.first_name} ${profile?.last_name}` })}
               </DialogTitle>
               <DialogDescription>
                 {t('userProfileModal.description')}
               </DialogDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleClose}
-              className="h-8 px-3"
+              className="h-8 px-3 bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
             >
               <X className="w-4 h-4 mr-1" />
               Cancel
@@ -293,7 +293,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   <img loading="lazy" decoding="async"
                     src={optimizeImageUrl(userImages[0], { width: 500, quality: 60 })}
                     alt={`${profile?.first_name} ${profile?.last_name}`}
-                    className="w-32 h-32 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-blue-100"
+                    className="w-32 h-32 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-pink-500/40"
                     onClick={() => handleImageClick(0)}
                   />
                   {isAdmin && (
@@ -312,25 +312,25 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   )}
                 </div>
               ) : (
-                <Avatar className="w-32 h-32 mx-auto mb-4">
-                  <AvatarFallback className="bg-blue-100 text-blue-700 text-2xl">
+                <Avatar className="w-32 h-32 mx-auto mb-4 border-4 border-pink-500/40">
+                  <AvatarFallback className="bg-pink-950 text-pink-300 text-2xl">
                     {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
               )}
-                
-                <h2 className="text-2xl font-bold text-gray-800">
+
+                <h2 className="text-2xl font-bold text-white">
                   {profile?.first_name} {profile?.last_name}
                 </h2>
-                
+
                 {(isEditingPreferences ? editedDateOfBirth : profile?.date_of_birth) && (
-                  <p className="text-gray-600 mb-2">
+                  <p className="text-gray-300 mb-2">
                     {t('userProfileModal.yearsOld', { age: calculateAge(isEditingPreferences ? editedDateOfBirth : profile.date_of_birth) })}
                   </p>
                 )}
-                
+
                 {(profile?.city || profile?.country) && (
-                  <div className="flex items-center justify-center text-gray-600 mb-4">
+                  <div className="flex items-center justify-center text-gray-300 mb-4">
                     <MapPin className="w-4 h-4 mr-1" />
                     <span>{profile?.city}{profile?.city && profile?.country && ', '}{profile?.country}</span>
                   </div>
@@ -339,10 +339,10 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Admin Preferences Section */}
               {isAdmin && (
-                <Card className="border-2 border-blue-200 bg-blue-50">
+                <Card className="border-2 border-blue-700/40 bg-blue-950/30">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold flex items-center text-blue-800">
+                      <h3 className="font-semibold flex items-center text-blue-300">
                         <Settings className="w-4 h-4 mr-2" />
                         User Preferences (Admin Edit)
                       </h3>
@@ -351,7 +351,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           size="sm"
                           variant="outline"
                           onClick={() => setIsEditingPreferences(true)}
-                          className="h-7 text-xs"
+                          className="h-7 text-xs bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
                         >
                           <Pencil className="w-3 h-3 mr-1" />
                           Edit
@@ -375,7 +375,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                               setEditedUnlockedCountries(profile?.unlocked_countries || []);
                               setEditedDateOfBirth(profile?.date_of_birth || '');
                             }}
-                            className="h-7 text-xs"
+                            className="h-7 text-xs bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
                           >
                             Cancel
                           </Button>
@@ -396,12 +396,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Gender</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">Gender</label>
                             <Select value={editedGender} onValueChange={setEditedGender}>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
                                 <SelectValue placeholder="Select gender" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent className="bg-black border-pink-500/30 text-white">
                                 <SelectItem value="male" className="text-xs">Male</SelectItem>
                                 <SelectItem value="female" className="text-xs">Female</SelectItem>
                                 <SelectItem value="other" className="text-xs">Other</SelectItem>
@@ -409,12 +409,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                             </Select>
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Looking For</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">Looking For</label>
                             <Select value={editedPreference} onValueChange={setEditedPreference}>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
                                 <SelectValue placeholder="Select preference" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent className="bg-black border-pink-500/30 text-white">
                                 <SelectItem value="male" className="text-xs">Male</SelectItem>
                                 <SelectItem value="female" className="text-xs">Female</SelectItem>
                                 <SelectItem value="everyone" className="text-xs">Everyone</SelectItem>
@@ -424,12 +424,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         </div>
 
                         <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Relationship Intent</label>
+                          <label className="text-xs font-medium text-gray-400 mb-1 block">Relationship Intent</label>
                           <Select value={editedRelationshipIntent} onValueChange={setEditedRelationshipIntent}>
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
                               <SelectValue placeholder="Select intent" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-black border-pink-500/30 text-white">
                               <SelectItem value="serious" className="text-xs">Serious</SelectItem>
                               <SelectItem value="long-term" className="text-xs">Long-term</SelectItem>
                               <SelectItem value="casual" className="text-xs">Casual</SelectItem>
@@ -441,15 +441,15 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
                         {/* Date of Birth */}
                         <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Date of Birth</label>
+                          <label className="text-xs font-medium text-gray-400 mb-1 block">Date of Birth</label>
                           <Input
                             type="date"
                             value={editedDateOfBirth}
                             onChange={(e) => setEditedDateOfBirth(e.target.value)}
-                            className="h-8 text-xs"
+                            className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
                           />
                           {editedDateOfBirth && (
-                            <p className="text-[10px] text-gray-500 mt-1">
+                            <p className="text-[10px] text-gray-400 mt-1">
                               Age: {calculateAge(editedDateOfBirth)} years old
                             </p>
                           )}
@@ -457,12 +457,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Country</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">Country</label>
                             <Select value={editedCountry} onValueChange={setEditedCountry}>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
                                 <SelectValue placeholder="Select country" />
                               </SelectTrigger>
-                              <SelectContent className="max-h-60">
+                              <SelectContent className="max-h-60 bg-black border-pink-500/30 text-white">
                                 {getCountriesList().map(country => (
                                   <SelectItem key={country.code} value={country.name} className="text-xs">
                                     {country.name}
@@ -472,56 +472,56 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                             </Select>
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">City</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">City</label>
                             <Input
                               type="text"
                               value={editedCity}
                               onChange={(e) => setEditedCity(e.target.value)}
                               placeholder="Enter city"
-                              className="h-8 text-xs"
+                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
                             />
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Min Age</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">Min Age</label>
                             <Input
                               type="number"
                               value={editedMinAge}
                               onChange={(e) => setEditedMinAge(e.target.value)}
                               min="18"
                               max="99"
-                              className="h-8 text-xs"
+                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Max Age</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">Max Age</label>
                             <Input
                               type="number"
                               value={editedMaxAge}
                               onChange={(e) => setEditedMaxAge(e.target.value)}
                               min="18"
                               max="99"
-                              className="h-8 text-xs"
+                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Max Distance (km)</label>
+                            <label className="text-xs font-medium text-gray-400 mb-1 block">Max Distance (km)</label>
                             <Input
                               type="number"
                               value={editedMaxDistance}
                               onChange={(e) => setEditedMaxDistance(e.target.value)}
                               min="1"
                               max="500"
-                              className="h-8 text-xs"
+                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
                             />
                           </div>
                         </div>
 
                         {/* Unlocked Countries */}
                         <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Unlocked Countries (Premium)</label>
+                          <label className="text-xs font-medium text-gray-400 mb-1 block">Unlocked Countries (Premium)</label>
                           <div className="flex flex-wrap gap-1 mb-2">
                             {editedUnlockedCountries.map((code: string) => {
                               const country = getCountriesList().find(c => c.code === code);
@@ -550,10 +550,10 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                                 }
                               }}
                             >
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
                                 <SelectValue placeholder="Add country..." />
                               </SelectTrigger>
-                              <SelectContent className="max-h-60">
+                              <SelectContent className="max-h-60 bg-black border-pink-500/30 text-white">
                                 {getCountriesList()
                                   .filter(c => !editedUnlockedCountries.includes(c.code))
                                   .map(country => (
@@ -570,35 +570,35 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       <div className="space-y-3">
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <span className="text-gray-500 text-xs">Gender:</span>
-                            <p className="font-medium capitalize">{profile?.gender || 'Not set'}</p>
+                            <span className="text-gray-400 text-xs">Gender:</span>
+                            <p className="font-medium capitalize text-white">{profile?.gender || 'Not set'}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">Looking For:</span>
-                            <p className="font-medium capitalize">{profile?.preference || 'Not set'}</p>
+                            <span className="text-gray-400 text-xs">Looking For:</span>
+                            <p className="font-medium capitalize text-white">{profile?.preference || 'Not set'}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">Relationship Intent:</span>
-                            <p className="font-medium capitalize">{profile?.relationship_intent?.replace(/_/g, ' ') || 'Not set'}</p>
+                            <span className="text-gray-400 text-xs">Relationship Intent:</span>
+                            <p className="font-medium capitalize text-white">{profile?.relationship_intent?.replace(/_/g, ' ') || 'Not set'}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">Age Range:</span>
-                            <p className="font-medium">{profile?.min_age || 18} - {profile?.max_age || 99}</p>
+                            <span className="text-gray-400 text-xs">Age Range:</span>
+                            <p className="font-medium text-white">{profile?.min_age || 18} - {profile?.max_age || 99}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">Country:</span>
-                            <p className="font-medium">{profile?.country || 'Not set'}</p>
+                            <span className="text-gray-400 text-xs">Country:</span>
+                            <p className="font-medium text-white">{profile?.country || 'Not set'}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">City:</span>
-                            <p className="font-medium">{profile?.city || 'Not set'}</p>
+                            <span className="text-gray-400 text-xs">City:</span>
+                            <p className="font-medium text-white">{profile?.city || 'Not set'}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">Max Distance:</span>
-                            <p className="font-medium">{profile?.max_distance || 250} km</p>
+                            <span className="text-gray-400 text-xs">Max Distance:</span>
+                            <p className="font-medium text-white">{profile?.max_distance || 250} km</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 text-xs">Unlocked Countries:</span>
+                            <span className="text-gray-400 text-xs">Unlocked Countries:</span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {profile?.unlocked_countries?.length > 0 ? (
                                 profile.unlocked_countries.map((code: string) => {
@@ -623,9 +623,9 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Photo Gallery */}
               {userImages.length > 1 && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                    <h3 className="font-semibold text-white mb-4 flex items-center">
                       <User className="w-4 h-4 mr-2" />
                       {t('userProfileModal.photos', { count: userImages.length })}
                     </h3>
@@ -663,31 +663,31 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Bio */}
               {profile?.bio && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <p className="text-gray-700 text-center italic">"{profile.bio}"</p>
+                    <p className="text-gray-200 text-center italic">"{profile.bio}"</p>
                   </CardContent>
                 </Card>
               )}
               
               {/* Basic Info */}
-              <Card>
+              <Card className="bg-black border-pink-500/20">
                 <CardContent className="pt-6">
-                  <h3 className="font-semibold mb-3 flex items-center">
-                    <Heart className="w-4 h-4 mr-2 text-blue-600" />
+                  <h3 className="font-semibold mb-3 flex items-center text-white">
+                    <Heart className="w-4 h-4 mr-2 text-blue-400" />
                     {t('userProfileModal.sections.lookingFor')}
                   </h3>
                   <div className="space-y-2">
                     {profile?.preference && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">{t('userProfileModal.lookingFor.interestedIn')}</span>
-                        <Badge variant="secondary" className="capitalize bg-blue-50 text-blue-700 border-blue-200">{profile.preference}</Badge>
+                        <span className="text-gray-400">{t('userProfileModal.lookingFor.interestedIn')}</span>
+                        <Badge variant="secondary" className="capitalize bg-blue-950/40 text-blue-300 border-blue-700/40">{profile.preference}</Badge>
                       </div>
                     )}
                     {profile?.relationship_intent && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">{t('userProfileModal.lookingFor.lookingFor')}</span>
-                        <Badge variant="secondary" className="capitalize bg-blue-50 text-blue-700 border-blue-200">{profile.relationship_intent}</Badge>
+                        <span className="text-gray-400">{t('userProfileModal.lookingFor.lookingFor')}</span>
+                        <Badge variant="secondary" className="capitalize bg-blue-950/40 text-blue-300 border-blue-700/40">{profile.relationship_intent}</Badge>
                       </div>
                     )}
                   </div>
@@ -696,32 +696,32 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Lifestyle */}
               {(profile?.smoking || profile?.drinking || profile?.exercise_level || profile?.sleeping_schedule) && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.lifestyle')}</h3>
+                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.lifestyle')}</h3>
                     <div className="grid grid-cols-2 gap-y-2 gap-x-4">
                       {profile?.smoking && (
                         <div>
-                          <span className="text-gray-600">{t('userProfileModal.lifestyle.smoking')}</span>
-                          <span className="block font-medium">{profile.smoking}</span>
+                          <span className="text-gray-400">{t('userProfileModal.lifestyle.smoking')}</span>
+                          <span className="block font-medium text-white">{profile.smoking}</span>
                         </div>
                       )}
                       {profile?.drinking && (
                         <div>
-                          <span className="text-gray-600">{t('userProfileModal.lifestyle.drinking')}</span>
-                          <span className="block font-medium">{profile.drinking}</span>
+                          <span className="text-gray-400">{t('userProfileModal.lifestyle.drinking')}</span>
+                          <span className="block font-medium text-white">{profile.drinking}</span>
                         </div>
                       )}
                       {profile?.exercise_level && (
                         <div>
-                          <span className="text-gray-600">{t('userProfileModal.lifestyle.exercise')}</span>
-                          <span className="block font-medium">{profile.exercise_level}</span>
+                          <span className="text-gray-400">{t('userProfileModal.lifestyle.exercise')}</span>
+                          <span className="block font-medium text-white">{profile.exercise_level}</span>
                         </div>
                       )}
                       {profile?.sleeping_schedule && (
                         <div>
-                          <span className="text-gray-600">{t('userProfileModal.lifestyle.sleep')}</span>
-                          <span className="block font-medium">{profile.sleeping_schedule}</span>
+                          <span className="text-gray-400">{t('userProfileModal.lifestyle.sleep')}</span>
+                          <span className="block font-medium text-white">{profile.sleeping_schedule}</span>
                         </div>
                       )}
                     </div>
@@ -731,31 +731,31 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Work & Education */}
               {(profile?.occupation || profile?.industry || profile?.education_level) && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center">
-                      <Briefcase className="w-4 h-4 mr-2 text-blue-600" />
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <Briefcase className="w-4 h-4 mr-2 text-blue-400" />
                       {t('userProfileModal.sections.workEducation')}
                     </h3>
                     <div className="space-y-3">
                       {profile?.occupation && (
                         <div>
-                          <span className="text-gray-600">{t('userProfileModal.workEducation.occupation')}</span>
-                          <span className="block font-medium">{profile.occupation}</span>
+                          <span className="text-gray-400">{t('userProfileModal.workEducation.occupation')}</span>
+                          <span className="block font-medium text-white">{profile.occupation}</span>
                         </div>
                       )}
                       {profile?.industry && (
                         <div>
-                          <span className="text-gray-600">{t('userProfileModal.workEducation.industry')}</span>
-                          <span className="block font-medium">{profile.industry}</span>
+                          <span className="text-gray-400">{t('userProfileModal.workEducation.industry')}</span>
+                          <span className="block font-medium text-white">{profile.industry}</span>
                         </div>
                       )}
                       {profile?.education_level && (
                         <div>
-                          <span className="text-gray-600 flex items-center">
+                          <span className="text-gray-400 flex items-center">
                             <GraduationCap className="w-4 h-4 mr-1" /> {t('userProfileModal.workEducation.education')}
                           </span>
-                          <span className="block font-medium">{profile.education_level}</span>
+                          <span className="block font-medium text-white">{profile.education_level}</span>
                         </div>
                       )}
                     </div>
@@ -765,19 +765,19 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Personality Traits */}
               {(typeof profile?.introvert_extrovert === 'number' || typeof profile?.spontaneous_planner === 'number' || typeof profile?.messy_organized === 'number') && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.personality')}</h3>
+                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.personality')}</h3>
                     <div className="space-y-3">
                       {typeof profile?.introvert_extrovert === 'number' && (
                         <div>
-                          <div className="flex justify-between text-sm mb-1">
+                          <div className="flex justify-between text-sm mb-1 text-gray-300">
                             <span>{t('userProfileModal.personality.introvert')}</span>
                             <span>{t('userProfileModal.personality.extrovert')}</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-neutral-800 rounded-full h-2">
                             <div 
-                              className="bg-blue-500 h-2 rounded-full" 
+                              className="bg-blue-400 h-2 rounded-full" 
                               style={{ width: `${profile.introvert_extrovert}%` }}
                             ></div>
                           </div>
@@ -785,13 +785,13 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       )}
                       {typeof profile?.spontaneous_planner === 'number' && (
                         <div>
-                          <div className="flex justify-between text-sm mb-1">
+                          <div className="flex justify-between text-sm mb-1 text-gray-300">
                             <span>{t('userProfileModal.personality.planner')}</span>
                             <span>{t('userProfileModal.personality.spontaneous')}</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-neutral-800 rounded-full h-2">
                             <div 
-                              className="bg-blue-500 h-2 rounded-full" 
+                              className="bg-blue-400 h-2 rounded-full" 
                               style={{ width: `${profile.spontaneous_planner}%` }}
                             ></div>
                           </div>
@@ -799,13 +799,13 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                       )}
                       {typeof profile?.messy_organized === 'number' && (
                         <div>
-                          <div className="flex justify-between text-sm mb-1">
+                          <div className="flex justify-between text-sm mb-1 text-gray-300">
                             <span>{t('userProfileModal.personality.organized')}</span>
                             <span>{t('userProfileModal.personality.messy')}</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-neutral-800 rounded-full h-2">
                             <div 
-                              className="bg-blue-500 h-2 rounded-full" 
+                              className="bg-blue-400 h-2 rounded-full" 
                               style={{ width: `${profile.messy_organized}%` }}
                             ></div>
                           </div>
@@ -818,26 +818,26 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Fun Questions */}
               {(profile?.fun_fact || profile?.perfect_first_date || profile?.last_googled) && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.funFacts')}</h3>
+                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.funFacts')}</h3>
                     <div className="space-y-4">
                       {profile?.fun_fact && (
                         <div>
-                          <span className="text-gray-600 font-medium">{t('userProfileModal.funFacts.funFact')}</span>
-                          <p className="text-gray-800">{profile.fun_fact}</p>
+                          <span className="text-gray-400 font-medium">{t('userProfileModal.funFacts.funFact')}</span>
+                          <p className="text-gray-200">{profile.fun_fact}</p>
                         </div>
                       )}
                       {profile?.perfect_first_date && (
                         <div>
-                          <span className="text-gray-600 font-medium">{t('userProfileModal.funFacts.perfectDate')}</span>
-                          <p className="text-gray-800">{profile.perfect_first_date}</p>
+                          <span className="text-gray-400 font-medium">{t('userProfileModal.funFacts.perfectDate')}</span>
+                          <p className="text-gray-200">{profile.perfect_first_date}</p>
                         </div>
                       )}
                       {profile?.last_googled && (
                         <div>
-                          <span className="text-gray-600 font-medium">{t('userProfileModal.funFacts.lastGoogled')}</span>
-                          <p className="text-gray-800">{profile.last_googled}</p>
+                          <span className="text-gray-400 font-medium">{t('userProfileModal.funFacts.lastGoogled')}</span>
+                          <p className="text-gray-200">{profile.last_googled}</p>
                         </div>
                       )}
                     </div>
@@ -847,12 +847,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Interests */}
               {profile?.interests && profile.interests.length > 0 && (
-                <Card>
+                <Card className="bg-black border-pink-500/20">
                   <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">{t('userProfileModal.sections.interests')}</h3>
+                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.interests')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {profile.interests.map((interest: string) => (
-                        <Badge key={interest} variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                        <Badge key={interest} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
                           {interest}
                         </Badge>
                       ))}

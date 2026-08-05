@@ -76,37 +76,37 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="bg-black border border-pink-500/50 text-white">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-white">
             {t('block.title', { name: `${userToBlock?.first_name} ${userToBlock?.last_name}` })}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-gray-300">
             {t('block.description')}
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div>
-            <Label htmlFor="reason">{t('block.reasonOptional')}</Label>
+            <Label htmlFor="reason" className="text-gray-300">{t('block.reasonOptional')}</Label>
             <Textarea
               id="reason"
               placeholder={t('block.placeholder')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1"
+              className="mt-1 bg-neutral-900 border-pink-500/40 text-white placeholder:text-gray-500"
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isBlocking}>
+          <Button variant="outline" onClick={onClose} disabled={isBlocking} className="border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
             {t('common.cancel')}
           </Button>
-          <Button 
-            onClick={handleBlock} 
+          <Button
+            onClick={handleBlock}
             disabled={isBlocking}
-            className="bg-red-500 hover:bg-red-600"
+            className="bg-red-500 hover:bg-red-600 text-white"
           >
             {isBlocking ? t('block.blocking') : t('block.blockUser')}
           </Button>

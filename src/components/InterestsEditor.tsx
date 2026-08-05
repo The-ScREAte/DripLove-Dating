@@ -66,7 +66,7 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
     return (
       <div className="flex flex-wrap gap-2">
         {interests.map((interest) => (
-          <Badge key={interest} variant="secondary">
+          <Badge key={interest} variant="secondary" className="bg-neutral-800 text-gray-100 border-pink-500/20">
             {interest}
           </Badge>
         ))}
@@ -78,15 +78,15 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
     <div className="space-y-4">
       {/* Selected Interests */}
       <div>
-        <h4 className="text-sm font-medium mb-2">Selected Interests ({interests.length}/10):</h4>
+        <h4 className="text-sm font-medium mb-2 text-gray-200">Selected Interests ({interests.length}/10):</h4>
         <div className="flex flex-wrap gap-2">
           {interests.map((interest) => (
-            <Badge key={interest} variant="default" className="flex items-center gap-1">
+            <Badge key={interest} variant="default" className="flex items-center gap-1 bg-pink-600/80 text-white border-transparent">
               {interest}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-4 w-4 p-0 hover:bg-transparent"
+                className="h-4 w-4 p-0 hover:bg-transparent text-white"
                 onClick={() => removeInterest(interest)}
               >
                 <X className="h-3 w-3" />
@@ -99,7 +99,7 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
       {/* Available Interests */}
       {interests.length < 10 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">Choose from popular interests:</h4>
+          <h4 className="text-sm font-medium mb-2 text-gray-200">Choose from popular interests:</h4>
           <div className="flex flex-wrap gap-2 mb-4">
             {availableInterests.slice(0, 15).map((interest) => (
               <Button
@@ -107,7 +107,7 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
                 variant="outline"
                 size="sm"
                 onClick={() => addInterest(interest)}
-                className="text-xs"
+                className="text-xs bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white"
               >
                 {interest}
               </Button>
@@ -121,7 +121,7 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAddCustom(true)}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white"
               >
                 <Plus className="h-4 w-4" />
                 Add Custom Interest
@@ -133,14 +133,15 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
                   value={newInterest}
                   onChange={(e) => setNewInterest(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addCustomInterest()}
-                  className="flex-1"
+                  className="flex-1 bg-neutral-900 border-pink-500/30 text-white placeholder:text-gray-500"
                 />
                 <Button onClick={addCustomInterest} size="sm">
                   Add
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white"
                   onClick={() => {
                     setShowAddCustom(false);
                     setNewInterest('');

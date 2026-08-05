@@ -92,7 +92,7 @@ const MatchAnimation = ({
       <Card
         role="dialog"
         aria-modal
-        className={`max-w-md w-full relative z-10 transform ${
+        className={`max-w-md w-full relative z-10 transform bg-black border border-pink-500/50 ${
           isVisible ? 'animate-enter' : 'animate-exit'
         }`}
         style={{
@@ -124,15 +124,15 @@ const MatchAnimation = ({
           </div>
 
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-pink-600 mb-1">{t('match.itsAMatch')}</h1>
-            <p className="text-gray-600 text-base">
+            <h1 className="text-2xl font-bold text-pink-400 mb-1">{t('match.itsAMatch')}</h1>
+            <p className="text-gray-300 text-base">
               {t('match.youAndLikedEachOther', { name: matchedUserName })}
             </p>
           </div>
 
           {imgSrc && (
             <div className="mb-4 flex justify-center">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-100 shadow-sm" style={{ willChange: 'transform, opacity' }}>
+              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-500/40 shadow-sm" style={{ willChange: 'transform, opacity' }}>
                 <img src={optimizeImageUrl(imgSrc, { width: 200, quality: 60 })} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
               </div>
             </div>
@@ -145,7 +145,7 @@ const MatchAnimation = ({
             >
               <MessageCircle className="w-5 h-5 mr-2 inline-block" /> {t('match.startChatting')}
             </Button>
-            <Button onClick={handleClose} variant="outline" className="w-full">
+            <Button onClick={handleClose} variant="outline" className="w-full bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
               {t('match.keepSwiping')}
             </Button>
           </div>

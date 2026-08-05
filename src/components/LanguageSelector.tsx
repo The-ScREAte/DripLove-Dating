@@ -35,14 +35,14 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   return (
     <div className="space-y-2">
       {showLabel && (
-        <Label className="flex items-center gap-2">
+        <Label className="flex items-center gap-2 text-gray-200">
           <Globe className="w-4 h-4" />
           {t('profile.language')}
         </Label>
       )}
       {/* Always show selector - users should be able to change language anytime */}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className={showLabel ? "w-full" : "w-auto min-w-[80px] h-8 text-xs px-2"}>
+        <SelectTrigger className={`bg-black/40 border-pink-500/30 text-white ${showLabel ? "w-full" : "w-auto min-w-[80px] h-8 text-xs px-2"}`}>
           <SelectValue>
             <span className="flex items-center gap-1.5">
               <Globe className={showLabel ? "w-4 h-4" : "w-3 h-3"} />
@@ -50,9 +50,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
             </span>
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-black border-pink-500/30">
           {languages.map((lang) => (
-            <SelectItem key={lang.code} value={lang.code}>
+            <SelectItem key={lang.code} value={lang.code} className="text-white focus:bg-pink-500/15 focus:text-white">
               <span className="flex items-center gap-2">
                 <Globe className="w-4 h-4" />
                 <span className="uppercase font-medium">{lang.code}</span>

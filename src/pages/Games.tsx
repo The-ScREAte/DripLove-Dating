@@ -47,9 +47,9 @@ const Games = () => {
   ];
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 via-rose-50/50 to-violet-100/60 flex flex-col">
+    <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="pt-safe pt-10 bg-white/90 backdrop-blur-sm border-b border-white/70 shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-black/90 backdrop-blur-sm border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -57,17 +57,17 @@ const Games = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="hover:bg-gray-100"
+                className="hover:bg-white/10 text-white"
                 title="Home"
               >
                 <Home className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-sm text-gray-600">Games</p>
+                <p className="text-sm text-gray-300">Games</p>
               </div>
             </div>
-            <div className="hidden sm:flex items-center gap-2 rounded-full border border-pink-100 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-pink-500/40 bg-black/60 px-3 py-1.5 text-xs font-medium text-gray-200">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               New mini-games weekly
             </div>
@@ -79,8 +79,8 @@ const Games = () => {
       <div className="flex-1 overflow-y-auto overflow-x-hidden pt-6 pb-8">
         <div className="max-w-6xl mx-auto px-4 py-6 pb-32 pb-safe-offset-32">
           <div className="mb-5">
-            <h2 className="text-lg sm:text-xl font-semibold text-slate-900">Pick Your Vibe</h2>
-            <p className="text-sm text-slate-600">Quick, fun drills to boost your dating game.</p>
+            <h2 className="text-lg sm:text-xl font-semibold text-white">Pick Your Vibe</h2>
+            <p className="text-sm text-gray-300">Quick, fun drills to boost your dating game.</p>
           </div>
 
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
@@ -89,7 +89,7 @@ const Games = () => {
             return (
               <Card
                 key={game.id}
-                className="group overflow-hidden border-white/70 bg-white/95 backdrop-blur-sm hover:border-white hover:shadow-xl hover:-translate-y-0.5 transition-all duration-250 cursor-pointer h-full"
+                className="group overflow-hidden border-pink-500/40 bg-neutral-900/95 backdrop-blur-sm hover:border-pink-500/70 hover:shadow-xl hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-250 cursor-pointer h-full"
                 onClick={() => navigate(game.path)}
               >
                 <div className="relative">
@@ -100,8 +100,8 @@ const Games = () => {
                     loading="lazy"
                     decoding="async"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-                  <div className={`absolute right-3 top-3 p-2.5 rounded-xl bg-gradient-to-br ${game.gradient} shadow-lg ring-2 ring-white/70`}>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  <div className={`absolute right-3 top-3 p-2.5 rounded-xl bg-gradient-to-br ${game.gradient} shadow-lg ring-2 ring-pink-500/40`}>
                     <IconComponent className="w-4 h-4 text-white" />
                   </div>
                 </div>
@@ -109,16 +109,16 @@ const Games = () => {
                 <CardHeader className="pb-3">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
-                      <div className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 mb-2">
+                      <div className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-gray-200 mb-2">
                         {game.subtitle}
                       </div>
-                      <CardTitle className="text-base sm:text-lg mb-0.5 text-slate-900 leading-tight">{game.title}</CardTitle>
-                      <p className="text-xs sm:text-sm font-medium text-slate-700">{game.tagline}</p>
+                      <CardTitle className="text-base sm:text-lg mb-0.5 text-white leading-tight">{game.title}</CardTitle>
+                      <p className="text-xs sm:text-sm font-medium text-gray-300">{game.tagline}</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 pb-4 flex flex-col h-full">
-                  <p className="text-xs sm:text-sm text-slate-600 mb-4">{game.description}</p>
+                  <p className="text-xs sm:text-sm text-gray-400 mb-4">{game.description}</p>
                   <Button
                     className={`mt-auto w-full bg-gradient-to-r ${game.gradient} hover:opacity-90 text-white font-medium`}
                     onClick={(e) => {

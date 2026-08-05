@@ -187,8 +187,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   if (isSystemMessage) {
     return (
       <div className="flex justify-center">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 max-w-sm shadow-sm">
-          <p className="text-sm text-amber-900 text-center mb-3">{message.message}</p>
+        <div className="bg-amber-950/40 border border-amber-500/40 rounded-xl px-4 py-3 max-w-sm shadow-sm">
+          <p className="text-sm text-amber-200 text-center mb-3">{message.message}</p>
           {!hasResponded && onDormancyResponse && (
             <div className="flex gap-2 justify-center">
               <button
@@ -206,7 +206,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </div>
           )}
           {hasResponded && (
-            <p className="text-xs text-amber-700 text-center">Response recorded</p>
+            <p className="text-xs text-amber-300 text-center">Response recorded</p>
           )}
         </div>
       </div>
@@ -244,9 +244,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           className={`
             relative max-w-[82%] sm:max-w-lg
             rounded-2xl
-            ${isOwnMessage 
+            ${isOwnMessage
               ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] rounded-br-md'
-              : 'bg-white text-slate-800 border border-pink-200 shadow-[0_3px_10px_rgba(15,23,42,0.08)] rounded-bl-md'
+              : 'bg-black/80 text-gray-100 border border-pink-500/30 shadow-[0_3px_10px_rgba(0,0,0,0.4)] rounded-bl-md'
             }
             ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
           `}
@@ -264,19 +264,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 className={`
                   mx-2 mt-2 mb-1 px-3 py-2 rounded-lg border-l-4
                   cursor-pointer transition-opacity hover:opacity-80
-                  ${isOwnMessage 
-                    ? 'bg-white/15 border-white/50' 
-                    : 'bg-rose-50 border-rose-400'
+                  ${isOwnMessage
+                    ? 'bg-white/15 border-white/50'
+                    : 'bg-pink-500/10 border-pink-400'
                   }
                 `}
               >
-                <p className={`text-xs font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-rose-600'}`}>
-                  {repliedMessage.sender_id === currentUser.id 
-                    ? t('chat.you', 'You') 
+                <p className={`text-xs font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-pink-300'}`}>
+                  {repliedMessage.sender_id === currentUser.id
+                    ? t('chat.you', 'You')
                     : repliedMessage.sender?.first_name || 'User'
                   }
                 </p>
-                <p className={`text-xs line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-slate-600'}`}>
+                <p className={`text-xs line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-gray-300'}`}>
                   {replyPreviewText}{replyPreviewText.length >= 80 ? '...' : ''}
                 </p>
               </div>
@@ -291,7 +291,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
 
           {/* Timestamp & Read Status */}
-          <div className={`flex items-center justify-end gap-1 px-3.5 pb-2 ${isOwnMessage ? 'text-white/70' : 'text-slate-400'}`}>
+          <div className={`flex items-center justify-end gap-1 px-3.5 pb-2 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'}`}>
             <span className="text-[11px]">
               {formatTime(message.sent_at || message.created_at)}
             </span>
@@ -312,7 +312,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               ref={optionsMenuRef}
               className={`
                 absolute z-50 min-w-[140px]
-                bg-white rounded-xl shadow-lg border border-slate-200
+                bg-black rounded-xl shadow-lg border border-pink-500/30
                 py-1 overflow-hidden
                 ${showOptionsBelow ? 'top-full mt-1' : 'bottom-full mb-1'}
                 ${isOwnMessage ? 'right-0' : 'left-0'}
@@ -321,23 +321,23 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
               {onReply && (
                 <button
                   onClick={handleReply}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-100 hover:bg-pink-500/10 transition-colors"
                 >
-                  <Reply className="w-4 h-4 text-slate-500" />
+                  <Reply className="w-4 h-4 text-gray-400" />
                   {t('chat.reply', 'Reply')}
                 </button>
               )}
               <button
                 onClick={handleDeleteForMe}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-100 hover:bg-pink-500/10 transition-colors"
               >
-                <Trash2 className="w-4 h-4 text-slate-500" />
+                <Trash2 className="w-4 h-4 text-gray-400" />
                 {t('chat.deleteForMe', 'Delete for me')}
               </button>
               {isOwnMessage && (
                 <button
                   onClick={handleDeleteForEveryone}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   {t('chat.deleteForEveryone', 'Delete for everyone')}

@@ -876,27 +876,27 @@ const ShootYourShot = () => {
 
   if (!selectedLevel) {
     return (
-      <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col">
-        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-black flex flex-col">
+        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
                   <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                  <p className="text-xs text-gray-600">Shoot Your Shot 🎯</p>
+                  <p className="text-xs text-gray-300">Shoot Your Shot 🎯</p>
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleClearResults}
-                className="border-gray-300 text-gray-700"
+                className="bg-black border-pink-500/40 text-gray-200 hover:bg-white/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -906,7 +906,7 @@ const ShootYourShot = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-          <Card>
+          <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
                 const level = Number(levelStr);
@@ -914,20 +914,20 @@ const ShootYourShot = () => {
                   <Button
                     key={level}
                     onClick={() => startLevel(level)}
-                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all"
+                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all bg-black/60 border-pink-500/30 text-white hover:bg-white/5"
                     variant="outline"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-lg">Level {level}</span>
-                        <span className="text-sm text-gray-600">- {cfg.name}</span>
+                        <span className="font-bold text-lg text-white">Level {level}</span>
+                        <span className="text-sm text-gray-300">- {cfg.name}</span>
                         <div className="flex gap-0.5">
                           {Array.from({ length: level }).map((_, i) => (
                             <Star key={i} className="w-3 h-3 fill-purple-400 text-purple-400" />
                           ))}
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600">{cfg.difficulty} • {cfg.challenges} shots • {cfg.timeLimit}s timer</p>
+                      <p className="text-sm text-gray-300">{cfg.difficulty} • {cfg.challenges} shots • {cfg.timeLimit}s timer</p>
                     </div>
                   </Button>
                 );
@@ -936,13 +936,13 @@ const ShootYourShot = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card>
+            <Card className="bg-neutral-900 border-pink-500/30">
               <CardContent className="pt-6 space-y-2">
-                <div className="font-semibold text-gray-900">Your best 3 (this device)</div>
+                <div className="font-semibold text-white">Your best 3 (this device)</div>
                 {best3.map((r, idx) => (
                   <div key={`${r.playedAt}-${idx}`} className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700">Level {r.level} • {r.percentage.toFixed(0)}%</div>
-                    <div className="text-gray-500">{new Date(r.playedAt).toLocaleDateString()}</div>
+                    <div className="text-gray-200">Level {r.level} • {r.percentage.toFixed(0)}%</div>
+                    <div className="text-gray-400">{new Date(r.playedAt).toLocaleDateString()}</div>
                   </div>
                 ))}
               </CardContent>
@@ -957,19 +957,19 @@ const ShootYourShot = () => {
   if (levelComplete) {
     const copy = getLevelSummaryCopy(levelComplete.percentage);
     return (
-      <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col">
-        <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="h-screen bg-black flex flex-col">
+        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-xs text-gray-600">Shoot Your Shot 🎯</p>
+                <p className="text-xs text-gray-300">Shoot Your Shot 🎯</p>
               </div>
             </div>
           </div>
@@ -977,31 +977,31 @@ const ShootYourShot = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32">
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-          <Card>
+          <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6">
               <div className="text-center space-y-2">
-                <Trophy className="w-10 h-10 text-purple-600 mx-auto" />
-                <div className="text-4xl font-extrabold text-gray-900">{levelComplete.percentage.toFixed(0)}%</div>
-                <div className="font-bold text-lg text-gray-900">{copy.title}</div>
-                <div className="text-sm text-gray-600 max-w-md mx-auto">{copy.message}</div>
+                <Trophy className="w-10 h-10 text-purple-400 mx-auto" />
+                <div className="text-4xl font-extrabold text-white">{levelComplete.percentage.toFixed(0)}%</div>
+                <div className="font-bold text-lg text-white">{copy.title}</div>
+                <div className="text-sm text-gray-300 max-w-md mx-auto">{copy.message}</div>
               </div>
 
               <div className="mt-6 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-                  <div className="text-xs text-green-700">Swish</div>
-                  <div className="text-xl font-bold text-green-800">{levelComplete.swish}</div>
+                <div className="rounded-lg bg-green-950/40 border border-green-500/40 p-3">
+                  <div className="text-xs text-green-300">Swish</div>
+                  <div className="text-xl font-bold text-green-400">{levelComplete.swish}</div>
                 </div>
-                <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
-                  <div className="text-xs text-orange-700">Brick</div>
-                  <div className="text-xl font-bold text-orange-800">{levelComplete.brick}</div>
+                <div className="rounded-lg bg-orange-950/40 border border-orange-500/40 p-3">
+                  <div className="text-xs text-orange-300">Brick</div>
+                  <div className="text-xl font-bold text-orange-400">{levelComplete.brick}</div>
                 </div>
-                <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                  <div className="text-xs text-red-700">Airball</div>
-                  <div className="text-xl font-bold text-red-800">{levelComplete.airball}</div>
+                <div className="rounded-lg bg-red-950/40 border border-red-500/40 p-3">
+                  <div className="text-xs text-red-300">Airball</div>
+                  <div className="text-xl font-bold text-red-400">{levelComplete.airball}</div>
                 </div>
               </div>
 
-              <div className="mt-4 text-xs text-gray-500 flex items-center justify-between">
+              <div className="mt-4 text-xs text-gray-400 flex items-center justify-between">
                 <div>{new Date(levelComplete.playedAt).toLocaleDateString()}</div>
                 {typeof levelComplete.timeTakenSeconds === 'number' && (
                   <div>{levelComplete.timeTakenSeconds}s</div>
@@ -1015,7 +1015,7 @@ const ShootYourShot = () => {
                 >
                   Replay Level {levelComplete.level}
                 </Button>
-                <Button onClick={backToLevelSelect} variant="outline" className="w-full">
+                <Button onClick={backToLevelSelect} variant="outline" className="w-full border-pink-500/40 text-white hover:bg-white/10">
                   Choose Another Level
                 </Button>
               </div>
@@ -1023,13 +1023,13 @@ const ShootYourShot = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card>
+            <Card className="bg-neutral-900 border-pink-500/30">
               <CardContent className="pt-6 space-y-2">
-                <div className="font-semibold text-gray-900">Your best 3 (this device)</div>
+                <div className="font-semibold text-white">Your best 3 (this device)</div>
                 {best3.map((r, idx) => (
                   <div key={`${r.playedAt}-${idx}`} className="flex items-center justify-between text-sm">
-                    <div className="text-gray-700">Level {r.level} • {r.percentage.toFixed(0)}%</div>
-                    <div className="text-gray-500">{new Date(r.playedAt).toLocaleDateString()}</div>
+                    <div className="text-gray-200">Level {r.level} • {r.percentage.toFixed(0)}%</div>
+                    <div className="text-gray-400">{new Date(r.playedAt).toLocaleDateString()}</div>
                   </div>
                 ))}
               </CardContent>
@@ -1042,42 +1042,42 @@ const ShootYourShot = () => {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex flex-col">
+    <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="pt-safe pt-10 bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
                 <h1 className="text-sm font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">DripLove</h1>
-                <p className="text-xs text-gray-600">Shoot Your Shot 🎯 • {currentChallenge + 1}/{levelChallenges.length}</p>
+                <p className="text-xs text-gray-300">Shoot Your Shot 🎯 • {currentChallenge + 1}/{levelChallenges.length}</p>
               </div>
             </div>
-            <div className="text-right text-xs text-gray-500">Timer-based</div>
+            <div className="text-right text-xs text-gray-400">Timer-based</div>
           </div>
         </div>
       </div>
 
       {/* Timer */}
       {gameStarted && !result && (
-        <div className="bg-white border-b">
+        <div className="bg-black border-b border-pink-500/20">
           <div className="max-w-2xl mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-orange-500" />
-                <span className="text-sm font-medium text-gray-700">Time Remaining</span>
+                <Zap className="w-4 h-4 text-orange-400" />
+                <span className="text-sm font-medium text-gray-200">Time Remaining</span>
               </div>
-              <div className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-600 animate-pulse' : 'text-gray-900'}`}>
+              <div className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
                 {timeLeft}s
               </div>
             </div>
-            <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="mt-2 h-2 bg-white/10 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-1000 ${
                   timeLeft <= 10 ? 'bg-red-500' : 'bg-blue-500'
@@ -1093,16 +1093,16 @@ const ShootYourShot = () => {
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
         <div className="max-w-2xl mx-auto px-4 py-6">
         {!result ? (
-          <Card className="mb-6">
+          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6">
               {/* Profile Preview */}
-              <div className="flex items-start gap-4 mb-6 pb-6 border-b">
+              <div className="flex items-start gap-4 mb-6 pb-6 border-b border-pink-500/20">
                 <div className="text-6xl">{challenge.image}</div>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">{challenge.name}</h2>
-                  <p className="text-gray-600 mb-3">{challenge.bio}</p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-sm text-gray-700">"{challenge.prompt}"</p>
+                  <h2 className="text-2xl font-bold text-white mb-2">{challenge.name}</h2>
+                  <p className="text-gray-300 mb-3">{challenge.bio}</p>
+                  <div className="bg-blue-950/40 border border-blue-500/30 rounded-lg p-3">
+                    <p className="text-sm text-gray-200">"{challenge.prompt}"</p>
                   </div>
                 </div>
               </div>
@@ -1110,10 +1110,10 @@ const ShootYourShot = () => {
               {/* Message Input */}
               {!gameStarted ? (
                 <div className="text-center space-y-4">
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <Target className="w-12 h-12 text-orange-600 mx-auto mb-3" />
-                    <h3 className="font-bold text-lg mb-2">Ready to shoot your shot?</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                  <div className="bg-orange-950/40 border border-orange-500/30 rounded-lg p-4">
+                    <Target className="w-12 h-12 text-orange-400 mx-auto mb-3" />
+                    <h3 className="font-bold text-lg mb-2 text-white">Ready to shoot your shot?</h3>
+                    <p className="text-sm text-gray-300 mb-4">
                       You have {levelConfig[selectedLevel]?.timeLimit ?? 60} seconds to write ONE message that will make {challenge.name} want to respond.
                       No edits. No second chances. Make it count!
                     </p>
@@ -1128,18 +1128,18 @@ const ShootYourShot = () => {
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-200 mb-2">
                       Your ONE shot:
                     </label>
                     <Textarea
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder={`Message ${challenge.name}...`}
-                      className="min-h-32 text-base resize-none"
+                      className="min-h-32 text-base resize-none bg-black/60 border-pink-500/30 text-white placeholder:text-gray-500"
                       maxLength={200}
                       disabled={!isActive}
                     />
-                    <div className="text-right text-xs text-gray-500 mt-1">
+                    <div className="text-right text-xs text-gray-400 mt-1">
                       {message.length}/200
                     </div>
                   </div>
@@ -1155,22 +1155,22 @@ const ShootYourShot = () => {
             </CardContent>
           </Card>
         ) : (
-          <Card className={`border-2 ${
-            resultInfo?.color === 'green' ? 'border-green-500 bg-green-50' :
-            resultInfo?.color === 'orange' ? 'border-orange-500 bg-orange-50' :
-            'border-red-500 bg-red-50'
+          <Card className={`border-2 bg-neutral-900 ${
+            resultInfo?.color === 'green' ? 'border-green-500/60' :
+            resultInfo?.color === 'orange' ? 'border-orange-500/60' :
+            'border-red-500/60'
           }`}>
             <CardContent className="pt-6">
               <div className="text-center mb-6">
                 <div className="text-6xl mb-4">{resultInfo?.emoji}</div>
-                <h2 className="text-3xl font-bold mb-3">{resultInfo?.title}</h2>
-                <p className="text-lg leading-relaxed text-gray-700">{resultInfo?.message}</p>
+                <h2 className="text-3xl font-bold mb-3 text-white">{resultInfo?.title}</h2>
+                <p className="text-lg leading-relaxed text-gray-300">{resultInfo?.message}</p>
               </div>
 
               {message && (
-                <div className="bg-white rounded-lg p-4 mb-6 border-2 border-gray-200">
-                  <p className="text-sm text-gray-600 mb-2 font-semibold">Your message:</p>
-                  <p className="text-gray-800">"{message}"</p>
+                <div className="bg-black/60 rounded-lg p-4 mb-6 border-2 border-pink-500/20">
+                  <p className="text-sm text-gray-400 mb-2 font-semibold">Your message:</p>
+                  <p className="text-gray-100">"{message}"</p>
                 </div>
               )}
 

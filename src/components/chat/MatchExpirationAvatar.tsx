@@ -151,7 +151,7 @@ const MatchExpirationAvatar = ({
           cy={circleSize[size] / 2}
           r={radius}
           fill="none"
-          stroke="rgba(200, 200, 200, 0.2)"
+          stroke="rgba(236, 72, 153, 0.15)"
           strokeWidth={strokeWidth[size]}
         />
         
@@ -198,7 +198,7 @@ const MatchExpirationAvatar = ({
           alt={`${firstName} ${lastName}`}
           className="h-full w-full object-cover"
         />
-        <AvatarFallback className="bg-gradient-to-br from-pink-100 to-purple-100 text-pink-700 font-bold text-lg">
+        <AvatarFallback className="bg-gradient-to-br from-pink-950/60 to-purple-950/60 text-pink-300 font-bold text-lg">
           {getInitials()}
         </AvatarFallback>
       </Avatar>

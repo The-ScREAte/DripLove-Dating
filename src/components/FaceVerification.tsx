@@ -398,7 +398,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-purple-500' : 'bg-white/30'}`} />
           </div>
 
-          <p className="text-center text-gray-700 text-sm font-medium">{getCaptureLabel()}</p>
+          <p className="text-center text-gray-200 text-sm font-medium">{getCaptureLabel()}</p>
 
           <div className="relative mx-auto" style={{ width: CAMERA_SIZE, height: CAMERA_SIZE }}>
             {/* Native preview */}
@@ -456,24 +456,24 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
           {/* Thumbnails */}
           <div className="flex justify-center gap-4">
             <div className="flex flex-col items-center">
-              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.front ? 'border-green-400' : 'border-gray-300'} bg-gray-100`}>
+              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.front ? 'border-green-400' : 'border-neutral-600'} bg-neutral-800`}>
                 {capturedImages.front ? (
                   <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Front</div>
                 )}
               </div>
-              <span className="text-xs text-gray-500 mt-1">{capturedImages.front ? '✓' : '1'}</span>
+              <span className="text-xs text-gray-400 mt-1">{capturedImages.front ? '✓' : '1'}</span>
             </div>
             <div className="flex flex-col items-center">
-              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.side ? 'border-green-400' : 'border-gray-300'} bg-gray-100`}>
+              <div className={`w-14 h-14 rounded-full border-2 overflow-hidden ${capturedImages.side ? 'border-green-400' : 'border-neutral-600'} bg-neutral-800`}>
                 {capturedImages.side ? (
                   <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">Side</div>
                 )}
               </div>
-              <span className="text-xs text-gray-500 mt-1">{capturedImages.side ? '✓' : '2'}</span>
+              <span className="text-xs text-gray-400 mt-1">{capturedImages.side ? '✓' : '2'}</span>
             </div>
           </div>
 
@@ -492,30 +492,30 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
       {/* Review Captured Images */}
       {step === 3 && (
         <div className="space-y-4 animate-fade-in">
-          <p className="text-center text-gray-700 text-sm font-medium">Review your photos</p>
+          <p className="text-center text-gray-200 text-sm font-medium">Review your photos</p>
 
           <div className="flex justify-center gap-4">
             <div className="flex flex-col items-center">
-              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-200'}`}>
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-400/50'}`}>
                 {capturedImages.front && (
                   <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" />
                 )}
               </div>
-              <span className="text-xs text-gray-500 mt-2">Front</span>
+              <span className="text-xs text-gray-400 mt-2">Front</span>
             </div>
             <div className="flex flex-col items-center">
-              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-200'}`}>
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-400/50'}`}>
                 {capturedImages.side && (
                   <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" />
                 )}
               </div>
-              <span className="text-xs text-gray-500 mt-2">Side</span>
+              <span className="text-xs text-gray-400 mt-2">Side</span>
             </div>
           </div>
 
           {/* Error Message */}
           {errorMessage && (
-            <div className={`p-3 rounded-lg text-sm text-center ${verificationResult === 'duplicate' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            <div className={`p-3 rounded-lg text-sm text-center ${verificationResult === 'duplicate' ? 'bg-amber-950/40 text-amber-300 border border-amber-500/40' : 'bg-red-950/40 text-red-300 border border-red-500/40'}`}>
               {errorMessage}
             </div>
           )}
@@ -525,7 +525,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <Button
               onClick={() => retakePhoto('all')}
               variant="outline"
-              className="flex-1 border-gray-300"
+              className="flex-1 border-pink-500/40 bg-transparent text-gray-100 hover:bg-neutral-800 hover:text-white"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Retake
@@ -544,21 +544,21 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
       {/* Verifying */}
       {step === 4 && (
         <div className="text-center space-y-4 animate-fade-in py-8">
-          <div className="animate-spin h-12 w-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto" />
-          <p className="text-gray-700 font-medium">Verifying your identity...</p>
-          <p className="text-sm text-gray-500">This may take a moment</p>
+          <div className="animate-spin h-12 w-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto" />
+          <p className="text-gray-100 font-medium">Verifying your identity...</p>
+          <p className="text-sm text-gray-400">This may take a moment</p>
         </div>
       )}
 
       {/* Success */}
       {step === 5 && (
         <div className="text-center space-y-4 animate-fade-in">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-10 h-10 text-green-600" />
+          <div className="w-16 h-16 bg-green-950/50 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-10 h-10 text-green-400" />
           </div>
           <div>
-            <p className="text-green-700 font-semibold">Face Verified!</p>
-            <p className="text-sm text-gray-600 mt-1">Your identity has been confirmed</p>
+            <p className="text-green-400 font-semibold">Face Verified!</p>
+            <p className="text-sm text-gray-300 mt-1">Your identity has been confirmed</p>
           </div>
         </div>
       )}
@@ -575,10 +575,10 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             {isLoading ? "Opening Camera..." : "Start Verification"}
           </Button>
           {disabled && (
-            <p className="text-xs text-amber-600 text-center">Enter your first and last name to enable verification</p>
+            <p className="text-xs text-amber-400 text-center">Enter your first and last name to enable verification</p>
           )}
           {errorMessage && (
-            <p className="text-xs text-red-600 text-center">{errorMessage}</p>
+            <p className="text-xs text-red-400 text-center">{errorMessage}</p>
           )}
         </div>
       )}

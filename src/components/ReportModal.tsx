@@ -83,12 +83,12 @@ const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, re
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-        <h3 className="font-semibold mb-2">Report</h3>
-        <label className="block mb-2 text-sm">Reason</label>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-60">
+      <div className="bg-black border border-pink-500/50 rounded-lg shadow-lg p-6 w-full max-w-sm text-white">
+        <h3 className="font-semibold mb-2 text-white">Report</h3>
+        <label className="block mb-2 text-sm text-gray-300">Reason</label>
         <select
-          className="w-full border rounded p-2 mb-3"
+          className="w-full border border-pink-500/40 rounded p-2 mb-3 bg-neutral-900 text-white"
           value={reason}
           onChange={e => setReason(e.target.value)}
         >
@@ -97,9 +97,9 @@ const ReportModal: React.FC<ReportModalProps> = ({ open, onClose, reporterId, re
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
-        <label className="block mb-2 text-sm">Details (optional)</label>
+        <label className="block mb-2 text-sm text-gray-300">Details (optional)</label>
         <textarea
-          className="w-full border rounded p-2 mb-3"
+          className="w-full border border-pink-500/40 rounded p-2 mb-3 bg-neutral-900 text-white placeholder:text-gray-500"
           rows={4}
           value={description}
           onChange={e => setDescription(e.target.value)}

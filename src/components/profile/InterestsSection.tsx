@@ -16,13 +16,13 @@ const InterestsSection = ({ editedProfile, profile, isEditing, onInterestsChange
   const { t } = useTranslation();
   
   return (
-    <Card>
+    <Card className="bg-black border-pink-500/30">
       <CardHeader>
-        <CardTitle>{t('profile.interests')}</CardTitle>
+        <CardTitle className="text-white">{t('profile.interests')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <Label htmlFor="interests">{t('profile.chooseInterests')}</Label>
+          <Label htmlFor="interests" className="text-gray-200">{t('profile.chooseInterests')}</Label>
           <InterestsEditor
             interests={isEditing ? editedProfile.interests || [] : profile?.interests || []}
             onInterestsChange={onInterestsChange}

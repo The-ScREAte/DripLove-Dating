@@ -13,19 +13,24 @@ interface WorkEducationSectionProps {
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
 
+const selectTriggerClass = "w-full bg-black/40 border-pink-500/30 text-white";
+const selectContentClass = "bg-black border-pink-500/30";
+const selectItemClass = "text-white focus:bg-pink-500/15 focus:text-white";
+const inputClass = "w-full mt-2 bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400";
+
 const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkEducationSectionProps) => {
   const { t } = useTranslation();
-  
+
   return (
-    <Card>
+    <Card className="bg-black border-pink-500/30">
       <CardHeader>
-        <CardTitle>{t('profile.workEducation')}</CardTitle>
+        <CardTitle className="text-white">{t('profile.workEducation')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="occupation">{t('profile.occupation')}</Label>
+              <Label htmlFor="occupation" className="text-gray-200">{t('profile.occupation')}</Label>
               <Select
                 value={editedProfile.occupation}
                 onValueChange={value => onInputChange({
@@ -33,12 +38,12 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 } as any)}
                 disabled={!isEditing}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder={t('profile.selectOccupation')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={selectContentClass}>
                   {occupationOptions.map(option => (
-                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                    <SelectItem key={option} value={option} className={selectItemClass}>{option}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -52,13 +57,13 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                     target: { name: 'occupationCustom', value: e.target.value }
                   } as any)}
                   disabled={!isEditing}
-                  className="w-full mt-2"
+                  className={inputClass}
                   placeholder={t('profile.enterOccupation')}
                 />
               )}
             </div>
             <div>
-              <Label htmlFor="industry">{t('profile.industry')}</Label>
+              <Label htmlFor="industry" className="text-gray-200">{t('profile.industry')}</Label>
               <Select
                 value={editedProfile.industry}
                 onValueChange={value => onInputChange({
@@ -66,12 +71,12 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                 } as any)}
                 disabled={!isEditing}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder={t('profile.selectIndustry')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={selectContentClass}>
                   {industryOptions.map(option => (
-                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                    <SelectItem key={option} value={option} className={selectItemClass}>{option}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -85,14 +90,14 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                     target: { name: 'industryCustom', value: e.target.value }
                   } as any)}
                   disabled={!isEditing}
-                  className="w-full mt-2"
+                  className={inputClass}
                   placeholder={t('profile.enterIndustry')}
                 />
               )}
             </div>
           </div>
           <div>
-            <Label htmlFor="education_level">{t('profile.education')}</Label>
+            <Label htmlFor="education_level" className="text-gray-200">{t('profile.education')}</Label>
             <Select
               value={editedProfile.education_level}
               onValueChange={value => onInputChange({
@@ -100,25 +105,25 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
               } as React.ChangeEvent<HTMLInputElement>)}
               disabled={!isEditing}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className={selectTriggerClass}>
                 <SelectValue placeholder={t('profile.selectEducation')} />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="No Formal Education">No Formal Education</SelectItem>
-                <SelectItem value="Primary School">Primary School</SelectItem>
-                <SelectItem value="Junior High School">Junior High / Middle School</SelectItem>
-                <SelectItem value="High School">{t('profile.educationOptions.highSchool')}</SelectItem>
-                <SelectItem value="Vocational/Trade School">Vocational / Trade School</SelectItem>
-                <SelectItem value="Some College">{t('profile.educationOptions.someCollege')}</SelectItem>
-                <SelectItem value="Associate Degree">{t('profile.educationOptions.associate')}</SelectItem>
-                <SelectItem value="Bachelor's Degree">{t('profile.educationOptions.bachelors')}</SelectItem>
-                <SelectItem value="Postgraduate Diploma">Postgraduate Diploma</SelectItem>
-                <SelectItem value="Master's Degree">{t('profile.educationOptions.masters')}</SelectItem>
-                <SelectItem value="Doctorate">{t('profile.educationOptions.doctorate')}</SelectItem>
-                <SelectItem value="Professional Degree">Professional Degree (MD, JD, etc.)</SelectItem>
-                <SelectItem value="Self-Taught">Self-Taught / Autodidact</SelectItem>
-                <SelectItem value="Currently Studying">Currently Studying</SelectItem>
-                <SelectItem value="Other">{t('profile.educationOptions.other')}</SelectItem>
+              <SelectContent className={selectContentClass}>
+                <SelectItem value="No Formal Education" className={selectItemClass}>No Formal Education</SelectItem>
+                <SelectItem value="Primary School" className={selectItemClass}>Primary School</SelectItem>
+                <SelectItem value="Junior High School" className={selectItemClass}>Junior High / Middle School</SelectItem>
+                <SelectItem value="High School" className={selectItemClass}>{t('profile.educationOptions.highSchool')}</SelectItem>
+                <SelectItem value="Vocational/Trade School" className={selectItemClass}>Vocational / Trade School</SelectItem>
+                <SelectItem value="Some College" className={selectItemClass}>{t('profile.educationOptions.someCollege')}</SelectItem>
+                <SelectItem value="Associate Degree" className={selectItemClass}>{t('profile.educationOptions.associate')}</SelectItem>
+                <SelectItem value="Bachelor's Degree" className={selectItemClass}>{t('profile.educationOptions.bachelors')}</SelectItem>
+                <SelectItem value="Postgraduate Diploma" className={selectItemClass}>Postgraduate Diploma</SelectItem>
+                <SelectItem value="Master's Degree" className={selectItemClass}>{t('profile.educationOptions.masters')}</SelectItem>
+                <SelectItem value="Doctorate" className={selectItemClass}>{t('profile.educationOptions.doctorate')}</SelectItem>
+                <SelectItem value="Professional Degree" className={selectItemClass}>Professional Degree (MD, JD, etc.)</SelectItem>
+                <SelectItem value="Self-Taught" className={selectItemClass}>Self-Taught / Autodidact</SelectItem>
+                <SelectItem value="Currently Studying" className={selectItemClass}>Currently Studying</SelectItem>
+                <SelectItem value="Other" className={selectItemClass}>{t('profile.educationOptions.other')}</SelectItem>
               </SelectContent>
             </Select>
             {editedProfile.education_level === 'Other' && (
@@ -131,7 +136,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
                   target: { name: 'education_level_custom', value: e.target.value }
                 } as React.ChangeEvent<HTMLInputElement>)}
                 disabled={!isEditing}
-                className="w-full mt-2"
+                className={inputClass}
                 placeholder={t('profile.enterEducation')}
               />
             )}

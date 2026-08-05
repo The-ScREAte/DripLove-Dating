@@ -93,43 +93,43 @@ const UnlockCountriesDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-primary" />
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <Globe className="w-5 h-5 text-pink-400" />
             {t('profile.unlockCountries')}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-gray-300">
             {t('profile.unlockCountriesDescription')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">
           {/* Current country indicator */}
-          <div className="mb-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+          <div className="mb-4 p-3 bg-pink-500/10 rounded-lg border border-pink-500/20">
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">{currentCountry}</span>
-              <span className="text-xs text-muted-foreground ml-auto">{t('profile.yourCountry')}</span>
+              <Check className="w-4 h-4 text-pink-400" />
+              <span className="text-sm font-medium text-white">{currentCountry}</span>
+              <span className="text-xs text-gray-400 ml-auto">{t('profile.yourCountry')}</span>
             </div>
           </div>
 
           {/* Selected countries summary */}
           <div className="mb-4">
-            <div className="text-sm text-muted-foreground mb-2">
+            <div className="text-sm text-gray-400 mb-2">
               {t('profile.selectedCountries')}: {selectedCountries.length}/3
             </div>
             {selectedCountries.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {selectedCountries.map(code => (
-                  <div 
+                  <div
                     key={code}
-                    className="flex items-center gap-1 px-2 py-1 bg-secondary rounded-full text-sm"
+                    className="flex items-center gap-1 px-2 py-1 bg-neutral-800 text-white rounded-full text-sm"
                   >
                     <span>{getCountryName(code)}</span>
-                    <button 
+                    <button
                       onClick={() => handleToggleCountry(code)}
-                      className="ml-1 hover:text-destructive"
+                      className="ml-1 hover:text-red-400"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -140,21 +140,21 @@ const UnlockCountriesDialog = ({
           </div>
 
           {/* Country list */}
-          <ScrollArea className="h-[300px] border rounded-lg p-2">
+          <ScrollArea className="h-[300px] border border-pink-500/20 rounded-lg p-2">
             <div className="space-y-2">
               {countries.map(country => {
                 const isSelected = selectedCountries.includes(country.code);
                 const isDisabled = !isSelected && selectedCountries.length >= 3;
-                
+
                 return (
-                  <div 
+                  <div
                     key={country.code}
                     className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                      isSelected 
-                        ? 'bg-primary/10 border border-primary/30' 
+                      isSelected
+                        ? 'bg-pink-500/10 border border-pink-500/30'
                         : isDisabled
                           ? 'opacity-50 cursor-not-allowed'
-                          : 'hover:bg-muted'
+                          : 'hover:bg-neutral-800'
                     }`}
                     onClick={() => !isDisabled && handleToggleCountry(country.code)}
                   >
@@ -164,9 +164,9 @@ const UnlockCountriesDialog = ({
                       disabled={isDisabled}
                       onCheckedChange={() => !isDisabled && handleToggleCountry(country.code)}
                     />
-                    <Label 
+                    <Label
                       htmlFor={country.code}
-                      className={`flex-1 cursor-pointer ${isDisabled ? 'cursor-not-allowed' : ''}`}
+                      className={`flex-1 cursor-pointer text-gray-200 ${isDisabled ? 'cursor-not-allowed' : ''}`}
                     >
                       {country.name}
                     </Label>
@@ -178,10 +178,10 @@ const UnlockCountriesDialog = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
+          <Button variant="outline" onClick={onClose} disabled={isSaving} className="border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">
             {t('common.cancel')}
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving} className="bg-pink-600 hover:bg-pink-700 text-white">
             {isSaving ? t('common.saving') : t('common.save')}
           </Button>
         </DialogFooter>

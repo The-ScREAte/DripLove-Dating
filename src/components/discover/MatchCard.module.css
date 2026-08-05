@@ -53,19 +53,17 @@
   padding: 0;
   border-radius: 0.75rem;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  background:
-    linear-gradient(to bottom, rgba(157, 23, 77, 0) 0%, rgba(157, 23, 77, 0.1) 55%, rgba(157, 23, 77, 0.2) 100%),
-    linear-gradient(
-      to bottom,
-      rgb(var(--app-light-bg-rgb) / 0.15) 0%,
-      rgb(var(--app-light-bg-rgb) / 0.6) 18%,
-      rgb(var(--app-light-bg-rgb) / 0.96) 40%,
-      rgb(var(--app-light-bg-rgb) / 1) 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.85) 15%,
+    rgba(0, 0, 0, 0.97) 35%,
+    rgba(0, 0, 0, 1) 100%
+  );
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 40px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 40px);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 100px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 100px);
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   will-change: mask-image, -webkit-mask-image, backdrop-filter, transform;
@@ -90,15 +88,13 @@
   -webkit-backdrop-filter: none;
   mask-image: none;
   -webkit-mask-image: none;
-  background:
-    linear-gradient(to bottom, rgba(157, 23, 77, 0) 0%, rgba(157, 23, 77, 0.15) 55%, rgba(157, 23, 77, 0.25) 100%),
-    linear-gradient(
-      to bottom,
-      rgb(var(--app-light-bg-rgb) / 0) 0%,
-      rgb(var(--app-light-bg-rgb) / 0.55) 18%,
-      rgb(var(--app-light-bg-rgb) / 0.96) 40%,
-      rgb(var(--app-light-bg-rgb) / 1) 100%
-    );
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.85) 15%,
+    rgba(0, 0, 0, 0.97) 35%,
+    rgba(0, 0, 0, 1) 100%
+  );
 }
 
 /* Performance optimized progress bar with percentage width */

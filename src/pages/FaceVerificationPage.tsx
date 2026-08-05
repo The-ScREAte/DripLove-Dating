@@ -7,9 +7,9 @@ export default function FaceVerificationPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-purple-500 to-pink-500 relative">
+    <div className="min-h-screen w-full bg-black relative">
       <div className="absolute top-4 left-4 z-20">
-        <Button variant="outline" onClick={() => navigate(-1)}>
+        <Button variant="outline" onClick={() => navigate(-1)} className="bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
           Back
         </Button>
       </div>
