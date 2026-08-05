@@ -455,7 +455,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && (
                 <div
                   className="absolute left-1/2 transform -translate-x-1/2 z-50"
-                  style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 44px)' }}
+                  style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 70px)' }}
                 >
                   <div className="relative flex flex-col items-center">
                     {/* Single optimized glow layer */}
@@ -538,11 +538,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 }}
               >
                 <div
-                  className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto"
+                  className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto flex flex-col"
                   onClick={e => e.stopPropagation()}
                   style={{
-                    minHeight: '350px',
-                    maxHeight: '90vh',
+                    maxHeight: '85vh',
                     width: '100%',
                     maxWidth: '400px',
                     overflow: 'hidden',
@@ -551,26 +550,31 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   }}
                 >
                   {/* Modal header with close button */}
-                  <div className="relative px-4 pt-4 pb-3 border-b border-pink-500/20 bg-black">
+                  <div className="relative px-3 pt-3 pb-2 border-b border-pink-500/20 bg-black shrink-0">
                     <button
                       onClick={closeReportModal}
-                      className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
+                      className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
                       disabled={reporting}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
 
-                    <div className="pr-10">
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
-                      <h3 className="text-lg font-bold text-white mt-1">{t('reportModal.title')}</h3>
-                      <p className="text-xs text-gray-300 mt-1">{t('reportModal.instruction')}</p>
+                    <div className="pr-8">
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
+                      <h3 className="text-base font-bold text-white mt-0.5">{t('reportModal.title')}</h3>
+                      <p className="text-[11px] text-gray-300 mt-0.5">{t('reportModal.instruction')}</p>
                     </div>
                   </div>
 
-                  {/* Modal content */}
-                  <div className="px-4 pb-4 pt-3 max-h-96 overflow-y-auto">
+                  {/* Modal content — flex-1 + min-h-0 so this always fills the remaining space
+                      up to the card's own maxHeight and reliably scrolls instead of relying on a
+                      guessed fixed max-height. */}
+                  <div
+                    className="px-3 pb-3 pt-2 overflow-y-auto flex-1 min-h-0"
+                    style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+                  >
                     {isBlockSuccess ? (
                       <div className="text-green-400 font-semibold text-center py-8">
                         <div className="mb-2 text-3xl">🚫</div>
@@ -585,7 +589,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     ) : (
                       <>
                         {/* Reason selection with stable layout */}
-                        <div className="grid grid-cols-2 gap-2 mb-4">
+                        <div className="grid grid-cols-2 gap-1.5 mb-3">
                           {reportReasons.map((reason, index) => {
                             const tone = reasonStyles[index % reasonStyles.length];
                             return (
@@ -593,7 +597,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                               key={reason}
                               onClick={() => setSelectedReason(reason)}
                               disabled={reporting || isBlocking}
-                              className={`w-full min-h-11 px-3 py-2 text-left rounded-xl border-2 transition-all duration-200 flex items-center justify-between ${
+                              className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
                                 selectedReason === reason
                                   ? tone.selected
                                   : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
@@ -611,18 +615,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         </div>
 
                         {/* Block section */}
-                        <div className="mb-4 p-3 bg-black/60 rounded-xl border border-pink-500/20">
-                          <p className="text-gray-200 mb-2 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
+                        <div className="mb-3 p-2.5 bg-black/60 rounded-lg border border-pink-500/20">
+                          <p className="text-gray-200 mb-1.5 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
                           <textarea
                             placeholder={t('reportModal.blockSection.placeholder')}
                             value={blockReason}
                             onChange={(e) => setBlockReason(e.target.value)}
                             disabled={reporting || isBlocking}
-                            className="w-full p-2.5 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full p-2 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                             rows={2}
                           />
                           <button
-                            className="w-full mt-2 h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-xs"
+                            className="w-full mt-1.5 h-8 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-xs"
                             onClick={handleBlockUser}
                             disabled={isBlocking || reporting}
                           >
@@ -631,9 +635,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         </div>
 
                         {/* Action buttons with stable height */}
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-1.5">
                           <button
-                            className="w-full h-10 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                            className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                             onClick={handleReportImage}
                             disabled={reporting || !selectedReason || isBlocking}
                           >
@@ -641,7 +645,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           </button>
 
                           <button
-                            className="w-full h-10 bg-black hover:bg-white/5 text-gray-200 font-semibold text-sm rounded-lg border border-pink-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            className="w-full h-9 bg-black hover:bg-white/5 text-gray-200 font-semibold text-sm rounded-lg border border-pink-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             onClick={closeReportModal}
                             disabled={reporting || isBlocking}
                           >
@@ -650,7 +654,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         </div>
 
                         {reportError && (
-                          <div className="text-red-300 text-xs mt-3 text-center bg-red-950/50 p-2.5 rounded-lg border border-red-500/30">
+                          <div className="text-red-300 text-xs mt-2 text-center bg-red-950/50 p-2 rounded-lg border border-red-500/30">
                             {reportError}
                           </div>
                         )}
@@ -910,7 +914,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
             {/* Language */}
             {preferredLanguageName && (
-              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3 pb-6">
                 <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.language')}</h4>
                 <div className="flex items-center text-sm">
                   <Languages className="w-[clamp(12px,3.2vw,14px)] h-[clamp(12px,3.2vw,14px)] mr-2 text-pink-500 shrink-0" />

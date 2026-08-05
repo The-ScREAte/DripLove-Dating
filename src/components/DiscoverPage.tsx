@@ -4446,12 +4446,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             max-height: 65vh !important;
           }
 
-          /* Collapsed info area should hug its content (name/location/etc.), not force a tall
-             minimum height that leaves a big blank strip above the nav. */
-          .discover-info-area.expanded {
-            min-height: 27vh !important;
-            max-height: 48vh !important;
-          }
+          /* NOTE: .discover-info-area.expanded height is now driven entirely by inline styles
+             computed from actual viewport height in JS (see the flex wrapper + scroll content +
+             filler div below), so real content can never end up hidden behind the floating nav.
+             A flat max-height: 48vh !important here used to silently override all of that JS
+             sizing on every real mobile device (this media query only matches touch/coarse
+             pointers) — removed so the two systems stop fighting each other. */
         }
         
         /* Additional mobile Safari specific fix */
@@ -4799,54 +4799,71 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             style={{ transform: 'translateY(-130px)', marginBottom: '-130px' }}
           >
             <div
-              ref={contentRef}
-              className={`w-full pt-1 ${showMoreInfo ? 'overflow-y-scroll scrollbar-hide' : 'overflow-hidden'}`}
-              style={{
-                WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain',
-                scrollBehavior: 'smooth',
-                // Restore fixed heights for collapsed/expanded states.
-                // The visible window (and its black background) is sized to reach almost all the
-                // way to the bottom of the screen, so there's no gap of photo/transparency below
-                // the panel — but the SCROLLABLE CONTENT inside gets a large paddingBottom (below)
-                // so the actual text always stops clear of the floating nav; only empty black
-                // padding sits behind the nav, never real content.
-                maxHeight: showMoreInfo ? `${Math.max(320, vh - 170)}px` : '320px', // Fixed max height when collapsed
-                minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
-                // Large enough that the LAST bit of real content clears the floating pill nav
-                // (nav sits ~22px/30px off the bottom edge plus its own compact height) well
-                // before the panel's own background runs out.
-                paddingBottom: showMoreInfo
-                  ? `calc(${vh < 700 ? '170px' : '150px'} + env(safe-area-inset-bottom, 0px))`
-                  : '0px'
-              }}
+              style={showMoreInfo ? {
+                display: 'flex',
+                flexDirection: 'column',
+                // Total panel height (background) reaches almost all the way to the bottom of
+                // the screen, so there's no gap of photo/transparency below it.
+                maxHeight: `${Math.max(400, vh - 170)}px`,
+              } : undefined}
             >
-            {/* Render MatchCard details area */}
-            {currentMatch && !isAd(currentMatch) && (
-              <MatchCard
-                match={currentMatch}
-                imageIndex={imageIndex}
-                showMoreInfo={showMoreInfo}
-                isPremium={premiumActive}
-                userImages={currentMatchImages}
-                preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
-                preferredLanguageName={userLanguages[currentMatch.id]}
-                currentUserLatitude={currentUser.latitude}
-                currentUserLongitude={currentUser.longitude}
-                onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-                onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-                calculateAge={calculateAge}
-                calculateDistance={calculateDistance}
-                swipeDirection={swipeUI.swipeDirection}
-                swipeDistance={swipeUI.swipeDistance}
-                isDragging={swipeUI.isDragging}
-                isVerified={!!currentMatch.is_verified}
-                isSwipeAreaOnly={false}
-                isDetailsAreaOnly={true} // Render only details/info area
-                getOptimizedUrl={getOptimizedUrl}
-                preCalculatedDistance={userDistances[currentMatch.id]}
-              />
-            )}
+              <div
+                ref={contentRef}
+                className={`w-full pt-1 ${showMoreInfo ? 'overflow-y-scroll scrollbar-hide' : 'overflow-hidden'}`}
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'contain',
+                  scrollBehavior: 'smooth',
+                  // The SCROLLABLE zone is explicitly capped short of the panel's total height
+                  // (see the filler div below) — real content can only ever scroll within this
+                  // safe zone, so it can never end up rendered behind the floating nav, no matter
+                  // the scroll position.
+                  maxHeight: showMoreInfo ? `${Math.max(280, Math.max(400, vh - 170) - 150)}px` : '320px',
+                  minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
+                  paddingBottom: showMoreInfo ? '24px' : '0px'
+                }}
+              >
+              {/* Render MatchCard details area */}
+              {currentMatch && !isAd(currentMatch) && (
+                <MatchCard
+                  match={currentMatch}
+                  imageIndex={imageIndex}
+                  showMoreInfo={showMoreInfo}
+                  isPremium={premiumActive}
+                  userImages={currentMatchImages}
+                  preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
+                  preferredLanguageName={userLanguages[currentMatch.id]}
+                  currentUserLatitude={currentUser.latitude}
+                  currentUserLongitude={currentUser.longitude}
+                  onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                  onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+                  calculateAge={calculateAge}
+                  calculateDistance={calculateDistance}
+                  swipeDirection={swipeUI.swipeDirection}
+                  swipeDistance={swipeUI.swipeDistance}
+                  isDragging={swipeUI.isDragging}
+                  isVerified={!!currentMatch.is_verified}
+                  isSwipeAreaOnly={false}
+                  isDetailsAreaOnly={true} // Render only details/info area
+                  getOptimizedUrl={getOptimizedUrl}
+                  preCalculatedDistance={userDistances[currentMatch.id]}
+                />
+              )}
+              </div>
+              {/* Purely decorative black filler — extends the panel's background down toward the
+                  true bottom of the screen (behind the floating nav) without ever holding real,
+                  scrollable content, so it can never cover up info the user needs to read. */}
+              {showMoreInfo && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    flexShrink: 0,
+                    flexGrow: 1,
+                    background: '#000',
+                    borderRadius: '0 0 0.75rem 0.75rem',
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

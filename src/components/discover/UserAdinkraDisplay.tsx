@@ -76,11 +76,10 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 bg-transparent p-1 rounded-full">
+      <div className="flex items-center gap-3">
         {visibleSymbols.map(({ name, symbol, SvgComponent }, index) => {
           const isCenter = index === centerIndex;
           const size = isCenter ? CENTER_ICON_SIZE : SIDE_ICON_SIZE;
-          const boxSize = size + (isCenter ? 8 : 6);
 
           return (
             <button
@@ -94,12 +93,11 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
                   setDismissed(prev => new Set(prev).add(name));
                 }
               }}
-              className="rounded-full bg-white/90 flex items-center justify-center shrink-0 transition-transform duration-150 active:scale-90"
+              className="flex items-center justify-center shrink-0 transition-transform duration-150 active:scale-90"
               style={{
-                width: boxSize,
-                height: boxSize,
-                boxShadow: isCenter ? '0 3px 8px rgba(0,0,0,0.3)' : '0 2px 5px rgba(0,0,0,0.22)',
-                border: '1px solid rgba(255,255,255,0.6)',
+                width: size,
+                height: size,
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
                 zIndex: isCenter ? 2 : 1,
               }}
               aria-label={isCenter ? `Show meaning of ${name}` : `Dismiss ${name}`}
@@ -111,20 +109,27 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
       </div>
 
       {activeMeaning && (
-        <div
-          className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-48 rounded-xl bg-black border border-pink-500/30 shadow-xl p-3 text-center"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={() => setActiveMeaning(null)}
-            className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-white/10"
-            aria-label="Close"
+        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+          {/* Little speech-bubble tail pointing up at the symbols */}
+          <div
+            className="w-3 h-3 rotate-45 -mb-1.5"
+            style={{ background: '#0a0a0a', borderLeft: '1px solid rgba(236,72,153,0.35)', borderTop: '1px solid rgba(236,72,153,0.35)' }}
+          />
+          <div
+            className="relative w-44 rounded-2xl bg-[#0a0a0a] border border-pink-500/35 shadow-xl px-2.5 py-2 text-center"
+            onClick={(e) => e.stopPropagation()}
           >
-            ✕
-          </button>
-          <p className="text-pink-400 font-semibold text-xs mb-1">{activeMeaning.name}</p>
-          <p className="text-gray-200 text-[11px] leading-snug">{activeMeaning.meaning}</p>
+            <button
+              type="button"
+              onClick={() => setActiveMeaning(null)}
+              className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-white/10 text-[10px] leading-none"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <p className="text-pink-400 font-semibold text-[11px] mb-0.5 pr-3">{activeMeaning.name}</p>
+            <p className="text-gray-200 text-[10.5px] leading-snug">{activeMeaning.meaning}</p>
+          </div>
         </div>
       )}
     </div>

@@ -1022,6 +1022,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 WebkitBackdropFilter: 'blur(18px) saturate(160%)',
                 border: '1px solid rgba(236,72,153,0.7)',
                 boxShadow: '0 4px 20px -10px rgba(236, 72, 153, 0.35)',
+                // Soft feather on the bottom edge so the header blends into the photo below
+                // instead of ending on a hard line.
+                maskImage: 'linear-gradient(to bottom, black 0%, black 78%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 78%, transparent 100%)',
                 // The header has no interactive controls of its own — it must never intercept
                 // touch/mouse events meant for the swipe card underneath it.
                 pointerEvents: 'none',
