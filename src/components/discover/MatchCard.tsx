@@ -768,7 +768,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
-          <div className="mt-4 px-4 pb-16 space-y-3 text-[clamp(13px,3.6vw,16px)]">
+          <div className="mt-4 px-4 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '100px' }}>
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
