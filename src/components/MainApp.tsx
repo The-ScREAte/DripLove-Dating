@@ -1023,7 +1023,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 // compact, fully solid bar sized to its own content, with a pink border framing
                 // it on the sides/bottom (never the top, which sits flush against the screen
                 // edge) and rounded bottom corners.
-                height: activeTab === 'dripcheck' ? '64px' : undefined,
+                height: activeTab === 'dripcheck' ? '170px' : undefined,
                 pointerEvents: 'none',
                 ...(activeTab !== 'dripcheck' && {
                   borderLeft: '2px solid #ec4899',
@@ -1043,14 +1043,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 aria-hidden="true"
                 className="absolute inset-0"
                 style={{
-                  background: 'rgba(0,0,0,1)',
+                  background: 'rgba(0,0,0,0.95)',
                   backdropFilter: 'blur(18px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(18px) saturate(160%)',
                   maskImage: activeTab === 'dripcheck'
-                    ? 'linear-gradient(to bottom, black 0%, black 80%, transparent 100%)'
+                    ? 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)'
                     : 'none',
                   WebkitMaskImage: activeTab === 'dripcheck'
-                    ? 'linear-gradient(to bottom, black 0%, black 80%, transparent 100%)'
+                    ? 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)'
                     : 'none',
                   ...(activeTab !== 'dripcheck' && {
                     borderBottomLeftRadius: '18px',
