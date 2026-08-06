@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
 import ReportModal from '../modals/ReportModal';
@@ -451,10 +452,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               )}
 
-              {/* Optimized cultural sign glow effect */}
-              {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && (
+              {/* Optimized cultural sign glow effect.
+                  Portaled straight to document.body: `discover-container` is `position: fixed`
+                  which — regardless of its own z-index — always establishes its own stacking
+                  context, so no z-index on anything inside it can ever paint above a sibling
+                  like the global header that has an explicit z-index. Portaling out is the only
+                  way for this to actually render above the header. */}
+              {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && createPortal(
                 <div
-                  className="absolute left-1/2 transform -translate-x-1/2 z-50"
+                  className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
                   style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 40px)' }}
                 >
                   <div className="relative flex flex-col items-center">
@@ -481,7 +487,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       </div>
                     </div>
                   </div>
-                </div>
+                </div>,
+                document.body
               )}
               {/* ⭐ PHASE 1.8: Use memoized SlideRenderer (40-60% Android render improvement) */}
               <SlideRenderer
@@ -497,9 +504,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
           )}
           
           {/* Slide indicators */}
-          {slides && slides.length > 1 && (
-            <div 
-              className="absolute left-4 flex space-x-2 z-10"
+          {/* Same stacking-context ceiling as the sign display above — portaled out so the
+              slide dots can render above the global header instead of underneath it. */}
+          {slides && slides.length > 1 && createPortal(
+            <div
+              className="fixed left-4 flex space-x-2 z-[9999]"
               style={{
                 top: platform === 'android'
                   ? 'calc(2rem + 56px)'
@@ -511,13 +520,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div
                   key={index}
                   className={`w-3 h-2 rounded-full transition-all duration-300 ${
-                    index === currentSlide 
-                      ? 'bg-white shadow-lg border border-pink-300' 
+                    index === currentSlide
+                      ? 'bg-white shadow-lg border border-pink-300'
                       : 'bg-white/30 border border-pink-300/80'
                   }`}
                 />
               ))}
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* Cultural sign is shown in the top-center */}
