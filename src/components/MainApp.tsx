@@ -1026,9 +1026,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 height: activeTab === 'dripcheck' ? '170px' : undefined,
                 pointerEvents: 'none',
                 ...(activeTab !== 'dripcheck' && {
-                  borderLeft: '2px solid #ec4899',
-                  borderRight: '2px solid #ec4899',
-                  borderBottom: '2px solid #ec4899',
+                  borderLeft: '1px solid rgba(236,72,153,0.55)',
+                  borderRight: '1px solid rgba(236,72,153,0.55)',
+                  borderBottom: '1px solid rgba(236,72,153,0.55)',
                   borderBottomLeftRadius: '20px',
                   borderBottomRightRadius: '20px',
                 }),

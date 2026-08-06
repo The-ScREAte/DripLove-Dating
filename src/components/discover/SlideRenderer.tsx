@@ -51,7 +51,7 @@ const ImageSlide = React.memo<{
   // Show placeholder if image failed to load
   if (hasError) {
     return (
-      <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
+      <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center px-8 pt-8 pb-[150px]">
         <div className="text-center w-full">
           <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto max-w-[96px]">
             <User className="w-16 h-16 mx-auto text-gray-500" />
@@ -95,7 +95,7 @@ const BioSlide = React.memo<{
 }>(({ content, userBackgroundColor, matchFirstName }) => {
   const { t } = useTranslation();
   return (
-    <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+    <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
       <div className="max-w-sm mx-auto text-center">
         <div className="flex items-center justify-center mb-6">
           <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
@@ -117,7 +117,7 @@ const FunFactSlide = React.memo<{
   content: string;
   userBackgroundColor: string;
 }>(({ content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
     <div className="max-w-sm mx-auto text-center">
       <div className="flex items-center justify-center mb-6">
         <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
@@ -136,7 +136,7 @@ const PerfectFirstDateSlide = React.memo<{
   content: string;
   userBackgroundColor: string;
 }>(({ content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
     <div className="max-w-sm mx-auto text-center">
       <div className="flex items-center justify-center mb-6">
         <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
@@ -155,7 +155,7 @@ const LastGoogledSlide = React.memo<{
   content: string;
   userBackgroundColor: string;
 }>(({ content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center p-8`}>
+  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
     <div className="max-w-sm mx-auto text-center">
       <div className="flex items-center justify-center mb-6">
         <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
@@ -174,15 +174,17 @@ const PlaceholderSlide = React.memo<{
   matchFirstName: string;
   matchLastName: string;
 }>(({ matchFirstName, matchLastName }) => (
-  <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-    <div className="text-center w-full">
-      <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto max-w-[96px]">
-        <User className="w-16 h-16 mx-auto text-gray-500" />
+  <div className="w-full h-full min-h-full bg-gradient-to-br from-zinc-800 via-neutral-900 to-black flex items-center justify-center px-8 pt-8 pb-[150px]">
+    <div className="flex flex-col items-center text-center">
+      {/* Monogram avatar — the initials are the profile image */}
+      <div className="w-28 h-28 rounded-full flex items-center justify-center
+                      bg-white/[0.06] border border-white/10 ring-1 ring-white/5
+                      shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+        <span className="text-4xl font-semibold tracking-wide text-white/90 select-none">
+          {matchFirstName?.[0]}{matchLastName?.[0]}
+        </span>
       </div>
-      <span className="text-6xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
-        {matchFirstName?.[0]}{matchLastName?.[0]}
-      </span>
-      <p className="text-gray-600 mt-4 text-sm">No photos uploaded yet</p>
+      <p className="mt-5 text-white/45 text-sm tracking-wide">No photos yet</p>
     </div>
   </div>
 ));

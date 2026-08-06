@@ -136,16 +136,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
   
   // Background colors for fun questions and about
   const backgroundColors = useMemo(() => [
-    'bg-gradient-to-br from-blue-400 to-blue-600',
-    'bg-gradient-to-br from-green-400 to-green-600',
-    'bg-gradient-to-br from-purple-400 to-purple-600',
-    'bg-gradient-to-br from-pink-400 to-pink-600',
-    'bg-gradient-to-br from-indigo-400 to-indigo-600',
-    'bg-gradient-to-br from-teal-400 to-teal-600',
-    'bg-gradient-to-br from-cyan-400 to-cyan-600',
-    'bg-gradient-to-br from-rose-400 to-rose-600',
-    'bg-gradient-to-br from-orange-400 to-orange-600',
-    'bg-gradient-to-br from-emerald-400 to-emerald-600'
+    'bg-gradient-to-br from-pink-600 to-rose-900',    // pink
+    'bg-gradient-to-br from-blue-700 to-indigo-950',  // deep blue
+    'bg-gradient-to-br from-red-800 to-rose-950',     // dark red
+    'bg-gradient-to-br from-zinc-700 to-neutral-950', // dark / charcoal
   ], []);
 
   // Generate consistent color for this user based on their ID
@@ -451,8 +445,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   className="fixed right-3 z-[9999]"
                   style={{
                     top: platform === 'android'
-                      ? 'calc(2rem + 40px)'
-                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 40px)'
+                      ? 'calc(2rem + 50px)'
+                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 50px)'
                   }}
                 >
                   <button
@@ -479,8 +473,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
                   style={{
                     top: platform === 'android'
-                      ? 'calc(2rem + 40px)'
-                      : 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 40px)'
+                      ? 'calc(2rem + 50px)'
+                      : 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 50px)'
                   }}
                 >
                   <div className="relative flex flex-col items-center">
@@ -531,8 +525,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
               className="fixed left-4 flex space-x-2 z-[9999]"
               style={{
                 top: platform === 'android'
-                  ? 'calc(2rem + 56px)'
-                  : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 56px)',
+                  ? 'calc(2rem + 66px)'
+                  : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 66px)',
                 pointerEvents: 'none'
               }}
             >
@@ -716,7 +710,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the non-swipeable details area
     return (
       <div
-        className={`w-full pt-3 ${styles.detailsContainer} ${isDragging ? styles.detailsContainerDragging : ''}`}
+        className={`w-full pt-3 ${styles.detailsContainer}`}
         style={{
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif'
         }}
@@ -727,7 +721,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="flex items-center gap-2 mb-2 leading-tight">
               <h2
                 className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(28px, 7vw, 44px)' }}
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(20px, 5vw, 32px)' }}
               >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
@@ -794,13 +788,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
               e.stopPropagation();
               onToggleInfo();
             }}
-            className={`text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md ${
-              !showMoreInfo ? styles.chevronHop : ''
-            }`}
+            className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              marginTop: 'clamp(28px, 7vw, 44px)',
+              marginTop: 'clamp(20px, 5vw, 32px)',
             }}
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >

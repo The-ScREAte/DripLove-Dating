@@ -5,8 +5,8 @@ import { AdinkraSvgComponents, type AdinkraSymbolName } from '@/components/adink
 // Flatten all symbols for easy lookup
 const ALL_SYMBOLS = AFRICAN_SYMBOL_GROUPS.flatMap(group => group.symbols);
 
-const CENTER_ICON_SIZE = 22;
-const SIDE_ICON_SIZE = 15;
+const CENTER_ICON_SIZE = 26;
+const SIDE_ICON_SIZE = 18;
 const MAX_VISIBLE = 3;
 
 interface UserAdinkraDisplayProps {

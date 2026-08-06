@@ -4643,8 +4643,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 decoding="async"
               />
             ) : nextMatch && !isAd(nextMatch) ? (
-              <div className="w-full h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center">
-                <span className="text-6xl font-bold text-gray-700">
+              <div className="w-full h-full bg-gradient-to-br from-zinc-800 via-neutral-900 to-black flex items-center justify-center">
+                <span className="text-6xl font-bold text-white/80">
                   {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
                 </span>
               </div>
