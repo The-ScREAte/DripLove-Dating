@@ -4192,34 +4192,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   if (isOutOfSwipes) {
     return (
       <div className="h-full w-full flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="p-8 text-center">
-            <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h2 className="text-xl font-semibold mb-2">{t('discover.outOfSwipes.title')}</h2>
-            <p className="text-gray-600 mb-4">
-              {premiumActive 
+        <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
+          <CardContent className="p-6 text-center flex flex-col items-center">
+            <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
+            <h2 className="text-lg font-semibold mb-1.5 text-white">{t('discover.outOfSwipes.title')}</h2>
+            <p className="text-gray-400 text-sm mb-5 max-w-xs">
+              {premiumActive
                 ? t('discover.outOfSwipes.premiumUserMessage')
                 : t('discover.outOfSwipes.freeUserMessage')
               }
             </p>
-            <div className="space-y-3">
+            <div className="w-full space-y-2.5">
             {!premiumActive && (
-              <Button 
-                onClick={() => setShowPremiumUpgrade(true)} 
+              <Button
+                onClick={() => setShowPremiumUpgrade(true)}
                 className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
               >
                 <Crown className="w-4 h-4 mr-2" />
                 {t('discover.outOfSwipes.upgradeButton')}
               </Button>
             )}
-              <Button 
+              <Button
                 onClick={() => {
                   // Close the modal and show the last profile they were viewing
                   // They can see the profile but if they try to swipe, the limit will be checked again
                   setIsOutOfSwipes(false);
-                }} 
-                variant="outline" 
-                className="w-full"
+                }}
+                variant="outline"
+                className="w-full bg-transparent border border-white/20 text-white hover:bg-white/10"
               >
                 {t('discover.outOfSwipes.okButton')}
               </Button>
@@ -4227,7 +4227,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               <Button
                 onClick={() => navigate('/games')}
                 variant="outline"
-                className="w-full border-purple-300 text-purple-700 hover:bg-purple-50 bg-white flex items-center justify-center gap-2"
+                className="w-full border border-pink-500/30 text-pink-400 hover:bg-pink-500/10 bg-transparent flex items-center justify-center gap-2"
                 aria-label="Play games"
               >
                 <Gamepad2 className="w-4 h-4" />
@@ -4354,12 +4354,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Background loading will continue silently without showing spinner
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="p-8 text-center">
-            <Heart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h2 className="text-xl font-semibold mb-2">{emptyTitle}</h2>
-            <p className="text-gray-600 mb-4">{emptyDescription}</p>
-            <div className="grid grid-cols-2 gap-3 mt-4">
+        <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
+          <CardContent className="p-6 text-center flex flex-col items-center">
+            <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
+            <h2 className="text-lg font-semibold mb-1.5 text-white">{emptyTitle}</h2>
+            <p className="text-gray-400 text-sm mb-5 max-w-xs">{emptyDescription}</p>
+            <div className="grid grid-cols-2 gap-2.5 w-full">
               <Button
                 onClick={() => {
                   // Clear all caches and force a complete refresh
@@ -4372,16 +4372,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   setIsLoading(true);
                   setIsLoadingMore(false);
                   setHasCompletedInitialFetch(false);
-                  
+
                   // Clear image cache
                   clearCache();
-                  
+
                   // Fetch fresh profiles
                   setTimeout(() => {
                     fetchPotentialMatches();
                   }, 100);
                 }}
-                className="w-full"
+                className="w-full bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white"
               >
                 {t('discover.refresh')}
               </Button>
@@ -4389,7 +4389,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               <Button
                 onClick={() => navigate('/games')}
                 variant="outline"
-                className="w-full border-purple-300 text-purple-700 hover:bg-purple-50 bg-white flex items-center justify-center gap-2"
+                className="w-full border border-pink-500/30 text-pink-400 hover:bg-pink-500/10 bg-transparent flex items-center justify-center gap-2"
                 aria-label="Play games"
               >
                 <Gamepad2 className="w-4 h-4" />
