@@ -1012,33 +1012,34 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {!showTerms && !showPrivacy && (
             <div
               data-driplove-global-header
-              className="fixed top-0 left-0 right-0 w-full z-50 rounded-b-[22px]"
+              className="fixed top-0 left-0 right-0 w-full z-50"
               style={{
                 margin: 0,
                 padding: 0,
                 top: 0,
                 position: 'fixed',
-                // Border/shadow live on this OUTER, unmasked element so they stay crisp — only
-                // the background/blur layer below gets feathered, not the border itself.
-                border: '1px solid rgba(236,72,153,0.7)',
-                boxShadow: '0 4px 20px -10px rgba(236, 72, 153, 0.35)',
-                // The header has no interactive controls of its own — it must never intercept
-                // touch/mouse events meant for the swipe card underneath it.
+                // No border/shadow at all now — solid black that fades away, no hard edges.
+                // The header box is made taller than its visible logo/text content so there's
+                // real room for the fade to run its course well past the sign row below the
+                // logo, instead of the feather having to compress into a short box (which read
+                // as the black area getting pushed back up instead of extending down).
+                height: '170px',
                 pointerEvents: 'none',
               }}
             >
-              {/* Background + blur, feathered on the bottom edge so it blends into the photo
-                  below instead of ending on a hard line. Kept on its own layer (behind the
-                  border-carrying parent) so the mask never fades the border/shadow too. */}
+              {/* Background, feathered on the bottom edge so it fades away going DOWN — solid
+                  black at the top, fully transparent only by the very bottom of this taller box
+                  (well past the sign row), so the fade throws downward instead of collapsing
+                  upward into a short strip. */}
               <div
                 aria-hidden="true"
-                className="absolute inset-0 rounded-[21px]"
+                className="absolute inset-0"
                 style={{
-                  background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.22))',
+                  background: 'rgba(0,0,0,0.95)',
                   backdropFilter: 'blur(18px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-                  maskImage: 'linear-gradient(to bottom, black 0%, black 55%, transparent 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 55%, transparent 100%)',
+                  maskImage: 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)',
                 }}
               />
               <div
