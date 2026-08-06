@@ -796,6 +796,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 });
 
   const isDraggingRef = useRef(false);
+  // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
+  // MatchCard) is up — otherwise a touch/drag on the card behind the modal both moves the card
+  // and drags the modal along with it, since the modal previously inherited the card's transform.
+  const isReportModalOpenRef = useRef(false);
   const [exitingCard, setExitingCard] = useState(false);
   const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
   const latestDeltaRef = useRef(0);
@@ -2893,6 +2897,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   }, [showMoreInfo, currentIndex, potentialMatches]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isReportModalOpenRef.current) return;
     const touch = e.touches[0];
     startXRef.current = touch.clientX;
     startYRef.current = touch.clientY;
@@ -2972,6 +2977,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   // Mouse event handlers for swipe on desktop
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isReportModalOpenRef.current) return;
     startXRef.current = e.clientX;
     startYRef.current = e.clientY;
     currentXRef.current = e.clientX;
@@ -4789,6 +4795,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 getOptimizedUrl={getOptimizedUrl}
                 preCalculatedDistance={userDistances[currentMatch.id]}
                 isActiveTab={isActiveTab}
+                onReportModalOpenChange={(isOpen) => { isReportModalOpenRef.current = isOpen; }}
               />
             )}
           </div>

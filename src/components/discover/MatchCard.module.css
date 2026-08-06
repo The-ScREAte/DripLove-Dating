@@ -56,14 +56,17 @@
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.85) 15%,
-    rgba(0, 0, 0, 0.97) 35%,
+    rgba(0, 0, 0, 0.85) 10%,
+    rgba(0, 0, 0, 0.97) 24%,
     rgba(0, 0, 0, 1) 100%
   );
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 100px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 100px);
+  /* Fully opaque well before the name text starts (padding-top clamp(28px, 7vw, 44px) below
+     this box's own top) — the previous 100px fade left the text sitting in the still-fading
+     zone, so the photo showed through behind it instead of solid black. */
+  mask-image: linear-gradient(to bottom, transparent 0%, black 62px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 62px);
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   will-change: mask-image, -webkit-mask-image, backdrop-filter, transform;
@@ -91,8 +94,8 @@
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.85) 15%,
-    rgba(0, 0, 0, 0.97) 35%,
+    rgba(0, 0, 0, 0.85) 10%,
+    rgba(0, 0, 0, 0.97) 24%,
     rgba(0, 0, 0, 1) 100%
   );
 }
@@ -145,7 +148,7 @@
   91% { transform: translateY(-6px) scale(1.06); }
 }
 .chevronHop {
-  animation: chevronHop 4.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: chevronHop 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;

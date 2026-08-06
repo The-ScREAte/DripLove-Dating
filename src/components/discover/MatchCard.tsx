@@ -39,6 +39,7 @@ interface MatchCardProps {
   preCalculatedDistance?: number; // Distance already calculated by location service
   imageStatus?: Record<string, 'idle'|'loading'|'loaded'|'error'>;
   isActiveTab?: boolean; // Whether the Discover/DripCheck tab is the one currently visible — gates the portaled overlays below so they don't leak onto other tabs
+  onReportModalOpenChange?: (isOpen: boolean) => void; // Lets the parent suspend swipe/drag gestures while the report modal is up
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -66,6 +67,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   preCalculatedDistance
   , imageStatus
   , isActiveTab = true
+  , onReportModalOpenChange
 }) => {
   const { t } = useTranslation();
 
@@ -333,6 +335,15 @@ const MatchCard: React.FC<MatchCardProps> = ({
     };
   }, [showReportModal]);
 
+  // Tell the parent (DiscoverPage) so it can suspend the swipe/drag gesture while this is open —
+  // otherwise dragging the card underneath also drags the modal along with it.
+  useEffect(() => {
+    onReportModalOpenChange?.(showReportModal);
+    return () => {
+      onReportModalOpenChange?.(false);
+    };
+  }, [showReportModal, onReportModalOpenChange]);
+
   // Handle report submit
   const handleReportImage = async () => {
     if (!selectedReason) {
@@ -541,11 +552,16 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Cultural sign is shown in the top-center */}
 
-          {/* Report Modal */}
-          {showReportModal && (
+          {/* Report Modal.
+              Portaled to document.body: this lives inside the swipe card, which gets a live
+              translate/rotate transform while dragging. A transformed ancestor becomes the
+              containing block for `position: fixed` descendants, so without portaling out the
+              modal would drag and rotate along with the card instead of staying centered and
+              still in the viewport. */}
+          {showReportModal && createPortal(
             <>
-              <div 
-                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 touch-none select-none" 
+              <div
+                className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 touch-none select-none"
                 onClick={closeReportModal}
                 style={{
                   position: 'fixed',
@@ -688,7 +704,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </div>
                 </div>
               </div>
-            </>
+            </>,
+            document.body
           )}
         </div>
       </div>
@@ -710,7 +727,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="flex items-center gap-2 mb-2 leading-tight">
               <h2
                 className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(65px, 10vw, 85px)' }}
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(28px, 7vw, 44px)' }}
               >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
@@ -777,13 +794,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
               e.stopPropagation();
               onToggleInfo();
             }}
-            className={`text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-all duration-200 shrink-0 backdrop-blur-md ${
+            className={`text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md ${
               !showMoreInfo ? styles.chevronHop : ''
             }`}
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              marginTop: '60px',
+              marginTop: 'clamp(28px, 7vw, 44px)',
             }}
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >
