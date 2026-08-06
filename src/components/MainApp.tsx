@@ -1018,19 +1018,27 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 padding: 0,
                 top: 0,
                 position: 'fixed',
-                // No border/shadow at all now — solid black that fades away, no hard edges.
-                // The header box is made taller than its visible logo/text content so there's
-                // real room for the fade to run its course well past the sign row below the
-                // logo, instead of the feather having to compress into a short box (which read
-                // as the black area getting pushed back up instead of extending down).
-                height: '170px',
+                // The feathered fade is only for Discover/DripCheck, where the tall sign/overlay
+                // row below the logo needs the extra room to fade into. Every other tab gets a
+                // compact, fully solid bar sized to its own content, with a pink border framing
+                // it on the sides/bottom (never the top, which sits flush against the screen
+                // edge) and rounded bottom corners.
+                height: activeTab === 'dripcheck' ? '170px' : undefined,
                 pointerEvents: 'none',
+                ...(activeTab !== 'dripcheck' && {
+                  borderLeft: '2px solid #ec4899',
+                  borderRight: '2px solid #ec4899',
+                  borderBottom: '2px solid #ec4899',
+                  borderBottomLeftRadius: '20px',
+                  borderBottomRightRadius: '20px',
+                }),
               }}
             >
-              {/* Background, feathered on the bottom edge so it fades away going DOWN — solid
-                  black at the top, fully transparent only by the very bottom of this taller box
-                  (well past the sign row), so the fade throws downward instead of collapsing
-                  upward into a short strip. */}
+              {/* Background. On Discover/DripCheck: feathered on the bottom edge so it fades away
+                  going DOWN — solid black at the top, fully transparent only by the very bottom of
+                  this taller box (well past the sign row). On every other tab: fully solid, no fade,
+                  no tall box — just an opaque bar behind the logo/text, clipped to match the
+                  rounded bottom corners of the pink border. */}
               <div
                 aria-hidden="true"
                 className="absolute inset-0"
@@ -1038,8 +1046,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   background: 'rgba(0,0,0,0.95)',
                   backdropFilter: 'blur(18px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-                  maskImage: 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)',
+                  maskImage: activeTab === 'dripcheck'
+                    ? 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)'
+                    : 'none',
+                  WebkitMaskImage: activeTab === 'dripcheck'
+                    ? 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)'
+                    : 'none',
+                  ...(activeTab !== 'dripcheck' && {
+                    borderBottomLeftRadius: '18px',
+                    borderBottomRightRadius: '18px',
+                  }),
                 }}
               />
               <div
@@ -1082,7 +1098,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
               > 
-                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />
+                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
               </div>
             </Suspense>
           )}

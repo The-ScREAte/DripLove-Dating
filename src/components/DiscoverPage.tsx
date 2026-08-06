@@ -95,6 +95,7 @@ interface DiscoverPageProps {
   onNavigateToProfile?: () => void;
   isPremium?: boolean;
   profileCompletion?: number; // Pass from parent (Profile page calculates it)
+  isActiveTab?: boolean; // Whether this tab is currently the visible one (parent keeps it mounted via display:none)
 }
 
 interface PassedUser {
@@ -245,7 +246,7 @@ type WindowWithIntervals = Window & {
   chatMatchesCache?: Map<string, unknown>;
 };
 
-const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPremium, profileCompletion: parentProfileCompletion }: DiscoverPageProps) => {
+const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPremium, profileCompletion: parentProfileCompletion, isActiveTab = true }: DiscoverPageProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -4787,6 +4788,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 isDetailsAreaOnly={false}
                 getOptimizedUrl={getOptimizedUrl}
                 preCalculatedDistance={userDistances[currentMatch.id]}
+                isActiveTab={isActiveTab}
               />
             )}
           </div>

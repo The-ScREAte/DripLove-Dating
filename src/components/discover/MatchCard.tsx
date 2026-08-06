@@ -38,6 +38,7 @@ interface MatchCardProps {
   getOptimizedUrl?: (url: string) => string; // New prop for image optimization
   preCalculatedDistance?: number; // Distance already calculated by location service
   imageStatus?: Record<string, 'idle'|'loading'|'loaded'|'error'>;
+  isActiveTab?: boolean; // Whether the Discover/DripCheck tab is the one currently visible — gates the portaled overlays below so they don't leak onto other tabs
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -64,6 +65,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   getOptimizedUrl = (url: string) => optimizeImageUrl(url, { width: 500, quality: 60 }),
   preCalculatedDistance
   , imageStatus
+  , isActiveTab = true
 }) => {
   const { t } = useTranslation();
 
@@ -433,7 +435,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               {/* Report button for image slides - positioned closer to top edge.
                   Same stacking-context ceiling as the sign display/slide dots below — portaled
                   out so it can render above the global header instead of underneath it. */}
-              {slides[currentSlide]?.type === 'image' && createPortal(
+              {isActiveTab && slides[currentSlide]?.type === 'image' && createPortal(
                 <div
                   className="fixed right-3 z-[9999]"
                   style={{
@@ -461,10 +463,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   context, so no z-index on anything inside it can ever paint above a sibling
                   like the global header that has an explicit z-index. Portaling out is the only
                   way for this to actually render above the header. */}
-              {stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && createPortal(
+              {isActiveTab && stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && createPortal(
                 <div
                   className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
-                  style={{ top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 40px)' }}
+                  style={{
+                    top: platform === 'android'
+                      ? 'calc(2rem + 40px)'
+                      : 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 40px)'
+                  }}
                 >
                   <div className="relative flex flex-col items-center">
                     {/* Single optimized glow layer */}
@@ -509,7 +515,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Slide indicators */}
           {/* Same stacking-context ceiling as the sign display above — portaled out so the
               slide dots can render above the global header instead of underneath it. */}
-          {slides && slides.length > 1 && createPortal(
+          {isActiveTab && slides && slides.length > 1 && createPortal(
             <div
               className="fixed left-4 flex space-x-2 z-[9999]"
               style={{
@@ -1014,6 +1020,7 @@ const areImageStatusMapsEqual = (
 export default React.memo(MatchCard, (prev, next) => {
   return (
     prev.match.id === next.match.id &&
+    prev.isActiveTab === next.isActiveTab &&
     areStringArraysEqual(prev.userImages, next.userImages) &&
     areStringMapsEqual(prev.preloadedBlobImages, next.preloadedBlobImages) &&
     prev.showMoreInfo === next.showMoreInfo &&

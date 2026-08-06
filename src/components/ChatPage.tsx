@@ -195,14 +195,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useChatKeyboardFix();
 
   useLayoutEffect(() => {
-    const measureTopCompensation = () => {
-      const globalHeader = document.querySelector('[data-driplove-global-header]') as HTMLElement | null;
-      if (!globalHeader) {
-        setTopCompensation(0);
-        return;
-      }
+    const globalHeader = document.querySelector('[data-driplove-global-header]') as HTMLElement | null;
+    if (!globalHeader) {
+      setTopCompensation(0);
+      return;
+    }
 
-      const contentReservedTop = 56;
+    const contentReservedTop = 56;
+    const measureTopCompensation = () => {
       const needed = Math.max(0, Math.ceil(globalHeader.getBoundingClientRect().height - contentReservedTop));
       setTopCompensation(needed);
     };
@@ -211,9 +211,16 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     window.addEventListener('resize', measureTopCompensation);
     window.addEventListener('orientationchange', measureTopCompensation);
 
+    // The header's actual height changes when switching tabs (tall/feathered on
+    // Discover, compact everywhere else) even while ChatPage stays mounted in the
+    // background — a ResizeObserver keeps this in sync instead of only measuring once.
+    const resizeObserver = new ResizeObserver(measureTopCompensation);
+    resizeObserver.observe(globalHeader);
+
     return () => {
       window.removeEventListener('resize', measureTopCompensation);
       window.removeEventListener('orientationchange', measureTopCompensation);
+      resizeObserver.disconnect();
     };
   }, []);
 
