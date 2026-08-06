@@ -73,7 +73,12 @@ const ImageSlide = React.memo<{
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`w-full h-full object-cover relative z-10 ${styles.optimizedImage}`}
+        className={`w-full h-full object-cover object-top relative z-10 ${styles.optimizedImage}`}
+        // Fills its container completely — the container itself (discover-image-area in
+        // DiscoverPage.tsx) is the thing pushed down now, not this image within an unmoved
+        // container, so there's no gap left over to expose whatever's behind. Rounded on the
+        // top corners since that's genuinely where the photo starts.
+        style={{ borderRadius: '26px 26px 0 0' }}
         draggable={false}
         onError={() => setHasError(true)}
       />

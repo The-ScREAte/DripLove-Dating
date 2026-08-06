@@ -4466,10 +4466,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
       <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
            style={{
-             top: 0, // Photo now extends to the very top, behind the glassy header
-             height: 'calc(100vh - 78px)', // Reserve room for the floating pill nav (now higher/slimmer)
+             // Shifted down 55px (instead of the individual card/image having its own internal
+             // padding or margin for this) — the whole fixed layer moves together: current card,
+             // next-card preview, everything. That way the gap at the top reveals the app's own
+             // background behind this layer, not some other layer that isn't shifted the same
+             // way and ends up visually mismatched with it.
+             top: '55px',
+             height: 'calc(100vh - 78px - 55px)', // Reserve room for the floating pill nav (now higher/slimmer)
              // Mobile browser viewport fix
-             minHeight: 'calc(100vh - 78px)',
+             minHeight: 'calc(100vh - 78px - 55px)',
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
              overscrollBehavior: 'contain',
              userSelect: 'none',
@@ -4624,7 +4629,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
                 })()}
                 alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-top"
                 style={{ position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
@@ -4655,7 +4660,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             willChange: 'transform',
             borderRadius: cardCornerRadius,
             overflow: 'hidden',
-            border: '1.5px solid rgba(236,72,153,0.95)',
             boxShadow: swipeUI.isDragging
               ? '0 14px 34px -8px rgba(0,0,0,0.28)'
               : exitingCard
@@ -4663,6 +4667,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 : '0 2px 8px rgba(0,0,0,0.08)'
           }}
         >
+          {/* Drag-state outline. The card itself no longer has any internal top gap to work
+              around — that offset now happens one level up, at discover-container's own `top`
+              (see below), before this card even starts — so this can just be a normal complete
+              border around the whole card, top edge included. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none transition-opacity duration-200"
+            style={{
+              border: '1.5px solid rgba(236,72,153,0.95)',
+              borderRadius: cardCornerRadius,
+              opacity: swipeUI.isDragging ? 1 : 0,
+              zIndex: 30,
+            }}
+          />
           {/* Image area - flexible height that fills remaining space */}
           <div
             className={`discover-image-area flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
@@ -4673,7 +4691,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               // compact info panel below just hugs its own content instead of being stretched.
               // Expanded: capped so the info panel has room to grow and show more detail.
               minHeight: showMoreInfo ? 'max(48vh, 340px)' : 'max(58vh, 400px)',
-              maxHeight: showMoreInfo ? '72vh' : 'none'
+              maxHeight: showMoreInfo ? '72vh' : 'none',
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -4803,8 +4821,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                 display: 'flex',
                 flexDirection: 'column',
                 // Total panel height (background) reaches almost all the way to the bottom of
-                // the screen, so there's no gap of photo/transparency below it.
-                maxHeight: `${Math.max(400, vh - 170)}px`,
+                // the screen, so there's no gap of photo/transparency below it. The extra -55
+                // accounts for discover-container itself now starting 55px lower (see its `top`
+                // above) — that much less vertical space is actually available overall, so this
+                // needs to know about it too or the panel overclaims space that isn't there,
+                // eating into the bottom padding/clearance that's supposed to be reserved.
+                maxHeight: `${Math.max(400, vh - 170 - 55)}px`,
               } : undefined}
             >
               <div
@@ -4818,9 +4840,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   // (see the filler div below) — real content can only ever scroll within this
                   // safe zone, so it can never end up rendered behind the floating nav, no matter
                   // the scroll position.
-                  maxHeight: showMoreInfo ? `${Math.max(280, Math.max(400, vh - 170) - 150)}px` : '320px',
+                  maxHeight: showMoreInfo ? `${Math.max(280, Math.max(400, vh - 170 - 55) - 150)}px` : '320px',
                   minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
-                  paddingBottom: showMoreInfo ? '24px' : '0px'
                 }}
               >
               {/* Render MatchCard details area */}

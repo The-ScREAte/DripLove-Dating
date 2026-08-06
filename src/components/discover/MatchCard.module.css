@@ -137,13 +137,16 @@
 
 /* Occasional attention-grabbing hop on the "show details" chevron — mostly idle, with a
    quick double-bounce every few seconds so it feels alive without being distracting. */
+/* A single smooth up-and-down arc instead of three quick direction changes crammed into a
+   short window near the end of the cycle — the old version packed 3 bounces into ~13% of the
+   4.5s cycle, which read as a rapid shake rather than a gentle, professional nudge. */
 @keyframes chevronHop {
-  0%, 78%, 100% { transform: translateY(0) scale(1); }
-  84% { transform: translateY(-7px) scale(1.1); }
-  89% { transform: translateY(0) scale(0.94); }
-  93% { transform: translateY(-3px) scale(1.05); }
-  97% { transform: translateY(0) scale(1); }
+  0%, 82%, 100% { transform: translateY(0) scale(1); }
+  91% { transform: translateY(-6px) scale(1.06); }
 }
 .chevronHop {
-  animation: chevronHop 4.5s ease-in-out infinite;
+  animation: chevronHop 4.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }

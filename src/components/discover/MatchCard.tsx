@@ -430,14 +430,16 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Current slide content */}
           {slides && slides.length > 0 && (
             <div className="w-full h-full transition-all duration-300 ease-in-out">
-              {/* Report button for image slides - positioned closer to top edge */}
-              {slides[currentSlide]?.type === 'image' && (
-                <div 
-                  className="absolute right-3 z-50"
+              {/* Report button for image slides - positioned closer to top edge.
+                  Same stacking-context ceiling as the sign display/slide dots below — portaled
+                  out so it can render above the global header instead of underneath it. */}
+              {slides[currentSlide]?.type === 'image' && createPortal(
+                <div
+                  className="fixed right-3 z-[9999]"
                   style={{
                     top: platform === 'android'
-                      ? 'calc(2rem + 56px)'
-                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 56px)'
+                      ? 'calc(2rem + 40px)'
+                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 40px)'
                   }}
                 >
                   <button
@@ -449,7 +451,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
-                </div>
+                </div>,
+                document.body
               )}
 
               {/* Optimized cultural sign glow effect.
@@ -701,7 +704,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="flex items-center gap-2 mb-2 leading-tight">
               <h2
                 className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(80px, 10vw, 100px)' }}
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(65px, 10vw, 85px)' }}
               >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
@@ -788,7 +791,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
         {/* Expandable details - appears below basic info */}
         {showMoreInfo && (
-          <div className="mt-4 px-4 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '100px' }}>
+          <div className="mt-4 px-4 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '160px' }}>
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
