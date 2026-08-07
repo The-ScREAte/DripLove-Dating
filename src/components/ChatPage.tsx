@@ -16,10 +16,8 @@ import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
 import ChatUserAvatar from './ChatUserAvatar';
 import MatchExpirationAvatar from './chat/MatchExpirationAvatar';
-import RatingDialog from './RatingDialog';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
-import { getRatingData } from '@/utils/ratingStorage';
 import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
 
 type WindowWithChatCaches = Window & {
@@ -181,11 +179,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   const [isSwiping, setIsSwiping] = useState(false);
   
   // Rating dialog state
-  const [messagesSentCount, setMessagesSentCount] = useState(0);
-  
   // Dormant conversations state
   const [showDormant, setShowDormant] = useState(false);
-  const [showRatingDialog, setShowRatingDialog] = useState(false);
 
   // Highlighted message state (for scroll-to-message)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -1400,16 +1395,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       return updated;
     });
 
-    // Track messages sent and show rating dialog after 7 messages
-    const newCount = messagesSentCount + 1;
-    setMessagesSentCount(newCount);
-    
-    if (newCount === 7) {
-      const ratingData = getRatingData();
-      if (!ratingData.hasRated) {
-        setShowRatingDialog(true);
-      }
-    }
+
 
       try {
       // Send the message to server with timeout
@@ -2356,12 +2342,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDeleteChatConfirm}
         matchName={selectedMatch ? `${selectedMatch.first_name} ${selectedMatch.last_name}` : ''}
-      />
-
-      <RatingDialog 
-        show={showRatingDialog}
-        onClose={() => setShowRatingDialog(false)}
-        onRatingComplete={() => setShowRatingDialog(false)}
       />
     </div>
   );

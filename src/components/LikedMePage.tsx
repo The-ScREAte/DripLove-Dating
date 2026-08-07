@@ -13,6 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
+import RatingFunnel from './RatingFunnel';
+import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
@@ -114,6 +116,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
+  const [showRatingFunnel, setShowRatingFunnel] = useState(false);
   // ------------------
   // REFS
   // ------------------
@@ -827,6 +830,16 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       if (!isPremium && !hasInteractedToday) {
         await setLockoutPeriod();
         setHasInteractedToday(true);
+      }
+
+      // A like-back can create a match without ever visiting Discover -
+      // make sure the one-time rating funnel still gets its chance to fire.
+      const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
+      if (madeMatch && registerMatchAndCheckIsFirst() && isRatingFunnelEligible()) {
+        setTimeout(() => {
+          markRatingFunnelTriggered();
+          setShowRatingFunnel(true);
+        }, 3000);
       }
     } catch (error) {
       // Revert optimistic update on error
@@ -1665,6 +1678,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           </div>
         )}
       </div>
+
+      <RatingFunnel
+        open={showRatingFunnel}
+        onClose={() => setShowRatingFunnel(false)}
+      />
     </div>
   );
 };

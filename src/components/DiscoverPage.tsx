@@ -65,9 +65,9 @@ import MatchAnimation from './MatchAnimation';
 import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
-import RatingDialog from './RatingDialog';
+import RatingFunnel from './RatingFunnel';
 import HoppingLogo from '@/components/HoppingLogo';
-import { handleMatchForRating, preloadNativeRating } from '@/services/appRatingService';
+import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
 import { CurrentUser, PotentialMatch } from '@/types';
 
 // Paginated fetch for tables that can exceed Supabase's 1000-row default limit.
@@ -311,7 +311,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
-  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [showRatingFunnel, setShowRatingFunnel] = useState(false);
+  const isFirstEverMatchRef = useRef(false);
   const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
   // Store users who liked the current user (for "they liked you" notification)
   const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
@@ -712,7 +713,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     if (todaySwipeCount === null) return;
     
     // Determine the correct swipe limit based on premium status
-    const swipeLimit = premiumActive ? 200 : 25;
+    const swipeLimit = premiumActive ? 200 : 29;
     
     // Always check and update the out of swipes state based on current premium status
     if (todaySwipeCount >= swipeLimit) {
@@ -3322,7 +3323,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       pending: pendingSwipesRef.current,
       todaySwipeCount,
       effectiveSwipeCount,
-      swipeLimit: premiumActive ? 200 : 25,
+      swipeLimit: premiumActive ? 200 : 29,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -3371,7 +3372,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Check daily limit - MUST be checked BEFORE swipe
     // Free users: 20 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 25;
+    const swipeLimit = premiumActive ? 200 : 29;
 
     // Block purely based on the authoritative swipe count.
     if (effectiveSwipeCount >= swipeLimit) {
@@ -3493,12 +3494,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
               
-              // Check if rating dialog should be shown (on 3rd match)
-              handleMatchForRating().then(shouldShow => {
-                if (shouldShow) {
-                  setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
-                }
-              });
+              if (registerMatchAndCheckIsFirst()) {
+                isFirstEverMatchRef.current = true;
+              }
               
               // Clear chat cache to force refresh when user opens ChatPage
               if (typeof window !== 'undefined') {
@@ -3549,14 +3547,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
-            
-            // Check if rating dialog should be shown (on 3rd match)
-            handleMatchForRating().then(shouldShow => {
-              if (shouldShow) {
-                setTimeout(() => setShowRatingDialog(true), 2000); // Show after match animation
-              }
-            });
-            
+
+            if (registerMatchAndCheckIsFirst()) {
+              isFirstEverMatchRef.current = true;
+            }
+
             // Clear chat cache to force refresh when user opens ChatPage
             if (typeof window !== 'undefined') {
               const win = window as WindowWithIntervals;
@@ -3631,7 +3626,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       pending: pendingSwipesRef.current,
       todaySwipeCount,
       effectiveSwipeCount,
-      swipeLimit: premiumActive ? 200 : 25,
+      swipeLimit: premiumActive ? 200 : 29,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -3672,7 +3667,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
     // Check daily limit - MUST be checked BEFORE swipe
     // Free users: 20 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 25;
+    const swipeLimit = premiumActive ? 200 : 29;
 
     // Block purely based on the authoritative swipe count.
     if (effectiveSwipeCount >= swipeLimit) {
@@ -4153,8 +4148,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, potentialMatches.length]);
 
+  const maybeTriggerRatingFunnel = () => {
+    if (!isFirstEverMatchRef.current) return;
+    isFirstEverMatchRef.current = false;
+    if (!isRatingFunnelEligible()) return;
+    setTimeout(() => {
+      markRatingFunnelTriggered();
+      setShowRatingFunnel(true);
+    }, 3000);
+  };
+
   const handleStartChat = (userId: string) => {
     setShowMatchAnimation(false);
+    maybeTriggerRatingFunnel();
     if (onNavigateToChat) {
       onNavigateToChat(userId);
     }
@@ -4164,6 +4170,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     setShowMatchAnimation(false);
     setMatchedUser(null);
     // Profile already moved when like was processed
+    maybeTriggerRatingFunnel();
   };
 
   if (showMatchAnimation && matchedUser) {
@@ -4311,7 +4318,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           <div className="mb-4">
             <HoppingLogo size={80} />
           </div>
-          <p className="text-gray-600">{t('discover.findingMatches')}</p>
         </div>
       </div>
     );
@@ -4329,7 +4335,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           <div className="mb-4">
             <HoppingLogo size={80} />
           </div>
-          <p className="text-gray-600">{t('discover.findingMatches')}</p>
         </div>
       </div>
     );
@@ -4909,11 +4914,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       </div>
       </div>
       
-      {/* Rating Dialog - Shows on 2nd match, then every 3 weeks */}
-      <RatingDialog 
-        show={showRatingDialog}
-        onClose={() => setShowRatingDialog(false)}
-        onRatingComplete={() => setShowRatingDialog(false)}
+      {/* One-time rating funnel - 3s after the user's first-ever match screen closes */}
+      <RatingFunnel
+        open={showRatingFunnel}
+        onClose={() => setShowRatingFunnel(false)}
       />
     </>
   );

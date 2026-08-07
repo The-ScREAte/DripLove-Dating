@@ -58,7 +58,7 @@ export const useSubscription = (userId: string | undefined) => {
             status: 'active',
             expires_at: null,
             features: {
-              daily_swipes: 25,
+              daily_swipes: 29,
               reverse_dislikes: 1,
               liked_me_visible: 1
             }
@@ -83,7 +83,7 @@ export const useSubscription = (userId: string | undefined) => {
           reverse_dislikes: -1, // Unlimited
           liked_me_visible: -1 // Unlimited
         } : {
-          daily_swipes: 25, // Free users get 25 swipes per day
+          daily_swipes: 29, // Free users get 29 swipes per day
           reverse_dislikes: 1,
           liked_me_visible: 1
         }
@@ -98,7 +98,7 @@ export const useSubscription = (userId: string | undefined) => {
         status: 'active',
         expires_at: null,
         features: {
-          daily_swipes: 25, // Free users get 25 swipes per day
+          daily_swipes: 29, // Free users get 29 swipes per day
           reverse_dislikes: 1,
           liked_me_visible: 1
         }

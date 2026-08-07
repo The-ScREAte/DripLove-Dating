@@ -86,6 +86,34 @@ export const saveWebRating = async (ratingValue: number): Promise<void> => {
 };
 
 /**
+ * Activate a temporary algorithmic visibility boost for the current user,
+ * as a thank-you for opening the native store review prompt.
+ */
+export const activateVisibilityBoost = async (
+  hours = 24,
+  multiplier = 1.5
+): Promise<void> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const boostUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        visibility_boost_until: boostUntil,
+        visibility_boost_multiplier: multiplier,
+      } as any)
+      .eq('id', user.id);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('[Rating] Error activating visibility boost:', error);
+  }
+};
+
+/**
  * Check if the rating plugin is available
  */
 export const isRatingAvailable = (): boolean => {
