@@ -1092,7 +1092,7 @@ const ProfileCompletionPage = () => {
                       </div>
 
                       {showFaceVerification ? (
-                        <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+                        <div className="space-y-3 bg-black border border-white/10 rounded-lg p-3">
                           <FaceVerification onVerified={handleFaceVerified} disabled={isVerifying} />
                         </div>
                       ) : faceVerified ? (
