@@ -1101,11 +1101,19 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
-        {/* Photo area - fixed height so layout stays predictable regardless of how
-            much the details panel below grows. Name/bio/details never sit on top of
-            the photo itself, so they're never washed out by a bright image - same
-            reason Discover keeps them in their own solid-black area below the card. */}
-        <div className="relative flex-shrink-0 w-full" style={{ height: '40vh', overflow: 'hidden' }}>
+        {/* Photo area - same sizing strategy as Discover's discover-image-area:
+            flex-1 so it absorbs whatever space the details panel below isn't using.
+            Collapsed: uncapped, so it fills nearly the whole screen. Expanded: capped
+            so the details panel actually has room to grow. Name/bio/details never sit
+            on top of the photo itself, so they're never washed out by a bright image. */}
+        <div
+          className="relative flex-1 w-full transition-all duration-300"
+          style={{
+            overflow: 'hidden',
+            minHeight: showMoreInfo ? 'max(30vh, 220px)' : 'max(50vh, 360px)',
+            maxHeight: showMoreInfo ? '55vh' : 'none',
+          }}
+        >
           <div className="w-full h-full relative" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
             <SlideRenderer
               slide={currentSlideData}
@@ -1177,22 +1185,30 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             </button>
           )}
 
-          {/* Feather the seam between the photo and the details panel below - the
-              details panel rides up over this faded zone (negative margin below),
-              instead of a hard cut from image straight to solid black. */}
-          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black to-transparent pointer-events-none" />
         </div>
 
-        {/* Details area - rides up over the photo's faded bottom edge (negative
-            margin), so it visually overlaps the feather instead of starting with a
-            hard seam. Compact (just name + basics) while collapsed so the photo
-            above gets the room; grows to a scrollable panel once expanded. */}
+        {/* Details area - rides up over the photo via transform (not a negative top
+            margin - that would shrink the space this flex item claims, letting the
+            photo's flex-1 grow right back into it and cancel the overlap out).
+            The feather is this box's OWN background gradient (transparent at its
+            top, where it overlaps the photo, down to solid black) rather than a
+            separate overlay element - no extra element to clip or mis-stack, the
+            fade is simply however this box paints itself. marginBottom cancels the
+            transform's shift so the action buttons below aren't pushed down by it.
+            Gradient stops are fixed PIXEL lengths, not percentages - this box's
+            height swings from ~200px (collapsed) to up to 48vh (expanded), and
+            percentage stops would spread the exact same fade over a much bigger
+            range once expanded, making it look like it nearly vanished right where
+            the name sits. Pixel stops keep the fade the same physical size in both
+            states. */}
         <div
-          className={`relative z-10 flex-shrink-0 px-6 ${showMoreInfo ? 'overflow-y-auto' : ''}`}
+          className={`relative z-20 flex-shrink-0 px-6 transition-all duration-300 ${showMoreInfo ? 'overflow-y-auto' : ''}`}
           style={{
-            marginTop: '-40px',
-            paddingTop: '20px',
-            ...(showMoreInfo ? { maxHeight: '50vh' } : {}),
+            transform: 'translateY(-80px)',
+            marginBottom: '-80px',
+            paddingTop: '88px',
+            background: 'linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.6) 60px, rgba(0,0,0,1) 100px)',
+            ...(showMoreInfo ? { maxHeight: '48vh' } : {}),
           }}
         >
           {/* Name + expand control share a row, so the button sits in line with the
