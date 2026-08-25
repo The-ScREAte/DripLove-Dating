@@ -1200,17 +1200,21 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             percentage stops would spread the exact same fade over a much bigger
             range once expanded, making it look like it nearly vanished right where
             the name sits. Pixel stops keep the fade the same physical size in both
-            states. */}
+            states. The scrollable expanded content lives in an INNER div (below) -
+            this outer div itself never gets overflow-y-auto, so there's no
+            possibility of its own background ever being affected by an overflow
+            setting, in any browser. */}
         <div
-          className={`relative z-20 flex-shrink-0 px-6 transition-all duration-300 ${showMoreInfo ? 'overflow-y-auto' : ''}`}
+          className="relative z-20 flex-shrink-0 transition-all duration-300"
           style={{
             transform: 'translateY(-80px)',
             marginBottom: '-80px',
             paddingTop: '88px',
-            background: 'linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.6) 60px, rgba(0,0,0,1) 100px)',
+            background: 'linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.55) 25px, rgba(0,0,0,0.85) 50px, rgba(0,0,0,0.97) 70px, rgba(0,0,0,1) 90px)',
             ...(showMoreInfo ? { maxHeight: '48vh' } : {}),
           }}
         >
+          <div className={`px-6 ${showMoreInfo ? 'overflow-y-auto' : ''}`}>
           {/* Name + expand control share a row, so the button sits in line with the
               name instead of floating further down the panel. */}
           <div className="flex items-start justify-between gap-3">
@@ -1382,6 +1386,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Action buttons - pinned above the mobile nav, always reachable regardless
