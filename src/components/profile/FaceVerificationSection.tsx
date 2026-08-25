@@ -50,19 +50,10 @@ const FaceVerificationSection = ({
       }
 
       if (data?.success) {
-        // Update profile with face descriptor
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            face_descriptor: data.faceId || 'verified',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentUser.id);
-
-        if (updateError) {
-          console.error('Profile update error:', updateError);
-        }
-
+        // The face-verify edge function persists profiles.face_descriptor itself
+        // (server-side, service role, after confirming caller identity) - the
+        // client is not trusted to set verification status directly, since RLS
+        // on profiles only checks row ownership, not which columns changed.
         // Face verified - no toast needed, verified badge shows on profile
         setShowVerification(false);
         onProfileUpdate();

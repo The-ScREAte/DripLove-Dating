@@ -183,11 +183,35 @@ const PaymentSuccess: React.FC = () => {
       // ignore
     }
 
-    // If IAP (Apple or Google), edge function has already validated and activated.
+    // If IAP (Apple or Google), the validator edge function has already verified the
+    // receipt and activated the subscription server-side before this redirect ever
+    // happened. Still do one last read here as defense-in-depth -- this page is the
+    // only thing standing between "purchase succeeded" and the user seeing
+    // confirmation, so it shouldn't blindly trust the URL query string alone.
     if (payment_type === 'iap' && status === 'successful') {
       setError(null);
-      setUpgradeSuccess(true);
-      setUpgrading(false);
+      setUpgrading(true);
+      (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
+        if (!user) {
+          // isAuthenticated already gates this effect, so this shouldn't happen --
+          // but don't block a real success behind a redundant check either.
+          setUpgrading(false);
+          setUpgradeSuccess(true);
+          return;
+        }
+
+        const activated = await waitForPremiumActivation(user.id);
+        setUpgrading(false);
+        if (activated) {
+          setUpgradeSuccess(true);
+        } else {
+          setError(
+            'Payment verified, but premium activation is taking a little longer than expected. It should appear automatically within a few minutes -- please reopen the app shortly. Contact support if it does not.'
+          );
+        }
+      })();
       return;
     }
 

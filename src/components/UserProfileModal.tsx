@@ -60,12 +60,17 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         .eq('image_url', imageUrl);
       if (dbError) throw dbError;
 
-      // Delete from storage
-      const fileName = imageUrl.split('/').pop();
-      if (fileName) {
+      // Delete from storage. Files are stored as `<userId>/<file>`, so taking just
+      // the last URL segment (as this used to) drops the userId prefix and silently
+      // fails to match the real object path, leaking the file in storage forever.
+      // Mirror the path resolution used in profile/ImageManagement.tsx.
+      const urlParts = imageUrl.split('/');
+      const bucketIndex = urlParts.findIndex(part => part === 'user-photos');
+      if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
+        const filePath = urlParts.slice(bucketIndex + 1).join('/');
         const { error: storageError } = await supabase.storage
           .from('user-photos')
-          .remove([fileName]);
+          .remove([filePath]);
         if (storageError) throw storageError;
       }
 

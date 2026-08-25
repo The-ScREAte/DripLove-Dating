@@ -722,15 +722,46 @@ serve(async (req: Request) => {
     // Handle index_face action - actually save the face to collection
     if (body.action === 'index_face') {
       const { front, userId, userName } = body;
-      
+
       console.log('📝 Indexing face for user:', userId, 'name:', userName);
-      
-      if (!front) {
+
+      if (!front || !userId) {
         return new Response(JSON.stringify({
           success: false,
-          error: 'Front image is required'
+          error: 'Front image and userId are required'
         }), {
           status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // SECURITY: this function has verify_jwt=false at the platform level, and it
+      // writes profiles.face_descriptor (the verified-badge flag) server-side below
+      // using the service role, which bypasses RLS entirely. Without this check,
+      // any caller could pass an arbitrary userId and grant that user (or a
+      // completely different account) the verified badge. Require a valid
+      // Supabase session whose subject matches the userId being indexed.
+      if (!adminClient) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Server misconfigured'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const authHeader = req.headers.get('Authorization') || '';
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const { data: authData, error: authError } = token
+        ? await adminClient.auth.getUser(token)
+        : { data: { user: null }, error: new Error('Missing Authorization header') };
+
+      if (authError || !authData?.user || authData.user.id !== userId) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Not authorized to verify this account'
+        }), {
+          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -772,17 +803,45 @@ serve(async (req: Request) => {
           });
         }
 
+        const faceId = indexResult.FaceRecords[0].Face?.FaceId;
         console.log('✅ Face indexed successfully');
-        return new Response(JSON.stringify({ 
+
+        // Mark the account verified server-side (service role bypasses RLS).
+        // Previously the client set profiles.face_descriptor itself after
+        // receiving this response, which meant any authenticated user could
+        // grant themselves the verified badge by writing directly to the
+        // profiles table without ever calling Rekognition. Writing it here,
+        // gated by the identity check above, closes that gap.
+        const { error: profileUpdateError } = await adminClient
+          .from('profiles')
+          .update({
+            face_descriptor: faceId || 'verified',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId);
+
+        if (profileUpdateError) {
+          console.error('Failed to persist verification status:', profileUpdateError.message);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Face verified but failed to save status. Please try again.',
+            code: 'PROFILE_UPDATE_FAILED'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        return new Response(JSON.stringify({
           success: true,
-          faceId: indexResult.FaceRecords[0].Face?.FaceId 
+          faceId
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
-        
+
       } catch (indexError: any) {
         const errorMsg = indexError.message || '';
-        
+
         if (errorMsg.includes('InvalidParameterException') && (errorMsg.includes('no faces') || errorMsg.includes('No faces'))) {
           return new Response(JSON.stringify({
             success: false,
@@ -793,7 +852,7 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
-        
+
         console.error('Index error:', errorMsg);
         return new Response(JSON.stringify({
           success: false,

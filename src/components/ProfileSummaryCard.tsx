@@ -23,7 +23,9 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
     if (currentUser?.id) {
       fetchUserStats();
     }
-  }, [currentUser]);
+    // currentUser is a new object reference on most parent re-renders; depending on
+    // currentUser.id (as the other effects below do) avoids refetching stats on every render.
+  }, [currentUser?.id]);
 
   // ⭐ Realtime subscription to update stats when likes are added
   useEffect(() => {

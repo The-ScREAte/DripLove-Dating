@@ -72,14 +72,11 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       }
 
       if (data?.success) {
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            face_descriptor: data.faceId || 'verified',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentUser?.id);
-
+        // The face-verify edge function now persists profiles.face_descriptor
+        // itself (server-side, service role) after confirming the caller's
+        // identity, so the client no longer writes verification status
+        // directly to the profiles table - that write is not something an
+        // ordinary authenticated client should be trusted to set.
         // Face verified - no toast needed, verified badge shows on profile
         setShowFaceVerification(false);
         onProfileUpdate?.();

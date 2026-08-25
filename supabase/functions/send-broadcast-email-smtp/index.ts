@@ -36,6 +36,29 @@ const isQuotaError = (message: string): boolean => {
   return m.includes('limit') || m.includes('quota') || m.includes('5.4.5') || m.includes('too many login attempts');
 };
 
+// Permanent (hard bounce) vs transient: only permanent failures get the recipient
+// suppressed from all future broadcasts. A quota error is the SENDING account's
+// fault, never the recipient's, so isQuotaError is always checked first by callers.
+// SMTP convention: a 5xx reply code means the recipient/address itself is invalid
+// and will never succeed; 4xx means a temporary condition worth retrying later.
+const isPermanentEmailError = (message: string): boolean => {
+  const m = message.toLowerCase();
+  const codeMatch = m.match(/\b([45]\d{2})\b/);
+  if (codeMatch) return codeMatch[1].startsWith('5');
+  return (
+    m.includes('no such user') ||
+    m.includes('user unknown') ||
+    m.includes('does not exist') ||
+    m.includes('mailbox unavailable') ||
+    m.includes('mailbox not found') ||
+    m.includes('invalid recipient') ||
+    m.includes('recipient rejected') ||
+    m.includes('address rejected') ||
+    m.includes('no mailbox') ||
+    m.includes('unrouteable address')
+  );
+};
+
 const htmlToText = (html: string): string =>
   String(html || '')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -201,7 +224,7 @@ serve(async (req: Request) => {
 
     // Dedupe + validate recipients up front.
     const seen = new Set<string>();
-    const accepted: string[] = [];
+    const formatChecked: string[] = [];
     const invalid: Array<{ email: string; error: string }> = [];
 
     for (const raw of recipients) {
@@ -212,7 +235,27 @@ serve(async (req: Request) => {
         invalid.push({ email, error: 'Invalid email format' });
         continue;
       }
-      accepted.push(email);
+      formatChecked.push(email);
+    }
+
+    // Skip addresses that previously hard-bounced on an earlier broadcast -- this is
+    // what stops a permanently-bad address from being re-attempted on every single
+    // send (including every occurrence of a recurring/scheduled broadcast) forever.
+    const accepted: string[] = [];
+    if (formatChecked.length > 0) {
+      const { data: suppressedRows } = await supabase
+        .from('email_suppression_list')
+        .select('email')
+        .in('email', formatChecked);
+      const suppressedSet = new Set((suppressedRows || []).map((r: { email: string }) => r.email));
+
+      for (const email of formatChecked) {
+        if (suppressedSet.has(email)) {
+          invalid.push({ email, error: 'Suppressed: previously failed permanently (invalid/non-existent mailbox)' });
+        } else {
+          accepted.push(email);
+        }
+      }
     }
 
     // Check how much quota each account has left today, then hand out recipients
@@ -270,6 +313,7 @@ serve(async (req: Request) => {
 
     const successful: string[] = [];
     const failed: Array<{ email: string; error: string }> = [...invalid];
+    const newlySuppressed: Array<{ email: string; error: string }> = [];
 
     for (const { account, batch } of assignments) {
       const transporter = nodemailer.createTransport({
@@ -309,7 +353,14 @@ serve(async (req: Request) => {
           } else {
             const message = getErrorMessage(result.reason);
             failed.push({ email, error: message });
-            if (isQuotaError(message)) hitQuota = true;
+            if (isQuotaError(message)) {
+              // The sending account is out of quota -- not the recipient's fault.
+              hitQuota = true;
+            } else if (isPermanentEmailError(message)) {
+              // Hard bounce: this address will never succeed. Suppress it from every
+              // future broadcast instead of letting it get re-attempted forever.
+              newlySuppressed.push({ email, error: message });
+            }
           }
           sentFromThisAccount += 1; // Every attempt (success or failure) counts against the account's daily quota.
         });
@@ -335,6 +386,21 @@ serve(async (req: Request) => {
           console.error('Failed to record account usage:', usageError);
         }
       }
+    }
+
+    // Persist hard bounces so they're never attempted again by any future broadcast
+    // (including every future occurrence of a recurring/scheduled one).
+    if (newlySuppressed.length > 0) {
+      const rows = newlySuppressed.map(({ email, error }) => ({
+        email,
+        reason: 'hard_bounce',
+        last_error: error,
+        broadcast_id: broadcastId,
+      }));
+      const { error: suppressError } = await supabase
+        .from('email_suppression_list')
+        .upsert(rows, { onConflict: 'email' });
+      if (suppressError) console.error('Failed to record suppressed emails:', suppressError);
     }
 
     // Anything left over (no account had capacity) goes into the queue for automatic resumption.

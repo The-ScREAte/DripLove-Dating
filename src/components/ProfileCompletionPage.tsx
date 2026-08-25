@@ -959,17 +959,11 @@ const ProfileCompletionPage = () => {
 
           if (faceError) {
             console.error('Face indexing error:', faceError);
-          } else if (faceData?.success) {
-            // Update profile with face descriptor
-            await supabase
-              .from('profiles')
-              .update({ 
-                face_descriptor: faceData.faceId || 'verified',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', user.id);
           }
-          
+          // The face-verify edge function persists profiles.face_descriptor itself
+          // (server-side, service role, after confirming caller identity) - the
+          // client no longer writes verification status directly.
+
           // Clear localStorage after successful indexing
           localStorage.removeItem('pending_face_verification_profile');
         } catch (faceErr) {

@@ -100,7 +100,7 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isBlocking} className="border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
+          <Button variant="outline" onClick={onClose} disabled={isBlocking} className="bg-black border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
             {t('common.cancel')}
           </Button>
           <Button

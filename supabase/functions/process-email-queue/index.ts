@@ -23,6 +23,27 @@ const isQuotaError = (message: string): boolean => {
   return m.includes('limit') || m.includes('quota') || m.includes('5.4.5') || m.includes('too many login attempts');
 };
 
+// Permanent (hard bounce) vs transient: only permanent failures get the recipient
+// suppressed from all future broadcasts. A quota error is the SENDING account's
+// fault, never the recipient's, so isQuotaError is always checked first by callers.
+const isPermanentEmailError = (message: string): boolean => {
+  const m = message.toLowerCase();
+  const codeMatch = m.match(/\b([45]\d{2})\b/);
+  if (codeMatch) return codeMatch[1].startsWith('5');
+  return (
+    m.includes('no such user') ||
+    m.includes('user unknown') ||
+    m.includes('does not exist') ||
+    m.includes('mailbox unavailable') ||
+    m.includes('mailbox not found') ||
+    m.includes('invalid recipient') ||
+    m.includes('recipient rejected') ||
+    m.includes('address rejected') ||
+    m.includes('no mailbox') ||
+    m.includes('unrouteable address')
+  );
+};
+
 const htmlToText = (html: string): string =>
   String(html || '')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -161,6 +182,32 @@ serve(async (req) => {
       );
     }
 
+    // Skip (and immediately fail) any queued recipient that already hard-bounced on
+    // an earlier broadcast, instead of leaving it "pending" forever and re-attempting
+    // it on every future run of this processor.
+    const suppressedEmails = Array.from(new Set(pendingRows.map((r) => r.recipient)));
+    const { data: suppressedRows } = await supabase
+      .from('email_suppression_list')
+      .select('email')
+      .in('email', suppressedEmails);
+    const suppressedSet = new Set((suppressedRows || []).map((r: { email: string }) => r.email));
+
+    const suppressedRowIds = pendingRows.filter((r) => suppressedSet.has(r.recipient)).map((r) => r.id);
+    if (suppressedRowIds.length > 0) {
+      await supabase
+        .from('email_send_queue')
+        .update({ status: 'failed', error: 'Suppressed: previously failed permanently (invalid/non-existent mailbox)' })
+        .in('id', suppressedRowIds);
+    }
+    const sendableRows = pendingRows.filter((r) => !suppressedSet.has(r.recipient));
+
+    if (sendableRows.length === 0) {
+      return new Response(
+        JSON.stringify({ message: 'All queued emails were suppressed', processed: 0, suppressed: suppressedRowIds.length }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Figure out remaining quota per account for today.
     const today = new Date().toISOString().slice(0, 10);
     const { data: usageRows } = await supabase
@@ -176,26 +223,26 @@ serve(async (req) => {
 
     // Assign pending rows to accounts with remaining capacity, in queue order.
     let cursor = 0;
-    const assignments: Array<{ account: SmtpAccount; rows: typeof pendingRows }> = [];
+    const assignments: Array<{ account: SmtpAccount; rows: typeof sendableRows }> = [];
     for (const account of accounts) {
       const used = usedByAccount.get(account.email) || 0;
       const remaining = Math.max(0, DAILY_LIMIT_PER_ACCOUNT - used);
-      if (remaining === 0 || cursor >= pendingRows.length) continue;
+      if (remaining === 0 || cursor >= sendableRows.length) continue;
 
-      const rows = pendingRows.slice(cursor, cursor + remaining);
+      const rows = sendableRows.slice(cursor, cursor + remaining);
       cursor += rows.length;
       if (rows.length > 0) assignments.push({ account, rows });
     }
 
     if (assignments.length === 0) {
       return new Response(
-        JSON.stringify({ message: 'All accounts are out of quota today; will retry next run', processed: 0, stillQueued: pendingRows.length }),
+        JSON.stringify({ message: 'All accounts are out of quota today; will retry next run', processed: 0, stillQueued: sendableRows.length, suppressed: suppressedRowIds.length }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Group the assigned rows by broadcast so we can batch-fetch each broadcast's content once.
-    const broadcastIds = Array.from(new Set(pendingRows.slice(0, cursor).map((r) => r.broadcast_id)));
+    const broadcastIds = Array.from(new Set(sendableRows.slice(0, cursor).map((r) => r.broadcast_id)));
     const { data: broadcasts, error: broadcastsError } = await supabase
       .from('email_broadcast_history')
       .select('id, subject, message, successful_sends, failed_sends')
@@ -209,6 +256,7 @@ serve(async (req) => {
 
     let totalSent = 0;
     let totalFailed = 0;
+    const newlySuppressed: Array<{ email: string; error: string; broadcastId: string }> = [];
 
     for (const { account, rows } of assignments) {
       const transporter = nodemailer.createTransport({
@@ -257,7 +305,15 @@ serve(async (req) => {
             rowUpdates.push({ id: row.id, status: 'failed', error: message });
             failedByBroadcast.set(row.broadcast_id, (failedByBroadcast.get(row.broadcast_id) || 0) + 1);
             totalFailed += 1;
-            if (isQuotaError(message)) hitQuota = true;
+            if (isQuotaError(message)) {
+              // The sending account is out of quota -- not the recipient's fault.
+              hitQuota = true;
+            } else if (isPermanentEmailError(message)) {
+              // Hard bounce: this address will never succeed. Suppress it from every
+              // future broadcast instead of leaving it to be re-queued and re-attempted
+              // forever.
+              newlySuppressed.push({ email: row.recipient, error: message, broadcastId: row.broadcast_id });
+            }
           }
           sentFromThisAccount += 1;
         });
@@ -288,6 +344,20 @@ serve(async (req) => {
       }
     }
 
+    // Persist hard bounces so they're never attempted again by any future broadcast.
+    if (newlySuppressed.length > 0) {
+      const rows = newlySuppressed.map(({ email, error, broadcastId }) => ({
+        email,
+        reason: 'hard_bounce',
+        last_error: error,
+        broadcast_id: broadcastId,
+      }));
+      const { error: suppressError } = await supabase
+        .from('email_suppression_list')
+        .upsert(rows, { onConflict: 'email' });
+      if (suppressError) console.error('Failed to record suppressed emails:', suppressError);
+    }
+
     // Update each affected broadcast's totals and mark it completed if nothing's pending anymore.
     for (const broadcastId of broadcastIds) {
       const broadcast = broadcastMap.get(broadcastId);
@@ -310,7 +380,13 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ message: 'Queue processing complete', processed: totalSent + totalFailed, sent: totalSent, failed: totalFailed }),
+      JSON.stringify({
+        message: 'Queue processing complete',
+        processed: totalSent + totalFailed,
+        sent: totalSent,
+        failed: totalFailed,
+        suppressed: suppressedRowIds.length,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

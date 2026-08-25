@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, Heart, X, Calendar, MapPin, Shield, ChevronDown, ChevronUp, 
-  Briefcase, GraduationCap, Crown, Lock, User, Quote, Coffee, Search 
+import {
+  Users, Heart, X, Calendar, MapPin, ArrowLeft, ArrowUp, ArrowDown,
+  Briefcase, GraduationCap, Crown, Lock, Languages
 } from 'lucide-react';
 
 // ANDROID FIX: Use platform utils instead of synchronous Capacitor import
@@ -11,7 +11,6 @@ import { getPlatformSync } from '@/utils/platformUtils';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import BlockDialog from './BlockDialog';
 import PremiumUpgrade from './PremiumUpgrade';
 import RatingFunnel from './RatingFunnel';
 import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
@@ -23,6 +22,12 @@ import { preloadImageToBlob } from '@/utils/imageCache';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 import type { AppUser, LikedMeCacheValue, LikerProfile } from '@/types/cacheTypes';
+import type { PotentialMatch } from '@/types';
+
+// Reuse Discover's exact slide-building/rendering so the "view a liker" screen
+// looks and behaves identically to the swipe card's own expanded view.
+import { SlideRenderer } from './discover/SlideRenderer';
+import { buildSlides, getUserColorHash } from './discover/MatchCardHelpers';
 
 // =========================================================
 // GLOBAL CACHES
@@ -106,7 +111,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<LikerProfile | null>(null);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
-  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  // Report/block modal - same shape and fields as Discover's swipe card modal.
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [selectedReportReason, setSelectedReportReason] = useState('');
+  const [isBlocking, setIsBlocking] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+  const [isBlockSuccess, setIsBlockSuccess] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
@@ -703,37 +716,21 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     setCurrentSlide(0);
   }, [selectedProfile]);
 
-  // ⭐ FIX #6: Memoize slides calculation with stable dependencies
+  // Slide list built by the exact same helper Discover's swipe card uses, so the
+  // mix of photos/bio/fun-question slides matches it exactly.
   const slides = useMemo(() => {
     if (!selectedProfile) return [];
-    
     const profileImages = userImages[selectedProfile.id] || [];
-    const result: Array<{ type: 'image' | 'about' | 'funfact' | 'placeholder', imageIndex?: number }> = [];
-    
-    const hasContent = (type: string) => {
-      if (type === 'image') return true;
-      if (type === 'about') return !!selectedProfile.bio;
-      if (type === 'funfact') return !!(selectedProfile.fun_fact || selectedProfile.perfect_first_date || selectedProfile.last_googled);
-      return false;
-    };
-    
-    if (profileImages.length > 0) {
-      for (let i = 0; i < profileImages.length; i++) {
-        result.push({ type: 'image', imageIndex: i });
-        const infoType: 'about' | 'funfact' = i % 2 === 0 ? 'about' : 'funfact';
-        if (hasContent(infoType)) {
-          result.push({ type: infoType });
-        }
-      }
-    } else {
-      // When no images, show placeholder with initials first
-      result.push({ type: 'placeholder' });
-      if (hasContent('about')) result.push({ type: 'about' });
-      if (hasContent('funfact')) result.push({ type: 'funfact' });
-    }
-    
-    return result;
+    return buildSlides(selectedProfile as unknown as PotentialMatch, profileImages);
   }, [selectedProfile, userImages]);
+
+  // Same 4-color palette Discover's swipe card uses for non-photo slide backgrounds.
+  const slideBackgroundColors = useMemo(() => [
+    'bg-gradient-to-br from-pink-600 to-rose-900',
+    'bg-gradient-to-br from-blue-700 to-indigo-950',
+    'bg-gradient-to-br from-red-800 to-rose-950',
+    'bg-gradient-to-br from-zinc-700 to-neutral-950',
+  ], []);
 
   // Clamp currentSlide if slides array shrinks
   useEffect(() => {
@@ -971,16 +968,83 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   }, [currentUser?.id, hasInteractedToday, isPremium, likers, setLockoutPeriod, supabaseRpc, toast]);
 
-  const handleBlock = useCallback(() => {
-    setBlockDialogOpen(true);
+  const closeReportModal = useCallback(() => {
+    setShowReportModal(false);
+    setSelectedReportReason('');
+    setReportError('');
+    setBlockReason('');
+    setIsBlockSuccess(false);
   }, []);
 
-  const handleBlockSuccess = useCallback(() => {
-    if (selectedProfile) {
-      setLikers(prev => prev.filter(liker => liker.id !== selectedProfile.id));
-      setSelectedProfile(null);
+  // Reports whichever photo is currently on screen - same semantics as Discover's
+  // swipe card, which is why the trigger only shows up while viewing a photo slide.
+  const handleReportImage = useCallback(async () => {
+    if (!selectedProfile) return;
+    if (!selectedReportReason) {
+      setReportError(t('reportModal.selectReason'));
+      return;
     }
-  }, [selectedProfile]);
+
+    setReporting(true);
+    setReportError('');
+    try {
+      const currentSlideData = slides[currentSlide];
+      const imageUrl = currentSlideData?.type === 'image' ? currentSlideData.content : undefined;
+      if (!imageUrl) throw new Error('Missing image');
+
+      const { error } = await supabase.from('reported_images').insert({
+        reporter_id: currentUser.id,
+        reported_user_id: selectedProfile.id,
+        image_url: imageUrl,
+        status: 'pending',
+        reason: selectedReportReason,
+      });
+      if (error) throw error;
+
+      setReportSuccess(true);
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+        setSelectedReportReason('');
+      }, 1500);
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : t('reportModal.error'));
+    } finally {
+      setReporting(false);
+    }
+  }, [selectedProfile, slides, currentSlide, currentUser?.id, selectedReportReason, t]);
+
+  const handleBlockUser = useCallback(async () => {
+    if (!selectedProfile || !currentUser?.id) return;
+
+    setIsBlocking(true);
+    try {
+      const { error } = await supabase
+        .from('blocks')
+        .insert({
+          blocker_id: currentUser.id,
+          blocked_id: selectedProfile.id,
+          reason: blockReason.trim() || null,
+        });
+      if (error) throw error;
+
+      setIsBlockSuccess(true);
+      const blockedId = selectedProfile.id;
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+        setIsBlockSuccess(false);
+        setSelectedReportReason('');
+        setBlockReason('');
+        setLikers(prev => prev.filter(liker => liker.id !== blockedId));
+        setSelectedProfile(null);
+      }, 3000);
+    } catch (error) {
+      setReportError(error instanceof Error ? error.message : 'Failed to block user');
+    } finally {
+      setIsBlocking(false);
+    }
+  }, [selectedProfile, currentUser?.id, blockReason]);
 
   const handleProfileClick = (liker: LikerProfile, index: number) => {
     // For free users, only allow clicking if they're premium
@@ -1024,33 +1088,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const selectedProfileCard = useMemo(() => {
     if (!selectedProfile) return null;
 
-    const profileImages = userImages[selectedProfile.id] || [];
     const totalSlides = slides.length;
-    const currentSlideInfo = slides[currentSlide] || slides[0];
-    
-    const isImageSlide = currentSlideInfo.type === 'image';
-    const isAboutSlide = currentSlideInfo.type === 'about';
-    const isFunFactSlide = currentSlideInfo.type === 'funfact';
-    const isPlaceholderSlide = currentSlideInfo.type === 'placeholder';
-    const currentImageIndex = currentSlideInfo.imageIndex || 0;
-
-    // Background colors for cards
-    const getCardColor = () => {
-      let hash = 0;
-      const str = selectedProfile.id.toString();
-      for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i);
-        hash = hash & hash;
-      }
-      const colors = [
-        'from-blue-400 to-blue-600',
-        'from-purple-400 to-purple-600',
-        'from-pink-400 to-pink-600',
-        'from-indigo-400 to-indigo-600',
-        'from-teal-400 to-teal-600',
-      ];
-      return colors[Math.abs(hash) % colors.length];
-    };
+    const currentSlideData = slides[currentSlide] || slides[0];
+    const isImageSlide = currentSlideData.type === 'image';
+    const userBackgroundColor = getUserColorHash(selectedProfile.id, slideBackgroundColors);
 
     return (
       <div
@@ -1060,151 +1101,27 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           paddingBottom: 'env(safe-area-inset-bottom, 0px)'
         }}
       >
-        {/* Main Slide Area */}
-        <div 
-          className="flex-1 relative" 
-          style={{
-            height: platform === 'ios' 
-              ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : platform === 'web'
-                ? 'calc(100vh - 56px - 80px)'
-                : 'calc(100vh - 56px)',
-            minHeight: platform === 'ios'
-              ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : platform === 'web'
-                ? 'calc(100vh - 56px - 80px)'
-                : 'calc(100vh - 56px)',
-            maxHeight: platform === 'ios'
-              ? 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)'
-              : platform === 'web'
-                ? 'calc(100vh - 56px - 80px)'
-                : 'calc(100vh - 56px)',
-            marginBottom: platform === 'web'
-              ? '0px'
-              : 'calc(env(safe-area-inset-bottom, 0px) + 100px)',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Placeholder Slide - when no images */}
-          {isPlaceholderSlide && (
-            <div
-              className="w-full h-full bg-gradient-to-br from-pink-950 to-purple-950 flex items-center justify-center relative"
-              onClick={handleNavigationClick}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="text-center">
-                <span className="text-6xl font-bold text-pink-200">
-                  {selectedProfile.first_name?.[0]}{selectedProfile.last_name?.[0]}
-                </span>
-                <p className="text-gray-300 mt-4 text-sm">No photos uploaded yet</p>
-              </div>
-            </div>
-          )}
-
-          {/* Image Slide */}
-          {isImageSlide && profileImages.length > 0 && currentImageIndex < profileImages.length && (
-            <>
-              <img
-                loading="eager"
-                decoding="async"
-                src={getSafeImageSrc(profileImages[currentImageIndex])}
-                alt={`${selectedProfile.first_name}'s photo`}
-                className="w-full h-full object-cover"
-                style={{
-                  height: '100%',
-                  width: '100%',
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                  display: 'block',
-                  pointerEvents: 'none'
-                }}
-              />
-              {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-              {/* Click/Touch handler overlay */}
-              <div 
-                className="absolute inset-0 z-0" 
-                onClick={handleNavigationClick}
-                style={{ cursor: 'pointer' }}
-              />
-            </>
-          )}
-
-          {/* About Card */}
-          {isAboutSlide && (
-            <div 
-              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-start pt-20 pb-6 px-6 text-white relative overflow-hidden`}
-              onClick={handleNavigationClick}
-              style={{ cursor: 'pointer' }}
-            >
-              <User className="w-10 h-10 mb-3 opacity-90" />
-              <h2 className="text-xl font-bold mb-3 text-center">About</h2>
-              <div className="max-w-md w-full space-y-2 text-center overflow-y-auto px-2" style={{ maxHeight: '70%' }}>
-                {selectedProfile.bio ? (
-                  <p className="text-sm leading-relaxed">{selectedProfile.bio}</p>
-                ) : (
-                  <p className="text-sm opacity-75 italic">No bio yet</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Fun Fact Card */}
-          {isFunFactSlide && (
-            <div 
-              className={`w-full h-full bg-gradient-to-br ${getCardColor()} flex flex-col items-center justify-start pt-20 pb-6 px-6 text-white relative overflow-hidden`}
-              onClick={handleNavigationClick}
-              style={{ cursor: 'pointer' }}
-            >
-              <Quote className="w-10 h-10 mb-3 opacity-90" />
-              <h2 className="text-xl font-bold mb-3 text-center">Fun Questions</h2>
-              <div className="max-w-md w-full space-y-3 overflow-y-auto px-2" style={{ maxHeight: '70%' }}>
-                {selectedProfile.fun_fact && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <Heart className="w-4 h-4 flex-shrink-0 mt-1" />
-                      <div>
-                        <p className="text-xs opacity-75 mb-1">Fun Fact</p>
-                        <p className="text-sm">{selectedProfile.fun_fact}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {selectedProfile.perfect_first_date && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <Coffee className="w-4 h-4 flex-shrink-0 mt-1" />
-                      <div>
-                        <p className="text-xs opacity-75 mb-1">Perfect First Date</p>
-                        <p className="text-sm">{selectedProfile.perfect_first_date}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {selectedProfile.last_googled && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <Search className="w-4 h-4 flex-shrink-0 mt-1" />
-                      <div>
-                        <p className="text-xs opacity-75 mb-1">Last Googled</p>
-                        <p className="text-sm">{selectedProfile.last_googled}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!selectedProfile.fun_fact && !selectedProfile.perfect_first_date && !selectedProfile.last_googled && (
-                  <p className="text-sm opacity-75 italic text-center">No fun questions answered yet</p>
-                )}
-              </div>
-            </div>
-          )}
+        {/* Photo area - fixed height so layout stays predictable regardless of how
+            much the details panel below grows. Name/bio/details never sit on top of
+            the photo itself, so they're never washed out by a bright image - same
+            reason Discover keeps them in their own solid-black area below the card. */}
+        <div className="relative flex-shrink-0 w-full" style={{ height: '40vh', overflow: 'hidden' }}>
+          <div className="w-full h-full relative" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
+            <SlideRenderer
+              slide={currentSlideData}
+              userBackgroundColor={userBackgroundColor}
+              matchFirstName={selectedProfile.first_name || ''}
+              matchLastName={selectedProfile.last_name || ''}
+              getOptimizedUrl={(url) => getSafeImageSrc(url) || url}
+            />
+          </div>
 
           {/* Slide indicators */}
-          <div 
+          <div
             className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
             style={{
               top: platform === 'ios'
-                ? '50px'
+                ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
                 : platform === 'android'
                   ? '32px'
                   : '16px'
@@ -1220,261 +1137,374 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             ))}
           </div>
 
-          {/* Header buttons */}
-          <Button
+          {/* Header buttons - icon-only, same small glass-circle style as Discover's
+              expand/collapse control. */}
+          <button
             onClick={() => {
               setSelectedProfile(null);
               setCurrentSlide(0);
             }}
-            variant="outline"
-            className="absolute left-4 bg-white/80 hover:bg-white z-10 h-10 px-3"
+            aria-label={t('matches.back')}
+            className="absolute left-4 z-10 flex items-center justify-center w-10 h-10 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
             style={{
-              top: platform === 'ios' 
+              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+              top: platform === 'ios'
                 ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
                 : '16px'
             }}
           >
-            ← {t('matches.back')}
-          </Button>
+            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+          </button>
 
-          <Button
-            onClick={handleBlock}
-            variant="outline"
-            size="sm"
-            className="absolute right-4 bg-white/80 hover:bg-white z-10 h-10 w-10 p-0"
-            style={{
-              top: platform === 'ios' 
-                ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
-                : '16px'
-            }}
-          >
-            <Shield className="w-4 h-4" />
-          </Button>
-
-          {/* Profile Info Overlay - Only show on image slides */}
+          {/* Report - exact same trigger Discover uses (small white circle, red
+              accent), and like Discover it only shows up while viewing a photo since
+              it reports whichever photo is currently on screen. */}
           {isImageSlide && (
-            <div 
-              className="absolute bottom-0 left-0 right-0 text-white"
+            <button
+              onClick={() => setShowReportModal(true)}
+              aria-label={t('reportModal.title')}
+              className="absolute right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/95 border border-red-300 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
               style={{
-                paddingBottom: platform === 'ios' 
-                  ? 'clamp(180px, calc(env(safe-area-inset-bottom, 10px) + 190px), 190px)'
-                  : platform === 'android'
-                    ? '180px'
-                    : '180px'
+                top: platform === 'ios'
+                  ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
+                  : '16px'
               }}
             >
-              <div className="px-6">
-                <div className="mb-2">
-                  <h2 className="text-xl font-bold mb-1">
-                    {selectedProfile.first_name} {selectedProfile.last_name}
-                  </h2>
-                  <div className="flex items-center space-x-3 text-xs">
-                    <div className="flex items-center">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      <span>{selectedProfile.city}, {selectedProfile.country}</span>
-                    </div>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Feather the seam between the photo and the details panel below - the
+              details panel rides up over this faded zone (negative margin below),
+              instead of a hard cut from image straight to solid black. */}
+          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black to-transparent pointer-events-none" />
+        </div>
+
+        {/* Details area - rides up over the photo's faded bottom edge (negative
+            margin), so it visually overlaps the feather instead of starting with a
+            hard seam. Compact (just name + basics) while collapsed so the photo
+            above gets the room; grows to a scrollable panel once expanded. */}
+        <div
+          className={`relative z-10 flex-shrink-0 px-6 ${showMoreInfo ? 'overflow-y-auto' : ''}`}
+          style={{
+            marginTop: '-40px',
+            paddingTop: '20px',
+            ...(showMoreInfo ? { maxHeight: '50vh' } : {}),
+          }}
+        >
+          {/* Name + expand control share a row, so the button sits in line with the
+              name instead of floating further down the panel. */}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold mb-1 text-white">
+                {selectedProfile.first_name} {selectedProfile.last_name}
+              </h2>
+              <div className="flex items-center space-x-3 text-xs text-gray-300">
+                <div className="flex items-center">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
+                </div>
+                <div className="flex items-center">
+                  <MapPin className="w-3 h-3 mr-1" />
+                  <span>{selectedProfile.city}, {selectedProfile.country}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Expand/collapse control - identical pink-gradient glass circle used
+                on Discover's own swipe card. */}
+            <button
+              onClick={() => setShowMoreInfo(!showMoreInfo)}
+              aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
+              className="shrink-0 text-white rounded-full p-2 backdrop-blur-md transition-colors"
+              style={{
+                background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+                boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+              }}
+            >
+              {showMoreInfo ? (
+                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+              ) : (
+                <ArrowDown className="w-4 h-4" strokeWidth={2.5} />
+              )}
+            </button>
+          </div>
+
+          {selectedProfile.occupation && (
+            <div className="flex items-center text-xs mt-2 text-gray-300">
+              <Briefcase className="w-3 h-3 mr-2" />
+              <span>{selectedProfile.occupation}</span>
+            </div>
+          )}
+
+          {selectedProfile.interests && selectedProfile.interests.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {selectedProfile.interests.slice(0, 5).map((interest: string, index: number) => (
+                <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs">
+                  {interest}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Expanded Info - same per-category card layout as Discover's swipe card
+              details area. */}
+          {showMoreInfo && (
+            <div className="mt-4 space-y-3">
+              {selectedProfile.bio && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-1">{t('matches.about')}</h4>
+                  <p className="text-gray-200 text-sm leading-relaxed">{selectedProfile.bio}</p>
+                </div>
+              )}
+
+              {[selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Lifestyle</h4>
+                  <div className="space-y-2">
+                    {selectedProfile.smoking && (
+                      <div className="flex items-center text-sm">
+                        <span className="font-semibold mr-2 text-white">Smoking:</span>
+                        <span className="text-gray-200">{selectedProfile.smoking}</span>
+                      </div>
+                    )}
+                    {selectedProfile.drinking && (
+                      <div className="flex items-center text-sm">
+                        <span className="font-semibold mr-2 text-white">Drinking:</span>
+                        <span className="text-gray-200">{selectedProfile.drinking}</span>
+                      </div>
+                    )}
+                    {selectedProfile.exercise_level && (
+                      <div className="flex items-center text-sm">
+                        <span className="font-semibold mr-2 text-white">Exercise:</span>
+                        <span className="text-gray-200">{selectedProfile.exercise_level}</span>
+                      </div>
+                    )}
+                    {selectedProfile.sleeping_schedule && (
+                      <div className="flex items-center text-sm">
+                        <span className="font-semibold mr-2 text-white">Sleep:</span>
+                        <span className="text-gray-200">{selectedProfile.sleeping_schedule}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
+              )}
 
-                {selectedProfile.occupation && (
-                  <div className="flex items-center text-xs mb-2">
-                    <Briefcase className="w-3 h-3 mr-2" />
-                    <span>{selectedProfile.occupation}</span>
+              {(selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry) && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Work & Education</h4>
+                  <div className="space-y-2">
+                    {selectedProfile.occupation && (
+                      <div className="flex items-center text-sm">
+                        <Briefcase className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                        <span className="text-gray-200">{selectedProfile.occupation}</span>
+                      </div>
+                    )}
+                    {selectedProfile.education_level && (
+                      <div className="flex items-center text-sm">
+                        <GraduationCap className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                        <span className="text-gray-200">{selectedProfile.education_level}</span>
+                      </div>
+                    )}
+                    {selectedProfile.industry && (
+                      <div className="flex items-center text-sm">
+                        <Briefcase className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                        <span className="text-gray-200">{selectedProfile.industry}</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
 
-                {selectedProfile.interests && selectedProfile.interests.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedProfile.interests.slice(0, 5).map((interest: string, index: number) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 bg-white/20 rounded-full text-xs backdrop-blur-sm"
-                      >
+              {selectedProfile.interests && selectedProfile.interests.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">{t('matches.interests')}</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProfile.interests.map((interest: string, index: number) => (
+                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
                         {interest}
                       </span>
                     ))}
                   </div>
-                )}
-
-                {/* Show More Button */}
-                <div className="flex justify-center mt-3">
-                  <button
-                    onClick={() => setShowMoreInfo(!showMoreInfo)}
-                    className="bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1 transition-colors"
-                    style={{ 
-                      color: 'white !important',
-                      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                      e.currentTarget.style.color = 'white';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                      e.currentTarget.style.color = 'white';
-                    }}
-                  >
-                    {showMoreInfo ? (
-                      <>
-                        <ChevronUp className="w-3 h-3" style={{ color: 'white', stroke: 'white' }} />
-                        <span className="text-[10px]" style={{ color: 'white' }}>Show Less</span>
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-3 h-3" style={{ color: 'white', stroke: 'white' }} />
-                        <span className="text-[10px]" style={{ color: 'white' }}>Show More</span>
-                      </>
-                    )}
-                  </button>
                 </div>
+              )}
 
-                {/* Expanded Info */}
-                {showMoreInfo && (
-                  <div className="mt-4 space-y-3 bg-black/85 border border-pink-500/30 backdrop-blur-sm rounded-lg p-4 max-h-64 overflow-y-auto text-gray-100">
-                    {selectedProfile.adinkra_symbols && selectedProfile.adinkra_symbols.length > 0 && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">✨</div>
-                        <div className="w-full">
-                          <p className="text-xs text-gray-400 mb-1">Cultural Signs</p>
-                          <div className="flex flex-wrap gap-1">
-                            {selectedProfile.adinkra_symbols.map((symbol: string, index: number) => (
-                              <span key={index} className="px-2 py-1 bg-primary/10 rounded-full text-xs text-primary font-medium">
-                                {symbol}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.preferred_language && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🗣️</div>
-                        <div>
-                          <p className="text-xs text-gray-400">Preferred Language</p>
-                          <p className="text-sm font-medium">{selectedProfile.preferred_language}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.education_level && (
-                      <div className="flex items-start gap-2">
-                        <GraduationCap className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-400">Education</p>
-                          <p className="text-sm font-medium">{selectedProfile.education_level}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.industry && (
-                      <div className="flex items-start gap-2">
-                        <Briefcase className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-400">Industry</p>
-                          <p className="text-sm font-medium">{selectedProfile.industry}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.drinking && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🍷</div>
-                        <div>
-                          <p className="text-xs text-gray-400">Drinking</p>
-                          <p className="text-sm font-medium">{selectedProfile.drinking}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.smoking && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">🚭</div>
-                        <div>
-                          <p className="text-xs text-gray-400">Smoking</p>
-                          <p className="text-sm font-medium">{selectedProfile.smoking}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.exercise_level && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">💪</div>
-                        <div>
-                          <p className="text-xs text-gray-400">Exercise</p>
-                          <p className="text-sm font-medium">{selectedProfile.exercise_level}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.sleeping_schedule && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-4 h-4 flex-shrink-0 mt-0.5 text-center">😴</div>
-                        <div>
-                          <p className="text-xs text-gray-400">Sleep Schedule</p>
-                          <p className="text-sm font-medium">{selectedProfile.sleeping_schedule}</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedProfile.relationship_intent && (
-                      <div className="flex items-start gap-2">
-                        <Heart className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-400">Looking For</p>
-                          <p className="text-sm font-medium">{selectedProfile.relationship_intent}</p>
-                        </div>
-                      </div>
-                    )}
+              {selectedProfile.adinkra_symbols && selectedProfile.adinkra_symbols.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Cultural Signs</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProfile.adinkra_symbols.map((symbol: string, index: number) => (
+                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                        {symbol}
+                      </span>
+                    ))}
                   </div>
+                </div>
+              )}
+
+              {selectedProfile.preferred_language && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Language</h4>
+                  <div className="flex items-center text-sm">
+                    <Languages className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
+                    <span className="text-gray-200">{selectedProfile.preferred_language}</span>
+                  </div>
+                </div>
+              )}
+
+              {selectedProfile.relationship_intent && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Looking For</h4>
+                  <div className="flex items-center text-sm">
+                    <Heart className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
+                    <span className="text-gray-200">{selectedProfile.relationship_intent}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons - pinned above the mobile nav, always reachable regardless
+            of scroll position in the details area above. */}
+        <div
+          className="flex-shrink-0 flex justify-center space-x-6 px-6 py-3"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)' }}
+        >
+          <Button
+            onClick={() => handlePass(selectedProfile.id)}
+            variant="outline"
+            className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30"
+          >
+            <X className="w-6 h-6 text-red-400" />
+          </Button>
+
+          <Button
+            onClick={() => handleLikeBack(selectedProfile.id)}
+            variant="outline"
+            className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30"
+          >
+            <Heart className="w-6 h-6 text-green-400" />
+          </Button>
+        </div>
+
+        {/* Report/Block modal - same content and flow as Discover's swipe card. */}
+        {showReportModal && (
+          <div
+            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={closeReportModal}
+          >
+            <div
+              className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxHeight: '85vh' }}
+            >
+              <div className="relative px-3 pt-3 pb-2 border-b border-pink-500/20 bg-black shrink-0">
+                <button
+                  onClick={closeReportModal}
+                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
+                  disabled={reporting}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <div className="pr-8">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
+                  <h3 className="text-base font-bold text-white mt-0.5">{t('reportModal.title')}</h3>
+                  <p className="text-[11px] text-gray-300 mt-0.5">{t('reportModal.instruction')}</p>
+                </div>
+              </div>
+
+              <div className="px-3 pb-3 pt-2 overflow-y-auto flex-1 min-h-0">
+                {isBlockSuccess ? (
+                  <div className="text-green-400 font-semibold text-center py-8">
+                    <div className="mb-2 text-3xl">🚫</div>
+                    <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
+                    <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
+                  </div>
+                ) : reportSuccess ? (
+                  <div className="text-green-400 font-semibold text-center py-8">
+                    <div className="mb-2 text-2xl">✓</div>
+                    <div>{t('reportModal.success')}</div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5 mb-3">
+                      {[
+                        t('reportModal.reasons.inappropriate'),
+                        t('reportModal.reasons.fake'),
+                        t('reportModal.reasons.spam'),
+                        t('reportModal.reasons.offensive'),
+                        t('reportModal.reasons.harassment'),
+                        t('reportModal.reasons.other'),
+                      ].map((reason) => (
+                        <button
+                          key={reason}
+                          onClick={() => setSelectedReportReason(reason)}
+                          disabled={reporting || isBlocking}
+                          className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-lg border-2 transition-all duration-200 ${
+                            selectedReportReason === reason
+                              ? 'border-rose-500 bg-rose-950/50 text-rose-300 ring-1 ring-rose-500/30'
+                              : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
+                          } ${(reporting || isBlocking) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <span className="text-xs sm:text-sm font-semibold leading-tight">{reason}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mb-3 p-2.5 bg-black/60 rounded-lg border border-pink-500/20">
+                      <p className="text-gray-200 mb-1.5 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
+                      <textarea
+                        placeholder={t('reportModal.blockSection.placeholder')}
+                        value={blockReason}
+                        onChange={(e) => setBlockReason(e.target.value)}
+                        disabled={reporting || isBlocking}
+                        className="w-full p-2 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50"
+                        rows={2}
+                      />
+                      <button
+                        className="w-full mt-1.5 h-8 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg disabled:opacity-50 transition-colors duration-200 text-xs"
+                        onClick={handleBlockUser}
+                        disabled={isBlocking || reporting}
+                      >
+                        {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 transition-all duration-200"
+                        onClick={handleReportImage}
+                        disabled={reporting || !selectedReportReason || isBlocking}
+                      >
+                        {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
+                      </button>
+                      <button
+                        className="w-full h-9 bg-black hover:bg-white/5 text-gray-200 font-semibold text-sm rounded-lg border border-pink-500/30 disabled:opacity-50 transition-colors duration-200"
+                        onClick={closeReportModal}
+                        disabled={reporting || isBlocking}
+                      >
+                        {t('reportModal.cancel')}
+                      </button>
+                    </div>
+
+                    {reportError && (
+                      <div className="text-red-300 text-xs mt-2 text-center bg-red-950/50 p-2 rounded-lg border border-red-500/30">
+                        {reportError}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
-          )}
-
-          {/* Action Buttons - positioned above mobile nav */}
-          <div 
-            className="absolute bottom-0 left-0 right-0 flex justify-center space-x-6 px-6 z-10"
-            style={{
-              paddingBottom: platform === 'ios' 
-                ? 'clamp(130px, calc(env(safe-area-inset-bottom, 10px) + 120px), 150px)'
-                : platform === 'android'
-                  ? '120px'
-                  : '100px'
-            }}
-          >
-            <Button
-              onClick={() => handlePass(selectedProfile.id)}
-              variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30 backdrop-blur-sm"
-            >
-              <X className="w-6 h-6 text-red-400" />
-            </Button>
-
-            <Button
-              onClick={() => handleLikeBack(selectedProfile.id)}
-              variant="outline"
-              className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30 backdrop-blur-sm"
-            >
-              <Heart className="w-6 h-6 text-green-400" />
-            </Button>
           </div>
-        </div>
-
-        <BlockDialog
-          isOpen={blockDialogOpen}
-          onClose={() => setBlockDialogOpen(false)}
-          userToBlock={
-            selectedProfile
-              ? {
-                  id: selectedProfile.id,
-                  first_name: selectedProfile.first_name ?? '',
-                  last_name: selectedProfile.last_name ?? '',
-                } as { id: string; first_name: string; last_name: string }
-              : null
-          }
-          currentUserId={currentUser?.id || ''}
-          onBlockSuccess={handleBlockSuccess}
-        />
+        )}
       </div>
     );
-  }, [selectedProfile, userImages, slides, currentSlide, showMoreInfo, platform, handleNavigationClick, handleBlock, handlePass, handleLikeBack, blockDialogOpen, currentUser?.id, handleBlockSuccess, calculateAge, t, ageByLikerId, getSafeImageSrc]);
+  }, [selectedProfile, slides, slideBackgroundColors, currentSlide, showMoreInfo, platform, handleNavigationClick, handlePass, handleLikeBack, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showPremiumUpgrade) {
@@ -1534,9 +1564,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
       )}
 
   <div
-    className="flex-shrink-0 bg-black border-b border-pink-500/30 px-4 py-4 mx-4"
+    className="flex-shrink-0 shadow-sm border-b border-pink-500/30 px-4 py-4"
     style={{
-      marginTop: platform === 'ios' 
+      background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))',
+      marginTop: platform === 'ios'
         ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
         : platform === 'android'
         ? '20px'
@@ -1546,7 +1577,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center space-x-1.5">
             <Users className="w-4 h-4 text-pink-400" />
-            <h1 className="text-sm font-bold text-white">{t('matches.peopleWhoLikedYou')}</h1>
+            <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">{t('matches.peopleWhoLikedYou')}</h1>
           </div>
           {!isPremium && (
             <Button

@@ -200,6 +200,11 @@ const ManualPremiumManager: React.FC<ManualPremiumManagerProps> = ({ users, onRe
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="text-sm"
                   onClick={(e) => e.stopPropagation()}
+                  // Radix's Select captures keydown on its content for keyboard
+                  // type-ahead navigation, which steals every keystroke typed into
+                  // this nested input (each character registers, then focus/typing
+                  // gets interrupted). Stop it from propagating past this field.
+                  onKeyDown={(e) => e.stopPropagation()}
                 />
                 {searchTerm && (
                   <p className="text-xs text-gray-600 mt-1">
@@ -266,48 +271,43 @@ const ManualPremiumManager: React.FC<ManualPremiumManagerProps> = ({ users, onRe
 
         {/* Premium Management Actions */}
         {selectedUser && (
-          <div className="space-y-3">
-            {/* Set Premium Section */}
-            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="font-medium text-sm text-green-800 mb-2">Set Premium</h4>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min="1"
-                  max="24"
-                  value={months}
-                  onChange={(e) => setMonths(e.target.value)}
-                  placeholder="Months"
-                  className="w-20 text-sm"
-                />
-                <span className="flex items-center text-sm text-gray-600">months</span>
-                <Button
-                  onClick={setPremium}
-                  disabled={loading}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Crown className="w-3 h-3 mr-1" />
-                  Set Premium
-                </Button>
-              </div>
-            </div>
-
-            {/* Cancel Premium Section */}
-            {selectedUserStatus?.is_premium && (
-              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                <h4 className="font-medium text-sm text-red-800 mb-2">Cancel Premium</h4>
+          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+            <h4 className="font-medium text-sm text-green-800 mb-2">Set Premium</h4>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="1"
+                max="24"
+                value={months}
+                onChange={(e) => setMonths(e.target.value)}
+                placeholder="Months"
+                className="w-20 text-sm"
+              />
+              <span className="flex items-center text-sm text-gray-600">months</span>
+              <Button
+                onClick={setPremium}
+                disabled={loading}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Crown className="w-3 h-3 mr-1" />
+                Set Premium
+              </Button>
+              {/* Cancel, right beside Set Premium - icon-only since it's a single, clear action */}
+              {selectedUserStatus?.is_premium && (
                 <Button
                   onClick={cancelPremium}
                   disabled={loading}
-                  size="sm"
+                  size="icon"
                   variant="destructive"
+                  className="h-9 w-9 shrink-0"
+                  title="Cancel Premium"
+                  aria-label="Cancel Premium"
                 >
-                  <X className="w-3 h-3 mr-1" />
-                  Cancel Premium
+                  <X className="w-4 h-4" />
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
