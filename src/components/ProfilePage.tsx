@@ -941,7 +941,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 className={`h-9 w-9 px-0 font-medium transition-all duration-200 ${
                   isEditing
                     ? 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50'
-                    : 'bg-neutral-800 hover:bg-neutral-700 text-white'
+                    : 'bg-neutral-800 hover:bg-neutral-700 text-white border border-pink-300/60'
                 }`}
                 variant={isEditing ? 'default' : 'default'}
                 aria-label={isEditing ? t('common.cancel') : t('common.edit')}
