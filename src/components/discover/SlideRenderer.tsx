@@ -66,7 +66,7 @@ const ImageSlide = React.memo<{
   }
   
   return (
-    <div className="relative w-full h-full bg-black">
+    <div className="relative w-full h-full bg-black max-[480px]:mt-2">
       <img
         key={imageSrc}
         loading="eager"

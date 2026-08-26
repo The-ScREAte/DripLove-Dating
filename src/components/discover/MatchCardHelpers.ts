@@ -140,10 +140,18 @@ export const getPreviewHighlights = (match: PotentialMatch): string[] => {
   if (match.occupation) highlights.push(match.occupation);
   if (match.education_level) highlights.push(match.education_level);
 
-  const lifestyleFillers = [match.exercise_level, match.drinking, match.smoking, match.sleeping_schedule];
-  for (const filler of lifestyleFillers) {
+  // Prefixed with an emoji (instead of a text label) so a bare "no"/"yes"/
+  // "occasionally" answer still makes sense on its own in a chip, without
+  // spending as many characters as a written-out label like "Exercise:" would.
+  const lifestyleFillers: [string, string | undefined][] = [
+    ['🏋️', match.exercise_level],
+    ['🍸', match.drinking],
+    ['🚬', match.smoking],
+    ['😴', match.sleeping_schedule],
+  ];
+  for (const [emoji, filler] of lifestyleFillers) {
     if (highlights.length >= 5) break;
-    if (filler && filler !== 'not_specified') highlights.push(filler);
+    if (filler && filler !== 'not_specified') highlights.push(`${emoji} ${filler}`);
   }
 
   return highlights.slice(0, 5);
@@ -173,6 +181,16 @@ export const getHighlightChipVisibilityClass = (index: number): string => {
   if (index === 2) return 'hidden min-[360px]:inline-flex';
   if (index === 3) return 'hidden min-[400px]:inline-flex';
   return 'hidden min-[440px]:inline-flex';
+};
+
+// Shortens a highlight-chip label so it never runs into the pill's rounded
+// corners the way CSS text-overflow: ellipsis does (and neither Chromium nor
+// WebKit support a custom ellipsis string, so ".." can't be done in pure CSS
+// anyway) - cut manually and always end in exactly two dots, not the native
+// three-dot "…" glyph.
+export const truncateChipLabel = (text: string, maxLength = 14): string => {
+  if (!text || text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 2).trimEnd()}..`;
 };
 
 // Hash function for generating consistent colors

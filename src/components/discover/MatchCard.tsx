@@ -9,7 +9,7 @@ import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, getHighlightChipVisibilityClass } from './MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { getPlatformSync } from '@/utils/platformUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
@@ -458,8 +458,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   className="fixed right-3 z-[9999]"
                   style={{
                     top: platform === 'android'
-                      ? 'calc(2rem + 50px)'
-                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 50px)'
+                      ? 'calc(2rem + 64px)'
+                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 64px)'
                   }}
                 >
                   <button
@@ -486,8 +486,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
                   style={{
                     top: platform === 'android'
-                      ? 'calc(2rem + 50px)'
-                      : 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 50px)'
+                      ? 'calc(2rem + 64px)'
+                      : 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 64px)'
                   }}
                 >
                   <div className="relative flex flex-col items-center">
@@ -718,7 +718,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div className="flex items-center gap-2 mb-2 leading-tight">
               <h2
                 className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)', paddingTop: 'clamp(20px, 5vw, 32px)' }}
+                style={{
+                  textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)',
+                  paddingTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : 'clamp(10px, 2.5vw, 18px)',
+                }}
               >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
               </h2>
@@ -783,10 +786,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 {previewHighlights.map((highlight, index) => (
                   <span
                     key={index}
-                    className={`${getHighlightChipVisibilityClass(index)} text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
+                    className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
                     style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
                   >
-                    {highlight}
+                    {truncateChipLabel(highlight)}
                   </span>
                 ))}
                 {signHighlight && (
@@ -808,7 +811,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              marginTop: 'clamp(20px, 5vw, 32px)',
+              marginTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : 'clamp(10px, 2.5vw, 18px)',
             }}
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >

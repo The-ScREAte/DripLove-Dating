@@ -540,6 +540,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       // Use clamp to respect the device safe-area inset while keeping
       // a reasonable minimum and maximum top padding for notched devices.
       paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
+      marginTop: '24px',
       // Keep the responsive horizontal padding via remaining classes on inner container
       paddingLeft: 'env(safe-area-inset-left, 0px)',
       paddingRight: 'env(safe-area-inset-right, 0px)',
@@ -717,12 +718,24 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <button
                     onClick={() => handlePaymentTypeSelection('iap')}
                     disabled={iapLoading}
-                    className="w-full p-3 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
                   >
-                    <div className="text-sm sm:text-base">{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</div>
-                    <div className="text-xs opacity-90">{t('premium.paymentOptions.iap.subtitle')}</div>
+                    <div className="flex items-center justify-center gap-2 text-sm sm:text-base">
+                      {iapLoading ? (
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
+                          <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+                        </svg>
+                      )}
+                      <span>{iapLoading ? t('premium.paymentOptions.iap.processing') : t('premium.paymentOptions.iap.button')}</span>
+                    </div>
+                    <div className="text-xs opacity-90 mt-0.5">{t('premium.paymentOptions.iap.subtitle')}</div>
                   </button>
-                  
+
                   {/* Auto-renewal disclosure */}
                   <div className="text-[10px] text-gray-400 text-center px-2 -mt-2">
                     {t('premium.paymentOptions.iap.disclosure')}
@@ -750,20 +763,20 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {showPaystackOption && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
-                  className="w-full p-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold"
+                  className="w-full p-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg border-2 border-emerald-300/40 hover:border-emerald-300/70 shadow-lg shadow-emerald-900/30 hover:shadow-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 font-semibold"
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
-                  <div className="text-xs opacity-90">{paystackButtonSubtitle}</div>
+                  <div className="text-xs opacity-90 mt-0.5">{paystackButtonSubtitle}</div>
                 </button>
               )}
-              
+
               {/* Google IAP - show on Android native */}
               {isAndroidNative && (
                 <>
                   <button
                     onClick={() => handlePaymentTypeSelection('google_iap')}
                     disabled={googleIapLoading || !canBuyGoogle}
-                    className="w-full p-3 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 font-semibold disabled:opacity-50"
+                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
                   >
                     <div className="text-sm sm:text-base flex items-center justify-center gap-2">
                       {googleIapLoading ? (
@@ -786,7 +799,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         </>
                       )}
                     </div>
-                    <div className="text-xs opacity-90">{googlePrice || `${currencySymbol}${monthlyPrice}`}/month • Google Play</div>
+                    <div className="text-xs opacity-90 mt-0.5">{googlePrice || `${currencySymbol}${monthlyPrice}`}/month • Google Play</div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}

@@ -13,7 +13,7 @@ import { PotentialMatch } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
-import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, getHighlightChipVisibilityClass } from '../discover/MatchCardHelpers';
+import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from '../discover/MatchCardHelpers';
 import { SlideRenderer } from '../discover/SlideRenderer';
 import UserAdinkraDisplay from '../discover/UserAdinkraDisplay';
 import SwipeButtons from '../discover/SwipeButtons';
@@ -121,7 +121,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         </div>
 
         {slides.length > 1 && (
-          <div className="absolute top-3 left-4 flex gap-1.5 z-10">
+          <div className="absolute left-4 flex gap-1.5 z-10" style={{ top: '41px' }}>
             {slides.map((_, idx) => (
               <div
                 key={idx}
@@ -170,7 +170,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,1) 85%)',
           }}
         >
-          <div className="flex justify-between items-end">
+          <div className="flex justify-between items-start">
             <div className="flex-1">
               <h2 className="text-xl font-bold mb-1 text-white">
                 {profile.first_name} {profile.last_name}, {calculateAge(profile.date_of_birth)}
@@ -187,9 +187,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                   {previewHighlights.map((highlight, index) => (
                     <span
                       key={index}
-                      className={`${getHighlightChipVisibilityClass(index)} text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                      className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
                     >
-                      {highlight}
+                      {truncateChipLabel(highlight)}
                     </span>
                   ))}
                   {profile.adinkra_symbols && profile.adinkra_symbols.length > 0 && (

@@ -27,7 +27,7 @@ import type { PotentialMatch } from '@/types';
 // Reuse Discover's exact slide-building/rendering so the "view a liker" screen
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, getHighlightChipVisibilityClass } from './discover/MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './discover/MatchCardHelpers';
 import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
 
 // =========================================================
@@ -1246,10 +1246,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
             className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
             style={{
               top: platform === 'ios'
-                ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
+                ? 'clamp(32px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
                 : platform === 'android'
-                  ? '32px'
-                  : '16px'
+                  ? '24px'
+                  : '10px'
             }}
           >
             {Array.from({ length: totalSlides }).map((_, idx) => (
@@ -1263,23 +1263,24 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
           </div>
 
           {/* Header buttons - icon-only, same small glass-circle style as Discover's
-              expand/collapse control. */}
+              expand/collapse control. Smaller (w-8 h-8, down from w-10 h-10) and
+              nudged up a bit compared to before. */}
           <button
             onClick={() => {
               setSelectedProfile(null);
               setCurrentSlide(0);
             }}
             aria-label={t('matches.back')}
-            className="absolute left-4 z-10 flex items-center justify-center w-10 h-10 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
+            className="absolute left-4 z-10 flex items-center justify-center w-8 h-8 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
               top: platform === 'ios'
-                ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
-                : '16px'
+                ? 'clamp(32px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
+                : '10px'
             }}
           >
-            <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
+            <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
           </button>
 
           {/* Report - exact same trigger Discover uses (small white circle, red
@@ -1289,14 +1290,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
             <button
               onClick={() => setShowReportModal(true)}
               aria-label={t('reportModal.title')}
-              className="absolute right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/95 border border-red-300 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
+              className="absolute right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/95 border border-red-300 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
               style={{
                 top: platform === 'ios'
-                  ? 'clamp(40px, calc(env(safe-area-inset-top, 10px) + 25px), 60px)'
-                  : '16px'
+                  ? 'clamp(32px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
+                  : '10px'
               }}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
@@ -1399,10 +1400,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
               {previewHighlights.map((highlight, index) => (
                 <span
                   key={index}
-                  className={`${getHighlightChipVisibilityClass(index)} text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
+                  className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
                   style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
                 >
-                  {highlight}
+                  {truncateChipLabel(highlight)}
                 </span>
               ))}
               {signHighlight && (

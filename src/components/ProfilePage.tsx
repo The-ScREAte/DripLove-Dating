@@ -931,36 +931,34 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 </Button>
               )}
 
-              {/* Single toggle button - Edit becomes Cancel */}
+              {/* Single toggle button - Edit becomes Cancel - icon-only */}
               <Button
                 onClick={isEditing ? handleCancel : () => setIsEditing(true)}
                 disabled={isSaving}
                 size="sm"
-                className={`h-9 px-3.5 font-medium transition-all duration-200 ${
+                className={`h-9 w-9 px-0 font-medium transition-all duration-200 ${
                   isEditing
-                    ? 'border-red-500/50 text-red-400 hover:bg-red-900/30 disabled:opacity-50 bg-black border'
+                    ? 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50'
                     : 'bg-neutral-800 hover:bg-neutral-700 text-white'
                 }`}
-                variant={isEditing ? 'outline' : 'default'}
+                variant={isEditing ? 'default' : 'default'}
+                aria-label={isEditing ? t('common.cancel') : t('common.edit')}
               >
                 {isEditing ? (
                   <X className="w-4 h-4" />
                 ) : (
-                  <>
-                    <Edit className="w-4 h-4 mr-2" /> 
-                    {t('common.edit')}
-                  </>
+                  <Edit className="w-4 h-4" />
                 )}
               </Button>
-              {/* Save button only shows when editing */}
+              {/* Save button only shows when editing - icon-only */}
               {isEditing && (
-                <Button 
-                  onClick={handleSave} 
-                  disabled={isSaving} 
-                  className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="h-9 w-9 px-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
+                  aria-label={isSaving ? t('common.saving') : t('common.save')}
                 >
-                  <Save className="w-4 h-4 mr-2" /> 
-                  {isSaving ? t('common.saving') : t('common.save')}
+                  <Save className="w-4 h-4" />
                 </Button>
               )}
             </div>
