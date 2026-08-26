@@ -715,7 +715,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
         {/* Basic Info - Always shown */}
         <div
           className="flex justify-between items-start px-4"
-          style={{ marginTop: showMoreInfo ? '0.5rem' : '-6px' }}
+          style={{ marginTop: showMoreInfo ? '0.5rem' : '5px' }}
         >
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 leading-tight">
