@@ -215,15 +215,20 @@ class SupabasePushNotificationService {
   }
 
   private handleRealtimeNotification(notification: RealtimeNotification): void {
-    // Show in-app notification
-    this.showInAppNotification({
-      title: notification.title,
-      body: notification.message,
-      data: { notificationId: notification.id },
-      type: notification.type as 'match' | 'message' | 'like' | 'system' | 'admin'
-    });
+    // Likes already get the real push notification (sendLikeNotification /
+    // sendMultipleLikesNotification) - skip the extra custom in-app popup
+    // banner for them so a like doesn't show up twice.
+    if (notification.type !== 'like') {
+      this.showInAppNotification({
+        title: notification.title,
+        body: notification.message,
+        data: { notificationId: notification.id },
+        type: notification.type as 'match' | 'message' | 'like' | 'system' | 'admin'
+      });
+    }
 
     // If on web and browser supports notifications, show browser notification
+    // (this is the actual push-equivalent on web, so likes still surface here).
     if (!Capacitor.isNativePlatform() && 'Notification' in window && Notification.permission === 'granted') {
       new Notification(notification.title, {
         body: notification.message,
@@ -234,6 +239,9 @@ class SupabasePushNotificationService {
   }
 
   private handleForegroundNotification(notification: PushNotificationSchema): void {
+    // Same rule as the realtime path: a like already arrived as the real push
+    // notification, so don't also pop the custom in-app banner for it.
+    if (notification.data?.type === 'like') return;
     this.showInAppNotification({
       title: notification.title,
       body: notification.body,

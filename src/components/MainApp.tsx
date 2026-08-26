@@ -954,7 +954,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'chat':
         return <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
-        return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} />;
+        return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} onNavigateToChat={handleNavigateToChat} />;
       case 'profile':
         return (
           <ProfilePage
@@ -1142,7 +1142,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'liked' ? 'block' : 'none' }}
               > 
-                <LikedMePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} />
+                <LikedMePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} onNavigateToChat={handleNavigateToChat} />
               </div>
             </Suspense>
           )}

@@ -12,6 +12,7 @@ import { getPlatformSync } from '@/utils/platformUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import PremiumUpgrade from './PremiumUpgrade';
+import MatchAnimation from './MatchAnimation';
 import RatingFunnel from './RatingFunnel';
 import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
 import { useTranslation } from 'react-i18next';
@@ -102,9 +103,12 @@ interface LikedMePageProps {
   // Whether the Liked Me tab is currently the visible one in the bottom nav
   // (parent keeps this component mounted via display:none when not active).
   isActiveTab?: boolean;
+  // Switches the bottom nav to the Chat tab - used by the match banner's
+  // "Start Chatting" button when liking someone back turns into a mutual match.
+  onNavigateToChat?: (userId: string) => void;
 }
 
-const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: LikedMePageProps) => {
+const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNavigateToChat }: LikedMePageProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -149,9 +153,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
   const [pullDistance, setPullDistance] = useState(0);
   const [startY, setStartY] = useState(0);
   const [showRatingFunnel, setShowRatingFunnel] = useState(false);
+  // Liking someone back here can turn into a mutual match without ever
+  // visiting Discover - same "It's a match!" banner as Discover uses.
+  const [showMatchAnimation, setShowMatchAnimation] = useState(false);
+  const [matchedProfile, setMatchedProfile] = useState<LikerProfile | null>(null);
   // ------------------
   // REFS
   // ------------------
+  const isFirstEverMatchRef = useRef(false);
   const backgroundFetchingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const preloadAbortRef = useRef<AbortController | null>(null);
@@ -829,6 +838,31 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
     }
   }, [selectedProfile, slides.length]);
 
+  // Only fire the one-time rating funnel for a user's actual first-ever match,
+  // and only after the match banner itself has been dismissed - same sequencing
+  // Discover uses (see DiscoverPage's maybeTriggerRatingFunnel).
+  const maybeTriggerRatingFunnel = useCallback(() => {
+    if (!isFirstEverMatchRef.current) return;
+    isFirstEverMatchRef.current = false;
+    if (!isRatingFunnelEligible()) return;
+    setTimeout(() => {
+      markRatingFunnelTriggered();
+      setShowRatingFunnel(true);
+    }, 3000);
+  }, []);
+
+  const handleStartChatFromMatch = useCallback((userId: string) => {
+    setShowMatchAnimation(false);
+    maybeTriggerRatingFunnel();
+    onNavigateToChat?.(userId);
+  }, [maybeTriggerRatingFunnel, onNavigateToChat]);
+
+  const handleCloseMatchAnimation = useCallback(() => {
+    setShowMatchAnimation(false);
+    setMatchedProfile(null);
+    maybeTriggerRatingFunnel();
+  }, [maybeTriggerRatingFunnel]);
+
   const handleLikeBack = useCallback(async (profileId: string) => {
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
@@ -870,14 +904,31 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
         setHasInteractedToday(true);
       }
 
-      // A like-back can create a match without ever visiting Discover -
-      // make sure the one-time rating funnel still gets its chance to fire.
+      // A like-back can create a match without ever visiting Discover - show
+      // the exact same "It's a match!" banner Discover uses, then let the
+      // one-time rating funnel fire after the banner is dismissed.
       const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
-      if (madeMatch && registerMatchAndCheckIsFirst() && isRatingFunnelEligible()) {
-        setTimeout(() => {
-          markRatingFunnelTriggered();
-          setShowRatingFunnel(true);
-        }, 3000);
+      if (madeMatch) {
+        if (registerMatchAndCheckIsFirst()) {
+          isFirstEverMatchRef.current = true;
+        }
+        if (profileToRemove) {
+          setMatchedProfile(profileToRemove);
+          setShowMatchAnimation(true);
+        }
+
+        // ChatPage keeps running in the background once visited (MainApp mounts
+        // tabs and hides them via display:none rather than unmounting), so its
+        // own match-fetch only ever runs once on that first mount. From then on
+        // it depends entirely on this event to know a new match exists - without
+        // it, a match made here would only ever surface after ChatPage's stale
+        // cache happens to expire on its own. Same pair of calls DiscoverPage's
+        // handleLike makes on a match.
+        if (typeof window !== 'undefined') {
+          const win = window as Window & { chatMatchesCache?: Map<string, unknown> };
+          win.chatMatchesCache?.delete(currentUser.id);
+          window.dispatchEvent(new CustomEvent('newMatch', { detail: { userId: currentUser.id } }));
+        }
       }
     } catch (error) {
       // Revert optimistic update on error
@@ -1641,6 +1692,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: Lik
   }, [selectedProfile, slides, previewHighlights, signHighlight, slideBackgroundColors, currentSlide, showMoreInfo, platform, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
 
   // ⭐ All early returns MUST be after all hooks
+  if (showMatchAnimation && matchedProfile) {
+    return (
+      <MatchAnimation
+        currentUserName={(currentUser as unknown as { first_name?: string })?.first_name || 'You'}
+        matchedUserName={`${matchedProfile.first_name} ${matchedProfile.last_name}`}
+        matchedUserImage={userImages[matchedProfile.id]?.[0]}
+        matchedUserId={matchedProfile.id}
+        onClose={handleCloseMatchAnimation}
+        onStartChat={handleStartChatFromMatch}
+      />
+    );
+  }
+
   if (showPremiumUpgrade) {
     return (
       <div className="h-full w-full overflow-y-auto">
