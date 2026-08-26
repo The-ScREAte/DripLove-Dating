@@ -85,9 +85,9 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
       </div>
 
       {/* Ad Info */}
-      <div className="p-2 pb-3 bg-black">
-        <h2 className="text-2xl font-bold mb- text-white">{ad.name}</h2>
-        <p className="text-gray-300 mb-4">{ad.about}</p>
+      <div className="p-4 pb-5 bg-black">
+        <h2 className="text-2xl font-bold mb-2 text-white">{ad.name}</h2>
+        <p className="text-gray-300 mb-4 line-clamp-2">{ad.about}</p>
         
         {ad.link && (
           <Button 
