@@ -880,9 +880,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {!isPremium && (
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
-                  className="h-9 px-4 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                  size="sm"
+                  className="h-9 w-9 px-0 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                  aria-label={t('Upgrade')}
                 >
-                  {t('Upgrade')}
+                  <Crown className="w-4 h-4" />
                 </Button>
               )}
               {/* Message button (own profile only) */}
