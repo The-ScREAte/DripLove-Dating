@@ -229,6 +229,72 @@ async function findUserByPurchaseToken(supabase: any, purchaseToken: string) {
   }
 }
 
+// Records a subscription_payments row and processes referral commission for a
+// real charge event (renewal, recovery, or restart). Without this, an
+// influencer's commission_duration setting (e.g. "earn for 6 months") was
+// meaningless for Android subscribers - the very first payment is commissioned
+// by google-iap-validator at purchase time, but every subsequent charge (which
+// arrives here via RTDN, never re-invoking the validator) was silently never
+// commissioned. transactionTag must be unique per charge (e.g. includes the new
+// expiry timestamp) so repeated notifications for the same charge don't insert
+// duplicate payment rows.
+async function recordPaymentAndCommission(
+  supabase: any,
+  userId: string,
+  purchaseToken: string,
+  transactionTag: string
+) {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('country_code')
+      .eq('id', userId)
+      .single()
+
+    const userCountry = profile?.country_code || 'US'
+
+    const { data: paymentConfig } = await supabase
+      .from('payment_config')
+      .select('premium_price_monthly, currency, country_prices')
+      .single()
+
+    let paymentAmount = paymentConfig?.premium_price_monthly || 56
+    let paymentCurrency = paymentConfig?.currency || 'GHS'
+
+    if (paymentConfig?.country_prices && typeof paymentConfig.country_prices === 'object') {
+      const countryPrices = paymentConfig.country_prices as Record<string, { price: number; currency: string }>
+      if (countryPrices[userCountry]) {
+        paymentAmount = countryPrices[userCountry].price
+        paymentCurrency = countryPrices[userCountry].currency
+      }
+    }
+
+    const { data: paymentRecord, error: paymentError } = await supabase
+      .from('subscription_payments')
+      .insert({
+        user_id: userId,
+        amount: paymentAmount,
+        currency: paymentCurrency,
+        payment_method: 'google',
+        transaction_id: `google_${transactionTag}_${purchaseToken.slice(-16)}`,
+      })
+      .select('id')
+      .single()
+
+    if (!paymentError && paymentRecord?.id) {
+      await supabase.rpc('process_referral_commission', {
+        p_user_id: userId,
+        p_payment_amount: paymentAmount,
+        p_payment_id: paymentRecord.id,
+      })
+    } else if (paymentError) {
+      console.error('[GOOGLE-WEBHOOK] Error recording payment:', paymentError)
+    }
+  } catch (err) {
+    console.error('[GOOGLE-WEBHOOK] Payment/commission processing failed:', err)
+  }
+}
+
 async function updateSubscriptionByToken(
   supabase: any,
   purchaseToken: string,
@@ -403,8 +469,15 @@ serve(async (req) => {
           console.error('[GOOGLE-WEBHOOK] Error renewing subscription:', renewError)
           return json(500, { error: 'Failed to renew subscription' })
         }
-        
+
         console.log('[GOOGLE-WEBHOOK] ✅ Subscription renewed until:', newExpiry.toISOString())
+
+        await recordPaymentAndCommission(
+          supabase,
+          subscription.user_id,
+          purchaseToken,
+          `renew_${newExpiry.getTime()}`
+        )
         break
       
       case NOTIFICATION_TYPES.SUBSCRIPTION_CANCELED:
@@ -563,6 +636,16 @@ serve(async (req) => {
           console.error('[GOOGLE-WEBHOOK] Error recovering subscription:', recoverError)
         } else {
           console.log('[GOOGLE-WEBHOOK] ✅ Subscription recovered until:', recoveryExpiry)
+
+          // SUBSCRIPTION_RECOVERED (billing retry succeeded) and
+          // SUBSCRIPTION_RESTARTED (user resubscribed before expiry) both
+          // represent a real charge, same as a normal renewal.
+          await recordPaymentAndCommission(
+            supabase,
+            subscription.user_id,
+            purchaseToken,
+            `recover_${new Date(recoveryExpiry).getTime()}`
+          )
         }
         break
       

@@ -109,83 +109,53 @@ const InfluencerManagement = () => {
 
   const fetchPromoCodes = useCallback(async () => {
     try {
+      // password_hash is intentionally excluded - it's no longer client-readable
+      // (column-level SELECT was revoked from authenticated/anon) and isn't
+      // needed here anyway.
       const { data, error } = await supabase
         .from('promo_codes')
-        .select('*')
+        .select('id, code, owner_name, email, percentage_cut, commission_duration, status, is_active, total_signups, total_paid_subscribers, total_commission_earned, created_at, deleted_at')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch actual stats for each promo code
+
+      // Stats (signups, subscribers, commission, payouts) come from the same
+      // canonical get_influencer_full_stats RPC the influencer portal itself
+      // uses, so admin and influencer-facing numbers can never drift apart.
       const codesWithStats = await Promise.all((data || []).map(async (code) => {
-        // Get referral count
-        const { count: signupCount } = await supabase
-          .from('referrals')
-          .select('*', { count: 'exact', head: true })
-          .eq('promo_code_id', code.id);
-        
-        // Get premium subscriber count - MUST match database function logic exactly
-        // Database uses: COUNT(DISTINCT r.user_id) FROM referrals r INNER JOIN user_subscriptions us
-        // WHERE us.plan_name = 'premium' AND us.status IN ('active', 'cancelled') 
-        // AND (us.expires_at IS NULL OR us.expires_at > NOW())
-        
-        // First get all referrals for this promo code
-        const { data: referrals } = await supabase
-          .from('referrals')
-          .select('user_id')
-          .eq('promo_code_id', code.id);
-        
-        let subscriberCount = 0;
-        if (referrals && referrals.length > 0) {
-          const userIds = referrals.map(r => r.user_id);
-          
-          // Now count DISTINCT users who have premium subscriptions matching the criteria
-          // We need to get the data and count distinct manually since Supabase might not handle this exactly
-          const { data: subs } = await supabase
-            .from('user_subscriptions')
-            .select('user_id')
-            .in('user_id', userIds)
-            .eq('plan_name', 'premium')
-            .in('status', ['active', 'cancelled'])
-            .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
-          
-          // Count distinct user_ids
-          if (subs) {
-            const uniqueUserIds = new Set(subs.map(s => s.user_id));
-            subscriberCount = uniqueUserIds.size;
-          }
+        const { data: stats, error: statsError } = await supabase.rpc('get_influencer_full_stats', {
+          p_promo_code_id: code.id,
+        });
+
+        if (statsError || !stats) {
+          console.error('Error fetching stats for promo code:', code.id, statsError);
+          return { ...code, total_signups: 0, total_paid_subscribers: 0, total_commission_earned: 0 };
         }
-        
-        // Get total commission
-        const { data: commissions } = await supabase
-          .from('influencer_commissions')
-          .select('commission_amount')
-          .eq('promo_code_id', code.id);
-        
-        const totalCommission = commissions?.reduce((sum, c) => sum + Number(c.commission_amount), 0) || 0;
 
-        // Get payout stats
-        const { data: allPayouts } = await supabase
-          .from('payout_requests')
-          .select('amount, status')
-          .eq('promo_code_id', code.id);
-        
-        const totalPaid = allPayouts?.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-        const pendingRequests = allPayouts?.filter(p => p.status === 'pending').length || 0;
-        const outstanding = totalCommission - totalPaid;
+        const s = stats as {
+          total_signups: number;
+          total_subscribers: number;
+          total_commission_ghs: number;
+          total_paid_ghs: number;
+          outstanding_ghs: number;
+          pending_requests: number;
+        };
 
-        // Store payout stats separately
         setPayoutStats(prev => ({
           ...prev,
-          [code.id]: { totalPaid, outstanding, pendingRequests }
+          [code.id]: {
+            totalPaid: s.total_paid_ghs || 0,
+            outstanding: s.outstanding_ghs || 0,
+            pendingRequests: s.pending_requests || 0,
+          }
         }));
 
         return {
           ...code,
-          total_signups: signupCount || 0,
-          total_paid_subscribers: subscriberCount,
-          total_commission_earned: totalCommission
+          total_signups: s.total_signups || 0,
+          total_paid_subscribers: s.total_subscribers || 0,
+          total_commission_earned: s.total_commission_ghs || 0,
         };
       }));
 
@@ -295,6 +265,12 @@ const InfluencerManagement = () => {
   const handleUpdatePromoCode = async () => {
     if (!selectedPromoCode) return;
 
+    const newPassword = formData.password.trim();
+    if (newPassword && newPassword.length < 6) {
+      toast({ title: 'Error', description: 'Password must be at least 6 characters', variant: 'destructive' });
+      return;
+    }
+
     try {
       const updateData: any = {
         owner_name: formData.ownerName.trim(),
@@ -303,10 +279,6 @@ const InfluencerManagement = () => {
         commission_duration: parseInt(formData.commissionDuration)
       };
 
-      if (formData.password.trim()) {
-        updateData.password_hash = formData.password;
-      }
-
       const { error } = await supabase
         .from('promo_codes')
         .update(updateData)
@@ -314,13 +286,28 @@ const InfluencerManagement = () => {
 
       if (error) throw error;
 
+      // Password changes go through a SECURITY DEFINER RPC that hashes with
+      // bcrypt server-side - promo_codes.password_hash is never written
+      // directly from the client anymore.
+      if (newPassword) {
+        const { data: pwResult, error: pwError } = await supabase.rpc('admin_set_influencer_password', {
+          p_promo_code_id: selectedPromoCode.id,
+          p_new_password: newPassword,
+        });
+
+        const result = pwResult as { success: boolean; error?: string } | null;
+        if (pwError || !result?.success) {
+          throw new Error(result?.error || pwError?.message || 'Failed to update password');
+        }
+      }
+
       toast({ title: 'Success', description: 'Promo code updated successfully' });
       setShowEditModal(false);
       setSelectedPromoCode(null);
       fetchPromoCodes();
     } catch (error) {
       console.error('Error updating promo code:', error);
-      toast({ title: 'Error', description: 'Failed to update promo code', variant: 'destructive' });
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to update promo code', variant: 'destructive' });
     }
   };
 
@@ -366,41 +353,45 @@ const InfluencerManagement = () => {
 
   const handleViewDetails = async (promoCode: PromoCode) => {
     setSelectedPromoCode(promoCode);
-    
+
     try {
       // Fetch detailed stats
-      const { data: referrals } = await supabase
-        .from('referrals')
-        .select(`
-          id,
-          user_id,
-          created_at,
-          profiles (
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('promo_code_id', promoCode.id);
-
-      const { data: commissions } = await supabase
-        .from('influencer_commissions')
-        .select('*')
-        .eq('promo_code_id', promoCode.id)
-        .order('created_at', { ascending: false });
-
-      const { data: payouts } = await supabase
-        .from('payout_requests')
-        .select('*')
-        .eq('promo_code_id', promoCode.id)
-        .order('created_at', { ascending: false });
+      const [{ data: referrals }, { data: commissions }, { data: payouts }, { data: stats }] = await Promise.all([
+        supabase
+          .from('referrals')
+          .select(`
+            id,
+            user_id,
+            created_at,
+            profiles (
+              first_name,
+              last_name,
+              email
+            )
+          `)
+          .eq('promo_code_id', promoCode.id),
+        supabase
+          .from('influencer_commissions')
+          .select('*')
+          .eq('promo_code_id', promoCode.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('payout_requests')
+          .select('*')
+          .eq('promo_code_id', promoCode.id)
+          .order('created_at', { ascending: false }),
+        // Authoritative totals - same RPC the influencer portal uses, so this
+        // modal can never disagree with what the influencer sees.
+        supabase.rpc('get_influencer_full_stats', { p_promo_code_id: promoCode.id }),
+      ]);
 
       setDetailStats({
         referrals: referrals || [],
         commissions: commissions || [],
-        payouts: payouts || []
+        payouts: payouts || [],
+        stats: stats || null,
       });
-      
+
       setShowDetailModal(true);
     } catch (error) {
       console.error('Error fetching details:', error);
@@ -819,22 +810,19 @@ const InfluencerManagement = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Commission Earned:</span>
                     <span className="font-bold text-green-700">
-                      GHS {detailStats.commissions.reduce((s: number, c: any) => s + Number(c.commission_amount), 0).toFixed(2)}
+                      GHS {Number(detailStats.stats?.total_commission_ghs || 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Paid Out:</span>
                     <span className="font-semibold text-blue-600">
-                      GHS {detailStats.payouts.filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + Number(p.amount), 0).toFixed(2)}
+                      GHS {Number(detailStats.stats?.total_paid_ghs || 0).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-green-200">
                     <span className="font-medium text-gray-700">Outstanding Balance:</span>
                     <span className="font-bold text-orange-600">
-                      GHS {(
-                        detailStats.commissions.reduce((s: number, c: any) => s + Number(c.commission_amount), 0) -
-                        detailStats.payouts.filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + Number(p.amount), 0)
-                      ).toFixed(2)}
+                      GHS {Number(detailStats.stats?.outstanding_ghs || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>

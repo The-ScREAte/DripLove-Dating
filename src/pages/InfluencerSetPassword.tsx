@@ -34,32 +34,23 @@ const InfluencerSetPassword = () => {
       }
 
       try {
-        // Fetch promo code to verify it exists and token matches
-        const { data, error: fetchError } = await supabase
-          .from('promo_codes')
-          .select('id, code, owner_name, password_hash, status')
-          .eq('id', promoCodeId)
-          .single();
+        // Validate via a SECURITY DEFINER RPC rather than reading the promo_codes
+        // table directly - the table's password_hash column is no longer
+        // client-readable, and this RPC does the same token check server-side
+        // without ever exposing that column's value to the browser.
+        const { data, error: rpcError } = await supabase.rpc('validate_promo_code_setup_link', {
+          p_promo_code_id: promoCodeId,
+          p_token: token,
+        });
 
-        if (fetchError || !data) {
-          setError('Invalid link. The promo code does not exist.');
+        const result = data as { valid: boolean; code?: string; owner_name?: string; error?: string } | null;
+
+        if (rpcError || !result?.valid) {
+          setError(result?.error || 'Invalid or expired token. Please request a new password setup link.');
           return;
         }
 
-        // Check if password is already set AND status is active (fully configured)
-        if (data.password_hash && data.password_hash !== token && data.status === 'active') {
-          setError('Password has already been set. Please use the login page.');
-          return;
-        }
-
-        // If status is pending_password, allow resetting even if password was changed
-        // This fixes the case where password was set but status wasn't updated
-        if (data.status !== 'pending_password' && data.password_hash !== token) {
-          setError('Invalid or expired token. Please request a new password setup link.');
-          return;
-        }
-
-        setPromoCodeInfo({ code: data.code, ownerName: data.owner_name });
+        setPromoCodeInfo({ code: result.code!, ownerName: result.owner_name! });
       } catch (err) {
         console.error('Error validating token:', err);
         setError('Something went wrong. Please try again later.');

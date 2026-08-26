@@ -121,6 +121,34 @@ export const buildSlides = (
   return mixedSlides;
 };
 
+// Build the "at a glance" highlight chips shown under the name when the card
+// is collapsed: one interest (deterministically chosen per user via the same
+// seeded RNG used for slide ordering, so it doesn't change on every re-render)
+// plus enough lifestyle attributes (occupation, education, then drinking/
+// smoking/exercise/sleep as fallbacks) to always show at least 3 when the data
+// exists.
+export const getPreviewHighlights = (match: PotentialMatch): string[] => {
+  const highlights: string[] = [];
+
+  if (match.interests && match.interests.length > 0) {
+    const seed = seedFromString((match.id || match.first_name || '') + '_highlight');
+    const rand = mulberry32(seed);
+    const randomInterest = match.interests[Math.floor(rand() * match.interests.length)];
+    if (randomInterest) highlights.push(randomInterest);
+  }
+
+  if (match.occupation) highlights.push(match.occupation);
+  if (match.education_level) highlights.push(match.education_level);
+
+  const lifestyleFillers = [match.exercise_level, match.drinking, match.smoking, match.sleeping_schedule];
+  for (const filler of lifestyleFillers) {
+    if (highlights.length >= 3) break;
+    if (filler && filler !== 'not_specified') highlights.push(filler);
+  }
+
+  return highlights.slice(0, 3);
+};
+
 // Hash function for generating consistent colors
 export const getUserColorHash = (userId: string | undefined, colors: string[]): string => {
   if (!userId) return colors[0];

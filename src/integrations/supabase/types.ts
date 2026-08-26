@@ -2070,7 +2070,23 @@ export type Database = {
         Returns: number
       }
       request_influencer_payout: {
-        Args: { p_amount: number; p_promo_code_id: string }
+        Args: { p_amount_ghs: number; p_code: string; p_password: string }
+        Returns: Json
+      }
+      admin_set_influencer_password: {
+        Args: { p_new_password: string; p_promo_code_id: string }
+        Returns: Json
+      }
+      get_influencer_full_stats: {
+        Args: { p_promo_code_id: string }
+        Returns: Json
+      }
+      get_influencer_referred_users: {
+        Args: { p_code: string; p_password: string }
+        Returns: Json
+      }
+      validate_promo_code_setup_link: {
+        Args: { p_promo_code_id: string; p_token: string }
         Returns: Json
       }
       set_influencer_password: {

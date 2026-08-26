@@ -168,8 +168,21 @@ serve(async (req) => {
         
         console.log(`[APPLE-WEBHOOK] ✅ Subscription activated until ${expiresAt.toISOString()}`)
         
-        // Record payment if it's a renewal
-        if (notificationType === 'DID_RENEW') {
+        // Record payment + commission for every notification that represents an
+        // actual charge going through: DID_RENEW (normal auto-renewal),
+        // INTERACTIVE_RENEWAL (user manually resubscribed before expiry), and
+        // DID_RECOVER (payment succeeded after a billing retry). INITIAL_BUY is
+        // deliberately excluded here - the client already records that first
+        // payment and processes its commission via iap-receipt-validator right
+        // after purchase, so recording it again here would double-commission the
+        // same transaction. This is what makes "commission_duration" (how many
+        // charges an influencer earns on) actually mean something for Apple
+        // subscribers instead of only ever firing once.
+        if (
+          notificationType === 'DID_RENEW' ||
+          notificationType === 'INTERACTIVE_RENEWAL' ||
+          notificationType === 'DID_RECOVER'
+        ) {
           try {
             const { data: profile } = await supabase
               .from('profiles')

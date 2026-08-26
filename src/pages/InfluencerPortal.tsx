@@ -6,8 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { getExchangeRate } from '@/services/exchangeRateService';
-import { 
+import {
   Gift, 
   LogIn, 
   LogOut, 
@@ -23,6 +22,13 @@ import {
   EyeOff
 } from 'lucide-react';
 
+interface ReferredUser {
+  first_name: string;
+  last_initial: string | null;
+  signup_date: string;
+  is_subscribed: boolean;
+}
+
 interface InfluencerSession {
   promo_code_id: string;
   code: string;
@@ -35,7 +41,12 @@ interface InfluencerSession {
   total_subscribers: number;
   total_commission: number;
   total_commission_usd: number;
-  total_commission_ghs_raw?: number; // Raw GHS value for dynamic conversion
+  total_commission_ghs_raw?: number;
+  total_paid_ghs: number;
+  total_paid_usd: number;
+  outstanding_ghs: number;
+  outstanding_usd: number;
+  exchange_rate: number;
   has_pending_payout: boolean;
 }
 
@@ -46,11 +57,6 @@ const InfluencerPortal = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [sessionPassword, setSessionPassword] = useState('');
-  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
-  const [paidAmount, setPaidAmount] = useState(0);
-  const [paidAmountUsd, setPaidAmountUsd] = useState(0);
-  const [availableBalance, setAvailableBalance] = useState(0);
-  const [availableBalanceUsd, setAvailableBalanceUsd] = useState(0);
   
   // Login form state
   const [promoCode, setPromoCode] = useState('');
@@ -59,6 +65,12 @@ const InfluencerPortal = () => {
   // Dashboard state
   const [payoutAmount, setPayoutAmount] = useState('');
   const [requestingPayout, setRequestingPayout] = useState(false);
+
+  // Referred users (who signed up with this code, and whether they've
+  // subscribed yet) - fetched separately since it's not part of the
+  // aggregate stats returned by influencer_login.
+  const [referredUsers, setReferredUsers] = useState<ReferredUser[] | null>(null);
+  const [loadingReferredUsers, setLoadingReferredUsers] = useState(false);
 
   // Check for existing session on mount (display-only, no auto-refresh with credentials)
   useEffect(() => {
@@ -81,6 +93,12 @@ const InfluencerPortal = () => {
             total_subscribers: parsed.total_subscribers || 0,
             total_commission: parsed.total_commission || 0,
             total_commission_usd: parsed.total_commission_usd || 0,
+            total_commission_ghs_raw: parsed.total_commission_ghs_raw,
+            total_paid_ghs: parsed.total_paid_ghs || 0,
+            total_paid_usd: parsed.total_paid_usd || 0,
+            outstanding_ghs: parsed.outstanding_ghs || 0,
+            outstanding_usd: parsed.outstanding_usd || 0,
+            exchange_rate: parsed.exchange_rate || 16,
             has_pending_payout: parsed.has_pending_payout || false
           });
         }
@@ -90,32 +108,16 @@ const InfluencerPortal = () => {
     }
   }, []);
 
-  // Update local session data from API response (no credentials stored)
-  // Now includes dynamic exchange rate conversion
-  const updateSessionFromResult = async (result: any) => {
-    // Get raw GHS commission from DB
-    const ghsCommission = result.total_commission || result.total_commission_ghs_raw || 0;
-    
-    // Use dynamic exchange rate from API
-    let usdCommission = result.total_commission_usd || 0;
-    let effectiveRate: number | null = null;
-    try {
-      const rate = await getExchangeRate('GHS', 'USD');
-      if (rate) {
-        usdCommission = Math.round(ghsCommission * rate * 100) / 100; // Round to 2 decimal places
-        setExchangeRate(rate);
-        effectiveRate = rate;
-      }
-    } catch (err) {
-      console.warn('Failed to get dynamic exchange rate, using server value:', err);
-    }
-    if (!effectiveRate && exchangeRate) {
-      effectiveRate = exchangeRate;
-    }
-    if (!effectiveRate) {
-      effectiveRate = 0.0625; // Fallback ~1/16
-    }
-    
+  // Update local session data from the influencer_login RPC response. Every
+  // number here (commission, paid, outstanding, and the exchange rate used to
+  // derive the USD figures) comes straight from get_influencer_full_stats on
+  // the server - the same function the admin dashboard now calls too, and the
+  // same one request_influencer_payout validates a withdrawal amount against.
+  // Previously this recomputed "paid"/"available" from a separate client-side
+  // payout_requests query using a live, independently-fetched exchange rate,
+  // which could drift from the server's rate and made it possible to see an
+  // "available" balance the payout RPC wouldn't actually accept.
+  const updateSessionFromResult = (result: any) => {
     const sessionData: InfluencerSession = {
       promo_code_id: result.promo_code_id,
       code: result.code,
@@ -126,37 +128,43 @@ const InfluencerPortal = () => {
       status: result.status,
       total_signups: result.total_signups,
       total_subscribers: result.total_subscribers,
-      total_commission: ghsCommission,
-      total_commission_usd: usdCommission,
-      total_commission_ghs_raw: ghsCommission,
+      total_commission: result.total_commission_ghs_raw ?? result.total_commission ?? 0,
+      total_commission_usd: result.total_commission_usd ?? 0,
+      total_commission_ghs_raw: result.total_commission_ghs_raw ?? result.total_commission ?? 0,
+      total_paid_ghs: result.total_paid_ghs ?? 0,
+      total_paid_usd: result.total_paid_usd ?? 0,
+      outstanding_ghs: result.outstanding_ghs ?? 0,
+      outstanding_usd: result.outstanding_usd ?? 0,
+      exchange_rate: result.exchange_rate ?? 16,
       has_pending_payout: result.has_pending_payout
     };
-    
+
     setSession(sessionData);
     // Store session data WITHOUT password - secure storage
     localStorage.setItem('influencer_session', JSON.stringify(sessionData));
-    
-    // Fetch paid amount from payout_requests
-    try {
-      const { data: payouts } = await supabase
-        .from('payout_requests')
-        .select('amount, status')
-        .eq('promo_code_id', result.promo_code_id);
-      
-      const totalPaid = payouts?.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-      setPaidAmount(totalPaid);
-      const paidUsd = Math.round(totalPaid * effectiveRate * 100) / 100;
-      setPaidAmountUsd(paidUsd);
 
-      const availableGhs = Math.max(ghsCommission - totalPaid, 0);
-      const availableUsd = Math.round(availableGhs * effectiveRate * 100) / 100;
-      setAvailableBalance(availableGhs);
-      setAvailableBalanceUsd(Math.max(availableUsd, 0));
-    } catch (err) {
-      console.warn('Could not fetch payout info:', err);
-    }
-    
     return sessionData;
+  };
+
+  const fetchReferredUsers = async (code: string, passwordToUse: string) => {
+    setLoadingReferredUsers(true);
+    try {
+      const { data, error } = await supabase.rpc('get_influencer_referred_users', {
+        p_code: code,
+        p_password: passwordToUse,
+      });
+
+      if (error) throw error;
+
+      const result = data as unknown as { success: boolean; referred_users?: ReferredUser[]; error?: string };
+      if (result.success) {
+        setReferredUsers(result.referred_users || []);
+      }
+    } catch (err) {
+      console.error('Error fetching referred users:', err);
+    } finally {
+      setLoadingReferredUsers(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -183,9 +191,10 @@ const InfluencerPortal = () => {
       const result = data as any;
       
       if (result.success) {
-        await updateSessionFromResult(result);
+        updateSessionFromResult(result);
         setSessionPassword(password);
-        
+        fetchReferredUsers(promoCode.trim(), password);
+
         toast({ title: 'Welcome!', description: `Logged in as ${result.owner_name}` });
       } else {
         toast({ 
@@ -211,11 +220,7 @@ const InfluencerPortal = () => {
     setPromoCode('');
     setPassword('');
     setSessionPassword('');
-    setExchangeRate(null);
-    setPaidAmount(0);
-    setPaidAmountUsd(0);
-    setAvailableBalance(0);
-    setAvailableBalanceUsd(0);
+    setReferredUsers(null);
     localStorage.removeItem('influencer_session');
     toast({ title: 'Logged out', description: 'You have been logged out successfully.' });
   };
@@ -245,7 +250,8 @@ const InfluencerPortal = () => {
 
       const result = data as any;
       if (result.success) {
-        await updateSessionFromResult(result);
+        updateSessionFromResult(result);
+        fetchReferredUsers(session.code, passwordToUse);
         toast({ title: 'Stats refreshed', description: 'Latest totals loaded.' });
       } else {
         // Auto-logout on refresh failure
@@ -274,31 +280,51 @@ const InfluencerPortal = () => {
 
   const handleRequestPayout = async () => {
     if (!session) return;
-    
-    const amount = parseFloat(payoutAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ 
-        title: 'Error', 
-        description: 'Please enter a valid amount', 
-        variant: 'destructive' 
+
+    // The payout amount is entered in USD (matching the "Available (USD)" figure
+    // shown above it), but everything downstream - influencer_commissions,
+    // promo_codes.total_commission_earned, and what the admin dashboard displays
+    // - is denominated in GHS. Convert using the exact rate the server itself
+    // computed this session's balances with, so what the user sees as
+    // "available" always matches what request_influencer_payout will accept.
+    const passwordToUse = sessionPassword || password;
+    if (!passwordToUse) {
+      toast({
+        title: 'Session expired',
+        description: 'Please log in again to request a payout.',
+        variant: 'destructive'
+      });
+      handleLogout();
+      return;
+    }
+
+    const amountUsd = parseFloat(payoutAmount);
+    if (isNaN(amountUsd) || amountUsd <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a valid amount',
+        variant: 'destructive'
       });
       return;
     }
 
-    if (amount > availableBalanceUsd) {
-      toast({ 
-        title: 'Error', 
-        description: `Amount exceeds available balance ($${availableBalanceUsd.toFixed(2)})`, 
-        variant: 'destructive' 
+    if (amountUsd > session.outstanding_usd) {
+      toast({
+        title: 'Error',
+        description: `Amount exceeds available balance ($${session.outstanding_usd.toFixed(2)})`,
+        variant: 'destructive'
       });
       return;
     }
+
+    const amountGhs = Math.round(amountUsd * session.exchange_rate * 100) / 100;
 
     setRequestingPayout(true);
     try {
       const { data, error } = await supabase.rpc('request_influencer_payout', {
-        p_promo_code_id: session.promo_code_id,
-        p_amount: amount
+        p_code: session.code,
+        p_password: passwordToUse,
+        p_amount_ghs: amountGhs
       });
 
       if (error) throw error;
@@ -477,6 +503,51 @@ const InfluencerPortal = () => {
           </Card>
         </div>
 
+        {/* Referred Users */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-500" />
+              People Who Used Your Code
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingReferredUsers ? (
+              <div className="flex justify-center py-4">
+                <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : !referredUsers || referredUsers.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-2">
+                No signups yet. Share your code to get started!
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {referredUsers.map((u, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
+                    <div>
+                      <p className="font-medium">
+                        {u.first_name}{u.last_initial ? ` ${u.last_initial}.` : ''}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Signed up {new Date(u.signup_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {u.is_subscribed ? (
+                      <Badge className="bg-green-100 text-green-800">
+                        <Crown className="w-3 h-3 mr-1" /> Subscribed
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-gray-500">
+                        Not yet
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Earnings */}
         <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
           <CardHeader className="pb-2">
@@ -503,11 +574,11 @@ const InfluencerPortal = () => {
               </div>
               <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-blue-200">
                 <span className="text-gray-600">✅ Paid Out (USD):</span>
-                <span className="font-semibold text-blue-700">${paidAmountUsd.toFixed(2)}</span>
+                <span className="font-semibold text-blue-700">${session.total_paid_usd.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-orange-200">
                 <span className="text-gray-600">💵 Available (USD):</span>
-                <span className="font-bold text-orange-700">${availableBalanceUsd.toFixed(2)}</span>
+                <span className="font-bold text-orange-700">${session.outstanding_usd.toFixed(2)}</span>
               </div>
             </div>
           </CardContent>
@@ -530,7 +601,7 @@ const InfluencerPortal = () => {
                   <p className="text-xs text-yellow-600">Your request is being processed</p>
                 </div>
               </div>
-            ) : availableBalanceUsd > 0 ? (
+            ) : session.outstanding_usd > 0 ? (
               <>
                 <div className="flex gap-2">
                   <Input
@@ -539,10 +610,10 @@ const InfluencerPortal = () => {
                     onChange={(e) => setPayoutAmount(e.target.value)}
                     placeholder="Amount to withdraw (USD)"
                     min="1"
-                    max={availableBalanceUsd}
+                    max={session.outstanding_usd}
                     step="0.01"
                   />
-                  <Button 
+                  <Button
                     onClick={handleRequestPayout}
                     disabled={requestingPayout || !payoutAmount}
                     className="bg-purple-600 hover:bg-purple-700"
@@ -551,11 +622,11 @@ const InfluencerPortal = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Available to withdraw: ${availableBalanceUsd.toFixed(2)}
+                  Available to withdraw: ${session.outstanding_usd.toFixed(2)}
                 </p>
-                {paidAmountUsd > 0 && (
+                {session.total_paid_usd > 0 && (
                   <p className="text-xs text-blue-600">
-                    ✓ Already paid out: ${paidAmountUsd.toFixed(2)}
+                    ✓ Already paid out: ${session.total_paid_usd.toFixed(2)}
                   </p>
                 )}
               </>

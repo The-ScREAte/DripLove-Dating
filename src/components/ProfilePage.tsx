@@ -6,7 +6,9 @@ import { getPlatformSync } from '@/utils/platformUtils';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad2 } from 'lucide-react';
+import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad2, Eye } from 'lucide-react';
+import { PotentialMatch } from '@/types';
+import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -72,9 +74,17 @@ interface ProfilePageProps {
   onShowTerms?: () => void;
   onShowPrivacy?: () => void;
   isPremium?: boolean;
+  // Whether the Profile tab is the one currently visible in the bottom nav. Used to
+  // reset the preview screen when the user navigates away, so switching back to this
+  // tab always lands on the real profile instead of leaving the preview stuck open.
+  isActiveTab?: boolean;
+  // Bumped by MainApp every time the Profile nav icon is tapped, even if Profile was
+  // already the active tab - covers the case of tapping it again while the preview
+  // is open (isActiveTab alone wouldn't change in that case).
+  profileTabSignal?: number;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0 }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const platform = useMemo(() => getPlatformSync(), []);
@@ -113,6 +123,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [isLoadingBroadcastMessages, setIsLoadingBroadcastMessages] = useState(false);
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
   const [isProfileMessagesOpen, setIsProfileMessagesOpen] = useState(false);
+  const [showProfilePreview, setShowProfilePreview] = useState(false);
+
+  // Navigating away from the Profile tab, or tapping the Profile nav icon again
+  // while already on it, always drops back to the real profile - the preview
+  // never gets left open in the background.
+  useEffect(() => {
+    if (!isActiveTab) {
+      setShowProfilePreview(false);
+    }
+  }, [isActiveTab]);
+  useEffect(() => {
+    setShowProfilePreview(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileTabSignal]);
 
   const refreshBroadcastUnreadCount = async () => {
     if (!isOwnProfile) return;
@@ -751,11 +775,66 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   // --- END: Comprehensive Profile Progress Bar ---
 
+  // Maps this user's own profile + approved photos into the same shape
+  // Discover/LikedMePage render other users with, so the "preview" modal is an
+  // honest rendering of the real card component rather than a hand-built
+  // lookalike that could drift from what matches actually see.
+  const previewImages = useMemo(
+    () => userImages.filter(img => img.is_approved && img.image_url).map(img => img.image_url as string),
+    [userImages]
+  );
+  const previewMatch = useMemo<(PotentialMatch & { preferred_language?: string }) | null>(() => {
+    if (!profile) return null;
+    return {
+      id: profile.id,
+      preferred_language: profile.preferred_language,
+      first_name: profile.first_name || '',
+      last_name: profile.last_name || '',
+      bio: profile.bio || '',
+      city: profile.city || '',
+      country: profile.country || '',
+      country_code: profile.country_code || '',
+      occupation: profile.occupation || '',
+      education_level: profile.education_level || '',
+      date_of_birth: profile.date_of_birth || '',
+      interests: profile.interests || [],
+      images: previewImages,
+      is_verified: profile.is_verified,
+      gender: profile.gender || '',
+      fun_fact: profile.fun_fact,
+      perfect_first_date: profile.perfect_first_date,
+      last_googled: profile.last_googled,
+      relationship_intent: profile.relationship_intent,
+      smoking: profile.smoking,
+      drinking: profile.drinking,
+      exercise_level: profile.exercise_level,
+      sleeping_schedule: profile.sleeping_schedule,
+      introvert_extrovert: profile.introvert_extrovert,
+      spontaneous_planner: profile.spontaneous_planner,
+      messy_organized: profile.messy_organized,
+      adinkra_symbols: profile.adinkra_symbols || [],
+    };
+  }, [profile, previewImages]);
+
   if (showPremiumUpgrade) {
     return (
       <div className="h-full w-full overflow-y-auto">
         <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
       </div>
+    );
+  }
+
+  // Renders inline (same as the premium-upgrade screen above) rather than as a
+  // full-screen overlay, so it stays inside MainApp's normal header/bottom-nav
+  // shell and scrolls the same way every other tab does, instead of covering
+  // the whole viewport in its own isolated modal.
+  if (showProfilePreview && previewMatch) {
+    return (
+      <ProfilePreviewModal
+        profile={previewMatch}
+        images={previewImages}
+        onClose={() => setShowProfilePreview(false)}
+      />
     );
   }
 
@@ -821,6 +900,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                     </span>
                   )}
                 </div>
+              )}
+
+              {/* Preview button (own profile only) - shows this profile the
+                  exact way Discover/LikedMePage render it to other users. */}
+              {isOwnProfile && (
+                <Button
+                  onClick={() => setShowProfilePreview(true)}
+                  disabled={!previewMatch}
+                  className="h-9 px-3.5 border-pink-500/40 text-white hover:bg-pink-900/30 disabled:opacity-50 bg-black border"
+                  variant="outline"
+                  aria-label="Preview my profile"
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
               )}
 
               {/* Games button (own profile only) */}

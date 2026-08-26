@@ -9,7 +9,7 @@ import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSlides, getUserColorHash } from './MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { getPlatformSync } from '@/utils/platformUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
@@ -130,6 +130,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ PHASE 1.3: Move heavy logic OUTSIDE + use memoized buildSlides
   const slides = useMemo(() => buildSlides(stableMatch, memoUserImages), [stableMatch, memoUserImages]);
+  const previewHighlights = useMemo(() => getPreviewHighlights(stableMatch), [stableMatch]);
 
   // ⭐ REMOVED: Language fetching (now passed as prop from parent to eliminate DB calls)
   // ⭐ REMOVED: imageLoading state - blob URLs load instantly from memory, no loader needed
@@ -778,6 +779,20 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <span className="text-[clamp(11px,3.2vw,13px)] font-medium">
                   {formatRelationshipIntent(match.relationship_intent)}
                 </span>
+              </div>
+            )}
+
+            {!showMoreInfo && previewHighlights.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-2 overflow-hidden">
+                {previewHighlights.map((highlight, index) => (
+                  <span
+                    key={index}
+                    className="text-[clamp(10px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border border-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[120px] shrink-0"
+                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
+                  >
+                    {highlight}
+                  </span>
+                ))}
               </div>
             )}
           </div>

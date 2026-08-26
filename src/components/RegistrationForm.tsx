@@ -761,19 +761,26 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         }
       }
 
-      // Save referral if promo code was used
+      // Save referral if promo code was used. Supabase queries resolve to
+      // { error } rather than throwing, so the error must be read explicitly
+      // here - a try/catch around the insert alone silently swallowed every
+      // DB-level failure (RLS denial, duplicate referral, etc.) with nothing
+      // ever logged.
       if (formData.promoCodeId) {
         try {
-          await supabase
+          const { error: refError } = await supabase
             .from('referrals')
             .insert({
               user_id: userId,
               promo_code_id: formData.promoCodeId
             });
+          if (refError) {
+            console.error('Error saving referral:', refError);
+          }
         } catch (refErr) {
           console.error('Error saving referral:', refErr);
-          // Don't block registration if referral save fails
         }
+        // Don't block registration if referral save fails
       }
       
     } catch (err) {

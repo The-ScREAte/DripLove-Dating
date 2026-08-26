@@ -85,6 +85,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     const initialTab = getInitialTab();
     return new Set(['dripcheck', initialTab]);
   });
+  const [profileTabSignal, setProfileTabSignal] = useState(0);
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -928,6 +929,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       return next;
     });
     setActiveTab(tab);
+    // Bump a signal every time Profile is (re-)selected, including taps while it's
+    // already the active tab, so ProfilePage always drops its preview screen and
+    // shows the real profile instead of leaving the preview stuck open.
+    if (tab === 'profile') {
+      setProfileTabSignal((s) => s + 1);
+    }
   }, []);
 
   // Memoize the current page component to prevent unnecessary re-renders
@@ -950,14 +957,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} />;
       case 'profile':
         return (
-          <ProfilePage 
-            currentUser={profile} 
-            profile={profile} 
-            onProfileUpdate={fetchUserProfile} 
+          <ProfilePage
+            currentUser={profile}
+            profile={profile}
+            onProfileUpdate={fetchUserProfile}
             onLogout={onLogout}
             onShowTerms={handleShowTerms}
             onShowPrivacy={handleShowPrivacy}
             isPremium={isPremium}
+            isActiveTab={activeTab === 'profile'}
+            profileTabSignal={profileTabSignal}
           />
         );
       default:
@@ -1131,14 +1140,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'profile' ? 'block' : 'none' }}
               > 
-                <ProfilePage 
-                  currentUser={profile} 
-                  profile={profile} 
-                  onProfileUpdate={fetchUserProfile} 
+                <ProfilePage
+                  currentUser={profile}
+                  profile={profile}
+                  onProfileUpdate={fetchUserProfile}
                   onLogout={onLogout}
                   onShowTerms={handleShowTerms}
                   onShowPrivacy={handleShowPrivacy}
                   isPremium={isPremium}
+                  isActiveTab={activeTab === 'profile'}
+                  profileTabSignal={profileTabSignal}
                 />
               </div>
             </Suspense>

@@ -27,7 +27,7 @@ import type { PotentialMatch } from '@/types';
 // Reuse Discover's exact slide-building/rendering so the "view a liker" screen
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
-import { buildSlides, getUserColorHash } from './discover/MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights } from './discover/MatchCardHelpers';
 
 // =========================================================
 // GLOBAL CACHES
@@ -724,6 +724,13 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     return buildSlides(selectedProfile as unknown as PotentialMatch, profileImages);
   }, [selectedProfile, userImages]);
 
+  // Same "one interest + up to 2 lifestyle attributes" chip line Discover's
+  // swipe card shows when collapsed, via the shared helper.
+  const previewHighlights = useMemo(() => {
+    if (!selectedProfile) return [];
+    return getPreviewHighlights(selectedProfile as unknown as PotentialMatch);
+  }, [selectedProfile]);
+
   // Same 4-color palette Discover's swipe card uses for non-photo slide backgrounds.
   const slideBackgroundColors = useMemo(() => [
     'bg-gradient-to-br from-pink-600 to-rose-900',
@@ -1253,18 +1260,15 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             </button>
           </div>
 
-          {selectedProfile.occupation && (
-            <div className="flex items-center text-xs mt-2 text-gray-300">
-              <Briefcase className="w-3 h-3 mr-2" />
-              <span>{selectedProfile.occupation}</span>
-            </div>
-          )}
-
-          {selectedProfile.interests && selectedProfile.interests.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {selectedProfile.interests.slice(0, 5).map((interest: string, index: number) => (
-                <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs">
-                  {interest}
+          {!showMoreInfo && previewHighlights.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-2 overflow-hidden">
+              {previewHighlights.map((highlight, index) => (
+                <span
+                  key={index}
+                  className="text-[clamp(10px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border border-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[120px] shrink-0"
+                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
+                >
+                  {highlight}
                 </span>
               ))}
             </div>
@@ -1525,7 +1529,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         )}
       </div>
     );
-  }, [selectedProfile, slides, slideBackgroundColors, currentSlide, showMoreInfo, platform, handleNavigationClick, handlePass, handleLikeBack, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc]);
+  }, [selectedProfile, slides, previewHighlights, slideBackgroundColors, currentSlide, showMoreInfo, platform, handleNavigationClick, handlePass, handleLikeBack, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showPremiumUpgrade) {
