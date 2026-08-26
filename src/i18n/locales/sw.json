@@ -486,8 +486,8 @@
     "paymentOptions": {
       "title": "Chagua Chaguo la Malipo",
       "iap": {
-        "button": "🍎 Jisajili Sasa",
-        "processing": "🍎 Inachakata...",
+        "button": "Jisajili Sasa",
+        "processing": "Inachakata...",
         "subtitle": "Ununuzi wa Ndani ya Programu • Salama na Haraka",
         "disclosure": "Usajili unajifanya kiotomatiki isipokuwa kujifanya kiotomatiki kumezimwa angalau masaa 24 kabla ya mwisho wa kipindi cha sasa. Malipo yatalipwa kwa akaunti yako ya Apple ID wakati wa kuthibitisha ununuzi. Unaweza kudhibiti na kufuta usajili wako katika mipangilio ya akaunti yako kwenye App Store baada ya ununuzi."
       },

@@ -485,8 +485,8 @@
     "paymentOptions": {
       "title": "Escolha a Opção de Pagamento",
       "iap": {
-        "button": "🍎 Assinar Agora",
-        "processing": "🍎 Processando...",
+        "button": "Assinar Agora",
+        "processing": "Processando...",
         "subtitle": "Compra no Aplicativo • Seguro e Rápido",
         "disclosure": "A assinatura é renovada automaticamente, a menos que a renovação automática seja desativada pelo menos 24 horas antes do final do período atual. O pagamento será cobrado da sua conta Apple ID na confirmação da compra. Você pode gerenciar e cancelar sua assinatura nas configurações da sua conta na App Store após a compra."
       },

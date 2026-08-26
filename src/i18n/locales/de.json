@@ -490,8 +490,8 @@
     "paymentOptions": {
       "title": "Zahlungsoption wählen",
       "iap": {
-        "button": "🍎 Jetzt abonnieren",
-        "processing": "🍎 Verarbeitung...",
+        "button": "Jetzt abonnieren",
+        "processing": "Verarbeitung...",
         "subtitle": "In-App-Kauf • Sicher und schnell",
         "disclosure": "Das Abonnement verlängert sich automatisch, es sei denn, die automatische Verlängerung wird mindestens 24 Stunden vor Ende des aktuellen Zeitraums deaktiviert. Die Zahlung wird bei Kaufbestätigung Ihrem Apple ID-Konto belastet. Sie können Ihr Abonnement nach dem Kauf in Ihren Kontoeinstellungen im App Store verwalten und kündigen."
       },

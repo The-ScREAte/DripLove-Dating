@@ -486,8 +486,8 @@
     "paymentOptions": {
       "title": "选择支付方式",
       "iap": {
-        "button": "🍎 立即订阅",
-        "processing": "🍎 处理中...",
+        "button": "立即订阅",
+        "processing": "处理中...",
         "subtitle": "应用内购买 • 安全快捷",
         "disclosure": "订阅将自动续订，除非在当前期间结束前至少24小时关闭自动续订。确认购买时，将向您的Apple ID账户收费。购买后，您可以在App Store的账户设置中管理和取消订阅。"
       },

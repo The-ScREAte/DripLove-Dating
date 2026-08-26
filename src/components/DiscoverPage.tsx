@@ -4837,7 +4837,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             className={`discover-info-area relative z-20 transition-all duration-300 flex-shrink-0 ${
               showMoreInfo ? 'expanded' : 'overflow-hidden'
             }`}
-            style={{ transform: 'translateY(-130px)', marginBottom: '-130px' }}
+            style={{ transform: 'translateY(-160px)', marginBottom: '-160px' }}
           >
             <div
               style={showMoreInfo ? {
@@ -4863,7 +4863,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   // (see the filler div below) — real content can only ever scroll within this
                   // safe zone, so it can never end up rendered behind the floating nav, no matter
                   // the scroll position.
-                  maxHeight: showMoreInfo ? `${Math.max(280, Math.max(400, vh - 170 - 55) - 150)}px` : '320px',
+                  maxHeight: showMoreInfo ? `${Math.max(280, Math.max(400, vh - 170 - 55) - 150)}px` : '360px',
                   minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
                 }}
               >

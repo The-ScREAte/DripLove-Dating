@@ -713,14 +713,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
         }}
       >
         {/* Basic Info - Always shown */}
-        <div className="flex justify-between items-start mt-2 px-4">
+        <div
+          className="flex justify-between items-start px-4"
+          style={{ marginTop: showMoreInfo ? '0.5rem' : '-6px' }}
+        >
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2 leading-tight">
               <h2
                 className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
                 style={{
                   textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)',
-                  paddingTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : 'clamp(10px, 2.5vw, 18px)',
+                  paddingTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : '0px',
                 }}
               >
                 {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
@@ -811,7 +814,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              marginTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : 'clamp(10px, 2.5vw, 18px)',
+              marginTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : '0px',
             }}
             aria-label={showMoreInfo ? "Hide details" : "Show details"}
           >

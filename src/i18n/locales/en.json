@@ -532,8 +532,8 @@
     "paymentOptions": {
       "title": "Choose Payment Option",
       "iap": {
-        "button": "🍎 Subscribe Now",
-        "processing": "🍎 Processing...",
+        "button": "Subscribe Now",
+        "processing": "Processing...",
         "subtitle": "In-App Purchase • Secure & Fast",
         "disclosure": "Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Payment will be charged to your Apple ID account at confirmation of purchase. You can manage and cancel your subscription in your account settings on the App Store after purchase."
       },

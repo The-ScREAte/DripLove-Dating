@@ -489,8 +489,8 @@
     "paymentOptions": {
       "title": "Choisir l'option de paiement",
       "iap": {
-        "button": "🍎 S'abonner maintenant",
-        "processing": "🍎 Traitement...",
+        "button": "S'abonner maintenant",
+        "processing": "Traitement...",
         "subtitle": "Achat intégré • Sécurisé et rapide",
         "disclosure": "L'abonnement se renouvelle automatiquement sauf si le renouvellement automatique est désactivé au moins 24 heures avant la fin de la période en cours. Le paiement sera débité de votre compte Apple ID lors de la confirmation de l'achat. Vous pouvez gérer et annuler votre abonnement dans les paramètres de votre compte sur l'App Store après l'achat."
       },
