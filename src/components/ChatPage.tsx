@@ -776,8 +776,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       .map((row) => {
         const partner = row.user1_id === currentUser.id ? row.user2 : row.user1;
 
-        if (partner?.is_archived === true) return null;
-
         const partnerId = partner?.id;
         const firstName = partner?.first_name || '';
         const lastName = partner?.last_name || '';

@@ -143,8 +143,7 @@ class LocationService {
         .select('id, first_name, date_of_birth, country, country_code, city, latitude, longitude')
         .neq('id', userId)
         .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false);
+        .eq('is_admin', false);
 
       // If user has coordinates, prioritize users with coordinates
       if (currentUser.latitude && currentUser.longitude) {

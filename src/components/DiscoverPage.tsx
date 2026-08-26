@@ -896,7 +896,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
-          .eq('is_archived', false)
           .limit(perCountryLimit);
 
         if (excludedIds.length > 0) {
@@ -1101,7 +1100,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               .in('gender', allowedGenders)
               .eq('account_status', 'active')
               .eq('is_admin', false)
-              .eq('is_archived', false)
               .limit(useDbExclusionPremium ? 100 : 500);
 
             if (error) throw error;
@@ -1118,7 +1116,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .eq('country_code', baseCountryCode)
             .eq('account_status', 'active')
             .eq('is_admin', false)
-            .eq('is_archived', false)
             .in('gender', allowedGenders)
             .limit(excludedIds.length <= 90 ? 80 : 400);
 
@@ -1255,7 +1252,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
-          .eq('is_archived', false)
           .limit(fetchLimit);
 
         if (error) throw error;
@@ -1290,7 +1286,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
-          .eq('is_archived', false)
           .limit(fallbackFetchLimit);
 
         if (error) throw error;
@@ -2371,7 +2366,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .in('gender', allowedGendersForRecovery)
             .eq('account_status', 'active')
             .eq('is_admin', false)
-            .eq('is_archived', false)
             .limit(200);
 
           if (baseCountryCode) {

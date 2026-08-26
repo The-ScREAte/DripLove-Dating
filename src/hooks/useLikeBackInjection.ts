@@ -223,8 +223,7 @@ export function useLikeBackInjection({
         `)
         .in('id', candidates)
         .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .eq('is_archived', false);
+        .eq('is_admin', false);
 
       if (profilesError) {
         console.error('[LikeBackInjection] Error fetching liker profiles:', profilesError);
@@ -325,7 +324,6 @@ export function useLikeBackInjection({
               .eq('id', newLikerId)
               .eq('account_status', 'active')
               .eq('is_admin', false)
-              .eq('is_archived', false)
               .single();
 
             if (!profile) return;

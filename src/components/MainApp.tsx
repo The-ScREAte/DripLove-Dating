@@ -235,8 +235,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           user2_id,
           user1_unread_count,
           user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, is_archived),
-          user2:profiles!matches_user2_id_fkey(id, is_archived),
           chats(id, message, created_at)
         `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
@@ -257,8 +255,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         user2_id: string;
         user1_unread_count?: unknown;
         user2_unread_count?: unknown;
-        user1?: { id?: string; is_archived?: boolean } | null;
-        user2?: { id?: string; is_archived?: boolean } | null;
         chats?: Array<{ id?: string; message?: string | null; created_at?: string | null }> | null;
       };
 
@@ -281,15 +277,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       // Count unread ONLY for chats visible on Chat page:
       // - include Active + Earlier conversations
-      // - exclude archived partners
       // - exclude auto-deletable dormant chats (already removed from list)
       let total = 0;
       for (const row of rows) {
         const isUser1 = row.user1_id === userId;
-        const partner = isUser1 ? row.user2 : row.user1;
-
-        // ChatPage excludes archived partner chats entirely.
-        if (partner?.is_archived === true) continue;
 
         const latest = latestChatByMatchId.get(row.id);
         const hasLastMessage = Boolean(latest?.message);
