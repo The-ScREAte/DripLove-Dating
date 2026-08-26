@@ -73,7 +73,7 @@
   right: 0 !important;
   bottom: 0 !important;
   width: 100% !important;
-  background: rgb(var(--app-light-bg-rgb));
+  background: #000;
   z-index: 9999 !important;
   /* GPU acceleration for smooth movement */
   transform: translate3d(0, calc(-1 * var(--keyboard-height, 0px)), 0);
