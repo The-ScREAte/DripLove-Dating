@@ -27,7 +27,8 @@ import type { PotentialMatch } from '@/types';
 // Reuse Discover's exact slide-building/rendering so the "view a liker" screen
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
-import { buildSlides, getUserColorHash, getPreviewHighlights } from './discover/MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, getHighlightChipVisibilityClass } from './discover/MatchCardHelpers';
+import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
 
 // =========================================================
 // GLOBAL CACHES
@@ -98,9 +99,12 @@ if (typeof window !== 'undefined') {
 interface LikedMePageProps {
   currentUser: CurrentUser;
   isPremium?: boolean;
+  // Whether the Liked Me tab is currently the visible one in the bottom nav
+  // (parent keeps this component mounted via display:none when not active).
+  isActiveTab?: boolean;
 }
 
-const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
+const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true }: LikedMePageProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -123,7 +127,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
   const [imageIndex, setImageIndex] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  // Swipe-to-pass/like-back on the photo card, same gesture as Discover's swipe
+  // card, replacing the old dedicated X/heart button row.
+  const [swipeDragX, setSwipeDragX] = useState(0);
+  const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+  const [swipeExitDirection, setSwipeExitDirection] = useState<'left' | 'right' | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
+
+  // Navigating away from this tab always drops the premium-upgrade screen, so
+  // coming back to Liked Me never lands on a stale upgrade screen instead of
+  // the actual list.
+  useEffect(() => {
+    if (!isActiveTab) {
+      setShowPremiumUpgrade(false);
+    }
+  }, [isActiveTab]);
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -714,6 +733,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     setImageIndex(0);
     setShowMoreInfo(false);
     setCurrentSlide(0);
+    setSwipeDragX(0);
+    setIsSwipeDragging(false);
+    setSwipeExitDirection(null);
+    swipeStartRef.current = null;
   }, [selectedProfile]);
 
   // Slide list built by the exact same helper Discover's swipe card uses, so the
@@ -730,6 +753,17 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     if (!selectedProfile) return [];
     return getPreviewHighlights(selectedProfile as unknown as PotentialMatch);
   }, [selectedProfile]);
+
+  // One cultural sign to surface as its own chip: whichever sign this profile
+  // shares with the current user if they have one in common, otherwise just
+  // one of the profile's own signs (deterministic, so it doesn't change on
+  // every re-render).
+  const signHighlight = useMemo(() => {
+    const theirs = selectedProfile?.adinkra_symbols;
+    if (!theirs || theirs.length === 0) return null;
+    const mine = (currentUser as unknown as { adinkra_symbols?: string[] | null })?.adinkra_symbols || [];
+    return theirs.find(symbol => mine.includes(symbol)) || theirs[0];
+  }, [selectedProfile, currentUser]);
 
   // Same 4-color palette Discover's swipe card uses for non-photo slide backgrounds.
   const slideBackgroundColors = useMemo(() => [
@@ -975,6 +1009,59 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
     }
   }, [currentUser?.id, hasInteractedToday, isPremium, likers, setLockoutPeriod, supabaseRpc, toast]);
 
+  // Swipe-to-pass/like-back, mirroring Discover's own swipe gesture: drag
+  // right past the threshold to like back, drag left to pass. A tap (no real
+  // drag movement) falls through to the existing left/right-half slide
+  // navigation instead, so browsing photos still works exactly as before.
+  const SWIPE_THRESHOLD_RATIO = 0.3;
+
+  const handleSwipePointerDown = useCallback((e: React.PointerEvent) => {
+    if (swipeExitDirection) return;
+    swipeStartRef.current = { x: e.clientX, y: e.clientY, dragging: false };
+  }, [swipeExitDirection]);
+
+  const handleSwipePointerMove = useCallback((e: React.PointerEvent) => {
+    const start = swipeStartRef.current;
+    if (!start || swipeExitDirection) return;
+    const deltaX = e.clientX - start.x;
+    const deltaY = e.clientY - start.y;
+    if (!start.dragging) {
+      // Ignore small jitter and mostly-vertical movement (that's a scroll, not a swipe).
+      if (Math.abs(deltaX) < 8 || Math.abs(deltaY) > Math.abs(deltaX)) return;
+      start.dragging = true;
+      setIsSwipeDragging(true);
+    }
+    setSwipeDragX(deltaX);
+  }, [swipeExitDirection]);
+
+  const handleSwipePointerUp = useCallback((e: React.PointerEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+
+    if (!start.dragging) {
+      // Not a drag - treat it as the existing tap-to-navigate-slides gesture.
+      handleNavigationClick(e as unknown as React.MouseEvent);
+      return;
+    }
+
+    setIsSwipeDragging(false);
+    const threshold = window.innerWidth * SWIPE_THRESHOLD_RATIO;
+    if (Math.abs(swipeDragX) > threshold && selectedProfile) {
+      const direction = swipeDragX > 0 ? 'right' : 'left';
+      setSwipeExitDirection(direction);
+      setTimeout(() => {
+        if (direction === 'right') {
+          handleLikeBack(selectedProfile.id);
+        } else {
+          handlePass(selectedProfile.id);
+        }
+      }, 250);
+    } else {
+      setSwipeDragX(0);
+    }
+  }, [swipeDragX, selectedProfile, handleLikeBack, handlePass, handleNavigationClick]);
+
   const closeReportModal = useCallback(() => {
     setShowReportModal(false);
     setSelectedReportReason('');
@@ -1102,26 +1189,31 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 
     return (
       <div
-        className="h-full w-full relative flex flex-col bg-black"
-        style={{
-          paddingTop: platform === 'web' ? '0px' : '0px',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
-        }}
+        className="h-full w-full relative flex flex-col bg-black overflow-hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {/* Photo area - same sizing strategy as Discover's discover-image-area:
-            flex-1 so it absorbs whatever space the details panel below isn't using.
-            Collapsed: uncapped, so it fills nearly the whole screen. Expanded: capped
-            so the details panel actually has room to grow. Name/bio/details never sit
-            on top of the photo itself, so they're never washed out by a bright image. */}
+        {/* Photo area - a static block (flex-shrink-0, fixed height) that never
+            resizes or moves, whether the info panel below is collapsed or
+            expanded - the details area absorbs its own height changes and
+            scrolls internally instead of stealing space from the photo. */}
         <div
-          className="relative flex-1 w-full transition-all duration-300"
-          style={{
-            overflow: 'hidden',
-            minHeight: showMoreInfo ? 'max(30vh, 220px)' : 'max(50vh, 360px)',
-            maxHeight: showMoreInfo ? '55vh' : 'none',
-          }}
+          className="relative flex-shrink-0 w-full overflow-hidden"
+          style={{ height: 'max(65vh, 440px)' }}
         >
-          <div className="w-full h-full relative" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
+          <div
+            className="w-full h-full relative select-none"
+            style={{
+              cursor: 'pointer',
+              touchAction: 'pan-y',
+              transform: `translateX(${swipeDragX}px) rotate(${Math.max(-15, Math.min(15, swipeDragX * 0.05))}deg)`,
+              opacity: swipeExitDirection ? 0 : 1,
+              transition: isSwipeDragging ? 'none' : 'transform 300ms ease-out, opacity 250ms ease-out',
+            }}
+            onPointerDown={handleSwipePointerDown}
+            onPointerMove={handleSwipePointerMove}
+            onPointerUp={handleSwipePointerUp}
+            onPointerCancel={handleSwipePointerUp}
+          >
             <SlideRenderer
               slide={currentSlideData}
               userBackgroundColor={userBackgroundColor}
@@ -1129,6 +1221,24 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
               matchLastName={selectedProfile.last_name || ''}
               getOptimizedUrl={(url) => getSafeImageSrc(url) || url}
             />
+
+            {/* Swipe direction hint, same red/green X and heart the removed
+                button row used, now surfacing as a fading overlay tied to drag
+                distance instead of a pair of dedicated buttons. */}
+            {swipeDragX !== 0 && (
+              <div
+                className={`absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center w-16 h-16 rounded-full border-4 ${
+                  swipeDragX > 0 ? 'right-6 border-green-400 bg-green-500/20' : 'left-6 border-red-400 bg-red-500/20'
+                }`}
+                style={{ opacity: Math.min(1, Math.abs(swipeDragX) / (window.innerWidth * SWIPE_THRESHOLD_RATIO)) }}
+              >
+                {swipeDragX > 0 ? (
+                  <Heart className="w-8 h-8 text-green-400" />
+                ) : (
+                  <X className="w-8 h-8 text-red-400" />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Slide indicators */}
@@ -1201,27 +1311,51 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             top, where it overlaps the photo, down to solid black) rather than a
             separate overlay element - no extra element to clip or mis-stack, the
             fade is simply however this box paints itself. marginBottom cancels the
-            transform's shift so the action buttons below aren't pushed down by it.
+            transform's shift.
             Gradient stops are fixed PIXEL lengths, not percentages - this box's
-            height swings from ~200px (collapsed) to up to 48vh (expanded), and
-            percentage stops would spread the exact same fade over a much bigger
-            range once expanded, making it look like it nearly vanished right where
-            the name sits. Pixel stops keep the fade the same physical size in both
-            states. The scrollable expanded content lives in an INNER div (below) -
-            this outer div itself never gets overflow-y-auto, so there's no
-            possibility of its own background ever being affected by an overflow
-            setting, in any browser. */}
+            height swings from ~200px (collapsed) to filling the rest of the
+            screen (expanded), and percentage stops would spread the exact same
+            fade over a much bigger range once expanded, making it look like it
+            nearly vanished right where the name sits. Pixel stops keep the fade
+            the same physical size in both states.
+            The photo above is now a fixed-size block (flex-shrink-0), so this is
+            the only thing that can grow - maxHeight is an unconditional
+            "whatever's left of the screen" calc (not state-toggled) and this box
+            scrolls internally on its own past that, in both collapsed and
+            expanded states, so the photo is never touched by expanding. */}
         <div
-          className="relative z-20 flex-shrink-0 transition-all duration-300"
+          className={`relative z-20 flex-1 ${showMoreInfo ? 'overflow-y-auto' : 'overflow-hidden cursor-pointer'}`}
+          onClick={() => { if (!showMoreInfo) setShowMoreInfo(true); }}
           style={{
-            transform: 'translateY(-80px)',
-            marginBottom: '-80px',
-            paddingTop: '88px',
-            background: 'linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.55) 25px, rgba(0,0,0,0.85) 50px, rgba(0,0,0,0.97) 70px, rgba(0,0,0,1) 90px)',
-            ...(showMoreInfo ? { maxHeight: '48vh' } : {}),
+            // Pulled up over the photo in both states - collapsed needs a small
+            // overlap too, otherwise there's no shared region for the gradient
+            // to actually fade over and it just reads as a flat black box with
+            // a hard edge instead of a feather. Expanded pulls up much further.
+            transform: showMoreInfo ? 'translateY(-110px)' : 'translateY(-70px)',
+            marginBottom: showMoreInfo ? '-110px' : '-70px',
+            // The overlap pulls this whole box (and its scroll viewport) up
+            // over the photo, but content still needs to clear the fade
+            // rather than sit inside it, so padding roughly matches the
+            // gradient's own run length. Much longer/lighter ramp now - the
+            // previous 22px fade was too short to actually read as a feather.
+            paddingTop: '76px',
+            background: 'linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.25) 25px, rgba(0,0,0,0.55) 50px, rgba(0,0,0,0.85) 70px, rgba(0,0,0,1) 90px)',
+            // flex-1 (not a manual maxHeight calc) so flexbox itself accounts for
+            // every fixed-size sibling - the photo above AND the action-button
+            // row below - filling exactly what's actually left over, in both
+            // collapsed and expanded states. minHeight: 0 overrides the flex
+            // item's default min-height:auto, which would otherwise force this
+            // box to stay as tall as its content and defeat overflow-y-auto.
+            minHeight: 0,
+            WebkitOverflowScrolling: 'touch',
+            // Without this, expanded content's last card sits flush against
+            // where the action-button row's own -Xpx overlap begins, so it
+            // reads as clipped/cut-off instead of genuinely scrollable. Not
+            // scrollable at all when collapsed, so there's nothing to bounce.
+            paddingBottom: showMoreInfo ? '16px' : '0px',
           }}
         >
-          <div className={`px-6 ${showMoreInfo ? 'overflow-y-auto' : ''}`}>
+          <div className="px-6" style={{ paddingBottom: showMoreInfo ? '24px' : '8px' }}>
           {/* Name + expand control share a row, so the button sits in line with the
               name instead of floating further down the panel. */}
           <div className="flex items-start justify-between gap-3">
@@ -1260,17 +1394,22 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
             </button>
           </div>
 
-          {!showMoreInfo && previewHighlights.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-2 overflow-hidden">
+          {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-2">
               {previewHighlights.map((highlight, index) => (
                 <span
                   key={index}
-                  className="text-[clamp(10px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border border-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[120px] shrink-0"
+                  className={`${getHighlightChipVisibilityClass(index)} text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
                   style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
                 >
                   {highlight}
                 </span>
               ))}
+              {signHighlight && (
+                <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 backdrop-blur-sm rounded-full w-8 h-8 shrink-0">
+                  <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                </span>
+              )}
             </div>
           )}
 
@@ -1356,19 +1495,6 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
                 </div>
               )}
 
-              {selectedProfile.adinkra_symbols && selectedProfile.adinkra_symbols.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Cultural Signs</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedProfile.adinkra_symbols.map((symbol: string, index: number) => (
-                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                        {symbol}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {selectedProfile.preferred_language && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Language</h4>
@@ -1393,28 +1519,10 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
           </div>
         </div>
 
-        {/* Action buttons - pinned above the mobile nav, always reachable regardless
-            of scroll position in the details area above. */}
-        <div
-          className="flex-shrink-0 flex justify-center space-x-6 px-6 py-3"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 8px) + 8px)' }}
-        >
-          <Button
-            onClick={() => handlePass(selectedProfile.id)}
-            variant="outline"
-            className="w-14 h-14 rounded-full border-2 border-red-400/80 bg-red-500/20 hover:bg-red-500/30"
-          >
-            <X className="w-6 h-6 text-red-400" />
-          </Button>
-
-          <Button
-            onClick={() => handleLikeBack(selectedProfile.id)}
-            variant="outline"
-            className="w-14 h-14 rounded-full border-2 border-green-400/80 bg-green-500/20 hover:bg-green-500/30"
-          >
-            <Heart className="w-6 h-6 text-green-400" />
-          </Button>
-        </div>
+        {/* Action buttons removed - pass/like-back is the swipe gesture on the
+            photo (drag left = pass, drag right = like back), same as Discover's
+            swipe card, with the red/green hint overlay standing in for what
+            these buttons used to make explicit. */}
 
         {/* Report/Block modal - same content and flow as Discover's swipe card. */}
         {showReportModal && (
@@ -1529,7 +1637,7 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, slideBackgroundColors, currentSlide, showMoreInfo, platform, handleNavigationClick, handlePass, handleLikeBack, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc]);
+  }, [selectedProfile, slides, previewHighlights, signHighlight, slideBackgroundColors, currentSlide, showMoreInfo, platform, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showPremiumUpgrade) {
@@ -1744,7 +1852,11 @@ const LikedMePage = ({ currentUser, isPremium = false }: LikedMePageProps) => {
 };
 
 export default React.memo(LikedMePage, (prevProps, nextProps) => {
-  // Only re-render if currentUser.id or isPremium changes
-  return prevProps.currentUser?.id === nextProps.currentUser?.id && 
-         prevProps.isPremium === nextProps.isPremium;
+  // Must also compare isActiveTab - otherwise switching tabs never re-renders
+  // this component (currentUser.id/isPremium don't change), so its internal
+  // "tab went inactive, reset showPremiumUpgrade" effect never even runs and
+  // coming back to this tab lands right back on the stale premium screen.
+  return prevProps.currentUser?.id === nextProps.currentUser?.id &&
+         prevProps.isPremium === nextProps.isPremium &&
+         prevProps.isActiveTab === nextProps.isActiveTab;
 });

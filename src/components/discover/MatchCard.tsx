@@ -9,7 +9,7 @@ import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSlides, getUserColorHash, getPreviewHighlights } from './MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, getHighlightChipVisibilityClass } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { getPlatformSync } from '@/utils/platformUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
@@ -40,6 +40,7 @@ interface MatchCardProps {
   imageStatus?: Record<string, 'idle'|'loading'|'loaded'|'error'>;
   isActiveTab?: boolean; // Whether the Discover/DripCheck tab is the one currently visible — gates the portaled overlays below so they don't leak onto other tabs
   onReportModalOpenChange?: (isOpen: boolean) => void; // Lets the parent suspend swipe/drag gestures while the report modal is up
+  currentUserAdinkraSymbols?: string[]; // Used to prefer a sign this profile shares with the viewer for the collapsed sign chip
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -68,6 +69,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   , imageStatus
   , isActiveTab = true
   , onReportModalOpenChange
+  , currentUserAdinkraSymbols
 }) => {
   const { t } = useTranslation();
 
@@ -131,6 +133,16 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // ⭐ PHASE 1.3: Move heavy logic OUTSIDE + use memoized buildSlides
   const slides = useMemo(() => buildSlides(stableMatch, memoUserImages), [stableMatch, memoUserImages]);
   const previewHighlights = useMemo(() => getPreviewHighlights(stableMatch), [stableMatch]);
+
+  // One cultural sign to surface as its own chip: whichever sign this profile
+  // shares with the current user if they have one in common, otherwise just
+  // one of the profile's own signs.
+  const signHighlight = useMemo(() => {
+    const theirs = stableMatch.adinkra_symbols;
+    if (!theirs || theirs.length === 0) return null;
+    const mine = currentUserAdinkraSymbols || [];
+    return theirs.find(symbol => mine.includes(symbol)) || theirs[0];
+  }, [stableMatch, currentUserAdinkraSymbols]);
 
   // ⭐ REMOVED: Language fetching (now passed as prop from parent to eliminate DB calls)
   // ⭐ REMOVED: imageLoading state - blob URLs load instantly from memory, no loader needed
@@ -479,23 +491,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   }}
                 >
                   <div className="relative flex flex-col items-center">
-                    {/* Single optimized glow layer */}
                     <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
-                      {/* Single efficient gradient layer — black, spread horizontally rather
-                          than a circular glow, so it reads as a soft backdrop shadow instead of
-                          a colored halo. */}
-                      <div
-                        className="absolute w-full"
-                        style={{
-                          left: 0,
-                          right: 0,
-                          top: '50%',
-                          height: '160%',
-                          transform: 'translateY(-50%)',
-                          background: 'radial-gradient(ellipse 100% 50% at center, rgba(0,0,0,0.45), transparent 75%)',
-                        }}
-                      ></div>
-
                       {/* Adinkra Symbol */}
                       <div className="relative z-10">
                         <UserAdinkraDisplay adinkraSymbols={stableMatch.adinkra_symbols} />
@@ -782,17 +778,22 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </div>
             )}
 
-            {!showMoreInfo && previewHighlights.length > 0 && (
-              <div className="flex items-center gap-1.5 mt-2 overflow-hidden">
+            {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-2">
                 {previewHighlights.map((highlight, index) => (
                   <span
                     key={index}
-                    className="text-[clamp(10px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border border-white/15 backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[120px] shrink-0"
+                    className={`${getHighlightChipVisibilityClass(index)} text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
                     style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
                   >
                     {highlight}
                   </span>
                 ))}
+                {signHighlight && (
+                  <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 backdrop-blur-sm rounded-full w-8 h-8 shrink-0">
+                    <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                  </span>
+                )}
               </div>
             )}
           </div>

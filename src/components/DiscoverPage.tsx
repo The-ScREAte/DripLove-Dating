@@ -308,6 +308,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
+
+  // Navigating away from this tab always drops the premium-upgrade screen, so
+  // coming back to Discover never lands on a stale upgrade screen instead of
+  // the actual swipe deck.
+  useEffect(() => {
+    if (!isActiveTab) {
+      setShowPremiumUpgrade(false);
+    }
+  }, [isActiveTab]);
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
@@ -4882,6 +4891,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   isDetailsAreaOnly={true} // Render only details/info area
                   getOptimizedUrl={getOptimizedUrl}
                   preCalculatedDistance={userDistances[currentMatch.id]}
+                  currentUserAdinkraSymbols={currentUser.adinkra_symbols}
                 />
               )}
               </div>

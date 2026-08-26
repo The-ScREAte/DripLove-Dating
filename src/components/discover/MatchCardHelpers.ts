@@ -125,7 +125,7 @@ export const buildSlides = (
 // is collapsed: one interest (deterministically chosen per user via the same
 // seeded RNG used for slide ordering, so it doesn't change on every re-render)
 // plus enough lifestyle attributes (occupation, education, then drinking/
-// smoking/exercise/sleep as fallbacks) to always show at least 3 when the data
+// smoking/exercise/sleep as fallbacks) to always show at least 5 when the data
 // exists.
 export const getPreviewHighlights = (match: PotentialMatch): string[] => {
   const highlights: string[] = [];
@@ -142,11 +142,37 @@ export const getPreviewHighlights = (match: PotentialMatch): string[] => {
 
   const lifestyleFillers = [match.exercise_level, match.drinking, match.smoking, match.sleeping_schedule];
   for (const filler of lifestyleFillers) {
-    if (highlights.length >= 3) break;
+    if (highlights.length >= 5) break;
     if (filler && filler !== 'not_specified') highlights.push(filler);
   }
 
-  return highlights.slice(0, 3);
+  return highlights.slice(0, 5);
+};
+
+// Cycled per chip (by index) across the highlight-chip row on Discover, Liked
+// Me, and the profile preview, so the chips read as distinct tags instead of
+// a uniform white/15 outline on all of them.
+export const HIGHLIGHT_CHIP_BORDER_COLORS = [
+  'border-pink-400/50',
+  'border-purple-400/50',
+  'border-sky-400/50',
+  'border-amber-400/50',
+  'border-emerald-400/50',
+];
+
+// Progressively drops later highlight chips on narrower phones instead of
+// wrapping them to a second line or squeezing everything down to
+// unreadable text - the first couple of chips (generally the most relevant,
+// since getPreviewHighlights orders interest-then-occupation-then-education
+// first) always show; a device has to be wide enough before the 3rd, 4th,
+// and 5th chip earn their spot. The sign chip is deliberately exempt from
+// this (always shown alongside) since it's a single compact badge, not a
+// variable-width text pill.
+export const getHighlightChipVisibilityClass = (index: number): string => {
+  if (index < 2) return '';
+  if (index === 2) return 'hidden min-[360px]:inline-flex';
+  if (index === 3) return 'hidden min-[400px]:inline-flex';
+  return 'hidden min-[440px]:inline-flex';
 };
 
 // Hash function for generating consistent colors

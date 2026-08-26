@@ -556,18 +556,6 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
             : 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 120px), 150px)'
         }}
       >
-        {onClose && (
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            // push down a bit and remove malformed class
-            className="mt-6 text-white hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4 mr-2" />
-            {t('premium.back')}
-          </Button>
-        )}
-          
           {/* Header Section */}
           <div className="text-center mb-4 md:mb-6">
             <div className="flex items-center justify-center mb-2 md:mb-4">

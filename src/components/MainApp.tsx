@@ -954,7 +954,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       case 'chat':
         return <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
       case 'liked':
-        return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} />;
+        return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} />;
       case 'profile':
         return (
           <ProfilePage
@@ -1027,27 +1027,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 padding: 0,
                 top: 0,
                 position: 'fixed',
-                // The feathered fade is only for Discover/DripCheck, where the tall sign/overlay
-                // row below the logo needs the extra room to fade into. Every other tab gets a
-                // compact, fully solid bar sized to its own content, with a pink border framing
-                // it on the sides/bottom (never the top, which sits flush against the screen
-                // edge) and rounded bottom corners.
-                height: activeTab === 'dripcheck' ? '170px' : undefined,
+                // Same compact, fully solid bar sized to its own content on
+                // every tab - this box's own size never changes. The pink
+                // border is drawn by a dedicated overlay div (last child
+                // below), not this element's own `border`, so it always
+                // paints on top of the feather tail instead of the two
+                // fighting over the exact same shared bottom-edge pixels.
                 pointerEvents: 'none',
-                ...(activeTab !== 'dripcheck' && {
-                  borderLeft: '1px solid rgba(236,72,153,0.55)',
-                  borderRight: '1px solid rgba(236,72,153,0.55)',
-                  borderBottom: '1px solid rgba(236,72,153,0.55)',
-                  borderBottomLeftRadius: '20px',
-                  borderBottomRightRadius: '20px',
-                }),
               }}
             >
-              {/* Background. On Discover/DripCheck: feathered on the bottom edge so it fades away
-                  going DOWN — solid black at the top, fully transparent only by the very bottom of
-                  this taller box (well past the sign row). On every other tab: fully solid, no fade,
-                  no tall box — just an opaque bar behind the logo/text, clipped to match the
-                  rounded bottom corners of the pink border. */}
+              {/* Background - fully solid, no fade, clipped to match the rounded
+                  bottom corners of the pink border. */}
               <div
                 aria-hidden="true"
                 className="absolute inset-0"
@@ -1055,16 +1045,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   background: 'rgba(0,0,0,0.95)',
                   backdropFilter: 'blur(18px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-                  maskImage: activeTab === 'dripcheck'
-                    ? 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)'
-                    : 'none',
-                  WebkitMaskImage: activeTab === 'dripcheck'
-                    ? 'linear-gradient(to bottom, black 0%, black 45%, transparent 100%)'
-                    : 'none',
-                  ...(activeTab !== 'dripcheck' && {
-                    borderBottomLeftRadius: '18px',
-                    borderBottomRightRadius: '18px',
-                  }),
+                  borderBottomLeftRadius: '18px',
+                  borderBottomRightRadius: '18px',
                 }}
               />
               <div
@@ -1091,6 +1073,37 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   </div>
                 </div>
               </div>
+
+              {/* Small unbordered feather tail for Discover/DripCheck only -
+                  positioned right below the border box via top: 100%, so it
+                  can never affect the border box's own size/position. */}
+              {activeTab === 'dripcheck' && (
+                <div
+                  aria-hidden="true"
+                  className="absolute left-0 right-0"
+                  style={{
+                    top: 'calc(100% - 10px)',
+                    height: '44px',
+                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), transparent)',
+                  }}
+                />
+              )}
+
+              {/* Border overlay - painted last (on top of the background AND
+                  the feather tail above), so it's always visible instead of
+                  getting covered where the feather starts right at this same
+                  bottom edge. */}
+              <div
+                aria-hidden="true"
+                className="absolute inset-0"
+                style={{
+                  borderLeft: '1px solid rgba(236,72,153,0.55)',
+                  borderRight: '1px solid rgba(236,72,153,0.55)',
+                  borderBottom: '1px solid rgba(236,72,153,0.55)',
+                  borderBottomLeftRadius: '20px',
+                  borderBottomRightRadius: '20px',
+                }}
+              />
             </div>
           )}
 
@@ -1129,7 +1142,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'liked' ? 'block' : 'none' }}
               > 
-                <LikedMePage currentUser={profile} isPremium={isPremium} />
+                <LikedMePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} />
               </div>
             </Suspense>
           )}

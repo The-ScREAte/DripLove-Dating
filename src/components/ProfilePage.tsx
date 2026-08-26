@@ -127,10 +127,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   // Navigating away from the Profile tab, or tapping the Profile nav icon again
   // while already on it, always drops back to the real profile - the preview
-  // never gets left open in the background.
+  // (and the premium-upgrade screen, if it was open) never gets left open in
+  // the background, so coming back to this tab never lands on a stale screen.
   useEffect(() => {
     if (!isActiveTab) {
       setShowProfilePreview(false);
+      setShowPremiumUpgrade(false);
     }
   }, [isActiveTab]);
   useEffect(() => {
