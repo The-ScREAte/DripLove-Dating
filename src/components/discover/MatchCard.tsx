@@ -455,8 +455,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   out so it can render above the global header instead of underneath it. */}
               {isActiveTab && slides[currentSlide]?.type === 'image' && createPortal(
                 <div
-                  className="fixed right-3 z-[9999]"
+                  className="fixed z-[9999]"
                   style={{
+                    right: 'calc(var(--frame-inset) + 0.75rem)',
                     top: platform === 'android'
                       ? 'calc(2rem + 64px)'
                       : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 64px)'
@@ -519,8 +520,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
               slide dots can render above the global header instead of underneath it. */}
           {isActiveTab && slides && slides.length > 1 && createPortal(
             <div
-              className="fixed left-4 flex space-x-2 z-[9999]"
+              className="fixed flex space-x-2 z-[9999]"
               style={{
+                left: 'calc(var(--frame-inset) + 1rem)',
                 top: platform === 'android'
                   ? 'calc(2rem + 66px)'
                   : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 66px)',

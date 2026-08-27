@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 import { useNavigate } from 'react-router-dom';
+import ChunkLoadBoundary from '@/components/ChunkLoadBoundary';
 
 // Eagerly load only essential pages
 import Index from "@/pages/Index";
@@ -30,8 +31,13 @@ const TestYourToast = lazy(() => import('../pages/TestYourToast'));
 const ShootYourShot = lazy(() => import('../pages/ShootYourShot'));
 const RedFlagGreenFlag = lazy(() => import('../pages/RedFlagGreenFlag'));
 
-// Minimal fallback - just blank screen
-const PageLoader = () => null;
+// Shown while a lazy route's chunk is being fetched. A blank screen here reads as "the tap did
+// nothing" on a slow mobile connection — a visible spinner confirms the navigation registered.
+const PageLoader = () => (
+  <div className="min-h-screen w-full flex items-center justify-center bg-black">
+    <div className="w-8 h-8 rounded-full border-2 border-pink-500/30 border-t-pink-500 animate-spin" />
+  </div>
+);
 
 const AppRoutes = ({
   user,
@@ -50,6 +56,7 @@ const AppRoutes = ({
   const navigate = useNavigate();
 
   return (
+    <ChunkLoadBoundary>
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Index user={user} isAuthenticated={isAuthenticated} />} />
@@ -83,6 +90,7 @@ const AppRoutes = ({
       <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </ChunkLoadBoundary>
   );
 };
 

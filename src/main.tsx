@@ -7,6 +7,15 @@ import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
 import { clearChatCache } from "./cache/chatCache";
 import HoppingLogo from "./components/HoppingLogo";
+import { getPlatformSync } from "./utils/platformUtils";
+
+// Mark web (browser) sessions before first paint so index.css can center the app in a
+// phone-width column on wide viewports. Runs synchronously off the capacitor:/file: URL
+// protocol check, so native iOS/Android — which should stay pixel-identical — never gets
+// this class, even before the Capacitor JS bridge finishes loading.
+if (getPlatformSync() === 'web') {
+  document.documentElement.classList.add('platform-web');
+}
 
 // Suppress non-critical console output in production
 if (import.meta.env.PROD) {

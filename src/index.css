@@ -10,6 +10,29 @@
   /* A clean, slightly darker pink than the original near-white tint (#FDF2F8) — no gray
      mixed in, just more pink. Still light enough that black text stays crisp on it. */
   --app-light-bg-rgb: 248 214 228;
+
+  /* App "frame": the column every fixed/full-bleed layout (header, bottom nav, the
+     Discover swipe card, etc.) sizes and centers itself against, via `--frame-width`
+     and `--frame-inset`. On native (no `.platform-web` on <html>) it's always the
+     full viewport, so this is a no-op there — native stays exactly edge-to-edge as
+     before. On web it's also the full viewport up to a phone-sized breakpoint, so
+     a phone browser still looks/feels like the native app. Only past that breakpoint
+     (tablet/desktop browser windows) does it settle into a centered phone-width
+     column instead of stretching content edge-to-edge across the whole window. */
+  --frame-width: 100vw;
+  --frame-inset: 0px;
+}
+
+html.platform-web {
+  --frame-max-width: 480px;
+  --frame-width: min(100vw, var(--frame-max-width));
+  --frame-inset: calc((100vw - var(--frame-width)) / 2);
+}
+
+/* Fill the space beside the centered frame on wide web viewports so it reads as an
+   intentional layout instead of empty page background. */
+html.platform-web body {
+  background: #000;
 }
 
 /* Global app theme override: map white/pink-50 backgrounds to the app's shade */

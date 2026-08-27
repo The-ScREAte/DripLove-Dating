@@ -4276,9 +4276,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const adCardTransform = getAdCardTransform();
     
     return (
-      <div className="h-full w-full fixed left-0 overflow-hidden"
-           style={{ 
+      <div className="h-full fixed overflow-hidden"
+           style={{
              top: '70px', // Align with header end (matches pt-[50px] in MainApp)
+             left: 'var(--frame-inset)',
+             width: 'var(--frame-width)',
              bottom: '70px', // Reserve space for bottom navigation (approximately 70px)
              height: 'auto', // Let top and bottom constraints define the height
              touchAction: 'pan-y',
@@ -4479,7 +4481,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         }
       `}</style>
 
-      <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
+      <div className="discover-container h-full fixed overflow-hidden"
            style={{
              // Shifted down 55px (instead of the individual card/image having its own internal
              // padding or margin for this) — the whole fixed layer moves together: current card,
@@ -4487,6 +4489,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              // background behind this layer, not some other layer that isn't shifted the same
              // way and ends up visually mismatched with it.
              top: '55px',
+             left: 'var(--frame-inset)',
+             width: 'var(--frame-width)',
              height: 'calc(100vh - 78px - 55px)', // Reserve room for the floating pill nav (now higher/slimmer)
              // Mobile browser viewport fix
              minHeight: 'calc(100vh - 78px - 55px)',
