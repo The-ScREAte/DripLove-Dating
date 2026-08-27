@@ -2983,7 +2983,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     latestDeltaRef.current = 0;
     latestDeltaYRef.current = 0;
     if (rafScheduledRef.current) rafScheduledRef.current = false;
+    // ⭐ ANDROID ONLY: drop the imperative transform written during the drag so React's
+    // style (snap-back / exit animation) takes over again.
+    if (isAndroidDevice) {
+      lastSyncedBucketRef.current = 0;
+      if (cardElRef.current) cardElRef.current.style.transform = '';
+    }
     setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0 }));
+
 
     if (Math.abs(deltaX) > minSwipeDistance) {
       // Trigger exit animation
