@@ -4743,7 +4743,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               // Expanded: capped so the info panel has room to grow and show more detail.
               minHeight: showMoreInfo ? 'max(48vh, 340px)' : 'max(58vh, 400px)',
               maxHeight: showMoreInfo ? '72vh' : 'none',
+              // ⭐ ANDROID ONLY: stop the WebView from competing with the drag (its own scroll /
+              // overscroll handling is what makes the card flash while the finger is held down).
+              ...(isAndroidDevice
+                ? {
+                    touchAction: 'none' as const,
+                    overscrollBehavior: 'none' as const,
+                    WebkitTapHighlightColor: 'transparent',
+                    backfaceVisibility: 'hidden' as const,
+                  }
+                : {}),
             }}
+
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
