@@ -2936,11 +2936,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       requestAnimationFrame(() => {
         const d = latestDeltaRef.current;
         const dy = latestDeltaYRef.current;
-        setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+
+        if (isAndroidDevice) {
+          // ⭐ ANDROID ONLY: write the transform straight to the DOM node so the gesture never
+          // re-renders the (very large) card tree mid-drag — that re-render is what makes the
+          // Android WebView blink/stutter while holding and dragging. iOS/web are untouched.
+          const el = cardElRef.current;
+          if (el) {
+            el.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
+          }
+          // Sync React state only in coarse 60px steps so the like/pass overlay still appears
+          // and grows, without a state update on every animation frame.
+          const bucket = Math.round(Math.abs(d) / 60);
+          const dir: 'left' | 'right' = d > 0 ? 'right' : 'left';
+          if (bucket !== lastSyncedBucketRef.current) {
+            lastSyncedBucketRef.current = bucket;
+            setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: dir }));
+          }
+        } else {
+          setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+        }
         rafScheduledRef.current = false;
       });
     }
   };
+
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDraggingRef.current) return;
