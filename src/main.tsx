@@ -268,6 +268,20 @@ const AppWrapper = () => {
 
               // Configure status bar
               await StatusBar.setStyle({ style: Style.Dark });
+
+              // ⭐ ANDROID ONLY: Android WebViews don't report env(safe-area-inset-top), so with
+              // the status bar overlaying the WebView the app header collides with the clock /
+              // battery icons. Push the WebView below the status bar on Android only — iOS keeps
+              // its existing overlay + safe-area behaviour untouched.
+              if (Capacitor.getPlatform() === 'android') {
+                try {
+                  await StatusBar.setOverlaysWebView({ overlay: false });
+                  await StatusBar.setBackgroundColor({ color: '#000000' });
+                } catch {
+                  // Status bar plugin unavailable — ignore
+                }
+              }
+
               
               // Configure keyboard: do not modify body padding; handled by useChatKeyboardFix
               Keyboard.addListener('keyboardWillShow', () => {
