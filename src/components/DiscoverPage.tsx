@@ -815,6 +815,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const latestDeltaRef = useRef(0);
   const latestDeltaYRef = useRef(0);
   const rafScheduledRef = useRef(false);
+  // ⭐ ANDROID ONLY: the Android WebView repaints the whole card tree on every React state
+  // update, which makes the drag flicker/blink. On Android we drive the card transform
+  // imperatively on the DOM node during the gesture and only sync React state in coarse steps.
+  const isAndroidDevice = useRef(typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)).current;
+  const cardElRef = useRef<HTMLDivElement | null>(null);
+  const lastSyncedBucketRef = useRef(0);
+
 
   const getGenderFilter = useCallback((userPreference: string) => {
     if (userPreference === 'male') {
