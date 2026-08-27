@@ -4448,23 +4448,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     <>
       {/* Mobile browser viewport fix styles */}
       <style>{`
-        /* Fix for mobile browser viewport height issues - only on actual mobile devices */
+        /* Fix for mobile browser viewport height issues - only on actual mobile devices.
+           These !important rules override the inline height on .discover-container (a
+           regular stylesheet !important beats an inline style without one), so they must
+           reserve the same 78px nav + 55px top offset the inline calc(100vh - 78px - 55px)
+           does. The old plain 100dvh/100svh/100lvh here ignored that reservation entirely,
+           making the container claim the FULL screen height starting 55px down - 55px
+           taller than what's actually visible - which silently clipped the bottom of
+           whatever was pinned to its bottom edge (e.g. the photo caption) against the
+           physical screen edge, with nothing to scroll to reveal it. */
         @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           .discover-container {
-            /* Use dynamic viewport height for mobile browsers */
-            height: 100dvh !important;
-            min-height: 100svh !important;
-            max-height: 100lvh !important;
+            /* Use dynamic viewport height for mobile browsers, minus the same reserved space */
+            height: calc(100dvh - 78px - 55px) !important;
+            min-height: calc(100svh - 78px - 55px) !important;
+            max-height: calc(100lvh - 78px - 55px) !important;
           }
-          
+
           .discover-image-area {
             /* Ensure image area doesn't get stuck at fixed heights on mobile */
-            min-height: 45vh !important;
+            min-height: 45dvh !important;
           }
 
           /* When expanded, cap the image so the info panel below has room to grow. */
           .discover-image-area.expanded {
-            max-height: 65vh !important;
+            max-height: 65dvh !important;
           }
 
           /* NOTE: .discover-info-area.expanded height is now driven entirely by inline styles
@@ -4474,12 +4482,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              sizing on every real mobile device (this media query only matches touch/coarse
              pointers) — removed so the two systems stop fighting each other. */
         }
-        
+
         /* Additional mobile Safari specific fix */
         @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           @supports (-webkit-touch-callout: none) {
             .discover-container {
-              height: -webkit-fill-available !important;
+              height: calc(-webkit-fill-available - 78px - 55px) !important;
             }
           }
         }
@@ -4627,13 +4635,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         </div>
       )}
       
-  <div className="flex-1 relative overflow-hidden" style={{ 
-    height: '100%', 
-    minHeight: 'calc(100vh - 100px)', 
-    display: 'flex', 
-    flexDirection: 'column', 
-    justifyContent: 'flex-end', 
-    paddingBottom: 0 
+  <div className="flex-1 relative overflow-hidden" style={{
+    height: '100%',
+    // Match the parent's real height exactly - never a vh-based calc here. On mobile,
+    // discover-container switches to 100dvh (the dynamic viewport, which shrinks when
+    // the browser's URL bar is showing), but a static `100vh` calc on this child does
+    // NOT track that - it stays pinned to the larger static viewport. That mismatch
+    // (which can be much more than the ~33px it was on desktop, depending on how much
+    // of the screen the URL bar takes) forced this div taller than its own parent, and
+    // with justify-content: flex-end below, silently shoved the swipe card down and
+    // clipped its bottom edge against this div's own overflow-hidden. The old separate
+    // info-area masked this by transform-shifting itself up 160px regardless of where
+    // it actually landed; the caption now lives pinned inside the photo box itself, so
+    // it's directly exposed to this and needs to never exceed its parent, full stop.
+    minHeight: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    paddingBottom: 0
   }}>
         {/* ...existing code... */}
         {nextMatch && (
@@ -4708,10 +4727,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             style={{
               // Use flexible height calculation that works better on mobile browsers
               // Extra vh reclaimed from the header now offsetting to 0 so the photo reaches the top edge.
-              // Collapsed: no cap — the image (flex-1) absorbs all leftover space itself, so the
-              // compact info panel below just hugs its own content instead of being stretched.
+              // Collapsed: no floor and no cap — the image (flex-1) absorbs all leftover space
+              // itself from its parent's real height (see the flex-1 wrapper above, which now
+              // matches its own parent exactly instead of a static vh calc). A static vh floor
+              // here doesn't track the dynamic viewport on mobile (the URL bar can make 100vh
+              // taller than what's actually visible), so it could force this taller than the
+              // parent actually has room for and get clipped by this div's own overflow-hidden -
+              // exactly the caption-cut-off bug. Nothing needs a floor: the parent already
+              // guarantees a real height.
               // Expanded: capped so the info panel has room to grow and show more detail.
-              minHeight: showMoreInfo ? 'max(48vh, 340px)' : 'max(58vh, 400px)',
+              minHeight: showMoreInfo ? 'max(48vh, 340px)' : 0,
               maxHeight: showMoreInfo ? '72vh' : 'none',
             }}
             onTouchStart={handleTouchStart}
@@ -4814,91 +4839,83 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             )}
           </div>
 
-          {/* Info section - dynamic height that fits content exactly */}
-          {/*
-            Always sized to its own content (flex-shrink-0), never stretched:
-            - Collapsed: the image above has no max-height, so it absorbs all leftover
-              vertical space itself, leaving this panel compact and hugging its content.
-            - Expanded: the image is capped, giving this panel room to grow; the inner
-              wrapper below handles the actual scroll/height animation via showMoreInfo.
-          */}
-          {/*
-            No background of its own (transparent) and pulled up slightly over the photo
-            (-mt) so the glassy top of .detailsContainer genuinely overlaps the image and
-            blurs it, instead of just sitting on a second flat pink layer behind it.
-          */}
-          {/*
-            Uses transform (not a negative margin) to visually pull this panel up over the
-            photo — a negative margin here changes how much space this flex item consumes,
-            which lets the image sibling (flex-1) grow to reclaim it, canceling the overlap
-            out. transform is purely visual and doesn't feed back into flex sizing.
-          */}
-          <div
-            className={`discover-info-area relative z-20 transition-all duration-300 flex-shrink-0 ${
-              showMoreInfo ? 'expanded' : 'overflow-hidden'
-            }`}
-            style={{ transform: 'translateY(-160px)', marginBottom: '-160px' }}
-          >
+          {/* Expanded details - plain black panel below the photo, same relationship as
+              ProfilePreviewModal's photo box + expanded panel below it (no transform/
+              overlap hack: the caption now lives inside the photo box itself, as an
+              absolute overlay, so this panel is just ordinary sibling content that only
+              takes up space when actually shown). */}
+          {showMoreInfo && (
             <div
-              style={showMoreInfo ? {
-                display: 'flex',
-                flexDirection: 'column',
-                // Total panel height (background) reaches almost all the way to the bottom of
-                // the screen, so there's no gap of photo/transparency below it. The extra -55
-                // accounts for discover-container itself now starting 55px lower (see its `top`
-                // above) — that much less vertical space is actually available overall, so this
-                // needs to know about it too or the panel overclaims space that isn't there,
-                // eating into the bottom padding/clearance that's supposed to be reserved.
-                maxHeight: `${Math.max(400, vh - 170 - 55)}px`,
-              } : undefined}
+              className="discover-info-area relative z-20 flex-shrink-0 bg-black"
+              style={{
+                // Its own black background (not just the MatchCard content nested inside it) so
+                // any gap between the photo's bottom edge and wherever that nested content
+                // actually starts painting black can never show the blurred background behind
+                // everything through as a seam. Also overlaps the photo by a hair as extra
+                // insurance against subpixel rounding - same fix as ProfilePreviewModal's
+                // expanded panel.
+                marginTop: '-2px',
+              }}
             >
               <div
-                ref={contentRef}
-                className={`w-full pt-1 ${showMoreInfo ? 'overflow-y-scroll scrollbar-hide' : 'overflow-hidden'}`}
                 style={{
-                  WebkitOverflowScrolling: 'touch',
-                  overscrollBehavior: 'contain',
-                  scrollBehavior: 'smooth',
-                  // The SCROLLABLE zone is explicitly capped short of the panel's total height
-                  // (see the filler div below) — real content can only ever scroll within this
-                  // safe zone, so it can never end up rendered behind the floating nav, no matter
-                  // the scroll position.
-                  maxHeight: showMoreInfo ? `${Math.max(280, Math.max(400, vh - 170 - 55) - 150)}px` : '360px',
-                  minHeight: showMoreInfo ? 'min(20vh, 200px)' : 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  // Total panel height (background) reaches almost all the way to the bottom of
+                  // the screen, so there's no gap of photo/transparency below it. The extra -55
+                  // accounts for discover-container itself now starting 55px lower (see its `top`
+                  // above) — that much less vertical space is actually available overall, so this
+                  // needs to know about it too or the panel overclaims space that isn't there,
+                  // eating into the bottom padding/clearance that's supposed to be reserved.
+                  maxHeight: `${Math.max(400, vh - 170 - 55)}px`,
                 }}
               >
-              {/* Render MatchCard details area */}
-              {currentMatch && !isAd(currentMatch) && (
-                <MatchCard
-                  match={currentMatch}
-                  imageIndex={imageIndex}
-                  showMoreInfo={showMoreInfo}
-                  isPremium={premiumActive}
-                  userImages={currentMatchImages}
-                  preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
-                  preferredLanguageName={userLanguages[currentMatch.id]}
-                  currentUserLatitude={currentUser.latitude}
-                  currentUserLongitude={currentUser.longitude}
-                  onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-                  onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-                  calculateAge={calculateAge}
-                  calculateDistance={calculateDistance}
-                  swipeDirection={swipeUI.swipeDirection}
-                  swipeDistance={swipeUI.swipeDistance}
-                  isDragging={swipeUI.isDragging}
-                  isVerified={!!currentMatch.is_verified}
-                  isSwipeAreaOnly={false}
-                  isDetailsAreaOnly={true} // Render only details/info area
-                  getOptimizedUrl={getOptimizedUrl}
-                  preCalculatedDistance={userDistances[currentMatch.id]}
-                  currentUserAdinkraSymbols={currentUser.adinkra_symbols}
-                />
-              )}
-              </div>
-              {/* Purely decorative black filler — extends the panel's background down toward the
-                  true bottom of the screen (behind the floating nav) without ever holding real,
-                  scrollable content, so it can never cover up info the user needs to read. */}
-              {showMoreInfo && (
+                <div
+                  ref={contentRef}
+                  className="w-full pt-1 overflow-y-scroll scrollbar-hide"
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    overscrollBehavior: 'contain',
+                    scrollBehavior: 'smooth',
+                    // The SCROLLABLE zone is explicitly capped short of the panel's total height
+                    // (see the filler div below) — real content can only ever scroll within this
+                    // safe zone, so it can never end up rendered behind the floating nav, no matter
+                    // the scroll position.
+                    maxHeight: `${Math.max(280, Math.max(400, vh - 170 - 55) - 150)}px`,
+                    minHeight: 'min(20vh, 200px)',
+                  }}
+                >
+                  {/* Render MatchCard details area */}
+                  {currentMatch && !isAd(currentMatch) && (
+                    <MatchCard
+                      match={currentMatch}
+                      imageIndex={imageIndex}
+                      showMoreInfo={showMoreInfo}
+                      isPremium={premiumActive}
+                      userImages={currentMatchImages}
+                      preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
+                      preferredLanguageName={userLanguages[currentMatch.id]}
+                      currentUserLatitude={currentUser.latitude}
+                      currentUserLongitude={currentUser.longitude}
+                      onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                      onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+                      calculateAge={calculateAge}
+                      calculateDistance={calculateDistance}
+                      swipeDirection={swipeUI.swipeDirection}
+                      swipeDistance={swipeUI.swipeDistance}
+                      isDragging={swipeUI.isDragging}
+                      isVerified={!!currentMatch.is_verified}
+                      isSwipeAreaOnly={false}
+                      isDetailsAreaOnly={true} // Render only details/info area
+                      getOptimizedUrl={getOptimizedUrl}
+                      preCalculatedDistance={userDistances[currentMatch.id]}
+                      currentUserAdinkraSymbols={currentUser.adinkra_symbols}
+                    />
+                  )}
+                </div>
+                {/* Purely decorative black filler — extends the panel's background down toward the
+                    true bottom of the screen (behind the floating nav) without ever holding real,
+                    scrollable content, so it can never cover up info the user needs to read. */}
                 <div
                   aria-hidden="true"
                   style={{
@@ -4908,9 +4925,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                     borderRadius: '0 0 0.75rem 0.75rem',
                   }}
                 />
-              )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
         {/* Loading more indicator */}
   {/* Loading more indicator removed for professional background loading */}

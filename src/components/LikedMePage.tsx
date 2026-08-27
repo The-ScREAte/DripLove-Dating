@@ -1355,121 +1355,87 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             </button>
           )}
 
+          {/* Name/age caption - pinned to the bottom of the photo with a feathered
+              gradient, same pattern as Discover's MatchCard caption and
+              ProfilePreviewModal (an ordinary overlay clipped by the photo's own
+              overflow-hidden, no transform/negative-margin tricks). */}
+          <div
+            className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
+            style={{
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,1) 85%)',
+            }}
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
+                  {selectedProfile.first_name} {selectedProfile.last_name}
+                </h2>
+                <div className="flex items-center gap-3 text-[clamp(12px,3.4vw,14px)] text-gray-300 mt-1">
+                  <div className="flex items-center">
+                    <Calendar className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                    <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                    <span>{selectedProfile.city}, {selectedProfile.country}</span>
+                  </div>
+                </div>
+
+                {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                    {previewHighlights.map((highlight, index) => (
+                      <span
+                        key={index}
+                        className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                      >
+                        {truncateChipLabel(highlight)}
+                      </span>
+                    ))}
+                    {signHighlight && (
+                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
+                        <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Expand/collapse control - identical pink-gradient glass circle used
+                  on Discover's own swipe card. */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMoreInfo(!showMoreInfo); }}
+                aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
+                className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+                  boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+                }}
+              >
+                {showMoreInfo ? (
+                  <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                ) : (
+                  <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Details area - rides up over the photo via transform (not a negative top
-            margin - that would shrink the space this flex item claims, letting the
-            photo's flex-1 grow right back into it and cancel the overlap out).
-            The feather is this box's OWN background gradient (transparent at its
-            top, where it overlaps the photo, down to solid black) rather than a
-            separate overlay element - no extra element to clip or mis-stack, the
-            fade is simply however this box paints itself. marginBottom cancels the
-            transform's shift.
-            Gradient stops are fixed PIXEL lengths, not percentages - this box's
-            height swings from ~200px (collapsed) to filling the rest of the
-            screen (expanded), and percentage stops would spread the exact same
-            fade over a much bigger range once expanded, making it look like it
-            nearly vanished right where the name sits. Pixel stops keep the fade
-            the same physical size in both states.
-            The photo above is now a fixed-size block (flex-shrink-0), so this is
-            the only thing that can grow - maxHeight is an unconditional
-            "whatever's left of the screen" calc (not state-toggled) and this box
-            scrolls internally on its own past that, in both collapsed and
-            expanded states, so the photo is never touched by expanding. */}
+        {/* Expanded details - plain black panel below the photo, same relationship as
+            ProfilePreviewModal's/Discover's expanded panel (no transform/overlap
+            hack: the caption now lives inside the photo box itself). Renders
+            nothing at all when collapsed, so there's no empty flex-1 box below the
+            photo either. */}
+        {showMoreInfo && (
         <div
-          className={`relative z-20 flex-1 ${showMoreInfo ? 'overflow-y-auto' : 'overflow-hidden cursor-pointer'}`}
-          onClick={() => { if (!showMoreInfo) setShowMoreInfo(true); }}
+          className="relative z-20 flex-1 overflow-y-auto bg-black"
           style={{
-            // Pulled up over the photo in both states - collapsed needs a small
-            // overlap too, otherwise there's no shared region for the gradient
-            // to actually fade over and it just reads as a flat black box with
-            // a hard edge instead of a feather. Expanded pulls up much further.
-            transform: showMoreInfo ? 'translateY(-110px)' : 'translateY(-70px)',
-            marginBottom: showMoreInfo ? '-110px' : '-70px',
-            // The overlap pulls this whole box (and its scroll viewport) up
-            // over the photo, but content still needs to clear the fade
-            // rather than sit inside it, so padding roughly matches the
-            // gradient's own run length. Much longer/lighter ramp now - the
-            // previous 22px fade was too short to actually read as a feather.
-            paddingTop: '76px',
-            background: 'linear-gradient(to bottom, transparent 0px, rgba(0,0,0,0.25) 25px, rgba(0,0,0,0.55) 50px, rgba(0,0,0,0.85) 70px, rgba(0,0,0,1) 90px)',
-            // flex-1 (not a manual maxHeight calc) so flexbox itself accounts for
-            // every fixed-size sibling - the photo above AND the action-button
-            // row below - filling exactly what's actually left over, in both
-            // collapsed and expanded states. minHeight: 0 overrides the flex
-            // item's default min-height:auto, which would otherwise force this
-            // box to stay as tall as its content and defeat overflow-y-auto.
             minHeight: 0,
             WebkitOverflowScrolling: 'touch',
-            // Without this, expanded content's last card sits flush against
-            // where the action-button row's own -Xpx overlap begins, so it
-            // reads as clipped/cut-off instead of genuinely scrollable. Not
-            // scrollable at all when collapsed, so there's nothing to bounce.
-            paddingBottom: showMoreInfo ? '16px' : '0px',
           }}
         >
-          <div className="px-6" style={{ paddingBottom: showMoreInfo ? '24px' : '8px' }}>
-          {/* Name + expand control share a row, so the button sits in line with the
-              name instead of floating further down the panel. */}
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold mb-1 text-white">
-                {selectedProfile.first_name} {selectedProfile.last_name}
-              </h2>
-              <div className="flex items-center space-x-3 text-xs text-gray-300">
-                <div className="flex items-center">
-                  <Calendar className="w-3 h-3 mr-1" />
-                  <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
-                </div>
-                <div className="flex items-center">
-                  <MapPin className="w-3 h-3 mr-1" />
-                  <span>{selectedProfile.city}, {selectedProfile.country}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Expand/collapse control - identical pink-gradient glass circle used
-                on Discover's own swipe card. */}
-            <button
-              onClick={() => setShowMoreInfo(!showMoreInfo)}
-              aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
-              className="shrink-0 text-white rounded-full p-2 backdrop-blur-md transition-colors"
-              style={{
-                background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-                boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              }}
-            >
-              {showMoreInfo ? (
-                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
-              ) : (
-                <ArrowDown className="w-4 h-4" strokeWidth={2.5} />
-              )}
-            </button>
-          </div>
-
-          {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
-            <div className="flex items-center gap-1.5 flex-wrap mt-2">
-              {previewHighlights.map((highlight, index) => (
-                <span
-                  key={index}
-                  className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
-                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
-                >
-                  {truncateChipLabel(highlight)}
-                </span>
-              ))}
-              {signHighlight && (
-                <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 backdrop-blur-sm rounded-full w-8 h-8 shrink-0">
-                  <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Expanded Info - same per-category card layout as Discover's swipe card
-              details area. */}
-          {showMoreInfo && (
-            <div className="mt-4 space-y-3">
+          <div className="px-6 pt-4" style={{ paddingBottom: '24px' }}>
+            <div className="space-y-3">
               {selectedProfile.bio && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-1">{t('matches.about')}</h4>
@@ -1568,9 +1534,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
             </div>
-          )}
           </div>
         </div>
+        )}
 
         {/* Action buttons removed - pass/like-back is the swipe gesture on the
             photo (drag left = pass, drag right = like back), same as Discover's

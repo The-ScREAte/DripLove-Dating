@@ -109,10 +109,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
       // ignore
     }
   }, [match.id, isSwipeAreaOnly, isDetailsAreaOnly, imageIndex, userImages]);
-  
+
   const [currentSlide, setCurrentSlide] = useState(0);
   const platform = useMemo(() => getPlatformSync(), []);
-  
+
   // Refs for performance
   const lastSlideInteraction = useRef<number>(0);
   const slideTransitionInProgress = useRef<boolean>(false);
@@ -146,7 +146,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ REMOVED: Language fetching (now passed as prop from parent to eliminate DB calls)
   // ⭐ REMOVED: imageLoading state - blob URLs load instantly from memory, no loader needed
-  
+
   // Background colors for fun questions and about
   const backgroundColors = useMemo(() => [
     'bg-gradient-to-br from-pink-600 to-rose-900',    // pink
@@ -191,13 +191,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const handleNext = useCallback(() => {
     if (slideTransitionInProgress.current) return; // Prevent rapid clicks
     slideTransitionInProgress.current = true;
-    
+
     setCurrentSlide(s => {
       const nextIndex = Math.min(s + 1, slides.length - 1);
       onImageIndexChange?.(nextIndex, slides.length); // ⭐ SMART LOADING: Notify parent with index info
       return nextIndex;
     });
-    
+
     setTimeout(() => {
       slideTransitionInProgress.current = false;
     }, 150); // Small debounce to prevent accidental double-clicks
@@ -206,13 +206,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const handlePrev = useCallback(() => {
     if (slideTransitionInProgress.current) return; // Prevent rapid clicks
     slideTransitionInProgress.current = true;
-    
+
     setCurrentSlide(s => {
       const prevIndex = Math.max(s - 1, 0);
       onImageIndexChange?.(prevIndex, slides.length); // ⭐ SMART LOADING: Notify parent with index info
       return prevIndex;
     });
-    
+
     setTimeout(() => {
       slideTransitionInProgress.current = false;
     }, 150); // Small debounce to prevent accidental double-clicks
@@ -221,13 +221,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // ⭐ FIX: Robust click handler that gets fresh values from DOM if needed
   const handleSlideClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    
+
     // Prevent clicks during transitions
     if (slideTransitionInProgress.current) return;
-    
+
     let width = containerWidth.current;
     let left = containerLeft.current;
-    
+
     // If values aren't initialized, compute them now (fallback for race conditions)
     if (!width && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -236,12 +236,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
       containerWidth.current = width;
       containerLeft.current = left;
     }
-    
+
     if (!width) return; // Still no width, can't determine click position
-    
+
     const clickX = e.clientX - left;
     const isLeftHalf = clickX < width / 2;
-    
+
     if (isLeftHalf) {
       handlePrev();
     } else {
@@ -265,11 +265,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
   }, [slides, currentSlide]);
   const getSwipeTransform = () => {
     if (!swipeDirection) return 'translateX(0) rotate(0deg)';
-    
+
     const rotation = swipeDistance * 0.1;
     const maxRotation = 15;
     const clampedRotation = Math.min(Math.max(rotation, -maxRotation), maxRotation);
-    
+
     return `translateX(${swipeDistance}px) rotate(${clampedRotation}deg)`;
   };
 
@@ -357,18 +357,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
       setReportError(t('reportModal.selectReason'));
       return;
     }
-    
+
     setReporting(true);
     setReportError("");
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const imageUrl = slides[currentSlide]?.content;
       if (!imageUrl || !match.id) throw new Error("Missing image or user");
-      
+
       // Get current user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
-      
+
       // Insert into reported_images table
       const { error } = await supabase.from("reported_images").insert({
         reporter_id: user.id,
@@ -390,7 +390,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     } finally {
       setReporting(false);
     }
-  }; 
+  };
 
   // Reset modal state when closing
   const closeReportModal = () => {
@@ -408,7 +408,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
     setIsBlocking(true);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      
+
       // Get current user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
@@ -513,7 +513,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               />
             </div>
           )}
-          
+
           {/* Slide indicators */}
           {/* Same stacking-context ceiling as the sign display above — portaled out so the
               slide dots can render above the global header instead of underneath it. */}
@@ -542,6 +542,107 @@ const MatchCard: React.FC<MatchCardProps> = ({
           )}
 
           {/* Cultural sign is shown in the top-center */}
+
+          {/* Name/age caption - pinned to the bottom of the photo with a feathered
+              gradient, same pattern as ProfilePreviewModal's caption (an ordinary
+              overlay clipped by the photo's own overflow-hidden, no transform/
+              negative-margin tricks). Not portaled: unlike the report button/sign/
+              dots above, this only needs to sit above the photo, not above the
+              global header. */}
+          <div
+            className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-28 ${showMoreInfo ? 'pb-4' : 'pb-5'}`}
+            style={{
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 72%, rgba(0,0,0,1) 92%)',
+            }}
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1 leading-tight">
+                  <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
+                    {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
+                  </h2>
+                  {isVerified && (
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src="/images/verified.svg"
+                      alt="Verified profile"
+                      title="Verified profile"
+                      className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
+                      aria-hidden="false"
+                    />
+                  )}
+                </div>
+
+                {match.city && (
+                  <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-gray-300">
+                    <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                    <span>
+                      {match.city}, {match.country}
+                      {match.distance !== undefined ? (
+                        <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km away</span>
+                      ) : preCalculatedDistance !== undefined ? (
+                        <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km away</span>
+                      ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
+                        <span className="ml-2">
+                          • {Math.max(1, Math.round(calculateDistance(
+                            currentUserLatitude,
+                            currentUserLongitude,
+                            match.latitude,
+                            match.longitude
+                          )))} km away
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
+
+                {match.relationship_intent && (
+                  <div className="flex items-center mt-2 text-[clamp(11px,3.2vw,13px)] font-medium text-gray-300">
+                    <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                    <span>{formatRelationshipIntent(match.relationship_intent)}</span>
+                  </div>
+                )}
+
+                {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                    {previewHighlights.map((highlight, index) => (
+                      <span
+                        key={index}
+                        className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                      >
+                        {truncateChipLabel(highlight)}
+                      </span>
+                    ))}
+                    {signHighlight && (
+                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
+                        <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleInfo();
+                }}
+                className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+                  boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+                }}
+                aria-label={showMoreInfo ? "Hide details" : "Show details"}
+              >
+                {showMoreInfo ? (
+                  <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                ) : (
+                  <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                )}
+              </button>
+            </div>
+          </div>
 
           {/* Report Modal.
               Portaled to document.body: this lives inside the swipe card, which gets a live
@@ -704,131 +805,19 @@ const MatchCard: React.FC<MatchCardProps> = ({
   }
 
   if (isDetailsAreaOnly) {
-    // Render only the non-swipeable details area
+    // Render only the expandable details panel - name/location/tags/toggle now
+    // live in the photo caption (isSwipeAreaOnly), so this renders nothing at all
+    // when collapsed, matching ProfilePreviewModal's `{showMoreInfo && (...)}` panel.
+    if (!showMoreInfo) return null;
+
     return (
       <div
-        className={`w-full pt-3 ${styles.detailsContainer}`}
+        className="w-full bg-black"
         style={{
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif'
         }}
       >
-        {/* Basic Info - Always shown */}
-        <div
-          className="flex justify-between items-start px-4"
-          style={{ marginTop: showMoreInfo ? '0.5rem' : '5px' }}
-        >
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2 leading-tight">
-              <h2
-                className="text-[clamp(15px,4.4vw,18px)] font-medium text-white"
-                style={{
-                  textShadow: '0 1px 3px rgba(0,0,0,0.45), 0 1px 8px rgba(0,0,0,0.25)',
-                  paddingTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : '0px',
-                }}
-              >
-                {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
-              </h2>
-              {/* Verified badge beside name and age - exact same as ProfilePage */}
-              {isVerified && (
-                <img
-                  loading="lazy"
-                  decoding="async"
-                  src="/images/verified.svg"
-                  alt="Verified profile"
-                  title="Verified profile"
-                  className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
-                  aria-hidden="false"
-                />
-              )}
-            </div>
-
-            {match.city && (
-              <div
-                className="flex items-center mt-1.5 text-white/90 leading-tight"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}
-              >
-                <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                <span className="text-[clamp(12px,3.4vw,14px)] font-normal">
-                  {match.city}, {match.country}
-                  {match.distance !== undefined ? (
-                    <span className="ml-2">
-                      • {Math.max(1, Math.round(match.distance))} km away
-                    </span>
-                  ) : preCalculatedDistance !== undefined ? (
-                    <span className="ml-2">
-                      • {Math.max(1, Math.round(preCalculatedDistance))} km away
-                    </span>
-                  ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
-                    <span className="ml-2">
-                      • {Math.max(1, Math.round(calculateDistance(
-                        currentUserLatitude,
-                        currentUserLongitude,
-                        match.latitude,
-                        match.longitude
-                      )))} km away
-                    </span>
-                  ))}
-                </span>
-              </div>
-            )}
-            
-            {match.relationship_intent && (
-              <div
-                className="flex items-center mt-2 text-white/90 leading-tight"
-                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}
-              >
-                <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                <span className="text-[clamp(11px,3.2vw,13px)] font-medium">
-                  {formatRelationshipIntent(match.relationship_intent)}
-                </span>
-              </div>
-            )}
-
-            {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
-              <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                {previewHighlights.map((highlight, index) => (
-                  <span
-                    key={index}
-                    className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} backdrop-blur-sm px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[120px] shrink-0`}
-                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
-                  >
-                    {truncateChipLabel(highlight)}
-                  </span>
-                ))}
-                {signHighlight && (
-                  <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 backdrop-blur-sm rounded-full w-8 h-8 shrink-0">
-                    <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Expandable info button — small, clean, glassy circle so it doesn't compete with the content */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleInfo();
-            }}
-            className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
-            style={{
-              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              marginTop: showMoreInfo ? 'clamp(20px, 5vw, 32px)' : '0px',
-            }}
-            aria-label={showMoreInfo ? "Hide details" : "Show details"}
-          >
-            {showMoreInfo ? (
-              <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
-            ) : (
-              <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
-            )}
-          </button>
-        </div>
-
-        {/* Expandable details - appears below basic info */}
-        {showMoreInfo && (
-          <div className="mt-4 px-4 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '160px' }}>
+        <div className="px-4 pt-1 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '160px' }}>
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -905,7 +894,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-400">{t('discover.matchCard.introvert')}</span>
                       <div className="flex-1 bg-white/10 rounded-full h-2">
-                        <div 
+                        <div
                           className={`bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full ${styles.dynamicWidth}`}
                           style={{ width: `${match.introvert_extrovert}%` }}
                         ></div>
@@ -921,7 +910,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-400">{t('discover.matchCard.spontaneous')}</span>
                         <div className="flex-1 bg-white/10 rounded-full h-2">
-                          <div 
+                          <div
                             className={`bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.spontaneous_planner}%` }}
                           ></div>
@@ -938,7 +927,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-400">{t('discover.matchCard.messy')}</span>
                         <div className="flex-1 bg-white/10 rounded-full h-2">
-                          <div 
+                          <div
                             className={`bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full ${styles.dynamicWidth}`}
                             style={{ width: `${match.messy_organized}%` }}
                           ></div>
@@ -978,8 +967,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               </div>
             )}
-          </div>
-        )}
+        </div>
       </div>
     );
   }
