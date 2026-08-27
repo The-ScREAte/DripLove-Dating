@@ -383,6 +383,24 @@ export type Database = {
         }
         Relationships: []
       }
+      email_account_usage: {
+        Row: {
+          account_email: string
+          send_date: string
+          sent_count: number
+        }
+        Insert: {
+          account_email: string
+          send_date: string
+          sent_count?: number
+        }
+        Update: {
+          account_email?: string
+          send_date?: string
+          sent_count?: number
+        }
+        Relationships: []
+      }
       email_broadcast_history: {
         Row: {
           admin_id: string | null
@@ -432,6 +450,44 @@ export type Database = {
             columns: ["admin_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_send_queue: {
+        Row: {
+          broadcast_id: string
+          created_at: string | null
+          error: string | null
+          id: string
+          recipient: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          broadcast_id: string
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          recipient: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          broadcast_id?: string
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          recipient?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_send_queue_broadcast_id_fkey"
+            columns: ["broadcast_id"]
+            isOneToOne: false
+            referencedRelation: "email_broadcast_history"
             referencedColumns: ["id"]
           },
         ]
@@ -2006,6 +2062,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_email_account_usage: {
+        Args: { p_account_email: string; p_amount?: number }
+        Returns: number
+      }
       increment_redirect_clicks:
         | {
             Args: { redirect_id: string }
@@ -2070,23 +2130,7 @@ export type Database = {
         Returns: number
       }
       request_influencer_payout: {
-        Args: { p_amount_ghs: number; p_code: string; p_password: string }
-        Returns: Json
-      }
-      admin_set_influencer_password: {
-        Args: { p_new_password: string; p_promo_code_id: string }
-        Returns: Json
-      }
-      get_influencer_full_stats: {
-        Args: { p_promo_code_id: string }
-        Returns: Json
-      }
-      get_influencer_referred_users: {
-        Args: { p_code: string; p_password: string }
-        Returns: Json
-      }
-      validate_promo_code_setup_link: {
-        Args: { p_promo_code_id: string; p_token: string }
+        Args: { p_amount: number; p_promo_code_id: string }
         Returns: Json
       }
       set_influencer_password: {
