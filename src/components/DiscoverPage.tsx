@@ -4697,9 +4697,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
         {/* ...existing code... */}
         <div
+          ref={cardElRef}
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
+
             transformOrigin: 'center center',
             transition: exitingCard
               ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-radius 0.3s ease' // Smooth exit with slight bounce
