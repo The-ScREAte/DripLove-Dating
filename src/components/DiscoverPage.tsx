@@ -815,13 +815,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const latestDeltaRef = useRef(0);
   const latestDeltaYRef = useRef(0);
   const rafScheduledRef = useRef(false);
-  // ⭐ ANDROID ONLY: the Android WebView repaints the whole card tree on every React state
-  // update, which makes the drag flicker/blink. On Android we drive the card transform
-  // imperatively on the DOM node during the gesture and only sync React state in coarse steps.
-  const isAndroidDevice = useRef(typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)).current;
-  const cardElRef = useRef<HTMLDivElement | null>(null);
-  const lastSyncedBucketRef = useRef(0);
-
 
   const getGenderFilter = useCallback((userPreference: string) => {
     if (userPreference === 'male') {
@@ -903,6 +896,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
+          .eq('is_archived', false)
           .limit(perCountryLimit);
 
         if (excludedIds.length > 0) {
@@ -1107,6 +1101,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               .in('gender', allowedGenders)
               .eq('account_status', 'active')
               .eq('is_admin', false)
+              .eq('is_archived', false)
               .limit(useDbExclusionPremium ? 100 : 500);
 
             if (error) throw error;
@@ -1123,6 +1118,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .eq('country_code', baseCountryCode)
             .eq('account_status', 'active')
             .eq('is_admin', false)
+            .eq('is_archived', false)
             .in('gender', allowedGenders)
             .limit(excludedIds.length <= 90 ? 80 : 400);
 
@@ -1259,6 +1255,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
+          .eq('is_archived', false)
           .limit(fetchLimit);
 
         if (error) throw error;
@@ -1293,6 +1290,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           .in('gender', allowedGenders)
           .eq('account_status', 'active')
           .eq('is_admin', false)
+          .eq('is_archived', false)
           .limit(fallbackFetchLimit);
 
         if (error) throw error;
@@ -2373,6 +2371,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .in('gender', allowedGendersForRecovery)
             .eq('account_status', 'active')
             .eq('is_admin', false)
+            .eq('is_archived', false)
             .limit(200);
 
           if (baseCountryCode) {
@@ -2936,31 +2935,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       requestAnimationFrame(() => {
         const d = latestDeltaRef.current;
         const dy = latestDeltaYRef.current;
-
-        if (isAndroidDevice) {
-          // ⭐ ANDROID ONLY: write the transform straight to the DOM node so the gesture never
-          // re-renders the (very large) card tree mid-drag — that re-render is what makes the
-          // Android WebView blink/stutter while holding and dragging. iOS/web are untouched.
-          const el = cardElRef.current;
-          if (el) {
-            el.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
-          }
-          // Sync React state only in coarse 60px steps so the like/pass overlay still appears
-          // and grows, without a state update on every animation frame.
-          const bucket = Math.round(Math.abs(d) / 60);
-          const dir: 'left' | 'right' = d > 0 ? 'right' : 'left';
-          if (bucket !== lastSyncedBucketRef.current) {
-            lastSyncedBucketRef.current = bucket;
-            setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: dir }));
-          }
-        } else {
-          setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
-        }
+        setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
         rafScheduledRef.current = false;
       });
     }
   };
-
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDraggingRef.current) return;
@@ -2983,14 +2962,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     latestDeltaRef.current = 0;
     latestDeltaYRef.current = 0;
     if (rafScheduledRef.current) rafScheduledRef.current = false;
-    // ⭐ ANDROID ONLY: drop the imperative transform written during the drag so React's
-    // style (snap-back / exit animation) takes over again.
-    if (isAndroidDevice) {
-      lastSyncedBucketRef.current = 0;
-      if (cardElRef.current) cardElRef.current.style.transform = '';
-    }
     setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0 }));
-
 
     if (Math.abs(deltaX) > minSwipeDistance) {
       // Trigger exit animation
@@ -4310,11 +4282,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const adCardTransform = getAdCardTransform();
     
     return (
-      <div className="h-full fixed overflow-hidden"
-           style={{
+      <div className="h-full w-full fixed left-0 overflow-hidden"
+           style={{ 
              top: '70px', // Align with header end (matches pt-[50px] in MainApp)
-             left: 'var(--frame-inset)',
-             width: 'var(--frame-width)',
              bottom: '70px', // Reserve space for bottom navigation (approximately 70px)
              height: 'auto', // Let top and bottom constraints define the height
              touchAction: 'pan-y',
@@ -4515,7 +4485,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         }
       `}</style>
 
-      <div className="discover-container h-full fixed overflow-hidden"
+      <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
            style={{
              // Shifted down 55px (instead of the individual card/image having its own internal
              // padding or margin for this) — the whole fixed layer moves together: current card,
@@ -4523,8 +4493,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              // background behind this layer, not some other layer that isn't shifted the same
              // way and ends up visually mismatched with it.
              top: '55px',
-             left: 'var(--frame-inset)',
-             width: 'var(--frame-width)',
              height: 'calc(100vh - 78px - 55px)', // Reserve room for the floating pill nav (now higher/slimmer)
              // Mobile browser viewport fix
              minHeight: 'calc(100vh - 78px - 55px)',
@@ -4701,11 +4669,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
         {/* ...existing code... */}
         <div
-          ref={cardElRef}
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,
-
             transformOrigin: 'center center',
             transition: exitingCard
               ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-radius 0.3s ease' // Smooth exit with slight bounce
@@ -4747,18 +4713,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               // Expanded: capped so the info panel has room to grow and show more detail.
               minHeight: showMoreInfo ? 'max(48vh, 340px)' : 'max(58vh, 400px)',
               maxHeight: showMoreInfo ? '72vh' : 'none',
-              // ⭐ ANDROID ONLY: stop the WebView from competing with the drag (its own scroll /
-              // overscroll handling is what makes the card flash while the finger is held down).
-              ...(isAndroidDevice
-                ? {
-                    touchAction: 'none' as const,
-                    overscrollBehavior: 'none' as const,
-                    WebkitTapHighlightColor: 'transparent',
-                    backfaceVisibility: 'hidden' as const,
-                  }
-                : {}),
             }}
-
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}

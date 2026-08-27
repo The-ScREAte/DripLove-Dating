@@ -235,6 +235,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           user2_id,
           user1_unread_count,
           user2_unread_count,
+          user1:profiles!matches_user1_id_fkey(id, is_archived),
+          user2:profiles!matches_user2_id_fkey(id, is_archived),
           chats(id, message, created_at)
         `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
@@ -255,6 +257,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         user2_id: string;
         user1_unread_count?: unknown;
         user2_unread_count?: unknown;
+        user1?: { id?: string; is_archived?: boolean } | null;
+        user2?: { id?: string; is_archived?: boolean } | null;
         chats?: Array<{ id?: string; message?: string | null; created_at?: string | null }> | null;
       };
 
@@ -277,10 +281,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       // Count unread ONLY for chats visible on Chat page:
       // - include Active + Earlier conversations
+      // - exclude archived partners
       // - exclude auto-deletable dormant chats (already removed from list)
       let total = 0;
       for (const row of rows) {
         const isUser1 = row.user1_id === userId;
+        const partner = isUser1 ? row.user2 : row.user1;
+
+        // ChatPage excludes archived partner chats entirely.
+        if (partner?.is_archived === true) continue;
 
         const latest = latestChatByMatchId.get(row.id);
         const hasLastMessage = Boolean(latest?.message);
@@ -1003,22 +1012,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }
 
   return (
-    <div
-      className="h-screen bg-black"
-      style={{
-        margin: 0,
-        padding: 0,
-        position: 'fixed',
-        top: 0,
-        left: 'var(--frame-inset)',
-        width: 'var(--frame-width)',
-        bottom: 0,
-        overflow: 'hidden',
-        // Reads as an intentional phone-width column (not a layout accident) once
-        // there's real space beside it on wide web viewports; a no-op at frame-inset: 0.
-        boxShadow: '0 0 40px rgba(0,0,0,0.6)',
-      }}
-    >
+    <div className="w-full h-screen bg-black" style={{ margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       {/* Make this parent the scrolling container so sticky children (header/nav) stick relative to it */}
       <div className="w-full h-full flex flex-col bg-black relative shadow-md" style={{ margin: 0, padding: 0 }}>
         
@@ -1027,13 +1021,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {!showTerms && !showPrivacy && (
             <div
               data-driplove-global-header
-              className="fixed top-0 z-50"
+              className="fixed top-0 left-0 right-0 w-full z-50"
               style={{
                 margin: 0,
                 padding: 0,
                 top: 0,
-                left: 'var(--frame-inset)',
-                width: 'var(--frame-width)',
                 position: 'fixed',
                 // Same compact, fully solid bar sized to its own content on
                 // every tab - this box's own size never changes. The pink
@@ -1180,10 +1172,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Bottom Nav - always visible */}
   {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
-            className="fixed z-[99999] rounded-[28px]"
+            className="fixed left-3 right-3 z-[99999] rounded-[28px]"
             style={{
-              left: 'calc(var(--frame-inset) + 0.75rem)',
-              width: 'calc(var(--frame-width) - 1.5rem)',
               bottom: getPlatformSync() === 'android'
                 ? '30px'
                 : 'calc(env(safe-area-inset-bottom, 0px) + 22px)',

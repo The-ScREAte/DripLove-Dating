@@ -864,15 +864,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
-        className="fixed z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm"
+        className="fixed left-0 right-0 z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm"
         style={{
           // Start from where main header ends; slightly lowered for cleaner breathing room
-          top: platform === 'android'
+          top: platform === 'android' 
             ? 'clamp(96px, calc(env(safe-area-inset-top, 10px) + 76px), 126px)'
             : 'clamp(62px, calc(env(safe-area-inset-top, 10px) + 42px), 92px)',
           paddingTop: '2px',
-          left: 'var(--frame-inset)',
-          width: 'var(--frame-width)',
+          width: '100%',
         }}
       >
   <div className="px-3 py-1.5">

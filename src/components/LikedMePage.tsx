@@ -397,7 +397,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       .from('profiles')
       .select('*')
       .in('id', likerIds)
-      .neq('is_admin', true);
+      .neq('is_admin', true)
+      .eq('is_archived', false);
 
     if (profileError) throw profileError;
 

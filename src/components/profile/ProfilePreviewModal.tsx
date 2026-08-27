@@ -97,15 +97,18 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           (a viewport-relative height rather than a fixed aspect ratio, so it
           fills the screen the same way) with a sensible floor for short
           screens; the caption overlay below is clipped to this box so it can
-          never bleed past the photo's own edges. flex-shrink-0 keeps it a
-          static block - like Discover, only the info panel scrolls, never
-          the photo. */}
+          never bleed past the photo's own edges. Collapsed, nothing else
+          shares this flex column, so a flat 78vh left a dead strip of plain
+          black between the photo's own bottom (where the caption/feathering
+          is pinned) and the screen's real bottom edge; flex:1 fills that
+          instead so the feathering actually reaches the bottom of the
+          screen. */}
       <div
-        className="relative w-full flex-shrink-0 overflow-hidden"
+        className="relative w-full overflow-hidden"
         style={{
-          height: showMoreInfo ? '42vh' : '78vh',
+          flex: showMoreInfo ? '0 0 42vh' : '1 1 auto',
           minHeight: showMoreInfo ? '240px' : '420px',
-          transition: 'height 300ms ease-out, min-height 300ms ease-out',
+          transition: 'flex-basis 300ms ease-out, min-height 300ms ease-out',
         }}
       >
         <div className="w-full h-full relative" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
@@ -172,12 +175,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         >
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <h2 className="text-xl font-bold mb-1 text-white">
+              <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold mb-1 text-white">
                 {profile.first_name} {profile.last_name}, {calculateAge(profile.date_of_birth)}
               </h2>
               {!showMoreInfo && profile.city && (
-                <div className="flex items-center text-xs text-gray-300">
-                  <MapPin className="w-3 h-3 mr-1" />
+                <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-gray-300">
+                  <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
                   <span>{profile.city}, {profile.country}</span>
                 </div>
               )}
@@ -204,7 +207,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             {/* Expandable info button - same style/behavior as Discover's MatchCard toggle. */}
             <button
               onClick={() => setShowMoreInfo(prev => !prev)}
-              className="text-white rounded-full p-2 transition-colors duration-200 shrink-0 backdrop-blur-md"
+              className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
               style={{
                 background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
                 boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
@@ -212,9 +215,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               aria-label={showMoreInfo ? t('discover.matchCard.hideDetails', 'Hide details') : t('discover.matchCard.showDetails', 'Show details')}
             >
               {showMoreInfo ? (
-                <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+                <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
               ) : (
-                <ArrowDown className="w-4 h-4" strokeWidth={2.5} />
+                <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
               )}
             </button>
           </div>
