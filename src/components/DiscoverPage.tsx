@@ -4873,7 +4873,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   // so this needs to know about both (as real measured numbers, not guesses) or
                   // the panel overclaims space that isn't there, eating into the bottom
                   // padding/clearance that's supposed to be reserved.
-                  maxHeight: `${Math.max(400, vh - (bottomNavHeight + 92) - headerHeight)}px`,
+                  // Container-relative: the surrounding discover-container is already
+                  // exactly the space between header and nav, so a percentage of it can
+                  // never overclaim space (the old vh math could, and pushed the card
+                  // out of view on some devices).
+                  maxHeight: '66%',
+
                 }}
               >
                 <div
