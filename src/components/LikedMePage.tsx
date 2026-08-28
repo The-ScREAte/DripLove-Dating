@@ -1250,7 +1250,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             scrolls internally instead of stealing space from the photo. */}
         <div
           className="relative flex-shrink-0 w-full overflow-hidden"
-          style={{ height: 'max(65vh, 440px)' }}
+          // Percentage of the page container (which is exactly the space between the
+          // header and the bottom nav) instead of viewport units, so the photo and the
+          // details panel below always fit together without crossing either bar.
+          style={{ height: '62%', minHeight: '220px' }}
         >
           <div
             className="select-none"
