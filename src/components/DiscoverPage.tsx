@@ -4726,8 +4726,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               // the column with the details panel below and needs to negotiate space
               // with it - capped by min/max height so it can't blow past its share.
               ...(showMoreInfo
-                ? { minHeight: 'max(48vh, 340px)', maxHeight: '72vh' }
+                ? { minHeight: '34%', maxHeight: '62%' }
                 : { position: 'absolute', inset: 0 }),
+
               // The outer discover-container above is 'pan-y' so the expanded info
               // panel further down can still scroll natively, but THIS specific element
               // fully drives its own dragging in both axes via JS (handleTouchMove sets
