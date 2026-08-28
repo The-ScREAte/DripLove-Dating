@@ -4351,7 +4351,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // Show loading state ONLY while initial fetch is in progress AND we have no profiles
   if (!hasCompletedInitialFetch && potentialMatches.length === 0 && isLoading) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+      <div className="h-full w-full flex items-center justify-center overflow-y-auto">
         <div className="flex flex-col items-center">
           <div className="mb-4">
             <HoppingLogo size={80} />
@@ -4368,7 +4368,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // where the empty screen would flash before the refill silently lands a moment later.
   if (potentialMatches.length === 0 && hasCompletedInitialFetch && isLoadingMore) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+      <div className="h-full w-full flex items-center justify-center overflow-y-auto">
         <div className="flex flex-col items-center">
           <div className="mb-4">
             <HoppingLogo size={80} />
@@ -4396,7 +4396,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     // Show empty state - user can manually refresh
     // Background loading will continue silently without showing spinner
     return (
-      <div className="min-h-screen w-full flex items-center justify-center" style={{ minHeight: 'calc(100vh - 152px)' }}>
+      <div className="h-full w-full flex items-center justify-center overflow-y-auto">
         <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
           <CardContent className="p-6 text-center flex flex-col items-center">
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
@@ -4892,8 +4892,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                     // (see the filler div below) — real content can only ever scroll within this
                     // safe zone, so it can never end up rendered behind the floating nav, no matter
                     // the scroll position.
-                    maxHeight: `${Math.max(280, Math.max(400, vh - (bottomNavHeight + 92) - headerHeight) - 150)}px`,
-                    minHeight: 'min(20vh, 200px)',
+                    maxHeight: '100%',
+                    minHeight: '80px',
                   }}
                 >
                   {/* Render MatchCard details area */}
