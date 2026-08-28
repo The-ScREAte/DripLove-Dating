@@ -4759,21 +4759,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           />
           {/* Image area - flexible height that fills remaining space */}
           <div
-            className={`discover-image-area flex-1 cursor-pointer select-none relative transition-all duration-300 overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
+            className={`discover-image-area ${showMoreInfo ? 'flex-1' : ''} cursor-pointer select-none relative transition-all duration-300 overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
             style={{
-              // Use flexible height calculation that works better on mobile browsers
-              // Extra vh reclaimed from the header now offsetting to 0 so the photo reaches the top edge.
-              // Collapsed: no floor and no cap — the image (flex-1) absorbs all leftover space
-              // itself from its parent's real height (see the flex-1 wrapper above, which now
-              // matches its own parent exactly instead of a static vh calc). A static vh floor
-              // here doesn't track the dynamic viewport on mobile (the URL bar can make 100vh
-              // taller than what's actually visible), so it could force this taller than the
-              // parent actually has room for and get clipped by this div's own overflow-hidden -
-              // exactly the caption-cut-off bug. Nothing needs a floor: the parent already
-              // guarantees a real height.
-              // Expanded: capped so the info panel has room to grow and show more detail.
-              minHeight: showMoreInfo ? 'max(48vh, 340px)' : 0,
-              maxHeight: showMoreInfo ? '72vh' : 'none',
+              // Collapsed: absolutely positioned to the parent's exact box (inset 0),
+              // not a flex-grow child. flex-basis/flex-grow still ultimately depend on
+              // the browser resolving this element's own intrinsic/content size at some
+              // point in the algorithm - on iOS Safari a tall photo could still win that
+              // fight and force this box (and the parent) taller than intended, no matter
+              // how many flex-basis/min-height overrides are stacked on top. Absolute
+              // positioning removes that possibility entirely: this box is always exactly
+              // the size of its (already real-height) `relative` parent, full stop,
+              // regardless of what's rendered inside it.
+              // Expanded: back to normal flow (flex-1 in className) since it now shares
+              // the column with the details panel below and needs to negotiate space
+              // with it - capped by min/max height so it can't blow past its share.
+              ...(showMoreInfo
+                ? { minHeight: 'max(48vh, 340px)', maxHeight: '72vh' }
+                : { position: 'absolute', inset: 0 }),
               // The outer discover-container above is 'pan-y' so the expanded info
               // panel further down can still scroll natively, but THIS specific element
               // fully drives its own dragging in both axes via JS (handleTouchMove sets

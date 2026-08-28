@@ -1253,8 +1253,15 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
           style={{ height: 'max(65vh, 440px)' }}
         >
           <div
-            className="w-full h-full relative select-none"
+            className="select-none"
             style={{
+              // Absolute + inset 0, not w-full/h-full: pins this box to the exact
+              // dimensions of its `relative` parent above (fixed at max(65vh,440px))
+              // with zero dependency on this element's own content size, so a very
+              // tall/portrait photo inside can never expand it - same fix as
+              // Discover's collapsed image area and the profile preview photo box.
+              position: 'absolute',
+              inset: 0,
               cursor: 'pointer',
               touchAction: 'pan-y',
               transform: `translateX(${swipeDragX}px) rotate(${Math.max(-15, Math.min(15, swipeDragX * 0.05))}deg)`,

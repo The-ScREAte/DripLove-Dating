@@ -124,7 +124,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           transition: 'flex-basis 300ms ease-out, min-height 300ms ease-out',
         }}
       >
-        <div className="w-full h-full relative" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
+        {/* Absolute + inset 0, not w-full/h-full: pins this box to the exact
+            dimensions of the flex box above with zero dependency on this
+            element's own content size, so a tall/portrait photo inside can
+            never expand it - belt-and-suspenders on top of the flex-basis
+            fix above, same technique used in Discover and Liked Me. */}
+        <div className="absolute inset-0" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
           {currentSlideData && (
             <SlideRenderer
               slide={currentSlideData}

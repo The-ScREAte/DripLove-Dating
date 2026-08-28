@@ -66,7 +66,12 @@ const ImageSlide = React.memo<{
   }
   
   return (
-    <div className="relative w-full h-full bg-black">
+    // Absolute + inset 0, not w-full/h-full: this is the one element shared by
+    // Discover, Liked Me, and the profile preview, so it's the most direct place
+    // to guarantee a tall/portrait photo can never influence this box's own size
+    // - it's always exactly the size of its (already correctly-sized) positioned
+    // ancestor, full stop, regardless of what image is inside it.
+    <div className="absolute inset-0 bg-black">
       <img
         key={imageSrc}
         loading="eager"
