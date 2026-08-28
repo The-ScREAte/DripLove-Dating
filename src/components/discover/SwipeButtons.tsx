@@ -17,12 +17,12 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   isPremium
 }) => {
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
-  
+
   // Detect platform
   const platform = Capacitor.getPlatform();
   const isIOS = platform === 'ios';
   const isAndroid = platform === 'android';
-  
+
   // Adjust bottom position based on platform — lifted to clear the floating pill nav
   const bottomClass = isAndroid
     ? 'bottom-32 sm:bottom-32'

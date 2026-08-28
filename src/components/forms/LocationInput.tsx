@@ -603,8 +603,13 @@ const LocationInput = ({
         )}
       </div>
 
-      {/* City + ZIP/Postal layout */}
-      <div className={`grid grid-cols-1 ${selectedCountryCode ? 'min-[390px]:grid-cols-2' : ''} gap-3 sm:gap-4`}>
+      {/* City + ZIP/Postal layout - both wait for a country to be chosen first, same
+          reasoning the city suggestions logic above already uses ("User MUST select a
+          country first before seeing cities"): without a country, city.name lookups/
+          suggestions/coordinates have nothing to match against, so the field just sat
+          there typable but functionally directionless until a country appeared. */}
+      {selectedCountryCode && (
+      <div className={`grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4`}>
       {/* City Selection */}
       <div className="space-y-2">
         <Label className="flex h-5 items-center gap-2">
@@ -729,9 +734,10 @@ const LocationInput = ({
         </div>
       )}
       </div>
+      )}
 
       {/* City status shown below the row to keep City/ZIP aligned */}
-      {cityInput && (
+      {selectedCountryCode && cityInput && (
         <div className="mt-1 flex items-center gap-2 text-xs">
           {coordinates.lat && coordinates.lng ? (
             <span className="text-green-600 flex items-center gap-1">

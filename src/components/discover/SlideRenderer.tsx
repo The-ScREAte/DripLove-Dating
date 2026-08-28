@@ -73,10 +73,18 @@ const ImageSlide = React.memo<{
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`w-full h-full object-cover object-top relative z-10 ${styles.optimizedImage}`}
+        className={`w-full h-full object-cover object-center relative z-10 ${styles.optimizedImage}`}
         // Fills its container completely, flush with the top - no offset margin pushing
         // it (and the space its own container needs) down within discover-image-area,
         // which only has room for exactly the container's own height.
+        // object-center, not object-top: this container can be quite tall/narrow
+        // relative to a typical photo (especially once it correctly fills all the
+        // real space between the header and nav), so object-cover crops aggressively.
+        // Anchoring to the top assumes the subject is always framed near the top of
+        // the source photo, which isn't true for every real user upload (e.g. a wider
+        // selfie where the person is centered or lower) - that mismatch can crop the
+        // subject out of frame almost entirely, leaving mostly background visible.
+        // Centering is a safer default across arbitrary user photos.
         style={{ borderRadius: '26px 26px 0 0' }}
         draggable={false}
         onError={() => setHasError(true)}

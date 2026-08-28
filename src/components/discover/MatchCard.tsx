@@ -11,7 +11,6 @@ import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
 import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
-import { getPlatformSync } from '@/utils/platformUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface MatchCardProps {
@@ -111,7 +110,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
   }, [match.id, isSwipeAreaOnly, isDetailsAreaOnly, imageIndex, userImages]);
 
   const [currentSlide, setCurrentSlide] = useState(0);
-  const platform = useMemo(() => getPlatformSync(), []);
 
   // Refs for performance
   const lastSlideInteraction = useRef<number>(0);
@@ -457,9 +455,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div
                   className="fixed right-3 z-[9999]"
                   style={{
-                    top: platform === 'android'
-                      ? 'calc(2rem + 64px)'
-                      : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 64px)'
+                    // env(safe-area-inset-top) is now reliable on Android too (see
+                    // @capacitor-community/safe-area setup in src/main.tsx).
+                    top: 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 64px)'
                   }}
                 >
                   <button
@@ -485,9 +483,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div
                   className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
                   style={{
-                    top: platform === 'android'
-                      ? 'calc(2rem + 64px)'
-                      : 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 64px)'
+                    // env(safe-area-inset-top) is now reliable on Android too (see
+                    // @capacitor-community/safe-area setup in src/main.tsx).
+                    top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 64px)'
                   }}
                 >
                   <div className="relative flex flex-col items-center">
@@ -521,9 +519,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div
               className="fixed left-4 flex space-x-2 z-[9999]"
               style={{
-                top: platform === 'android'
-                  ? 'calc(2rem + 66px)'
-                  : 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 66px)',
+                // env(safe-area-inset-top) is now reliable on Android too (see
+                // @capacitor-community/safe-area setup in src/main.tsx).
+                top: 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 66px)',
                 pointerEvents: 'none'
               }}
             >

@@ -2,7 +2,6 @@ import React from 'react';
 import { ChatMatch } from '@/types';
 import ChatUserAvatar from '../ChatUserAvatar';
 import NewMatches from './NewMatches';
-import { Capacitor } from '@capacitor/core';
 
 interface ChatUserListProps {
   matches: ChatMatch[];
@@ -21,13 +20,10 @@ const ChatUserList: React.FC<ChatUserListProps> = ({
   onUserProfileOpen,
   currentUserId
 }) => {
-  // Platform-specific safe area padding
-  const platform = Capacitor.getPlatform();
-  const paddingTopValue = platform === 'ios' 
-    ? 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)' 
-    : platform === 'android' 
-    ? '80px' 
-    : '72px'; // Increased from 64px to 72px for consistent header visibility
+  // env(safe-area-inset-top) is now reliable on Android too (see
+  // @capacitor-community/safe-area setup in src/main.tsx), so one formula covers
+  // native (iOS/Android) and web instead of a platform-branched guess.
+  const paddingTopValue = 'clamp(32px, calc(env(safe-area-inset-top, 0px) + 32px), 80px)';
 
   return (
     <div className="w-full h-full flex flex-col bg-black">

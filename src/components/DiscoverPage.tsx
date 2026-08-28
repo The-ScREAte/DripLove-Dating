@@ -258,6 +258,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Real rendered height of the app's fixed header/bottom nav, published by MainApp.tsx
+  // as CSS custom properties (measured via ResizeObserver, not guessed). Some of the
+  // expanded-panel height math below is plain JS, not CSS, so it needs these as numbers
+  // too - read once and kept in sync on resize, same cadence as `vh` above.
+  const readHeightVar = (name: string, fallback: number): number => {
+    if (typeof window === 'undefined') return fallback;
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+    const parsed = parseFloat(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+  const [headerHeight, setHeaderHeight] = useState<number>(() => readHeightVar('--app-header-height', 55));
+  const [bottomNavHeight, setBottomNavHeight] = useState<number>(() => readHeightVar('--app-bottom-nav-height', 78));
+  useEffect(() => {
+    const sync = () => {
+      setHeaderHeight(readHeightVar('--app-header-height', 55));
+      setBottomNavHeight(readHeightVar('--app-bottom-nav-height', 78));
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, [vh]);
   
   // IAP: Track if buy is enabled
   const [canBuy, setCanBuy] = useState(false);
@@ -4302,7 +4324,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                    ? 'none' 
                    : 'transform 0.2s ease-out',
                willChange: 'transform',
-               boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)'
+               boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)',
+               // Same fix as the main swipe card: this drives its own transform off both
+               // axes via JS, so native touch-action panning must be fully disabled here
+               // or it fights the manual drag (see the main discover-image-area for the
+               // full explanation).
+               touchAction: 'none',
              }}
              onTouchStart={handleTouchStart}
              onTouchMove={handleTouchMove}
@@ -4451,18 +4478,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         /* Fix for mobile browser viewport height issues - only on actual mobile devices.
            These !important rules override the inline height on .discover-container (a
            regular stylesheet !important beats an inline style without one), so they must
-           reserve the same 78px nav + 55px top offset the inline calc(100vh - 78px - 55px)
-           does. The old plain 100dvh/100svh/100lvh here ignored that reservation entirely,
-           making the container claim the FULL screen height starting 55px down - 55px
-           taller than what's actually visible - which silently clipped the bottom of
-           whatever was pinned to its bottom edge (e.g. the photo caption) against the
-           physical screen edge, with nothing to scroll to reveal it. */
+           reserve the same space the inline calc() below does. Both read the exact same
+           --app-header-height / --app-bottom-nav-height custom properties (set by
+           MainApp.tsx from the real rendered height of those two fixed elements, via
+           ResizeObserver) instead of two independently-hardcoded copies of a guessed
+           number that has to be kept in sync by hand - the old plain 100dvh/100svh/100lvh
+           here ignored the reservation entirely, making the container claim the FULL
+           screen height starting var(--app-header-height) down - taller than what's
+           actually visible - which silently clipped the bottom of whatever was pinned to
+           its bottom edge (e.g. the photo caption) against the physical screen edge, with
+           nothing to scroll to reveal it. */
         @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           .discover-container {
             /* Use dynamic viewport height for mobile browsers, minus the same reserved space */
-            height: calc(100dvh - 78px - 55px) !important;
-            min-height: calc(100svh - 78px - 55px) !important;
-            max-height: calc(100lvh - 78px - 55px) !important;
+            height: calc(100dvh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
+            min-height: calc(100svh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
+            max-height: calc(100lvh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
           }
 
           .discover-image-area {
@@ -4487,7 +4518,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           @supports (-webkit-touch-callout: none) {
             .discover-container {
-              height: calc(-webkit-fill-available - 78px - 55px) !important;
+              height: calc(-webkit-fill-available - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
             }
           }
         }
@@ -4495,15 +4526,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
       <div className="discover-container h-full w-full fixed left-0 overflow-hidden"
            style={{
-             // Shifted down 55px (instead of the individual card/image having its own internal
-             // padding or margin for this) — the whole fixed layer moves together: current card,
-             // next-card preview, everything. That way the gap at the top reveals the app's own
-             // background behind this layer, not some other layer that isn't shifted the same
-             // way and ends up visually mismatched with it.
-             top: '55px',
-             height: 'calc(100vh - 78px - 55px)', // Reserve room for the floating pill nav (now higher/slimmer)
+             // Shifted down by the header's real height (instead of the individual
+             // card/image having its own internal padding or margin for this) — the whole
+             // fixed layer moves together: current card, next-card preview, everything.
+             // That way the gap at the top reveals the app's own background behind this
+             // layer, not some other layer that isn't shifted the same way and ends up
+             // visually mismatched with it. Reads --app-header-height / --app-bottom-nav-height,
+             // set by MainApp.tsx from the real rendered height of those two fixed
+             // elements (see its ResizeObserver effect) - not a guessed constant.
+             top: 'var(--app-header-height, 55px)',
+             height: 'calc(100vh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px))',
              // Mobile browser viewport fix
-             minHeight: 'calc(100vh - 78px - 55px)',
+             minHeight: 'calc(100vh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px))',
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
              overscrollBehavior: 'contain',
              userSelect: 'none',
@@ -4669,7 +4703,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
                 })()}
                 alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-cover object-top"
+                className="w-full h-full object-cover object-center"
                 style={{ position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
@@ -4738,6 +4772,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               // Expanded: capped so the info panel has room to grow and show more detail.
               minHeight: showMoreInfo ? 'max(48vh, 340px)' : 0,
               maxHeight: showMoreInfo ? '72vh' : 'none',
+              // The outer discover-container above is 'pan-y' so the expanded info
+              // panel further down can still scroll natively, but THIS specific element
+              // fully drives its own dragging in both axes via JS (handleTouchMove sets
+              // both dragOffset and dragOffsetY off a transform - see getCardTransform).
+              // Left at 'pan-y' (inherited), the browser's own native vertical pan
+              // gesture recognizer can engage on the same touch at the same time as the
+              // JS handlers, fighting the manual transform for any touch with even a
+              // slight vertical component (i.e. nearly every real swipe) - this is what
+              // shows up as swipe jank/glitching, especially on Android Chrome, which is
+              // more aggressive about honoring touch-action for native scroll
+              // optimization. 'none' hands full control to the JS handlers with nothing
+              // to fight.
+              touchAction: 'none',
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -4862,12 +4909,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   display: 'flex',
                   flexDirection: 'column',
                   // Total panel height (background) reaches almost all the way to the bottom of
-                  // the screen, so there's no gap of photo/transparency below it. The extra -55
-                  // accounts for discover-container itself now starting 55px lower (see its `top`
-                  // above) — that much less vertical space is actually available overall, so this
-                  // needs to know about it too or the panel overclaims space that isn't there,
-                  // eating into the bottom padding/clearance that's supposed to be reserved.
-                  maxHeight: `${Math.max(400, vh - 170 - 55)}px`,
+                  // the screen, so there's no gap of photo/transparency below it. bottomNavHeight
+                  // + 92 accounts for the floating nav plus a fixed buffer below it; headerHeight
+                  // accounts for discover-container itself starting that much lower (see its
+                  // `top` above) — that much less vertical space is actually available overall,
+                  // so this needs to know about both (as real measured numbers, not guesses) or
+                  // the panel overclaims space that isn't there, eating into the bottom
+                  // padding/clearance that's supposed to be reserved.
+                  maxHeight: `${Math.max(400, vh - (bottomNavHeight + 92) - headerHeight)}px`,
                 }}
               >
                 <div
@@ -4881,7 +4930,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                     // (see the filler div below) — real content can only ever scroll within this
                     // safe zone, so it can never end up rendered behind the floating nav, no matter
                     // the scroll position.
-                    maxHeight: `${Math.max(280, Math.max(400, vh - 170 - 55) - 150)}px`,
+                    maxHeight: `${Math.max(280, Math.max(400, vh - (bottomNavHeight + 92) - headerHeight) - 150)}px`,
                     minHeight: 'min(20vh, 200px)',
                   }}
                 >

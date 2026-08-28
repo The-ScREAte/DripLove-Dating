@@ -37,7 +37,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: true,
     // Performance optimizations for Android WebView
     // Transparent background is required for native CameraPreview with toBack:true
     backgroundColor: '#00000000',
@@ -65,15 +65,16 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "banner"]
     },
-    StatusBar: {
-      style: 'default',
-      overlaysWebView: true
-    },
+    // StatusBar config removed - @capacitor/status-bar is replaced by
+    // @capacitor-community/safe-area (see src/main.tsx), which handles system
+    // bar styling and makes env(safe-area-inset-*) reliable on Android too.
     Keyboard: {
       // Prevent native viewport resize; we handle layout manually in JS
       resize: 'none',
-      style: 'dark',
-      resizeOnFullScreen: true
+      style: 'dark'
+      // resizeOnFullScreen intentionally omitted - @capacitor-community/safe-area
+      // requires this to be unset/false or it fights the plugin's own
+      // keyboard-resize handling that useChatKeyboardFix relies on.
     },
     Browser: {
       // Safari View Controller configuration for iOS (for in-app OAuth)

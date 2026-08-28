@@ -7,4 +7,7 @@
     
     <!-- Notification icon tint color -->
     <color name="notification_icon_color">#9333EA</color>
+
+    <!-- App is dark-themed everywhere; matches src/index.css's body background -->
+    <color name="appWindowBackground">#000000</color>
 </resources>

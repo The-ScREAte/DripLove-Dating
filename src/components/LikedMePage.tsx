@@ -1297,11 +1297,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
           <div
             className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
             style={{
-              top: platform === 'ios'
-                ? 'clamp(32px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
-                : platform === 'android'
-                  ? '24px'
-                  : '10px'
+              // env(safe-area-inset-top) is now reliable on Android too (see
+              // @capacitor-community/safe-area setup in src/main.tsx).
+              top: 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
             }}
           >
             {Array.from({ length: totalSlides }).map((_, idx) => (
@@ -1327,9 +1325,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              top: platform === 'ios'
-                ? 'clamp(32px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
-                : '10px'
+              top: 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
             }}
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
@@ -1344,9 +1340,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               aria-label={t('reportModal.title')}
               className="absolute right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/95 border border-red-300 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
               style={{
-                top: platform === 'ios'
-                  ? 'clamp(32px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
-                  : '10px'
+                top: 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
               }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1732,11 +1726,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     className="flex-shrink-0 shadow-sm border-b border-pink-500/30 px-4 py-4"
     style={{
       background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))',
-      marginTop: platform === 'ios'
-        ? 'clamp(20px, calc(env(safe-area-inset-top, 10px) + 23px), 50px)'
-        : platform === 'android'
-        ? '20px'
-        : '0'
+      // env(safe-area-inset-top) is now reliable on Android too (see
+      // @capacitor-community/safe-area setup in src/main.tsx).
+      marginTop: 'clamp(0px, calc(env(safe-area-inset-top, 0px) + 23px), 50px)'
     }}
   >
         <div className="flex items-center justify-between mb-1">

@@ -19,6 +19,8 @@ PODS:
     - Capacitor
   - CapacitorCommunityCameraPreview (7.0.2):
     - Capacitor
+  - CapacitorCommunitySafeArea (7.0.0):
+    - Capacitor
   - CapacitorCordova (7.4.3)
   - CapacitorFirebaseMessaging (7.4.0):
     - Capacitor
@@ -30,8 +32,6 @@ PODS:
   - CapacitorPushNotifications (7.0.3):
     - Capacitor
   - CapacitorRateApp (4.0.3):
-    - Capacitor
-  - CapacitorStatusBar (7.0.1):
     - Capacitor
   - CapacitorVideoPlayer (6.0.2):
     - Capacitor
@@ -114,13 +114,13 @@ DEPENDENCIES:
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCommunityCameraPreview (from `../../node_modules/@capacitor-community/camera-preview`)"
+  - "CapacitorCommunitySafeArea (from `../../node_modules/@capacitor-community/safe-area`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFirebaseMessaging (from `../../node_modules/@capacitor-firebase/messaging`)"
   - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
   - "CapacitorPreferences (from `../../node_modules/@capacitor/preferences`)"
   - "CapacitorPushNotifications (from `../../node_modules/@capacitor/push-notifications`)"
   - CapacitorRateApp (from `../../node_modules/capacitor-rate-app`)
-  - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
   - CapacitorVideoPlayer (from `../../node_modules/capacitor-video-player`)
   - CordovaPlugins (from `../capacitor-cordova-ios-plugins`)
   - GoogleSignIn (~> 7.1)
@@ -158,6 +158,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCommunityCameraPreview:
     :path: "../../node_modules/@capacitor-community/camera-preview"
+  CapacitorCommunitySafeArea:
+    :path: "../../node_modules/@capacitor-community/safe-area"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorFirebaseMessaging:
@@ -170,8 +172,6 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/push-notifications"
   CapacitorRateApp:
     :path: "../../node_modules/capacitor-rate-app"
-  CapacitorStatusBar:
-    :path: "../../node_modules/@capacitor/status-bar"
   CapacitorVideoPlayer:
     :path: "../../node_modules/capacitor-video-player"
   CordovaPlugins:
@@ -188,13 +188,13 @@ SPEC CHECKSUMS:
   CapacitorCamera: 6e18d54c8ab30d7dc7b8cd93d96f9b4f57e9202a
   CapacitorCommunityAppleSignIn: 59bc8ade5677e6ea60a14bdca8d3f4bdc91069e2
   CapacitorCommunityCameraPreview: e103f14483f5f0a5356aacee4605dc7e88260462
+  CapacitorCommunitySafeArea: cea909b52195cf57d08a6b6331288cb43d906196
   CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
   CapacitorFirebaseMessaging: 9cac5fc77994801e2b87a61f7b2a5f8efc0da33a
   CapacitorKeyboard: 3822c3a0c6b58168f96ca562f9534ed095d40860
   CapacitorPreferences: 83f13cc19660ca9649a4769ec255be93f8c2ff68
   CapacitorPushNotifications: 729ade0d2791ec1969feaf931a15e28d929a6d70
   CapacitorRateApp: 896df7ec6a237fea72d1955e0cb26394654b00db
-  CapacitorStatusBar: 275cbf2f4dfc00388f519ef80c7ec22edda342c9
   CapacitorVideoPlayer: e437e704dbc171ecab1a28e89671017643fab06b
   CordovaPlugins: 799c0d0e2e65a22f43dd5e5785398b04b426e943
   FirebaseCore: 3227e35f4197a924206fbcdc0349325baf4f5de4
@@ -210,6 +210,6 @@ SPEC CHECKSUMS:
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   SouthdevsCapacitorGoogleAuth: 344574498481b6c631d1a2ac103252a3a8166ede
 
-PODFILE CHECKSUM: b098c8ccd03d77773af9e943b4a5e2660076a85a
+PODFILE CHECKSUM: 672e077885e8380acd91d3c821e5f143157f9554
 
 COCOAPODS: 1.12.1

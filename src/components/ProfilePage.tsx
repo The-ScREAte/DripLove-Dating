@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { getPlatformSync } from '@/utils/platformUtils';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,7 +86,6 @@ interface ProfilePageProps {
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0 }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const platform = useMemo(() => getPlatformSync(), []);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
@@ -866,10 +864,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div
         className="fixed left-0 right-0 z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm"
         style={{
-          // Start from where main header ends; slightly lowered for cleaner breathing room
-          top: platform === 'android' 
-            ? 'clamp(96px, calc(env(safe-area-inset-top, 10px) + 76px), 126px)'
-            : 'clamp(62px, calc(env(safe-area-inset-top, 10px) + 42px), 92px)',
+          // Start from where main header ends; slightly lowered for cleaner breathing room.
+          // env(safe-area-inset-top) is now reliable on Android too (see
+          // @capacitor-community/safe-area setup in src/main.tsx), and MainApp's own
+          // header padding is no longer platform-branched either, so one clamp now
+          // covers both platforms instead of two separately-tuned ranges.
+          top: 'clamp(62px, calc(env(safe-area-inset-top, 10px) + 42px), 92px)',
           paddingTop: '2px',
           width: '100%',
         }}
@@ -1026,8 +1026,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       {/* Scrollable Content - with padding to account for fixed header */}
       <div 
         className="max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden w-full" 
-        style={{ 
-          paddingTop: '160px', 
+        style={{
+          // Clears the two stacked fixed headers above (MainApp's + this page's own),
+          // both of which grow with env(safe-area-inset-top) - this needs to grow with
+          // it too instead of a single flat guess, or content sits under the headers
+          // on devices with a bigger inset (Dynamic Island, etc).
+          paddingTop: 'clamp(140px, calc(env(safe-area-inset-top, 10px) + 120px), 190px)',
           paddingBottom: Capacitor.getPlatform() === 'web'
             ? '30px'
             : 'clamp(100px, calc(env(safe-area-inset-bottom, 0px) + 90px), 150px)'

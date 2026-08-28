@@ -29,6 +29,18 @@ html.platform-web {
   --frame-inset: calc((100vw - var(--frame-width)) / 2);
 }
 
+/* The app is dark-themed everywhere (the shadcn `.dark` class this design system ships
+   with is never actually toggled - every screen just paints its own bg-black directly),
+   so body's real baseline needs to be black on every platform, not just web. Without
+   this, body falls back to `--background` from :root (white, shadcn's light-mode
+   default), which only stays invisible because every screen happens to fully cover it -
+   any gap that doesn't (a safe-area inset, an overscroll bounce, a loading flash) shows
+   white through a supposedly all-black app instead of matching whatever's on screen. */
+html,
+body {
+  background-color: #000;
+}
+
 /* Fill the space beside the centered frame on wide web viewports so it reads as an
    intentional layout instead of empty page background. */
 html.platform-web body {

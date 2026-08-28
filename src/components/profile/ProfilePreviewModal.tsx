@@ -107,7 +107,13 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         className="relative w-full overflow-hidden"
         style={{
           flex: showMoreInfo ? '0 0 42vh' : '1 1 auto',
-          minHeight: showMoreInfo ? '240px' : '420px',
+          // Floors that fit even short screens once the header/nav space above is
+          // correctly reserved (this used to assume ~420px was always available below
+          // the header, but a real short device/emulator can have well under that once
+          // MainApp's wrapper reserves the header/nav's real measured height - the photo
+          // would blow past its own parent's bottom edge and get clipped by the nav
+          // instead of shrinking to fit).
+          minHeight: showMoreInfo ? '200px' : '300px',
           transition: 'flex-basis 300ms ease-out, min-height 300ms ease-out',
         }}
       >
@@ -143,17 +149,6 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         {profile.adinkra_symbols && profile.adinkra_symbols.length > 0 && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
             <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
-              <div
-                className="absolute w-full"
-                style={{
-                  left: 0,
-                  right: 0,
-                  top: '50%',
-                  height: '160%',
-                  transform: 'translateY(-50%)',
-                  background: 'radial-gradient(ellipse 100% 50% at center, rgba(0,0,0,0.45), transparent 75%)',
-                }}
-              />
               <div className="relative z-10">
                 <UserAdinkraDisplay adinkraSymbols={profile.adinkra_symbols} />
               </div>
@@ -334,9 +329,14 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         </div>
       )}
 
-      {/* Undo button - same fixed-position control as Discover's SwipeButtons.
-          There's no swipe to undo in a read-only preview, so it steps back
-          through this profile's own photos instead; disabled on the first one. */}
+      {/* Undo button - same 'fixed' control as Discover's SwipeButtons. This modal is
+          rendered inline within MainApp's own layout (in place of ProfilePage's
+          content), which keeps MainApp's fixed header/nav visible around it - so it
+          shares the SAME true viewport those are anchored to, and the same nav-aware
+          'fixed' formula that positions this correctly on Discover positions it
+          correctly here too. There's no swipe to undo in a read-only preview, so it
+          steps back through this profile's own photos instead; disabled on the first
+          one. */}
       <SwipeButtons
         onReverse={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
         canReverse={currentSlide > 0}

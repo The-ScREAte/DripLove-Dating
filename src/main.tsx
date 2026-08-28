@@ -269,34 +269,30 @@ const AppWrapper = () => {
           const { Capacitor } = await import('@capacitor/core');
           if (Capacitor.isNativePlatform()) {
             try {
-              const [{ Keyboard }, { StatusBar, Style }, { App }] = await Promise.all([
+              const [{ Keyboard }, { SafeArea, SystemBarsStyle }, { App }] = await Promise.all([
                 import('@capacitor/keyboard'),
-                import('@capacitor/status-bar'),
+                import('@capacitor-community/safe-area'),
                 import('@capacitor/app')
               ]);
 
-              // Configure status bar
-              await StatusBar.setStyle({ style: Style.Dark });
-
-              // ⭐ ANDROID ONLY: Android WebViews don't report env(safe-area-inset-top), so with
-              // the status bar overlaying the WebView the app header collides with the clock /
-              // battery icons. Push the WebView below the status bar on Android only — iOS keeps
-              // its existing overlay + safe-area behaviour untouched.
-              if (Capacitor.getPlatform() === 'android') {
-                try {
-                  await StatusBar.setOverlaysWebView({ overlay: false });
-                  await StatusBar.setBackgroundColor({ color: '#000000' });
-                } catch {
-                  // Status bar plugin unavailable — ignore
-                }
+              // Configure system bars. @capacitor-community/safe-area replaces
+              // @capacitor/status-bar entirely - it detects broken WebView/Chromium
+              // versions and pads the WebView natively so env(safe-area-inset-*) is
+              // reliably correct on Android too, the same way it already was on iOS
+              // and web. No more forcing overlaysWebView off on Android and no more
+              // manually mirroring env() into CSS vars - every screen just uses plain
+              // env(safe-area-inset-*) now, on every platform.
+              try {
+                await SafeArea.setSystemBarsStyle({ style: SystemBarsStyle.Dark });
+              } catch {
+                // System bars API unavailable — ignore
               }
 
-              
               // Configure keyboard: do not modify body padding; handled by useChatKeyboardFix
               Keyboard.addListener('keyboardWillShow', () => {
                 // No-op: layout handled via CSS variables in useChatKeyboardFix
               });
-              
+
               Keyboard.addListener('keyboardWillHide', () => {
                 // No-op: layout handled via CSS variables in useChatKeyboardFix
               });
@@ -304,13 +300,7 @@ const AppWrapper = () => {
               // ✅ Deep link OAuth handling is done in useMobileOAuth hook (AppRoutes.tsx)
               // ❌ REMOVED duplicate appUrlOpen listener to prevent conflicts
               // Only ONE appUrlOpen listener should exist - it's in useMobileOAuth.ts
-              
-              // Set up safe area CSS variables (using environment variables)
-              document.documentElement.style.setProperty('--safe-area-inset-top', 'env(safe-area-inset-top, 0px)');
-              document.documentElement.style.setProperty('--safe-area-inset-bottom', 'env(safe-area-inset-bottom, 0px)');
-              document.documentElement.style.setProperty('--safe-area-inset-left', 'env(safe-area-inset-left, 0px)');
-              document.documentElement.style.setProperty('--safe-area-inset-right', 'env(safe-area-inset-right, 0px)');
-              
+
             } catch (error) {
               // Ignore plugin initialization failures
             }

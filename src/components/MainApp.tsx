@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, User } from 'lucide-react';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
-import { isAndroidPlatform, isIOSPlatform, getPlatformSync, getPlatformSafe } from '@/utils/platformUtils';
+import { isAndroidPlatform, isIOSPlatform, getPlatformSafe } from '@/utils/platformUtils';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
 import RatingDialog from '@/components/RatingDialog';
 import AppUpdatePopup from '@/components/AppUpdatePopup';
@@ -105,6 +105,34 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // Ignore storage errors
     }
   }, [activeTab]);
+
+  // Measure the real rendered height of the fixed header and bottom nav (both
+  // grow/shrink with env(safe-area-inset-*) - see their own styles below) and
+  // publish them as CSS custom properties. Screens like DiscoverPage that need
+  // to reserve exactly this much space read these vars instead of hardcoding a
+  // guessed pixel number that silently goes stale the moment either bar's real
+  // height changes on some device.
+  useEffect(() => {
+    const header = document.querySelector<HTMLElement>('[data-driplove-global-header]');
+    const bottomNav = document.querySelector<HTMLElement>('[data-driplove-bottom-nav]');
+    const root = document.documentElement;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = Math.round(entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height);
+        if (entry.target === header) {
+          root.style.setProperty('--app-header-height', `${height}px`);
+        } else if (entry.target === bottomNav) {
+          root.style.setProperty('--app-bottom-nav-height', `${height}px`);
+        }
+      }
+    });
+
+    if (header) observer.observe(header);
+    if (bottomNav) observer.observe(bottomNav);
+
+    return () => observer.disconnect();
+  }, [activeTab, showTerms, showPrivacy, isKeyboardOpen, isChatDetailOpen]);
 
   // Keep visited tabs in sync even when activeTab changes outside handleTabChange.
   useEffect(() => {
@@ -1052,11 +1080,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               <div
                 className="relative px-4 py-2 flex justify-between items-center"
                 style={{
-                  paddingTop: getPlatformSync() === 'ios'
-                    ? 'clamp(10px, env(safe-area-inset-top, 10px), 40px)'
-                    : getPlatformSync() === 'android'
-                    ? '24px'
-                    : '8px'
+                  // env(safe-area-inset-top) is now reliable on Android too (see
+                  // @capacitor-community/safe-area setup in src/main.tsx), so this no
+                  // longer needs a platform branch with a hardcoded Android guess.
+                  paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)'
                 }}
               >
                 <img src="/driplove-logo.webp" alt="DripLove Logo" className="h-10" loading="lazy" decoding="async" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))' }} />
@@ -1108,9 +1135,25 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           )}
 
         {/* Main Content */}
-        <div 
-          className={`flex-1 overflow-auto ${!showTerms && !showPrivacy ? 'pt-[56px] pb-[80px]' : ''}`}
-          style={{ height: '100%', position: 'relative' }}
+        <div
+          className="flex-1 overflow-auto"
+          style={{
+            height: '100%',
+            position: 'relative',
+            // Clears the real header/nav using the SAME measurements they're each built
+            // from (published by the ResizeObserver effect above) instead of a flat
+            // 56px/80px guess. That guess under-reserved both edges on real devices
+            // (e.g. a real header of 72px, real nav footprint of ~106px including its
+            // own bottom offset and safe-area inset) - every tab's content silently
+            // extended a bit further behind the header/nav than intended, most visibly
+            // on ProfilePreviewModal (rendered in place of ProfilePage's own content),
+            // which relies on this wrapper's real height to size its full-bleed photo
+            // and caption precisely.
+            paddingTop: !showTerms && !showPrivacy ? 'var(--app-header-height, 56px)' : 0,
+            paddingBottom: !showTerms && !showPrivacy
+              ? 'calc(env(safe-area-inset-bottom, 0px) + 22px + var(--app-bottom-nav-height, 78px))'
+              : 0,
+          }}
         >
           {/* Lazy load tabs on first access, then keep mounted in background */}
           {/* Use visibility instead of conditional rendering to preserve state */}
@@ -1172,11 +1215,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         {/* Fixed Bottom Nav - always visible */}
   {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
+            data-driplove-bottom-nav
             className="fixed left-3 right-3 z-[99999] rounded-[28px]"
             style={{
-              bottom: getPlatformSync() === 'android'
-                ? '30px'
-                : 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
+              // env(safe-area-inset-bottom) is now reliable on Android too (see
+              // @capacitor-community/safe-area setup in src/main.tsx).
+              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
               background: 'linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.88))',
               backdropFilter: 'blur(22px) saturate(180%)',
               WebkitBackdropFilter: 'blur(22px) saturate(180%)',
