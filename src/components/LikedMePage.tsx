@@ -1242,15 +1242,23 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return (
       <div
         className="h-full w-full relative flex flex-col bg-black overflow-hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          // Same pink frame Discover's card gets, around the whole thing - photo
+          // and info panel together, not just the photo.
+          border: '1px solid rgba(236,72,153,0.55)',
+          boxSizing: 'border-box',
+        }}
       >
-        {/* Photo area - a static block (flex-shrink-0, fixed height) that never
-            resizes or moves, whether the info panel below is collapsed or
-            expanded - the details area absorbs its own height changes and
-            scrolls internally instead of stealing space from the photo. */}
+        {/* Photo area - fixed height only while the info panel below is actually
+            showing (so that panel has room to breathe, same proportion Discover
+            gives its own expanded panel). Collapsed, there's no info panel
+            rendered at all (see below), so the photo fills 100% of the available
+            space instead of stopping at a fixed height and leaving a dead gap -
+            exactly how Discover's own collapsed card behaves. */}
         <div
           className="relative flex-shrink-0 w-full overflow-hidden"
-          style={{ height: '62%', minHeight: '220px' }}
+          style={{ height: showMoreInfo ? '58%' : '100%', minHeight: '220px' }}
         >
           {/* Swipeable unit - photo, swipe hint, AND the name/caption all live in
               this one box and move together as a single card on drag, the same
@@ -1534,6 +1542,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     <Heart className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
                     <span className="text-gray-200">{selectedProfile.relationship_intent}</span>
                   </div>
+                </div>
+              )}
+
+              {!(
+                selectedProfile.bio ||
+                [selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) ||
+                selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry ||
+                (selectedProfile.interests && selectedProfile.interests.length > 0) ||
+                selectedProfile.preferred_language ||
+                selectedProfile.relationship_intent
+              ) && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-6 text-center">
+                  <p className="text-gray-400 text-sm">No additional details shared yet.</p>
                 </div>
               )}
             </div>
