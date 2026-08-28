@@ -106,7 +106,14 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
       <div
         className="relative w-full overflow-hidden"
         style={{
-          flex: showMoreInfo ? '0 0 42vh' : '1 1 auto',
+          // flex-basis 0% (not 'auto'): on iOS Safari, a flex item with an 'auto'
+          // basis can size itself off its CONTENT's intrinsic height before the
+          // image's own 100%-height is resolved - a tall/portrait photo then
+          // forces this box (and everything below it) taller than the parent
+          // actually has room for, pushing the caption down or off-screen. '0%'
+          // makes flex-grow fill space purely from the parent's own definite
+          // height, with zero dependency on the photo's natural size.
+          flex: showMoreInfo ? '0 0 42vh' : '1 1 0%',
           // Floors that fit even short screens once the header/nav space above is
           // correctly reserved (this used to assume ~420px was always available below
           // the header, but a real short device/emulator can have well under that once
