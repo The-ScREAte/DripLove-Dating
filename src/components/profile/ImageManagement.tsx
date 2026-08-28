@@ -9,7 +9,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, Camera } from 'lucide-react';
+import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, Camera, Pencil } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
@@ -17,6 +17,7 @@ import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
 import { detectHumanFace, verifyUploadedImage } from '@/utils/faceVerificationUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import PhotoCropModal from './PhotoCropModal';
 
 interface ImageManagementProps {
   currentUser: {
@@ -46,6 +47,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [referenceFaceData, setReferenceFaceData] = useState<string | null>(null);
+  const [croppingImageUrl, setCroppingImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Check if user is verified (has face_descriptor)
@@ -806,6 +808,16 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
               
               {/* Action buttons - top right corner */}
               <div className="absolute top-2 right-2 flex gap-1">
+                {/* Crop - always available, on any photo */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setCroppingImageUrl(userImage.image_url)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-pink-600 hover:bg-pink-700 rounded-full shadow-md"
+                  title="Crop photo"
+                >
+                  <Pencil className="w-3 h-3" />
+                </Button>
                 {/* Show Replace button if only 2 images remain, otherwise show Delete */}
                 {userImages.length <= 2 ? (
                   <Button 
@@ -870,6 +882,18 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           </div>
         )}
       </CardContent>
+
+      {croppingImageUrl && currentUser?.id && (
+        <PhotoCropModal
+          imageUrl={croppingImageUrl}
+          userId={currentUser.id}
+          onClose={() => setCroppingImageUrl(null)}
+          onSaved={() => {
+            fetchUserImages();
+            onProfileUpdate?.();
+          }}
+        />
+      )}
     </Card>
   );
 };

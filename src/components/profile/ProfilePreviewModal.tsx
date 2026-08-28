@@ -9,6 +9,7 @@ import {
   ArrowDown,
   ArrowUp,
 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
@@ -17,11 +18,13 @@ import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BOR
 import { SlideRenderer } from '../discover/SlideRenderer';
 import UserAdinkraDisplay from '../discover/UserAdinkraDisplay';
 import SwipeButtons from '../discover/SwipeButtons';
+import PhotoCropModal from './PhotoCropModal';
 
 interface ProfilePreviewModalProps {
   profile: PotentialMatch;
   images: string[];
   onClose: () => void;
+  onPhotoUpdated?: () => void;
 }
 
 const BACKGROUND_COLORS = [
@@ -58,10 +61,11 @@ const getSafeImageSrc = (url?: string): string | undefined => {
 // instead of covering the screen; leaving the tab (including tapping the
 // Profile nav icon again) drops back to the real profile page, handled by
 // ProfilePage via onClose/isActiveTab.
-const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose }) => {
+const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated }) => {
   const { t } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const [showCropModal, setShowCropModal] = useState(false);
   const expandedDetailsRef = useRef<HTMLDivElement>(null);
 
   const slides = useMemo(() => buildSlides(profile, images), [profile, images]);
@@ -168,6 +172,35 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               </div>
             </div>
           </div>
+        )}
+
+        {/* Crop - top right, same row as the slide dots/sign. Only for photo
+            slides (there's nothing to crop on a bio/fact slide). Edits the
+            photo currently on screen. */}
+        {currentSlideData?.type === 'image' && currentSlideData.content && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowCropModal(true); }}
+            aria-label="Crop photo"
+            className="absolute right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
+            style={{
+              top: '4px',
+              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+            }}
+          >
+            <Pencil className="w-3.5 h-3.5" strokeWidth={2.5} />
+          </button>
+        )}
+
+        {showCropModal && currentSlideData?.type === 'image' && currentSlideData.content && (
+          <PhotoCropModal
+            imageUrl={currentSlideData.content}
+            userId={profile.id}
+            onClose={() => setShowCropModal(false)}
+            onSaved={() => {
+              onPhotoUpdated?.();
+            }}
+          />
         )}
 
         {/* Name/age caption - pinned to the bottom of the photo with the same

@@ -834,6 +834,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         profile={previewMatch}
         images={previewImages}
         onClose={() => setShowProfilePreview(false)}
+        onPhotoUpdated={onProfileUpdate}
       />
     );
   }

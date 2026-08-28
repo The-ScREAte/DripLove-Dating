@@ -842,17 +842,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     dragOffsetY: number;
   }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 });
 
-  // Dismiss the swipe guide the instant the user actually starts a real swipe -
-  // the overlay itself no longer blocks touches (see its pointerEvents below), so
-  // a genuine first swipe goes straight through to the card and counts for real
+  // Dismiss the swipe guide once the user actually starts a real swipe - the
+  // overlay itself no longer blocks touches (see its pointerEvents below), so a
+  // genuine first swipe goes straight through to the card and counts for real
   // (a real like/pass), instead of being trapped behind a demo the user has to
-  // dismiss first.
+  // dismiss first. Gated on swipeDistance crossing a real movement threshold,
+  // not just isDragging - that flips true on plain touchdown, before any actual
+  // movement, which was dismissing the guide on a tap alone rather than a swipe.
   useEffect(() => {
-    if (showSwipeGuide && swipeUI.isDragging) {
+    if (showSwipeGuide && swipeUI.isDragging && swipeUI.swipeDistance > 12) {
       setShowSwipeGuide(false);
       localStorage.setItem('driplove_swipe_guide_shown', 'true');
     }
-  }, [showSwipeGuide, swipeUI.isDragging]);
+  }, [showSwipeGuide, swipeUI.isDragging, swipeUI.swipeDistance]);
 
   const isDraggingRef = useRef(false);
   // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
@@ -4561,7 +4563,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // the timeout.
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{ pointerEvents: 'none' }}
+          style={{ pointerEvents: 'none', background: 'rgba(0,0,0,0.35)' }}
         >
           <style>{`
             @keyframes swipeGuideIn {
@@ -4891,7 +4893,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   // shorter (was uncapped in practice) and matching Liked Me's and the
                   // profile preview's own expanded panel proportions - the photo keeps
                   // the larger share of the card on all three.
-                  maxHeight: '38vh',
+                  maxHeight: '28vh',
 
                 }}
               >
