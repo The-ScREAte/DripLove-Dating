@@ -113,14 +113,14 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           // actually has room for, pushing the caption down or off-screen. '0%'
           // makes flex-grow fill space purely from the parent's own definite
           // height, with zero dependency on the photo's natural size.
-          flex: showMoreInfo ? '0 0 42vh' : '1 1 0%',
+          flex: showMoreInfo ? '0 0 45%' : '1 1 0%',
           // Floors that fit even short screens once the header/nav space above is
           // correctly reserved (this used to assume ~420px was always available below
           // the header, but a real short device/emulator can have well under that once
           // MainApp's wrapper reserves the header/nav's real measured height - the photo
           // would blow past its own parent's bottom edge and get clipped by the nav
           // instead of shrinking to fit).
-          minHeight: showMoreInfo ? '200px' : '300px',
+          minHeight: showMoreInfo ? '180px' : '220px',
           transition: 'flex-basis 300ms ease-out, min-height 300ms ease-out',
         }}
       >

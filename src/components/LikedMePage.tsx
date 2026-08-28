@@ -1250,7 +1250,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             scrolls internally instead of stealing space from the photo. */}
         <div
           className="relative flex-shrink-0 w-full overflow-hidden"
-          style={{ height: 'max(65vh, 440px)' }}
+          style={{ height: '62%', minHeight: '220px' }}
         >
           <div
             className="select-none"
