@@ -386,6 +386,40 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       };
     }
   }, []);
+
+  // The app's actual visible height, tracked live - not assumed from 100vh/100dvh.
+  // `position: fixed; inset: 0` (or 100dvh) sizes against the browser's LAYOUT
+  // viewport, which on a real mobile browser (Chrome/Safari's own address bar +
+  // nav buttons, not a device notch/home-indicator env() covers) can be taller
+  // than what's actually visible on screen - the bottom nav then renders "correctly"
+  // by CSS, but ends up sitting underneath the browser's own UI chrome, invisible.
+  // window.visualViewport.height is the one number that always reflects the real,
+  // currently-visible area (shrinks when the browser chrome or keyboard is showing,
+  // grows back the instant either is dismissed) - driving the app's own height from
+  // it directly, in JS, sidesteps any CSS viewport-unit ambiguity entirely.
+  const [appViewportHeight, setAppViewportHeight] = useState<number | null>(
+    () => (typeof window !== 'undefined' ? (window.visualViewport?.height ?? window.innerHeight) : null)
+  );
+  useEffect(() => {
+    const sync = () => {
+      setAppViewportHeight(window.visualViewport?.height ?? window.innerHeight);
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    window.addEventListener('orientationchange', sync);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', sync);
+      window.visualViewport.addEventListener('scroll', sync);
+    }
+    return () => {
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('orientationchange', sync);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', sync);
+        window.visualViewport.removeEventListener('scroll', sync);
+      }
+    };
+  }, []);
   // Register device token for push notifications (mobile only) - with error handling
   useEffect(() => {
     const registerDeviceToken = async () => {
@@ -1040,7 +1074,33 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   }
 
   return (
-    <div className="w-full h-screen bg-black" style={{ margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+    <div
+      className="w-full bg-black"
+      style={{
+        margin: 0,
+        padding: 0,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        // Prefer the live-tracked visualViewport height (see appViewportHeight above)
+        // over any CSS viewport unit - it's the one source of truth for what's
+        // actually visible right now, not what the layout viewport claims. Falls
+        // back to 100dvh (which itself falls back to 100vh in browsers that don't
+        // understand the unit - an unsupported value is simply ignored, leaving the
+        // previous declaration in effect) only before the very first measurement.
+        height: appViewportHeight != null ? `${appViewportHeight}px` : '100dvh',
+        bottom: 'auto',
+        overflow: 'hidden',
+        // Landscape on a notched/rounded-corner device puts the notch or a rounded
+        // corner on the LEFT or RIGHT edge instead of top/bottom - env() reports
+        // that as inset-left/right, not inset-top/bottom, so it's a separate pair
+        // of insets from the header/nav's own top/bottom handling below.
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Make this parent the scrolling container so sticky children (header/nav) stick relative to it */}
       <div className="w-full h-full flex flex-col bg-black relative shadow-md" style={{ margin: 0, padding: 0 }}>
         
