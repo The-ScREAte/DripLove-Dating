@@ -4304,17 +4304,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const adCardTransform = getAdCardTransform();
     
     return (
-      <div className="h-full w-full fixed left-0 overflow-hidden"
+      <div className="h-full w-full relative overflow-hidden"
            style={{
-             top: 'var(--app-header-height, 55px)', // Align with the real header height
-             bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px + var(--app-bottom-nav-height, 78px))', // Stop above the real nav
-             height: 'auto', // Let top and bottom constraints define the height
+             // Plain in-flow box: MainApp's content wrapper already reserves the header
+             // (padding-top) and the nav (padding-bottom), so filling 100% of it is
+             // exactly "between the header and the nav" on every screen size. No fixed
+             // positioning and no vh math that can disagree with the real available space.
              touchAction: 'pan-y',
              overscrollBehavior: 'contain',
              userSelect: 'none',
              WebkitUserSelect: 'none',
              WebkitTouchCallout: 'none'
            }}>
+
         <div className="h-full w-full relative z-10 flex flex-col"
              style={{
                transform: adCardTransform,
