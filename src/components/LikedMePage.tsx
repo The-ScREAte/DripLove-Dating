@@ -1252,16 +1252,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
           className="relative flex-shrink-0 w-full overflow-hidden"
           style={{ height: '62%', minHeight: '220px' }}
         >
+          {/* Swipeable unit - photo, swipe hint, AND the name/caption all live in
+              this one box and move together as a single card on drag, the same
+              way Discover's swipe card carries its own caption along with it
+              (not a separate static layer next to a moving photo). Only the
+              chrome that Discover ALSO keeps fixed in place during a swipe -
+              slide dots, back button, report button - stays outside this box,
+              as real siblings of it rather than children. */}
           <div
-            className="select-none"
+            className="absolute inset-0 select-none"
             style={{
-              // Absolute + inset 0, not w-full/h-full: pins this box to the exact
-              // dimensions of its `relative` parent above (fixed at max(65vh,440px))
-              // with zero dependency on this element's own content size, so a very
-              // tall/portrait photo inside can never expand it - same fix as
-              // Discover's collapsed image area and the profile preview photo box.
-              position: 'absolute',
-              inset: 0,
               cursor: 'pointer',
               touchAction: 'pan-y',
               transform: `translateX(${swipeDragX}px) rotate(${Math.max(-15, Math.min(15, swipeDragX * 0.05))}deg)`,
@@ -1298,6 +1298,73 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 )}
               </div>
             )}
+
+            {/* Name/age caption - pinned to the bottom of the photo with a feathered
+                gradient, same pattern as Discover's MatchCard caption and
+                ProfilePreviewModal (an ordinary overlay clipped by the photo's own
+                overflow-hidden, no transform/negative-margin tricks). Living inside
+                the swipeable unit above (not a separate static sibling) is what
+                makes it move together with the photo on drag, just like Discover. */}
+            <div
+              className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
+              style={{
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,1) 85%)',
+              }}
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
+                    {selectedProfile.first_name} {selectedProfile.last_name}
+                  </h2>
+                  <div className="flex items-center gap-3 text-[clamp(12px,3.4vw,14px)] text-gray-300 mt-1">
+                    <div className="flex items-center">
+                      <Calendar className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                      <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                      <span>{selectedProfile.city}, {selectedProfile.country}</span>
+                    </div>
+                  </div>
+
+                  {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                      {previewHighlights.map((highlight, index) => (
+                        <span
+                          key={index}
+                          className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                        >
+                          {truncateChipLabel(highlight)}
+                        </span>
+                      ))}
+                      {signHighlight && (
+                        <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
+                          <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Expand/collapse control - identical pink-gradient glass circle used
+                    on Discover's own swipe card. */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowMoreInfo(!showMoreInfo); }}
+                  aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
+                  className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+                    boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+                  }}
+                >
+                  {showMoreInfo ? (
+                    <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                  ) : (
+                    <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Slide indicators */}
@@ -1355,71 +1422,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               </svg>
             </button>
           )}
-
-          {/* Name/age caption - pinned to the bottom of the photo with a feathered
-              gradient, same pattern as Discover's MatchCard caption and
-              ProfilePreviewModal (an ordinary overlay clipped by the photo's own
-              overflow-hidden, no transform/negative-margin tricks). */}
-          <div
-            className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
-            style={{
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,1) 85%)',
-            }}
-          >
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
-                  {selectedProfile.first_name} {selectedProfile.last_name}
-                </h2>
-                <div className="flex items-center gap-3 text-[clamp(12px,3.4vw,14px)] text-gray-300 mt-1">
-                  <div className="flex items-center">
-                    <Calendar className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                    <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                    <span>{selectedProfile.city}, {selectedProfile.country}</span>
-                  </div>
-                </div>
-
-                {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
-                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                    {previewHighlights.map((highlight, index) => (
-                      <span
-                        key={index}
-                        className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
-                      >
-                        {truncateChipLabel(highlight)}
-                      </span>
-                    ))}
-                    {signHighlight && (
-                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
-                        <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Expand/collapse control - identical pink-gradient glass circle used
-                  on Discover's own swipe card. */}
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowMoreInfo(!showMoreInfo); }}
-                aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
-                className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-                  boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-                }}
-              >
-                {showMoreInfo ? (
-                  <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
-                ) : (
-                  <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
-                )}
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Expanded details - plain black panel below the photo, same relationship as
