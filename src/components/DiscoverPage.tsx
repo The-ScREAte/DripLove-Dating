@@ -49,7 +49,7 @@ import {
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Gamepad2 } from 'lucide-react';
+import { Heart, X, Crown, Gamepad2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -841,6 +841,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     dragOffset: number;
     dragOffsetY: number;
   }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 });
+
+  // Dismiss the swipe guide the instant the user actually starts a real swipe -
+  // the overlay itself no longer blocks touches (see its pointerEvents below), so
+  // a genuine first swipe goes straight through to the card and counts for real
+  // (a real like/pass), instead of being trapped behind a demo the user has to
+  // dismiss first.
+  useEffect(() => {
+    if (showSwipeGuide && swipeUI.isDragging) {
+      setShowSwipeGuide(false);
+      localStorage.setItem('driplove_swipe_guide_shown', 'true');
+    }
+  }, [showSwipeGuide, swipeUI.isDragging]);
 
   const isDraggingRef = useRef(false);
   // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
@@ -4542,18 +4554,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
       {/* --- Swipe Guide Popup for New Users --- */}
       {showSwipeGuide && (
+        // pointerEvents: 'none' throughout - this is a purely visual demo overlay,
+        // not a modal to dismiss first. A real swipe on the card underneath must
+        // go straight through and count for real (the effect above closes this
+        // the instant that happens); it auto-dismisses on its own otherwise after
+        // the timeout.
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{
-            background: 'rgba(20, 10, 20, 0.28)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
-            cursor: 'pointer',
-          }}
-          onClick={() => {
-            setShowSwipeGuide(false);
-            localStorage.setItem('driplove_swipe_guide_shown', 'true');
-          }}
+          style={{ pointerEvents: 'none' }}
         >
           <style>{`
             @keyframes swipeGuideIn {
@@ -4570,6 +4578,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               70% { box-shadow: 0 0 0 14px rgba(225, 29, 72, 0); }
               100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
             }
+            @keyframes arrowNudgeLeft {
+              0%, 100% { transform: translateX(0); opacity: 0.55; }
+              50% { transform: translateX(-6px); opacity: 1; }
+            }
+            @keyframes arrowNudgeRight {
+              0%, 100% { transform: translateX(0); opacity: 0.55; }
+              50% { transform: translateX(6px); opacity: 1; }
+            }
             .swipe-guide-card {
               animation: swipeGuideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             }
@@ -4579,14 +4595,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             .swipe-guide-icon-right {
               animation: ringPulseRed 1.6s ease-out infinite;
             }
+            .swipe-guide-arrow-left { animation: arrowNudgeLeft 1.2s ease-in-out infinite; }
+            .swipe-guide-arrow-right { animation: arrowNudgeRight 1.2s ease-in-out infinite; }
           `}</style>
-          <div
-            className="swipe-guide-card flex flex-row items-center gap-10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Swipe Left - Nope */}
+          <div className="swipe-guide-card flex flex-row items-center gap-6">
+            {/* Swipe Left - Nope. Arrow sits outboard (further left), pointing
+                further left - away from center, in the actual swipe direction. */}
+            <ChevronLeft className="swipe-guide-arrow-left w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
             <div
-              className="swipe-guide-icon-left rounded-full flex items-center justify-center"
+              className="swipe-guide-icon-left rounded-full flex items-center justify-center shrink-0"
               style={{
                 width: 72,
                 height: 72,
@@ -4596,9 +4613,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             >
               <X className="w-9 h-9" style={{ color: '#ef4444' }} strokeWidth={3} />
             </div>
-            {/* Swipe Right - Like */}
+            <div className="w-4" />
+            {/* Swipe Right - Like. Arrow sits outboard (further right), pointing
+                further right - away from center, in the actual swipe direction. */}
             <div
-              className="swipe-guide-icon-right rounded-full flex items-center justify-center"
+              className="swipe-guide-icon-right rounded-full flex items-center justify-center shrink-0"
               style={{
                 width: 72,
                 height: 72,
@@ -4608,6 +4627,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             >
               <Heart className="w-9 h-9" style={{ color: 'white' }} strokeWidth={0} fill="white" />
             </div>
+            <ChevronRight className="swipe-guide-arrow-right w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
           </div>
         </div>
       )}

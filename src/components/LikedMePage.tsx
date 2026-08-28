@@ -1403,7 +1403,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             style={{
               // env(safe-area-inset-top) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx).
-              top: 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
+              top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
             }}
           >
             {Array.from({ length: totalSlides }).map((_, idx) => (
@@ -1429,7 +1429,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              top: 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
+              top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
             }}
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
@@ -1444,7 +1444,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               aria-label={t('reportModal.title')}
               className="absolute right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/95 border border-red-300 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
               style={{
-                top: 'clamp(10px, calc(env(safe-area-inset-top, 10px) + 17px), 52px)'
+                top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
               }}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

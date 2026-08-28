@@ -142,7 +142,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         </div>
 
         {slides.length > 1 && (
-          <div className="absolute left-4 flex gap-1.5 z-10" style={{ top: '41px' }}>
+          <div className="absolute left-4 flex gap-1.5 z-10" style={{ top: '28px' }}>
             {slides.map((_, idx) => (
               <div
                 key={idx}

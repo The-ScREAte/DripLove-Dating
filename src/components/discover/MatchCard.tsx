@@ -455,9 +455,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div
                   className="fixed right-3 z-[9999]"
                   style={{
-                    // env(safe-area-inset-top) is now reliable on Android too (see
-                    // @capacitor-community/safe-area setup in src/main.tsx).
-                    top: 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 64px)'
+                    // The header is now a real flex sibling of the content area (not an
+                    // overlay the card sits behind), so this only needs to clear the
+                    // header's own real height plus a small breathing gap - not also
+                    // re-adding a safe-area allowance the header already accounts for
+                    // internally, and not the old flat pixel guess from when the card
+                    // rendered directly behind a position: fixed header.
+                    top: 'calc(var(--app-header-height, 72px) + 12px)'
                   }}
                 >
                   <button
@@ -483,9 +487,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div
                   className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
                   style={{
-                    // env(safe-area-inset-top) is now reliable on Android too (see
-                    // @capacitor-community/safe-area setup in src/main.tsx).
-                    top: 'calc(clamp(-0.5rem, env(safe-area-inset-top, -0.5rem) - 0.125rem, 0.75rem) + 64px)'
+                    // Same reasoning as the report button above - clears the header's
+                    // real height plus a small gap, not a stale pixel guess from when
+                    // the header overlaid the card instead of sitting above it in flow.
+                    top: 'calc(var(--app-header-height, 72px) + 4px)'
                   }}
                 >
                   <div className="relative flex flex-col items-center">
@@ -519,9 +524,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div
               className="fixed left-4 flex space-x-2 z-[9999]"
               style={{
-                // env(safe-area-inset-top) is now reliable on Android too (see
-                // @capacitor-community/safe-area setup in src/main.tsx).
-                top: 'calc(clamp(1rem, env(safe-area-inset-top, 1rem) + 0.5rem, 2.25rem) + 66px)',
+                // Same reasoning as the report button above - clears the header's real
+                // height plus a small gap, not a stale pixel guess.
+                top: 'calc(var(--app-header-height, 72px) + 14px)',
                 pointerEvents: 'none'
               }}
             >

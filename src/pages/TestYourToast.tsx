@@ -1310,7 +1310,7 @@ const TestYourToast = () => {
   if (!selectedLevel) {
     return (
       <div className="h-screen bg-black flex flex-col">
-        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
+        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -1405,7 +1405,7 @@ const TestYourToast = () => {
     const isNewBest = bestPct === undefined || percentage >= bestPct;
     return (
       <div className="h-screen bg-black flex flex-col">
-        <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
+        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
@@ -1464,7 +1464,7 @@ const TestYourToast = () => {
   return (
     <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="pt-safe pt-10 bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10">
+      <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
