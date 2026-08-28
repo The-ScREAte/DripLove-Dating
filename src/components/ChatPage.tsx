@@ -190,33 +190,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useChatKeyboardFix();
 
   useLayoutEffect(() => {
-    const globalHeader = document.querySelector('[data-driplove-global-header]') as HTMLElement | null;
-    if (!globalHeader) {
-      setTopCompensation(0);
-      return;
-    }
-
-    const contentReservedTop = 56;
-    const measureTopCompensation = () => {
-      const needed = Math.max(0, Math.ceil(globalHeader.getBoundingClientRect().height - contentReservedTop));
-      setTopCompensation(needed);
-    };
-
-    measureTopCompensation();
-    window.addEventListener('resize', measureTopCompensation);
-    window.addEventListener('orientationchange', measureTopCompensation);
-
-    // The header's actual height changes when switching tabs (tall/feathered on
-    // Discover, compact everywhere else) even while ChatPage stays mounted in the
-    // background — a ResizeObserver keeps this in sync instead of only measuring once.
-    const resizeObserver = new ResizeObserver(measureTopCompensation);
-    resizeObserver.observe(globalHeader);
-
-    return () => {
-      window.removeEventListener('resize', measureTopCompensation);
-      window.removeEventListener('orientationchange', measureTopCompensation);
-      resizeObserver.disconnect();
-    };
+    // MainApp's header is now a real flex sibling of the content area (not a
+    // position: fixed overlay it had to reserve a JS-measured padding-top for),
+    // so the content area already starts at exactly the header's real bottom
+    // edge with zero gap, on every tab, regardless of how tall the header gets
+    // (e.g. Discover's feathered variant). There is nothing left here to
+    // compensate for - topCompensation stays 0.
+    setTopCompensation(0);
   }, []);
 
   // Cleanup highlight timeout on unmount

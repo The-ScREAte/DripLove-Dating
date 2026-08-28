@@ -1049,12 +1049,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {!showTerms && !showPrivacy && (
             <div
               data-driplove-global-header
-              className="fixed top-0 left-0 right-0 w-full z-50"
+              // A real flex child (first item in MainApp's own flex column), not
+              // position: fixed - its natural rendered height is what pushes the
+              // content below it down, guaranteed by the browser's own layout
+              // engine. No JS measurement, no CSS var, no timing race: the
+              // content area below can never start any higher than this box's
+              // real bottom edge, on any device, on the very first frame.
+              className="relative w-full z-50 flex-shrink-0"
               style={{
                 margin: 0,
                 padding: 0,
-                top: 0,
-                position: 'fixed',
                 // Same compact, fully solid bar sized to its own content on
                 // every tab - this box's own size never changes. The pink
                 // border is drawn by a dedicated overlay div (last child
@@ -1148,19 +1152,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           // scroll to reveal, no matter what. Other tabs keep normal scrolling.
           className={`flex-1 ${activeTab === 'dripcheck' ? 'overflow-hidden' : 'overflow-auto'}`}
           style={{
-            height: '100%',
+            // No padding-top/padding-bottom guesswork here anymore: header and nav
+            // are now real flex siblings of this box (see above/below), not
+            // position: fixed overlays this box had to reserve space for via a
+            // JS-measured pixel guess. flex: 1 (from className) + min-height: 0
+            // means this box's height is WHATEVER IS LEFT after the browser lays
+            // out the header and nav - it structurally cannot start any higher
+            // than the header's bottom edge or extend any lower than the nav's
+            // top edge, on any device, with no measurement involved at all.
+            minHeight: 0,
             position: 'relative',
-            // Clears the real header/nav using the SAME measurements they're each built
-            // from (published by the ResizeObserver effect above) instead of a flat
-            // guess. Fallbacks here are intentionally generous (not the bare/measured
-            // real values) so the very first paint - before the ResizeObserver below
-            // has had a chance to measure the real header/nav - still reserves at
-            // least as much space as the real bars need, erring toward a bit of
-            // extra black rather than any overlap.
-            paddingTop: !showTerms && !showPrivacy ? 'var(--app-header-height, 72px)' : 0,
-            paddingBottom: !showTerms && !showPrivacy
-              ? 'calc(env(safe-area-inset-bottom, 0px) + 22px + var(--app-bottom-nav-height, 96px))'
-              : 0,
           }}
         >
           {/* Lazy load tabs on first access, then keep mounted in background */}
@@ -1224,15 +1225,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
           <div
             data-driplove-bottom-nav
-            className="fixed left-3 right-3 z-[99999] rounded-[28px]"
+            // A real flex child (last item in MainApp's own flex column), not
+            // position: fixed - the content area above (flex: 1) can only ever
+            // occupy the space this box's presence leaves behind, guaranteed by
+            // the browser's layout engine rather than a JS-measured padding
+            // guess. The floating-pill inset from the screen edges/bottom (which
+            // `left-3 right-3` + a fixed `bottom` used to provide) is now plain
+            // margin instead.
+            className="mx-3 z-[99999] rounded-[28px] flex-shrink-0"
             style={{
               // env(safe-area-inset-bottom) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx).
-              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
+              marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
               // Solid: the nav is the fixed end of the page, same role as the header at
-              // the top. Page content (see discover-container in DiscoverPage.tsx and
-              // MainApp's own content padding-bottom) now stops above it on its own, so
-              // there's nothing behind this bar that would ever need to show through it.
+              // the top. Page content stops above it on its own now (a real flex
+              // sibling, not an overlay), so there's nothing behind this bar that
+              // would ever need to show through it.
               background: '#000',
               border: '1px solid rgba(236,72,153,0.55)',
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
