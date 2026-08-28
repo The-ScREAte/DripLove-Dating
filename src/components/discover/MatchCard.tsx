@@ -548,9 +548,21 @@ const MatchCard: React.FC<MatchCardProps> = ({
               dots above, this only needs to sit above the photo, not above the
               global header. */}
           <div
-            className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-28 ${showMoreInfo ? 'pb-4' : 'pb-5'}`}
+            className={`absolute inset-x-0 z-20 px-4 pt-28 ${showMoreInfo ? 'pb-4' : 'pb-5'}`}
             style={{
               background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 72%, rgba(0,0,0,1) 92%)',
+              // Collapsed: the photo box now intentionally extends all the way to the
+              // true screen bottom (behind the now-opaque floating nav, so there's no
+              // dead gap below the card) instead of stopping just above the nav - see
+              // DiscoverPage.tsx's discover-container. That means this caption's own
+              // bottom:0 would land behind the nav too unless offset by the nav's real
+              // footprint, which keeps it at the exact same on-screen spot as before.
+              // Expanded: the photo is height-capped (not flex-filled to the bottom) and
+              // the details panel below already has its own correct nav clearance, so
+              // this can stay flush at the photo's own bottom.
+              bottom: showMoreInfo
+                ? 0
+                : 'calc(env(safe-area-inset-bottom, 0px) + 22px + var(--app-bottom-nav-height, 78px))',
             }}
           >
             <div className="flex justify-between items-start">

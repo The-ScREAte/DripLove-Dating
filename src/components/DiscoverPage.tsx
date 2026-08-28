@@ -4478,22 +4478,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         /* Fix for mobile browser viewport height issues - only on actual mobile devices.
            These !important rules override the inline height on .discover-container (a
            regular stylesheet !important beats an inline style without one), so they must
-           reserve the same space the inline calc() below does. Both read the exact same
-           --app-header-height / --app-bottom-nav-height custom properties (set by
-           MainApp.tsx from the real rendered height of those two fixed elements, via
-           ResizeObserver) instead of two independently-hardcoded copies of a guessed
-           number that has to be kept in sync by hand - the old plain 100dvh/100svh/100lvh
-           here ignored the reservation entirely, making the container claim the FULL
-           screen height starting var(--app-header-height) down - taller than what's
-           actually visible - which silently clipped the bottom of whatever was pinned to
-           its bottom edge (e.g. the photo caption) against the physical screen edge, with
-           nothing to scroll to reveal it. */
+           reserve the same space the inline calc() below does. Reads the same
+           --app-header-height custom property MainApp.tsx publishes (from the real
+           rendered header height, via ResizeObserver) instead of a guessed number - the
+           old plain 100dvh/100svh/100lvh here ignored the reservation entirely, making
+           the container claim the FULL screen height starting var(--app-header-height)
+           down - taller than what's actually visible.
+           This intentionally reaches all the way to the true screen bottom (not stopping
+           above the nav) - the photo/card fills edge-to-edge, sliding visually behind the
+           now-opaque floating nav instead of leaving a dead gap above it. The caption
+           itself still keeps clear of the nav on its own (see its own bottom offset in
+           MatchCard.tsx), independent of how tall this container is. */
         @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           .discover-container {
-            /* Use dynamic viewport height for mobile browsers, minus the same reserved space */
-            height: calc(100dvh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
-            min-height: calc(100svh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
-            max-height: calc(100lvh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
+            /* Use dynamic viewport height for mobile browsers, minus the header only */
+            height: calc(100dvh - var(--app-header-height, 55px)) !important;
+            min-height: calc(100svh - var(--app-header-height, 55px)) !important;
+            max-height: calc(100lvh - var(--app-header-height, 55px)) !important;
           }
 
           .discover-image-area {
@@ -4518,7 +4519,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         @media screen and (max-width: 768px) and (hover: none) and (pointer: coarse) {
           @supports (-webkit-touch-callout: none) {
             .discover-container {
-              height: calc(-webkit-fill-available - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px)) !important;
+              height: calc(-webkit-fill-available - var(--app-header-height, 55px)) !important;
             }
           }
         }
@@ -4531,13 +4532,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              // fixed layer moves together: current card, next-card preview, everything.
              // That way the gap at the top reveals the app's own background behind this
              // layer, not some other layer that isn't shifted the same way and ends up
-             // visually mismatched with it. Reads --app-header-height / --app-bottom-nav-height,
-             // set by MainApp.tsx from the real rendered height of those two fixed
-             // elements (see its ResizeObserver effect) - not a guessed constant.
+             // visually mismatched with it. Reads --app-header-height, set by MainApp.tsx
+             // from the real rendered header height (see its ResizeObserver effect) - not
+             // a guessed constant.
+             // Reaches the true screen bottom (not stopping above the nav) so the photo
+             // card fills edge-to-edge with no dead gap, sliding behind the now-opaque
+             // floating nav instead of stopping short of it. The caption stays clear of
+             // the nav independently via its own bottom offset (see MatchCard.tsx).
              top: 'var(--app-header-height, 55px)',
-             height: 'calc(100vh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px))',
+             height: 'calc(100vh - var(--app-header-height, 55px))',
              // Mobile browser viewport fix
-             minHeight: 'calc(100vh - var(--app-bottom-nav-height, 78px) - var(--app-header-height, 55px))',
+             minHeight: 'calc(100vh - var(--app-header-height, 55px))',
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
              overscrollBehavior: 'contain',
              userSelect: 'none',

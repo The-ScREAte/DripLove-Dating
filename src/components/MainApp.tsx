@@ -1221,9 +1221,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // env(safe-area-inset-bottom) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx).
               bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.92), rgba(0,0,0,0.88))',
-              backdropFilter: 'blur(22px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(22px) saturate(180%)',
+              // Fully opaque - was a translucent gradient (92%/88%) with a blur behind it,
+              // which let whatever's underneath (the full-bleed blurred "next card"
+              // background Discover/Preview/Liked all paint behind their own content)
+              // show/bleed through the nav instead of being fully hidden by it.
+              background: '#000',
               border: '1px solid rgba(236,72,153,0.55)',
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
             }}
@@ -1261,6 +1263,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           </div>
         )}
       </div>
+
 
       {/* Rating Dialog - Now triggered by matches instead of timer */}
 

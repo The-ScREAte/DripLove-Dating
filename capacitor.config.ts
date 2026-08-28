@@ -37,7 +37,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false,
     // Performance optimizations for Android WebView
     // Transparent background is required for native CameraPreview with toBack:true
     backgroundColor: '#00000000',
