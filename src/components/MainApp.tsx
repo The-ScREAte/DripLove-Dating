@@ -1136,22 +1136,30 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
         {/* Main Content */}
         <div
-          className="flex-1 overflow-auto"
+          // Discover's own card is a fixed, non-scrolling swipe surface - it never
+          // needs this wrapper's scroll. Real mobile browsers (iOS Safari/Chrome
+          // especially) rubber-band/overscroll an `overflow-auto` box by a few px on
+          // any touch, which - if the card were ever even marginally taller than
+          // its reserved space (e.g. the CSS vars below not being populated yet on
+          // the very first paint, before MainApp's ResizeObserver has measured the
+          // real header/nav) - would momentarily reveal that clipped sliver, making
+          // the card look like it slides out from under the nav. overflow-hidden on
+          // this one tab removes that possibility outright: there is nothing to
+          // scroll to reveal, no matter what. Other tabs keep normal scrolling.
+          className={`flex-1 ${activeTab === 'dripcheck' ? 'overflow-hidden' : 'overflow-auto'}`}
           style={{
             height: '100%',
             position: 'relative',
             // Clears the real header/nav using the SAME measurements they're each built
             // from (published by the ResizeObserver effect above) instead of a flat
-            // 56px/80px guess. That guess under-reserved both edges on real devices
-            // (e.g. a real header of 72px, real nav footprint of ~106px including its
-            // own bottom offset and safe-area inset) - every tab's content silently
-            // extended a bit further behind the header/nav than intended, most visibly
-            // on ProfilePreviewModal (rendered in place of ProfilePage's own content),
-            // which relies on this wrapper's real height to size its full-bleed photo
-            // and caption precisely.
-            paddingTop: !showTerms && !showPrivacy ? 'var(--app-header-height, 56px)' : 0,
+            // guess. Fallbacks here are intentionally generous (not the bare/measured
+            // real values) so the very first paint - before the ResizeObserver below
+            // has had a chance to measure the real header/nav - still reserves at
+            // least as much space as the real bars need, erring toward a bit of
+            // extra black rather than any overlap.
+            paddingTop: !showTerms && !showPrivacy ? 'var(--app-header-height, 72px)' : 0,
             paddingBottom: !showTerms && !showPrivacy
-              ? 'calc(env(safe-area-inset-bottom, 0px) + 22px + var(--app-bottom-nav-height, 78px))'
+              ? 'calc(env(safe-area-inset-bottom, 0px) + 22px + var(--app-bottom-nav-height, 96px))'
               : 0,
           }}
         >

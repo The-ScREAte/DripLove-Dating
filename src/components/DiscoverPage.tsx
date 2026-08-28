@@ -263,22 +263,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // as CSS custom properties (measured via ResizeObserver, not guessed). Some of the
   // expanded-panel height math below is plain JS, not CSS, so it needs these as numbers
   // too - read once and kept in sync on resize, same cadence as `vh` above.
+  const rafIds = useRef<number[]>([]);
   const readHeightVar = (name: string, fallback: number): number => {
     if (typeof window === 'undefined') return fallback;
     const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
     const parsed = parseFloat(raw);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   };
-  const [headerHeight, setHeaderHeight] = useState<number>(() => readHeightVar('--app-header-height', 55));
-  const [bottomNavHeight, setBottomNavHeight] = useState<number>(() => readHeightVar('--app-bottom-nav-height', 78));
+  const [headerHeight, setHeaderHeight] = useState<number>(() => readHeightVar('--app-header-height', 72));
+  const [bottomNavHeight, setBottomNavHeight] = useState<number>(() => readHeightVar('--app-bottom-nav-height', 96));
   useEffect(() => {
     const sync = () => {
-      setHeaderHeight(readHeightVar('--app-header-height', 55));
-      setBottomNavHeight(readHeightVar('--app-bottom-nav-height', 78));
+      setHeaderHeight(readHeightVar('--app-header-height', 72));
+      setBottomNavHeight(readHeightVar('--app-bottom-nav-height', 96));
     };
     sync();
+    // The very first `sync()` above can race MainApp's own ResizeObserver (it hasn't
+    // measured the real header/nav yet on first paint, so this reads the CSS-level
+    // fallback instead of the real value) - a couple of rAF-delayed re-syncs catch
+    // the real value the moment it lands, without waiting for an actual window
+    // resize event (which mobile browsers may not fire again for a long time).
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(sync);
+      rafIds.current.push(raf2);
+    });
+    rafIds.current.push(raf1);
     window.addEventListener('resize', sync);
-    return () => window.removeEventListener('resize', sync);
+    return () => {
+      window.removeEventListener('resize', sync);
+      rafIds.current.forEach((id) => cancelAnimationFrame(id));
+      rafIds.current = [];
+    };
   }, [vh]);
   
   // IAP: Track if buy is enabled
