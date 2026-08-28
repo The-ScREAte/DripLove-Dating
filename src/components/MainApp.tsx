@@ -1221,11 +1221,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // env(safe-area-inset-bottom) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx).
               bottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
-              // Fully opaque - was a translucent gradient (92%/88%) with a blur behind it,
-              // which let whatever's underneath (the full-bleed blurred "next card"
-              // background Discover/Preview/Liked all paint behind their own content)
-              // show/bleed through the nav instead of being fully hidden by it.
-              background: '#000',
+              // Translucent + blurred on purpose: the photo card behind it is full-bleed
+              // to the true screen bottom (see discover-container in DiscoverPage.tsx),
+              // so the nav should read as a frosted island floating over the card rather
+              // than a solid bar that hides it. z-index stays high (see className) so
+              // the nav is still the topmost, fully clickable layer - only its own paint
+              // is translucent, touches still land on these buttons, not the card below.
+              background: 'rgba(0, 0, 0, 0.72)',
+              backdropFilter: 'blur(20px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(160%)',
               border: '1px solid rgba(236,72,153,0.55)',
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
             }}
