@@ -11,6 +11,7 @@ import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 import BasicInfoSection from './profile/BasicInfoSection';
 import LocationSection from './profile/LocationSection';
 
@@ -86,6 +87,10 @@ interface ProfilePageProps {
 const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0 }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  // Screenshots are blocked app-wide by default - Profile is one of the two
+  // exemptions (the other is the mini-games), so protection is off for as
+  // long as this tab is the one actually showing.
+  useAllowScreenshots(isActiveTab);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);

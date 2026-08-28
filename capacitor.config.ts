@@ -90,6 +90,14 @@ const config: CapacitorConfig = {
     // Performance monitoring
     CapacitorHttp: {
       enabled: true
+    },
+    // Screenshot/screen-recording protection, ON everywhere by default at
+    // launch. Individual screens that should be exempt (Profile, the
+    // mini-games) call PrivacyScreen.disable() for as long as they're
+    // showing - see src/hooks/useAllowScreenshots.ts.
+    PrivacyScreen: {
+      enable: true,
+      preventScreenshots: true // iOS only
     }
   },
   cordova: {

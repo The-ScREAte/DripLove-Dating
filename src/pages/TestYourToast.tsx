@@ -14,6 +14,7 @@ import {
 } from '@/utils/gameStorage';
 import { saveFinalGameResultToDb, clearGameResultsFromDb } from '@/utils/gameResultsDb';
 import { useToast } from '@/hooks/use-toast';
+import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 import { Scenario } from '@/data/games/types';
 import { getScenariosForLevel, seededShuffle } from '@/data/games/scenarioLoader';
 
@@ -1108,6 +1109,7 @@ const shuffleOptions = (options: string[]): string[] => {
 const TestYourToast = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  useAllowScreenshots();
 
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);

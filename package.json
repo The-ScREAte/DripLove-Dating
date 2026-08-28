@@ -27,6 +27,7 @@
     "@awesome-cordova-plugins/in-app-purchase-2": "^8.1.0",
     "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor-community/camera-preview": "^7.0.2",
+    "@capacitor-community/privacy-screen": "^6.1.0",
     "@capacitor-community/safe-area": "^7.0.0",
     "@capacitor-firebase/messaging": "^7.4.0",
     "@capacitor/android": "^7.4.2",

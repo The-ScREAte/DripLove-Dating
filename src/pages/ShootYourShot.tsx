@@ -7,6 +7,7 @@ import { ArrowLeft, Target, Zap, Star, Trash2, Trophy, Home } from 'lucide-react
 import { addResult, clearResults, getBestResults, type GameType } from '@/utils/gameStorage';
 import { saveFinalGameResultToDb, clearGameResultsFromDb } from '@/utils/gameResultsDb';
 import { useToast } from '@/hooks/use-toast';
+import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 
 interface Challenge {
   id: number;
@@ -595,6 +596,7 @@ const levelConfig: Record<number, { name: string; difficulty: string; timeLimit:
 const ShootYourShot = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  useAllowScreenshots();
   const [best3, setBest3] = useState(() => getBestResults(GAME_TYPE));
 
   const resultsRef = React.useRef({ swish: 0, brick: 0, airball: 0 });

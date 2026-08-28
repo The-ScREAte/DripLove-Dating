@@ -3,9 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gamepad2, Target, Flag, Home } from 'lucide-react';
+import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 
 const Games = () => {
   const navigate = useNavigate();
+  // The mini-games are one of the two exemptions from the app-wide
+  // screenshot block (the other is Profile) - on for as long as this page
+  // is mounted.
+  useAllowScreenshots();
 
   const games = [
     {

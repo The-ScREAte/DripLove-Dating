@@ -6,6 +6,7 @@ import { ArrowLeft, ThumbsUp, ThumbsDown, Star, Trash2, Home } from 'lucide-reac
 import { addResult, clearResults, getBestResults, type GameType } from '@/utils/gameStorage';
 import { saveFinalGameResultToDb, clearGameResultsFromDb } from '@/utils/gameResultsDb';
 import { useToast } from '@/hooks/use-toast';
+import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 
 interface Scenario {
   id: number;
@@ -731,6 +732,7 @@ const levelConfig: Record<number, { name: string; difficulty: string; scenarios:
 const RedFlagGreenFlag = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  useAllowScreenshots();
   const best3 = useMemo(() => getBestResults(GAME_TYPE), []);
 
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);

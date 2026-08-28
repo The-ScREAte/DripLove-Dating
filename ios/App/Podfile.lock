@@ -19,6 +19,8 @@ PODS:
     - Capacitor
   - CapacitorCommunityCameraPreview (7.0.2):
     - Capacitor
+  - CapacitorCommunityPrivacyScreen (6.1.0):
+    - Capacitor
   - CapacitorCommunitySafeArea (7.0.0):
     - Capacitor
   - CapacitorCordova (7.4.3)
@@ -114,6 +116,7 @@ DEPENDENCIES:
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCommunityCameraPreview (from `../../node_modules/@capacitor-community/camera-preview`)"
+  - "CapacitorCommunityPrivacyScreen (from `../../node_modules/@capacitor-community/privacy-screen`)"
   - "CapacitorCommunitySafeArea (from `../../node_modules/@capacitor-community/safe-area`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFirebaseMessaging (from `../../node_modules/@capacitor-firebase/messaging`)"
@@ -158,6 +161,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCommunityCameraPreview:
     :path: "../../node_modules/@capacitor-community/camera-preview"
+  CapacitorCommunityPrivacyScreen:
+    :path: "../../node_modules/@capacitor-community/privacy-screen"
   CapacitorCommunitySafeArea:
     :path: "../../node_modules/@capacitor-community/safe-area"
   CapacitorCordova:
@@ -188,6 +193,7 @@ SPEC CHECKSUMS:
   CapacitorCamera: 6e18d54c8ab30d7dc7b8cd93d96f9b4f57e9202a
   CapacitorCommunityAppleSignIn: 59bc8ade5677e6ea60a14bdca8d3f4bdc91069e2
   CapacitorCommunityCameraPreview: e103f14483f5f0a5356aacee4605dc7e88260462
+  CapacitorCommunityPrivacyScreen: cecddb5f4fb6427a6f9f822aba7970c361e5ecaf
   CapacitorCommunitySafeArea: cea909b52195cf57d08a6b6331288cb43d906196
   CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
   CapacitorFirebaseMessaging: 9cac5fc77994801e2b87a61f7b2a5f8efc0da33a
@@ -210,6 +216,6 @@ SPEC CHECKSUMS:
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   SouthdevsCapacitorGoogleAuth: 344574498481b6c631d1a2ac103252a3a8166ede
 
-PODFILE CHECKSUM: 672e077885e8380acd91d3c821e5f143157f9554
+PODFILE CHECKSUM: a0733335ba84cf731bcca9c93339fa0c615028aa
 
 COCOAPODS: 1.12.1
