@@ -852,6 +852,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const latestDeltaRef = useRef(0);
   const latestDeltaYRef = useRef(0);
   const rafScheduledRef = useRef(false);
+  // Ref to whichever card element is currently mounted (the regular swipe card
+  // or the ad-card variant - only one is ever rendered at a time, both attach
+  // the same ref). During an active drag, the transform is written directly to
+  // this DOM node's style in the rAF callback below, instead of only through
+  // React state - a state update here still re-renders this whole (very large)
+  // page, and on weaker Android hardware that render can take longer than a
+  // frame, which is what shows up as the card stuttering/lagging behind the
+  // finger. The direct write always lands the same frame, independent of how
+  // long the rest of the page's render takes; the state update still happens
+  // too (throttled to the same rAF), for the overlay hint/buttons that read
+  // swipeDistance/swipeDirection, which can tolerate lagging a frame or two.
+  const cardElRef = useRef<HTMLDivElement>(null);
 
   const getGenderFilter = useCallback((userPreference: string) => {
     if (userPreference === 'male') {
@@ -2972,6 +2984,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       requestAnimationFrame(() => {
         const d = latestDeltaRef.current;
         const dy = latestDeltaYRef.current;
+        // Write the transform straight to the DOM first, ahead of the state update
+        // below - this always lands this frame regardless of how long the rest of
+        // this page takes to re-render, which is what keeps the card itself glued
+        // to the finger even when the (much larger) surrounding re-render lags on
+        // slower Android hardware.
+        if (cardElRef.current) {
+          cardElRef.current.style.transform = currentMatch && isAd(currentMatch)
+            ? `translate3d(${d}px, 0, 0) rotate(${d * 0.08}deg)`
+            : `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
+        }
         setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
         rafScheduledRef.current = false;
       });
@@ -3047,6 +3069,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         requestAnimationFrame(() => {
           const d = latestDeltaRef.current;
           const dy = latestDeltaYRef.current;
+          if (cardElRef.current) {
+            cardElRef.current.style.transform = currentMatch && isAd(currentMatch)
+              ? `translate3d(${d}px, 0, 0) rotate(${d * 0.08}deg)`
+              : `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
+          }
           setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
           rafScheduledRef.current = false;
         });
@@ -4332,7 +4359,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              WebkitTouchCallout: 'none'
            }}>
 
-        <div className="h-full w-full relative z-10 flex flex-col"
+        <div ref={cardElRef} className="h-full w-full relative z-10 flex flex-col"
              style={{
                transform: adCardTransform,
                transition: exitingCard 
@@ -4691,6 +4718,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
         {/* ...existing code... */}
         <div
+          ref={cardElRef}
           className="h-full w-full relative z-10 flex flex-col"
           style={{
             transform: cardTransform,

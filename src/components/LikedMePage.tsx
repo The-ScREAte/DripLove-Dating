@@ -137,6 +137,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
   const [swipeExitDirection, setSwipeExitDirection] = useState<'left' | 'right' | null>(null);
   const swipeStartRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
+  // rAF-throttled drag, same fix as Discover's swipe card: pointermove can fire far
+  // more often than the display refreshes (especially on Android), and calling
+  // setSwipeDragX on every single event re-renders this whole page that often -
+  // capping the state update to once per animation frame, and writing the
+  // transform straight to the card's own DOM node ahead of that (so it never
+  // waits on this page's render to actually land), is what keeps the drag feeling
+  // glued to the finger instead of stuttering on weaker hardware.
+  const swipeCardElRef = useRef<HTMLDivElement>(null);
+  const latestSwipeDeltaRef = useRef(0);
+  const swipeRafScheduledRef = useRef(false);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
 
   // Navigating away from this tab always drops the premium-upgrade screen, so
@@ -1083,7 +1093,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       start.dragging = true;
       setIsSwipeDragging(true);
     }
-    setSwipeDragX(deltaX);
+    latestSwipeDeltaRef.current = deltaX;
+    if (!swipeRafScheduledRef.current) {
+      swipeRafScheduledRef.current = true;
+      requestAnimationFrame(() => {
+        const d = latestSwipeDeltaRef.current;
+        if (swipeCardElRef.current) {
+          swipeCardElRef.current.style.transform = `translateX(${d}px) rotate(${Math.max(-15, Math.min(15, d * 0.05))}deg)`;
+        }
+        setSwipeDragX(d);
+        swipeRafScheduledRef.current = false;
+      });
+    }
   }, [swipeExitDirection]);
 
   const handleSwipePointerUp = useCallback((e: React.PointerEvent) => {
@@ -1098,6 +1119,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     }
 
     setIsSwipeDragging(false);
+    // Flush any pending rAF from handleSwipePointerMove - otherwise it can fire
+    // after this point with a stale delta and briefly redraw the card at the
+    // wrong position right after it's been reset/committed to an exit.
+    latestSwipeDeltaRef.current = 0;
+    swipeRafScheduledRef.current = false;
     const threshold = window.innerWidth * SWIPE_THRESHOLD_RATIO;
     if (Math.abs(swipeDragX) > threshold && selectedProfile) {
       const direction = swipeDragX > 0 ? 'right' : 'left';
@@ -1268,8 +1294,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               slide dots, back button, report button - stays outside this box,
               as real siblings of it rather than children. */}
           <div
+            ref={swipeCardElRef}
             className="absolute inset-0 select-none"
             style={{
+              willChange: 'transform',
               cursor: 'pointer',
               touchAction: 'pan-y',
               transform: `translateX(${swipeDragX}px) rotate(${Math.max(-15, Math.min(15, swipeDragX * 0.05))}deg)`,
