@@ -58,7 +58,7 @@ const LocationSection = ({
     <div className="space-y-6">
       {/* Matching Preferences Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">
           {t('profile.matchingPreferences')}
         </h3>
         
@@ -105,7 +105,7 @@ const LocationSection = ({
                 className="w-full"
                 disabled={!isEditing}
               />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <div className="flex justify-between text-xs text-gray-300 mt-1">
                 <span>{t('profile.ageYears', { age: 18 })}</span>
                 <span className="font-medium">
                   {editedProfile.min_age || 18} - {(editedProfile.max_age || 75) >= 75 ? '75+' : `${editedProfile.max_age} years`}
@@ -118,7 +118,7 @@ const LocationSection = ({
 
       {/* Location Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">
           {t('profile.location')}
         </h3>
         
@@ -148,7 +148,7 @@ const LocationSection = ({
               className="w-full"
               disabled={!isEditing}
             />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <div className="flex justify-between text-xs text-gray-300 mt-1">
               <span>1 km</span>
               <span className="font-medium">{editedProfile.max_distance || 250} km</span>
               <span>500 km</span>
@@ -167,14 +167,14 @@ const LocationSection = ({
           </div>
 
           <div className="p-4 bg-black rounded-lg border border-pink-500/20">
-            <p className="text-sm text-gray-400 mb-3">
+            <p className="text-sm text-gray-300 mb-3">
               {t('profile.unlockCountriesInfo')}
             </p>
 
             {/* Show currently unlocked countries */}
             {unlockedCountries.length > 0 && (
               <div className="mb-3">
-                <div className="text-xs text-gray-400 mb-1">
+                <div className="text-xs text-gray-300 mb-1">
                   {t('profile.currentlyUnlocked')}:
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -204,7 +204,7 @@ const LocationSection = ({
                   : t('profile.selectCountries')}
               </span>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-300">
                   {unlockedCountries.length}/3
                 </span>
                 <ChevronRight className="w-4 h-4" />
@@ -216,16 +216,16 @@ const LocationSection = ({
 
       {/* Premium Upsell for Free Users */}
       {!isPremium && (
-        <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-amber-950/10 rounded-lg border border-yellow-200 text-sm">
-          <div className="p-2 bg-yellow-100 rounded-full">
-            <Globe className="w-5 h-5 text-yellow-600" />
+        <div className="flex items-start gap-3 p-3 bg-black rounded-lg border border-yellow-500/30 text-sm">
+          <div className="p-2 bg-yellow-500/15 rounded-full">
+            <Globe className="w-5 h-5 text-yellow-500" />
           </div>
           <div className="flex-1 space-y-1">
-            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <p className="flex items-center gap-2 text-sm font-semibold text-white">
               Match worldwide
               <Crown className="w-4 h-4 text-yellow-500" />
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-300">
               Unlock up to 3 extra countries when you go Premium.
             </p>
           </div>
@@ -234,22 +234,22 @@ const LocationSection = ({
 
       {/* Location Status - Only show warnings when location is not available */}
       {editedProfile.city && !editedProfile.latitude && (
-        <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
-          <div className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+        <div className="p-3 bg-black rounded-lg border border-orange-500/30">
+          <div className="text-sm text-orange-300 font-medium">
             ⚠️ {t('profile.approximateLocation')}
           </div>
-          <div className="text-xs text-orange-600 dark:text-orange-300">
+          <div className="text-xs text-orange-200/80">
             {t('profile.approximateLocationDescription')}
           </div>
         </div>
       )}
 
       {!editedProfile.city && (
-        <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
-          <div className="text-sm text-red-800 dark:text-red-200 font-medium">
+        <div className="p-3 bg-black rounded-lg border border-red-500/30">
+          <div className="text-sm text-red-300 font-medium">
             ⚠️ {t('profile.locationRequired')}
           </div>
-          <div className="text-xs text-red-600 dark:text-red-300">
+          <div className="text-xs text-red-200/80">
             {t('profile.locationRequiredDescription')}
           </div>
         </div>

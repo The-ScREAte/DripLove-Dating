@@ -49,7 +49,7 @@ import {
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Gamepad2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, X, Crown, Gamepad2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -4560,107 +4560,54 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               0% { opacity: 0; transform: scale(0.9) translateY(12px); }
               100% { opacity: 1; transform: scale(1) translateY(0); }
             }
-            @keyframes trackSwipeLeft {
-              0%   { transform: translateX(26px); opacity: 0; }
-              15%  { opacity: 1; }
-              85%  { opacity: 1; }
-              100% { transform: translateX(-26px); opacity: 0; }
-            }
-            @keyframes trackSwipeRight {
-              0%   { transform: translateX(-26px); opacity: 0; }
-              15%  { opacity: 1; }
-              85%  { opacity: 1; }
-              100% { transform: translateX(26px); opacity: 0; }
+            @keyframes ringPulseWhite {
+              0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35); }
+              70% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
             }
             @keyframes ringPulseRed {
-              0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45); }
-              70% { box-shadow: 0 0 0 14px rgba(244, 63, 94, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
-            }
-            @keyframes ringPulseGreen {
-              0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
-              70% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+              0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.45); }
+              70% { box-shadow: 0 0 0 14px rgba(225, 29, 72, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
             }
             .swipe-guide-card {
               animation: swipeGuideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             }
             .swipe-guide-icon-left {
-              animation: ringPulseRed 2.2s ease-out infinite;
+              animation: ringPulseWhite 1.6s ease-out infinite;
             }
             .swipe-guide-icon-right {
-              animation: ringPulseGreen 2.2s ease-out infinite;
+              animation: ringPulseRed 1.6s ease-out infinite;
             }
-            .swipe-guide-track-left span {
-              animation: trackSwipeLeft 1.6s ease-in-out infinite;
-            }
-            .swipe-guide-track-right span {
-              animation: trackSwipeRight 1.6s ease-in-out infinite;
-            }
-            .swipe-guide-track-left span:nth-child(2) { animation-delay: 0.18s; }
-            .swipe-guide-track-left span:nth-child(1) { animation-delay: 0.36s; }
-            .swipe-guide-track-right span:nth-child(2) { animation-delay: 0.18s; }
-            .swipe-guide-track-right span:nth-child(3) { animation-delay: 0.36s; }
           `}</style>
           <div
-            className="swipe-guide-card flex flex-col items-center rounded-[28px] px-8 py-7"
-            style={{
-              maxWidth: 340,
-              width: '90%',
-              background: 'rgba(0, 0, 0, 0.75)',
-              backdropFilter: 'blur(24px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-              border: '1px solid rgba(236, 72, 153, 0.7)',
-              boxShadow: '0 20px 50px -12px rgba(236, 72, 153, 0.35), 0 0 0 1px rgba(236,72,153,0.25) inset',
-            }}
+            className="swipe-guide-card flex flex-row items-center gap-10"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-bold text-white mb-5 text-center tracking-tight">
-              {t('discover.swipeGuide.title')}
-            </h3>
-            <div className="flex flex-row items-start gap-10 mb-5">
-              {/* Swipe Left */}
-              <div className="flex flex-col items-center">
-                <div
-                  className="swipe-guide-icon-left rounded-full flex items-center justify-center mb-3"
-                  style={{
-                    width: 56,
-                    height: 56,
-                    background: 'linear-gradient(135deg, rgba(244,63,94,0.15), rgba(244,63,94,0.05))',
-                    border: '1.5px solid rgba(244,63,94,0.35)',
-                  }}
-                >
-                  <X className="w-6 h-6" style={{ color: '#f43f5e' }} strokeWidth={2.5} />
-                </div>
-                <div className="swipe-guide-track-left flex gap-0.5 mb-1.5 h-4">
-                  <span className="block"><ChevronLeft className="w-4 h-4" style={{ color: '#f43f5e' }} strokeWidth={3} /></span>
-                  <span className="block"><ChevronLeft className="w-4 h-4" style={{ color: '#f43f5e' }} strokeWidth={3} /></span>
-                </div>
-                <span className="text-sm font-bold text-rose-500">{t('discover.swipeGuide.nope')}</span>
-                <span className="text-[11px] text-gray-300 mt-0.5">{t('discover.swipeGuide.swipeLeft')}</span>
-              </div>
-              {/* Swipe Right */}
-              <div className="flex flex-col items-center">
-                <div
-                  className="swipe-guide-icon-right rounded-full flex items-center justify-center mb-3"
-                  style={{
-                    width: 56,
-                    height: 56,
-                    background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))',
-                    border: '1.5px solid rgba(16,185,129,0.35)',
-                  }}
-                >
-                  <Heart className="w-6 h-6" style={{ color: '#10b981' }} strokeWidth={2.5} fill="#10b981" />
-                </div>
-                <div className="swipe-guide-track-right flex gap-0.5 mb-1.5 h-4">
-                  <span className="block"><ChevronRight className="w-4 h-4" style={{ color: '#10b981' }} strokeWidth={3} /></span>
-                  <span className="block"><ChevronRight className="w-4 h-4" style={{ color: '#10b981' }} strokeWidth={3} /></span>
-                </div>
-                <span className="text-sm font-bold text-emerald-400">{t('discover.swipeGuide.like')}</span>
-                <span className="text-[11px] text-gray-300 mt-0.5">{t('discover.swipeGuide.swipeRight')}</span>
-              </div>
+            {/* Swipe Left - Nope */}
+            <div
+              className="swipe-guide-icon-left rounded-full flex items-center justify-center"
+              style={{
+                width: 72,
+                height: 72,
+                background: 'rgba(255,255,255,0.95)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              }}
+            >
+              <X className="w-9 h-9" style={{ color: '#ef4444' }} strokeWidth={3} />
             </div>
-            <p className="text-[11px] text-gray-300 text-center">{t('discover.swipeGuide.tapToClose')}</p>
+            {/* Swipe Right - Like */}
+            <div
+              className="swipe-guide-icon-right rounded-full flex items-center justify-center"
+              style={{
+                width: 72,
+                height: 72,
+                background: '#e11d48',
+                boxShadow: '0 4px 20px rgba(225,29,72,0.5)',
+              }}
+            >
+              <Heart className="w-9 h-9" style={{ color: 'white' }} strokeWidth={0} fill="white" />
+            </div>
           </div>
         </div>
       )}

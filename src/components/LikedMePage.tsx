@@ -1268,13 +1268,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return (
       <div
         className="h-full w-full relative flex flex-col bg-black overflow-hidden"
-        style={{
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          // Same pink frame Discover's card gets, around the whole thing - photo
-          // and info panel together, not just the photo.
-          border: '1px solid rgba(236,72,153,0.55)',
-          boxSizing: 'border-box',
-        }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Photo area - fixed height only while the info panel below is actually
             showing (so that panel has room to breathe, same proportion Discover
