@@ -4883,11 +4883,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   // so this needs to know about both (as real measured numbers, not guesses) or
                   // the panel overclaims space that isn't there, eating into the bottom
                   // padding/clearance that's supposed to be reserved.
-                  // Container-relative: the surrounding discover-container is already
-                  // exactly the space between header and nav, so a percentage of it can
-                  // never overclaim space (the old vh math could, and pushed the card
-                  // out of view on some devices).
-                  maxHeight: '66%',
+                  // A definite vh cap, not a percentage: this wrapper's own parent
+                  // (discover-info-area) has no explicit height of its own - it's sized
+                  // by content - so a percentage maxHeight here has nothing definite to
+                  // resolve against and is effectively ignored by the browser. 38vh
+                  // always resolves to a real number, keeping the info panel noticeably
+                  // shorter (was uncapped in practice) and matching Liked Me's and the
+                  // profile preview's own expanded panel proportions - the photo keeps
+                  // the larger share of the card on all three.
+                  maxHeight: '38vh',
 
                 }}
               >

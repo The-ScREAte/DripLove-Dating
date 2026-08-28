@@ -113,7 +113,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           // actually has room for, pushing the caption down or off-screen. '0%'
           // makes flex-grow fill space purely from the parent's own definite
           // height, with zero dependency on the photo's natural size.
-          flex: showMoreInfo ? '0 0 45%' : '1 1 0%',
+          // 58% (was 45%) - matches Liked Me's own expanded photo/info split, so the
+          // info panel below reads as the same proportion on both screens.
+          flex: showMoreInfo ? '0 0 58%' : '1 1 0%',
           // Floors that fit even short screens once the header/nav space above is
           // correctly reserved (this used to assume ~420px was always available below
           // the header, but a real short device/emulator can have well under that once
@@ -142,7 +144,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         </div>
 
         {slides.length > 1 && (
-          <div className="absolute left-4 flex gap-1.5 z-10" style={{ top: '28px' }}>
+          <div className="absolute left-4 flex gap-1.5 z-10" style={{ top: '10px' }}>
             {slides.map((_, idx) => (
               <div
                 key={idx}
@@ -159,7 +161,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             inside a `position: fixed` ancestor, so a plain absolute overlay
             already paints above everything else on the page. */}
         {profile.adinkra_symbols && profile.adinkra_symbols.length > 0 && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
+          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex flex-col items-center" style={{ top: '4px' }}>
             <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
               <div className="relative z-10">
                 <UserAdinkraDisplay adinkraSymbols={profile.adinkra_symbols} />

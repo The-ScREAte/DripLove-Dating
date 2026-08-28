@@ -461,7 +461,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     // re-adding a safe-area allowance the header already accounts for
                     // internally, and not the old flat pixel guess from when the card
                     // rendered directly behind a position: fixed header.
-                    top: 'calc(var(--app-header-height, 72px) + 12px)'
+                    top: 'calc(var(--app-header-height, 72px) + 6px)'
                   }}
                 >
                   <button
@@ -526,7 +526,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
               style={{
                 // Same reasoning as the report button above - clears the header's real
                 // height plus a small gap, not a stale pixel guess.
-                top: 'calc(var(--app-header-height, 72px) + 14px)',
+                top: 'calc(var(--app-header-height, 72px) + 8px)',
                 pointerEvents: 'none'
               }}
             >

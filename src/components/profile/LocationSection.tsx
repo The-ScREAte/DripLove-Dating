@@ -58,14 +58,14 @@ const LocationSection = ({
     <div className="space-y-6">
       {/* Matching Preferences Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-white uppercase tracking-wide">
           {t('profile.matchingPreferences')}
         </h3>
         
         {/* Gender and Looking For Preferences */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="gender" className="text-gray-200">{t('profile.gender')}</Label>
+              <Label htmlFor="gender" className="text-white">{t('profile.gender')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('gender', value)} value={editedProfile.gender}>
                 <SelectTrigger id="gender" className="w-full bg-black/40 border-pink-500/30 text-white">
                   <SelectValue placeholder={t('common.select')} />
@@ -78,7 +78,7 @@ const LocationSection = ({
               </Select>
             </div>
             <div>
-              <Label htmlFor="preference" className="text-gray-200">{t('profile.lookingFor')}</Label>
+              <Label htmlFor="preference" className="text-white">{t('profile.lookingFor')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('preference', value)} value={editedProfile.preference}>
                 <SelectTrigger id="preference" className="w-full bg-black/40 border-pink-500/30 text-white">
                   <SelectValue placeholder={t('common.select')} />
@@ -94,7 +94,7 @@ const LocationSection = ({
 
           {/* Age Range Preference */}
           <div className="space-y-3">
-            <Label className="text-gray-200">{t('profile.ageRangeForMatches')}</Label>
+            <Label className="text-white">{t('profile.ageRangeForMatches')}</Label>
             <div className="px-3">
               <Slider
                 value={[editedProfile.min_age || 18, editedProfile.max_age || 75]}
@@ -105,7 +105,7 @@ const LocationSection = ({
                 className="w-full"
                 disabled={!isEditing}
               />
-              <div className="flex justify-between text-xs text-gray-300 mt-1">
+              <div className="flex justify-between text-xs text-white mt-1">
                 <span>{t('profile.ageYears', { age: 18 })}</span>
                 <span className="font-medium">
                   {editedProfile.min_age || 18} - {(editedProfile.max_age || 75) >= 75 ? '75+' : `${editedProfile.max_age} years`}
@@ -118,7 +118,7 @@ const LocationSection = ({
 
       {/* Location Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-white uppercase tracking-wide">
           {t('profile.location')}
         </h3>
         
@@ -137,7 +137,7 @@ const LocationSection = ({
 
         {/* Distance Preference */}
         <div className="space-y-3">
-          <Label className="text-gray-200">What max distance do you want to see people?</Label>
+          <Label className="text-white">What max distance do you want to see people?</Label>
           <div className="px-3">
           <Slider
               value={[editedProfile.max_distance || 250]}
@@ -148,7 +148,7 @@ const LocationSection = ({
               className="w-full"
               disabled={!isEditing}
             />
-            <div className="flex justify-between text-xs text-gray-300 mt-1">
+            <div className="flex justify-between text-xs text-white mt-1">
               <span>1 km</span>
               <span className="font-medium">{editedProfile.max_distance || 250} km</span>
               <span>500 km</span>
@@ -162,19 +162,19 @@ const LocationSection = ({
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-pink-400" />
-            <Label className="font-medium text-gray-200">{t('profile.unlockCountries')}</Label>
+            <Label className="font-medium text-white">{t('profile.unlockCountries')}</Label>
             <Crown className="w-4 h-4 text-yellow-500" />
           </div>
 
           <div className="p-4 bg-black rounded-lg border border-pink-500/20">
-            <p className="text-sm text-gray-300 mb-3">
+            <p className="text-sm text-white mb-3">
               {t('profile.unlockCountriesInfo')}
             </p>
 
             {/* Show currently unlocked countries */}
             {unlockedCountries.length > 0 && (
               <div className="mb-3">
-                <div className="text-xs text-gray-300 mb-1">
+                <div className="text-xs text-white mb-1">
                   {t('profile.currentlyUnlocked')}:
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -189,25 +189,25 @@ const LocationSection = ({
                 </div>
               </div>
             )}
-            
+
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowCountryDialog(true)}
-              className="w-full flex items-center justify-between border-pink-500/30 text-gray-200 hover:bg-pink-500/10 hover:text-white"
+              className="h-8 px-3 text-xs flex items-center justify-between gap-3 border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white"
               disabled={!isEditing}
             >
-              <span className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
+              <span className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
                 {unlockedCountries.length > 0
                   ? t('profile.manageCountries')
                   : t('profile.selectCountries')}
               </span>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-300">
+                <span className="text-xs text-white">
                   {unlockedCountries.length}/3
                 </span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </div>
             </Button>
           </div>
@@ -225,7 +225,7 @@ const LocationSection = ({
               Match worldwide
               <Crown className="w-4 h-4 text-yellow-500" />
             </p>
-            <p className="text-xs text-gray-300">
+            <p className="text-xs text-white">
               Unlock up to 3 extra countries when you go Premium.
             </p>
           </div>

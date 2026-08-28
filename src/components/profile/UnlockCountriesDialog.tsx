@@ -111,7 +111,7 @@ const UnlockCountriesDialog = ({
             <Globe className="w-5 h-5 text-pink-400" />
             {t('profile.unlockCountries')}
           </DialogTitle>
-          <DialogDescription className="text-gray-300">
+          <DialogDescription className="text-white">
             {t('profile.unlockCountriesDescription')}
           </DialogDescription>
         </DialogHeader>
@@ -122,13 +122,13 @@ const UnlockCountriesDialog = ({
             <div className="flex items-center gap-2">
               <Check className="w-3.5 h-3.5 text-pink-400 shrink-0" />
               <span className="text-sm font-medium text-white">{currentCountry}</span>
-              <span className="text-xs text-gray-400 ml-auto">{t('profile.yourCountry')}</span>
+              <span className="text-xs text-white ml-auto">{t('profile.yourCountry')}</span>
             </div>
           </div>
 
           {/* Selected countries summary */}
           <div className="mb-3">
-            <div className="text-xs text-gray-400 mb-1.5">
+            <div className="text-xs text-white mb-1.5">
               {t('profile.selectedCountries')}: {selectedCountries.length}/3
             </div>
             {selectedCountries.length > 0 && (
@@ -153,12 +153,12 @@ const UnlockCountriesDialog = ({
 
           {/* Search */}
           <div className="relative mb-2">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-pink-400" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('common.search', 'Search countries')}
-              className="pl-8 h-9 bg-black border-pink-500/30 text-white placeholder:text-gray-500 text-sm"
+              className="pl-8 h-9 bg-black border-pink-500/30 text-white placeholder:text-white/50 text-sm"
             />
           </div>
 
@@ -166,7 +166,7 @@ const UnlockCountriesDialog = ({
           <ScrollArea className="h-[220px] border border-pink-500/20 rounded-lg p-2">
             <div className="space-y-1">
               {filteredCountries.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-6">
+                <p className="text-sm text-white text-center py-6">
                   {t('common.noResults', 'No countries found')}
                 </p>
               )}
@@ -191,10 +191,11 @@ const UnlockCountriesDialog = ({
                       checked={isSelected}
                       disabled={isDisabled}
                       onCheckedChange={() => !isDisabled && handleToggleCountry(country.code)}
+                      className="w-5 h-5 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
                     />
                     <Label
                       htmlFor={country.code}
-                      className={`flex-1 cursor-pointer text-sm text-gray-200 ${isDisabled ? 'cursor-not-allowed' : ''}`}
+                      className={`flex-1 cursor-pointer text-sm text-white ${isDisabled ? 'cursor-not-allowed' : ''}`}
                     >
                       {country.name}
                     </Label>
