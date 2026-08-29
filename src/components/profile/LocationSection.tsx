@@ -194,7 +194,7 @@ const LocationSection = ({
               variant="outline"
               size="sm"
               onClick={() => setShowCountryDialog(true)}
-              className="h-8 px-3 text-xs flex items-center justify-between gap-3 border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white"
+              className="h-8 px-3 text-xs flex items-center justify-between gap-3 bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
               disabled={!isEditing}
             >
               <span className="flex items-center gap-1.5">
@@ -204,7 +204,7 @@ const LocationSection = ({
                   : t('profile.selectCountries')}
               </span>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-white">
+                <span className="text-xs text-black">
                   {unlockedCountries.length}/3
                 </span>
                 <ChevronRight className="w-3.5 h-3.5" />

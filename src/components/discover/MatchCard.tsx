@@ -553,9 +553,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
               dots above, this only needs to sit above the photo, not above the
               global header. */}
           <div
-            className={`absolute inset-x-0 z-20 px-4 pt-28 ${showMoreInfo ? 'pb-4' : 'pb-5'}`}
+            className={`absolute inset-x-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
             style={{
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.88) 72%, rgba(0,0,0,1) 92%)',
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,1) 85%)',
               // Photo box now stops above the nav on its own (see DiscoverPage.tsx's
               // discover-container), so bottom:0 already lands right at the photo's
               // own bottom edge, just above the nav - no extra offset needed.
@@ -824,7 +824,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif'
         }}
       >
-        <div className="px-4 pt-1 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '160px' }}>
+        <div className="px-4 pt-1 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 80px)' }}>
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
