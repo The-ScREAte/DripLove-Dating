@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MapPin,
@@ -18,7 +18,9 @@ import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BOR
 import { SlideRenderer } from '../discover/SlideRenderer';
 import UserAdinkraDisplay from '../discover/UserAdinkraDisplay';
 import SwipeButtons from '../discover/SwipeButtons';
-import PhotoCropModal from './PhotoCropModal';
+import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProfilePreviewModalProps {
   profile: PotentialMatch;
@@ -63,9 +65,53 @@ const getSafeImageSrc = (url?: string): string | undefined => {
 // ProfilePage via onClose/isActiveTab.
 const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated }) => {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
+  // Crop is applied locally first ("OK" in the crop modal) so the user sees it
+  // exactly as it will look here, and only hits storage/db on an explicit Save.
+  const [pendingCrop, setPendingCrop] = useState<{ blob: Blob; previewUrl: string; originalUrl: string } | null>(null);
+  const [savingCrop, setSavingCrop] = useState(false);
+  const [showDiscardWarning, setShowDiscardWarning] = useState(false);
+
+  // Revoke the local object URL when it's replaced or the preview goes away.
+  useEffect(() => {
+    return () => {
+      if (pendingCrop?.previewUrl) URL.revokeObjectURL(pendingCrop.previewUrl);
+    };
+  }, [pendingCrop?.previewUrl]);
+
+  // Warn on a real page unload while a crop is pending.
+  useEffect(() => {
+    if (!pendingCrop) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [pendingCrop]);
+
+  const handleSavePendingCrop = useCallback(async () => {
+    if (!pendingCrop || savingCrop) return;
+    setSavingCrop(true);
+    try {
+      await uploadCroppedPhoto(profile.id, pendingCrop.originalUrl, pendingCrop.blob);
+      URL.revokeObjectURL(pendingCrop.previewUrl);
+      setPendingCrop(null);
+      toast({ title: 'Photo updated', description: 'Your cropped photo has been saved.' });
+      onPhotoUpdated?.();
+    } catch (error) {
+      console.error('Error saving cropped photo:', error);
+      toast({ title: 'Error', description: 'Failed to save your cropped photo. Please try again.', variant: 'destructive' });
+    } finally {
+      setSavingCrop(false);
+    }
+  }, [pendingCrop, savingCrop, profile.id, toast, onPhotoUpdated]);
+
+  const handleDiscardPendingCrop = useCallback(() => {
+    if (pendingCrop?.previewUrl) URL.revokeObjectURL(pendingCrop.previewUrl);
+    setPendingCrop(null);
+    setShowDiscardWarning(false);
+  }, [pendingCrop]);
   const expandedDetailsRef = useRef<HTMLDivElement>(null);
 
   const slides = useMemo(() => buildSlides(profile, images), [profile, images]);
@@ -142,7 +188,11 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               userBackgroundColor={userBackgroundColor}
               matchFirstName={profile.first_name || ''}
               matchLastName={profile.last_name || ''}
-              getOptimizedUrl={(url) => getSafeImageSrc(url) || url}
+              getOptimizedUrl={(url) =>
+                (pendingCrop && url === pendingCrop.originalUrl
+                  ? pendingCrop.previewUrl
+                  : getSafeImageSrc(url)) || url
+              }
             />
           )}
         </div>
@@ -197,10 +247,69 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             imageUrl={currentSlideData.content}
             userId={profile.id}
             onClose={() => setShowCropModal(false)}
-            onSaved={() => {
-              onPhotoUpdated?.();
+            onApply={(result) => {
+              if (pendingCrop?.previewUrl) URL.revokeObjectURL(pendingCrop.previewUrl);
+              // Keep the ORIGINAL stored url as the key, even when re-cropping a
+              // crop, so Save still repoints the right user_images row.
+              setPendingCrop({ ...result, originalUrl: pendingCrop?.originalUrl || result.originalUrl });
+              setShowCropModal(false);
             }}
           />
+        )}
+
+        {/* Unsaved-crop controls - only visible while a crop is pending. */}
+        {pendingCrop && (
+          <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 px-3 py-2 bg-black/70 backdrop-blur-md">
+            <span className="text-xs text-white">Unsaved crop</span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); setShowDiscardWarning(true); }}
+                disabled={savingCrop}
+                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); handleSavePendingCrop(); }}
+                disabled={savingCrop}
+                className="h-8 px-3 text-xs bg-pink-600 hover:bg-pink-700 text-white"
+              >
+                {savingCrop ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {showDiscardWarning && (
+          <div
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 px-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full max-w-xs rounded-xl border border-pink-500/30 bg-black p-4 text-center">
+              <p className="text-sm text-white mb-1 font-semibold">Discard your crop?</p>
+              <p className="text-xs text-gray-300 mb-4">Your cropped photo hasn't been saved yet.</p>
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowDiscardWarning(false)}
+                  className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+                >
+                  Keep editing
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleDiscardPendingCrop}
+                  className="h-8 px-3 text-xs bg-pink-600 hover:bg-pink-700 text-white"
+                >
+                  Discard
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Name/age caption - pinned to the bottom of the photo with the same

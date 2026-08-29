@@ -632,7 +632,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
       const timer = setTimeout(() => {
         setShowSwipeGuide(false);
         localStorage.setItem('driplove_swipe_guide_shown', 'true');
-      }, 20000); // 20 seconds
+      }, 5000); // 5 seconds
       return () => clearTimeout(timer);
     }
   }, [currentUser?.id]);
@@ -4541,7 +4541,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
            itself as a percentage of that one container instead, so it works on any
            screen. */
         .discover-image-area.expanded {
-          max-height: 62%;
+          max-height: 58%;
         }
       `}</style>
 
@@ -4738,7 +4738,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
               // the column with the details panel below and needs to negotiate space
               // with it - capped by min/max height so it can't blow past its share.
               ...(showMoreInfo
-                ? { minHeight: '34%', maxHeight: '62%' }
+                ? { flex: '0 0 58%', minHeight: '180px', maxHeight: '58%' }
                 : { position: 'absolute', inset: 0 }),
 
               // The outer discover-container above is 'pan-y' so the expanded info
