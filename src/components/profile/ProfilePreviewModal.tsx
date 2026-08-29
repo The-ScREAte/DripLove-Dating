@@ -386,7 +386,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           ref={expandedDetailsRef}
           className="bg-black px-4 pt-1 space-y-3 flex-1 overflow-y-auto"
           style={{
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 80px)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 60px)',
             WebkitOverflowScrolling: 'touch',
             // Overlaps the photo box by a hair to paper over the subpixel seam
             // that shows up between the gradient's solid-black bottom edge and
