@@ -18,10 +18,60 @@ interface PhotoCropModalProps {
   imageUrl: string;
   userId: string;
   onClose: () => void;
-  onSaved: (newUrl: string) => void;
+  /** Legacy immediate-save flow (Image Management): uploads right here. */
+  onSaved?: (newUrl: string) => void;
+  /**
+   * Deferred flow (profile preview): hands the cropped result back to the
+   * parent WITHOUT uploading, so the user can review it in the real preview
+   * and then explicitly Save or Cancel there.
+   */
+  onApply?: (result: { blob: Blob; previewUrl: string; originalUrl: string }) => void;
 }
 
-const PhotoCropModal: React.FC<PhotoCropModalProps> = ({ imageUrl, userId, onClose, onSaved }) => {
+/**
+ * Persists a cropped photo: uploads the blob, repoints the existing
+ * user_images row at it (keeps order + approval), and best-effort deletes the
+ * old object. Shared by the immediate flow here and the deferred Save in
+ * ProfilePreviewModal.
+ */
+export const uploadCroppedPhoto = async (
+  userId: string,
+  originalUrl: string,
+  blob: Blob
+): Promise<string> => {
+  const safeFile = new File([blob], `${Date.now()}.jpg`, { type: 'image/jpeg' });
+  const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
+
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('user-photos')
+    .upload(fileName, safeFile, { contentType: 'image/jpeg', cacheControl: '3600', upsert: false });
+  if (uploadError) throw uploadError;
+
+  const storedPath = uploadData?.path;
+  if (!storedPath) throw new Error('Upload succeeded but no path returned from storage');
+
+  const { data: urlData } = await supabase.storage.from('user-photos').getPublicUrl(storedPath);
+  if (!urlData?.publicUrl) throw new Error('Failed to generate public image URL');
+  const newUrl = urlData.publicUrl;
+
+  const { error: dbError } = await supabase
+    .from('user_images')
+    .update({ image_url: newUrl })
+    .eq('user_id', userId)
+    .eq('image_url', originalUrl);
+  if (dbError) throw dbError;
+
+  const urlParts = originalUrl.split('/');
+  const bucketIndex = urlParts.findIndex((part) => part === 'user-photos');
+  if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
+    const oldPath = urlParts.slice(bucketIndex + 1).join('/');
+    await supabase.storage.from('user-photos').remove([oldPath]).catch(() => {});
+  }
+
+  return newUrl;
+};
+
+const PhotoCropModal: React.FC<PhotoCropModalProps> = ({ imageUrl, userId, onClose, onSaved, onApply }) => {
   const { toast } = useToast();
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -37,45 +87,18 @@ const PhotoCropModal: React.FC<PhotoCropModalProps> = ({ imageUrl, userId, onClo
     setIsSaving(true);
     try {
       const blob = await getCroppedImageBlob(imageUrl, croppedAreaPixels);
-      const safeFile = new File([blob], `${Date.now()}.jpg`, { type: 'image/jpeg' });
-      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('user-photos')
-        .upload(fileName, safeFile, {
-          contentType: 'image/jpeg',
-          cacheControl: '3600',
-          upsert: false,
-        });
-      if (uploadError) throw uploadError;
-
-      const storedPath = uploadData?.path;
-      if (!storedPath) throw new Error('Upload succeeded but no path returned from storage');
-
-      const { data: urlData } = await supabase.storage.from('user-photos').getPublicUrl(storedPath);
-      if (!urlData?.publicUrl) throw new Error('Failed to generate public image URL');
-      const newUrl = urlData.publicUrl;
-
-      // Re-crop of already-approved content, not new content - update the
-      // existing row in place (same order, same approval status) rather than
-      // inserting a new one and sending it back through moderation.
-      const { error: dbError } = await supabase
-        .from('user_images')
-        .update({ image_url: newUrl })
-        .eq('user_id', userId)
-        .eq('image_url', imageUrl);
-      if (dbError) throw dbError;
-
-      // Best-effort cleanup of the old storage object - not fatal if it fails.
-      const urlParts = imageUrl.split('/');
-      const bucketIndex = urlParts.findIndex((part) => part === 'user-photos');
-      if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
-        const oldPath = urlParts.slice(bucketIndex + 1).join('/');
-        await supabase.storage.from('user-photos').remove([oldPath]).catch(() => {});
+      // Deferred flow: don't touch storage or the database yet - just hand the
+      // crop back so it can be previewed, then saved or discarded by the user.
+      if (onApply) {
+        onApply({ blob, previewUrl: URL.createObjectURL(blob), originalUrl: imageUrl });
+        onClose();
+        return;
       }
 
+      const newUrl = await uploadCroppedPhoto(userId, imageUrl, blob);
       toast({ title: 'Photo updated', description: 'Your cropped photo has been saved.' });
-      onSaved(newUrl);
+      onSaved?.(newUrl);
       onClose();
     } catch (error) {
       console.error('Error saving cropped photo:', error);
@@ -140,7 +163,7 @@ const PhotoCropModal: React.FC<PhotoCropModalProps> = ({ imageUrl, userId, onClo
             disabled={isSaving || !croppedAreaPixels}
             className="w-auto h-9 px-4 bg-pink-600 hover:bg-pink-700 text-white"
           >
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? (onApply ? 'Applying...' : 'Saving...') : (onApply ? 'OK' : 'Save')}
           </Button>
         </div>
       </DialogContent>
