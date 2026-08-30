@@ -4560,7 +4560,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // the timeout.
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{ pointerEvents: 'none', background: 'rgba(0,0,0,0.35)' }}
+          style={{
+            pointerEvents: 'none',
+            // Dark, softly blurred scrim: the card behind stays visible through it
+            // while the Nope / Yep icons read cleanly on top.
+            background: 'rgba(0,0,0,0.62)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)'
+          }}
         >
           <style>{`
             @keyframes swipeGuideIn {
