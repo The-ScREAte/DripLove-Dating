@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -69,6 +69,7 @@ const AdsManagement = () => {
   // local object URL for the cropper to work against while that happens.
   const [croppingFileUrl, setCroppingFileUrl] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     about: '',
@@ -213,9 +214,39 @@ const AdsManagement = () => {
     }
   };
 
+  // A bare domain like "www.example.com" has no protocol, so it fails
+  // type="url" validation (and would 404 as a relative path if used as-is
+  // in an href/window.open) - https:// is assumed if nothing else is given.
+  const normalizeUrl = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', about: '', image_url: '', video_url: '', media_type: 'image', link: '', link_as: 'Click here', target_countries: [] });
+    setEditingAdId(null);
+  };
+
+  const handleEditAd = (ad: Ad) => {
+    setFormData({
+      name: ad.name,
+      about: ad.about,
+      image_url: ad.image_url,
+      video_url: ad.video_url || '',
+      media_type: ad.media_type,
+      link: ad.link || '',
+      link_as: ad.link_as || 'Click here',
+      target_countries: ad.target_countries || []
+    });
+    setEditingAdId(ad.id);
+    setShowCreateForm(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.about) {
       toast({
         title: 'Error',
@@ -245,34 +276,36 @@ const AdsManagement = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('ads')
-        .insert({
-          name: formData.name,
-          about: formData.about,
-          image_url: formData.image_url || 'https://via.placeholder.com/400x300',
-          video_url: formData.video_url || null,
-          media_type: formData.media_type,
-          link: formData.link || null,
-          link_as: formData.link_as || 'Click here',
-          target_countries: formData.target_countries
-        } as any);
+      const payload = {
+        name: formData.name,
+        about: formData.about,
+        image_url: formData.image_url || 'https://via.placeholder.com/400x300',
+        video_url: formData.video_url || null,
+        media_type: formData.media_type,
+        link: formData.link ? normalizeUrl(formData.link) : null,
+        link_as: formData.link_as || 'Click here',
+        target_countries: formData.target_countries
+      };
+
+      const { error } = editingAdId
+        ? await supabase.from('ads').update(payload as any).eq('id', editingAdId)
+        : await supabase.from('ads').insert(payload as any);
 
       if (error) throw error;
 
       toast({
         title: 'Success',
-        description: 'Ad created successfully'
+        description: editingAdId ? 'Ad updated successfully' : 'Ad created successfully'
       });
 
-      setFormData({ name: '', about: '', image_url: '', video_url: '', media_type: 'image', link: '', link_as: 'Click here', target_countries: [] });
+      resetForm();
       setShowCreateForm(false);
       fetchAds();
     } catch (error) {
-      console.error('Error creating ad:', error);
+      console.error('Error saving ad:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create ad',
+        description: editingAdId ? 'Failed to update ad' : 'Failed to create ad',
         variant: 'destructive'
       });
     } finally {
@@ -336,21 +369,27 @@ const AdsManagement = () => {
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <Collapsible open={showCreateForm} onOpenChange={setShowCreateForm}>
+          <Collapsible
+            open={showCreateForm}
+            onOpenChange={(open) => {
+              setShowCreateForm(open);
+              if (!open) resetForm();
+            }}
+          >
             <CollapsibleTrigger asChild>
               <Button
                 type="button"
                 variant="outline"
                 className="w-full justify-between"
               >
-                <span className="text-base font-semibold">Create New Ad</span>
+                <span className="text-base font-semibold">{editingAdId ? 'Edit Ad' : 'Create New Ad'}</span>
                 {showCreateForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Name</label>
+              <label className="block text-sm font-medium mb-2">Title</label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -445,9 +484,10 @@ const AdsManagement = () => {
               <Input
                 value={formData.link}
                 onChange={(e) => setFormData(prev => ({ ...prev, link: e.target.value }))}
-                placeholder="Enter link URL"
-                type="url"
+                placeholder="e.g. www.example.com"
+                type="text"
               />
+              <p className="text-xs text-gray-500 mt-1">https:// is added automatically if you leave it off.</p>
             </div>
 
             <div>
@@ -513,7 +553,7 @@ const AdsManagement = () => {
               disabled={loading || uploading}
               className="w-full"
             >
-              {loading ? 'Creating...' : 'Create Ad'}
+              {loading ? (editingAdId ? 'Saving...' : 'Creating...') : (editingAdId ? 'Save Changes' : 'Create Ad')}
             </Button>
           </form>
             </CollapsibleContent>
@@ -531,107 +571,54 @@ const AdsManagement = () => {
           <div className="grid gap-4">
             {ads.map((ad) => (
               <Card key={ad.id}>
-                <CardContent className="pt-6">
-                  <div className="flex gap-4">
-                    {ad.media_type === 'video' && ad.video_url ? (
-                      <div className="w-24 h-24 bg-gray-100 rounded flex items-center justify-center relative">
-                        <Video className="w-8 h-8 text-gray-500" />
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1 rounded">
-                          Video
-                        </div>
-                      </div>
-                    ) : (
-                      <img
-                        loading="lazy"
-                        decoding="async"
-                        src={getRawStorageUrl(ad.image_url)}
-                        alt={ad.name}
-                        className="w-24 h-24 object-cover rounded"
-                      />
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold">{ad.name}</h4>
+                    {!ad.is_active && (
+                      <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium">Paused</span>
                     )}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{ad.name}</h4>
-                        {!ad.is_active && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium">Paused</span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{ad.about}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {ad.media_type === 'video' ? (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">Video</span>
-                        ) : (
-                          <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">Image</span>
-                        )}
-                        {ad.target_countries && ad.target_countries.length > 0 ? (
-                          <Collapsible>
-                            <CollapsibleTrigger className="flex items-center gap-1 text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded hover:bg-purple-200 transition-colors">
-                              <span>{ad.target_countries.length} {ad.target_countries.length === 1 ? 'country' : 'countries'}</span>
-                              <ChevronDown className="w-3 h-3" />
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="mt-1">
-                              <div className="flex flex-wrap gap-1 p-2 bg-purple-50 rounded border border-purple-100">
-                                {ad.target_countries.map((code) => (
-                                  <span key={code} className="text-xs bg-white text-purple-700 px-2 py-0.5 rounded border border-purple-200">
-                                    {COUNTRY_OPTIONS.find(c => c.code === code)?.name || code}
-                                  </span>
-                                ))}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        ) : (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">All countries</span>
-                        )}
-                      </div>
-                      {ad.link && (
-                        <a 
-                          href={ad.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline mt-1 block"
-                        >
-                          {ad.link_as || 'Click here'}
-                        </a>
+                  </div>
+                  <div className="flex gap-1.5 mt-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setPreviewAd(ad)}
+                      title="Preview ad"
+                      className="h-8 w-8"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleEditAd(ad)}
+                      title="Edit ad"
+                      className="h-8 w-8"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant={ad.is_active ? "outline" : "default"}
+                      size="icon"
+                      onClick={() => handleToggleActive(ad.id, ad.is_active)}
+                      title={ad.is_active ? 'Pause' : 'Resume'}
+                      className={`h-8 w-8 ${ad.is_active ? "text-orange-600 border-orange-300 hover:bg-orange-50" : "bg-green-600 hover:bg-green-700"}`}
+                    >
+                      {ad.is_active ? (
+                        <Pause className="h-3.5 w-3.5" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
                       )}
-                      <p className="text-xs text-gray-400 mt-2">
-                        {new Date(ad.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setPreviewAd(ad)}
-                          title="Preview ad"
-                          className="h-8 w-8"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => handleDelete(ad.id)}
-                          title="Delete ad"
-                          className="h-8 w-8"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      <Button
-                        variant={ad.is_active ? "outline" : "default"}
-                        size="icon"
-                        onClick={() => handleToggleActive(ad.id, ad.is_active)}
-                        title={ad.is_active ? 'Pause' : 'Resume'}
-                        className={`h-8 w-8 ${ad.is_active ? "text-orange-600 border-orange-300 hover:bg-orange-50" : "bg-green-600 hover:bg-green-700"}`}
-                      >
-                        {ad.is_active ? (
-                          <Pause className="h-3.5 w-3.5" />
-                        ) : (
-                          <Play className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </div>
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDelete(ad.id)}
+                      title="Delete ad"
+                      className="h-8 w-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
