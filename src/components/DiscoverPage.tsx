@@ -849,12 +849,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // dismiss first. Gated on swipeDistance crossing a real movement threshold,
   // not just isDragging - that flips true on plain touchdown, before any actual
   // movement, which was dismissing the guide on a tap alone rather than a swipe.
-  useEffect(() => {
-    if (showSwipeGuide && swipeUI.isDragging && swipeUI.swipeDistance > 12) {
-      setShowSwipeGuide(false);
-      localStorage.setItem('driplove_swipe_guide_shown', 'true');
-    }
-  }, [showSwipeGuide, swipeUI.isDragging, swipeUI.swipeDistance]);
+  // NOTE: the guide is no longer dismissed by the first touch/swipe — it stays up
+  // for its full 5 seconds so the user actually gets to read it, while real swipes
+  // underneath still count (the overlay is pointer-events: none).
 
   const isDraggingRef = useRef(false);
   // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
