@@ -17,7 +17,7 @@ import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
 import { detectHumanFace, verifyUploadedImage } from '@/utils/faceVerificationUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
-import PhotoCropModal from './PhotoCropModal';
+import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 
 interface ImageManagementProps {
   currentUser: {
@@ -48,7 +48,58 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   const [isVerifying, setIsVerifying] = useState(false);
   const [referenceFaceData, setReferenceFaceData] = useState<string | null>(null);
   const [croppingImageUrl, setCroppingImageUrl] = useState<string | null>(null);
+  // Same deferred pattern as the profile preview's own crop: "OK" in the
+  // modal only applies the crop locally so it can be reviewed against the
+  // real thumbnail first; nothing touches storage/db until an explicit Save,
+  // keyed by the original image_url so multiple photos can have their own
+  // pending crop at once.
+  const [pendingCrops, setPendingCrops] = useState<Record<string, { blob: Blob; previewUrl: string }>>({});
+  const [savingCropUrl, setSavingCropUrl] = useState<string | null>(null);
+  const [discardWarningUrl, setDiscardWarningUrl] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Warn on a real page unload while any crop is pending.
+  useEffect(() => {
+    if (Object.keys(pendingCrops).length === 0) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [pendingCrops]);
+
+  const handleSavePendingCrop = useCallback(async (originalUrl: string) => {
+    const pending = pendingCrops[originalUrl];
+    if (!pending || savingCropUrl || !currentUser?.id) return;
+    setSavingCropUrl(originalUrl);
+    try {
+      await uploadCroppedPhoto(currentUser.id, originalUrl, pending.blob);
+      URL.revokeObjectURL(pending.previewUrl);
+      setPendingCrops((prev) => {
+        const next = { ...prev };
+        delete next[originalUrl];
+        return next;
+      });
+      toast({ title: 'Photo updated', description: 'Your cropped photo has been saved.' });
+      await fetchUserImages();
+      onProfileUpdate?.();
+    } catch (error) {
+      console.error('Error saving cropped photo:', error);
+      toast({ title: 'Error', description: 'Failed to save your cropped photo. Please try again.', variant: 'destructive' });
+    } finally {
+      setSavingCropUrl(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCrops, savingCropUrl, currentUser?.id, toast, onProfileUpdate]);
+
+  const handleDiscardPendingCrop = useCallback((originalUrl: string) => {
+    const pending = pendingCrops[originalUrl];
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+    setPendingCrops((prev) => {
+      const next = { ...prev };
+      delete next[originalUrl];
+      return next;
+    });
+    setDiscardWarningUrl(null);
+  }, [pendingCrops]);
 
   // Check if user is verified (has face_descriptor)
   const isVerified = !!profile?.face_descriptor;
@@ -795,18 +846,53 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {userImages.map((userImage, index) => (
+          {userImages.map((userImage, index) => {
+            const pending = pendingCrops[userImage.image_url];
+            return (
             <div key={userImage.image_url} className="relative group">
-              <img loading="lazy" decoding="async" src={optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })} alt={`User Image ${index + 1}`} className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm" />
-              
+              <img
+                loading="lazy"
+                decoding="async"
+                src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
+                alt={`User Image ${index + 1}`}
+                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm"
+              />
+
               {/* Pending approval indicator */}
-              {userImage.is_approved === false && (
+              {userImage.is_approved === false && !pending && (
                 <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
                   🔒 Reviewing...
                 </div>
               )}
-              
-              {/* Action buttons - top right corner */}
+
+              {/* Unsaved crop - review, then explicitly Save or Cancel; nothing
+                  else on this photo is actionable while a crop is pending. */}
+              {pending ? (
+                <>
+                  <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full">
+                    Unsaved crop
+                  </div>
+                  <div className="absolute bottom-2 inset-x-2 flex gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setDiscardWarningUrl(userImage.image_url)}
+                      disabled={savingCropUrl === userImage.image_url}
+                      className="flex-1 h-7 px-2 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleSavePendingCrop(userImage.image_url)}
+                      disabled={savingCropUrl === userImage.image_url}
+                      className="flex-1 h-7 px-2 text-xs bg-pink-600 hover:bg-pink-700 text-white"
+                    >
+                      {savingCropUrl === userImage.image_url ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
               <div className="absolute top-2 right-2 flex gap-1">
                 {/* Crop - always available, on any photo */}
                 <Button
@@ -870,8 +956,10 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                   </>
                 )}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {userImages.length === 0 && (
@@ -888,11 +976,47 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           imageUrl={croppingImageUrl}
           userId={currentUser.id}
           onClose={() => setCroppingImageUrl(null)}
-          onSaved={() => {
-            fetchUserImages();
-            onProfileUpdate?.();
+          onApply={(result) => {
+            setPendingCrops((prev) => {
+              const existing = prev[result.originalUrl];
+              if (existing) URL.revokeObjectURL(existing.previewUrl);
+              return { ...prev, [result.originalUrl]: { blob: result.blob, previewUrl: result.previewUrl } };
+            });
+            setCroppingImageUrl(null);
           }}
         />
+      )}
+
+      {discardWarningUrl && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 px-6"
+          onClick={() => setDiscardWarningUrl(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-xl border border-pink-500/30 bg-black p-4 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-white mb-1 font-semibold">Discard your crop?</p>
+            <p className="text-xs text-gray-300 mb-4">Your cropped photo hasn't been saved yet.</p>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDiscardWarningUrl(null)}
+                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+              >
+                Keep editing
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleDiscardPendingCrop(discardWarningUrl)}
+                className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white"
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </Card>
   );

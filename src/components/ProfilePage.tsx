@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -127,6 +127,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
   const [isProfileMessagesOpen, setIsProfileMessagesOpen] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
+  // Set by ProfilePreviewModal - it has an unsaved crop applied ("OK" but not
+  // yet "Save"), which is about to be silently lost below since leaving
+  // always unmounts it. There's no button here to intercept and block (the
+  // tab has already switched by the time isActiveTab flips), so this is a
+  // heads-up after the fact, not a confirm-before-you-leave gate.
+  const hasPendingCropRef = useRef(false);
 
   // Navigating away from the Profile tab, or tapping the Profile nav icon again
   // while already on it, always drops back to the real profile - the preview
@@ -134,11 +140,26 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   // the background, so coming back to this tab never lands on a stale screen.
   useEffect(() => {
     if (!isActiveTab) {
+      if (showProfilePreview && hasPendingCropRef.current) {
+        toast({
+          title: 'Unsaved crop discarded',
+          description: "You left the preview before saving your cropped photo, so it wasn't kept.",
+        });
+      }
+      hasPendingCropRef.current = false;
       setShowProfilePreview(false);
       setShowPremiumUpgrade(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActiveTab]);
   useEffect(() => {
+    if (showProfilePreview && hasPendingCropRef.current) {
+      toast({
+        title: 'Unsaved crop discarded',
+        description: "You left the preview before saving your cropped photo, so it wasn't kept.",
+      });
+    }
+    hasPendingCropRef.current = false;
     setShowProfilePreview(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileTabSignal]);
@@ -840,6 +861,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         images={previewImages}
         onClose={() => setShowProfilePreview(false)}
         onPhotoUpdated={onProfileUpdate}
+        onPendingCropChange={(hasPending) => { hasPendingCropRef.current = hasPending; }}
       />
     );
   }

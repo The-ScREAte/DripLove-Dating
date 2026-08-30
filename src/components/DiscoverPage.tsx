@@ -4288,6 +4288,104 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     maybeTriggerRatingFunnel();
   };
 
+  // Extracted so it can be rendered from every early-return branch below, not
+  // just the main card return - completing a swipe can flip the page into
+  // the loading/out-of-swipes/ad-card branch mid-guide, and since each of
+  // those used to `return` a completely different tree, the guide (only
+  // ever inlined in the main return before) would unmount right along with
+  // it, well before its own 5s timer was up. It's plain JSX computed off
+  // state, not a hook, so it's safe to build here ahead of the conditionals.
+  const swipeGuideOverlay = showSwipeGuide ? (
+    // pointerEvents: 'none' throughout - this is a purely visual demo overlay,
+    // not a modal to dismiss first, and never blocks the real card underneath.
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{
+        pointerEvents: 'none',
+        // Dark, softly blurred scrim: the card behind stays visible through it
+        // while the tagline / Nope / Yep icons read cleanly on top.
+        background: 'rgba(0,0,0,0.62)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)'
+      }}
+    >
+      <style>{`
+        @keyframes swipeGuideIn {
+          0% { opacity: 0; transform: scale(0.9) translateY(12px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes ringPulseWhite {
+          0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35); }
+          70% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+        @keyframes ringPulseRed {
+          0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.45); }
+          70% { box-shadow: 0 0 0 14px rgba(225, 29, 72, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+        }
+        @keyframes arrowNudgeLeft {
+          0%, 100% { transform: translateX(0); opacity: 0.55; }
+          50% { transform: translateX(-6px); opacity: 1; }
+        }
+        @keyframes arrowNudgeRight {
+          0%, 100% { transform: translateX(0); opacity: 0.55; }
+          50% { transform: translateX(6px); opacity: 1; }
+        }
+        .swipe-guide-card {
+          animation: swipeGuideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .swipe-guide-icon-left {
+          animation: ringPulseWhite 1.6s ease-out infinite;
+        }
+        .swipe-guide-icon-right {
+          animation: ringPulseRed 1.6s ease-out infinite;
+        }
+        .swipe-guide-arrow-left { animation: arrowNudgeLeft 1.2s ease-in-out infinite; }
+        .swipe-guide-arrow-right { animation: arrowNudgeRight 1.2s ease-in-out infinite; }
+      `}</style>
+      <div className="swipe-guide-card flex flex-col items-center gap-6">
+        <p
+          className="text-center text-white font-semibold text-lg px-8 leading-snug"
+          style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)', maxWidth: 320 }}
+        >
+          Love awaits — a beautiful journey begins by swiping on DripLove.
+        </p>
+        <div className="flex flex-row items-center gap-6">
+          {/* Swipe Left - Nope. Arrow sits outboard (further left), pointing
+              further left - away from center, in the actual swipe direction. */}
+          <ChevronLeft className="swipe-guide-arrow-left w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
+          <div
+            className="swipe-guide-icon-left rounded-full flex items-center justify-center shrink-0"
+            style={{
+              width: 72,
+              height: 72,
+              background: 'rgba(255,255,255,0.95)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            }}
+          >
+            <X className="w-9 h-9" style={{ color: '#ef4444' }} strokeWidth={3} />
+          </div>
+          <div className="w-4" />
+          {/* Swipe Right - Like. Arrow sits outboard (further right), pointing
+              further right - away from center, in the actual swipe direction. */}
+          <div
+            className="swipe-guide-icon-right rounded-full flex items-center justify-center shrink-0"
+            style={{
+              width: 72,
+              height: 72,
+              background: '#e11d48',
+              boxShadow: '0 4px 20px rgba(225,29,72,0.5)',
+            }}
+          >
+            <Heart className="w-9 h-9" style={{ color: 'white' }} strokeWidth={0} fill="white" />
+          </div>
+          <ChevronRight className="swipe-guide-arrow-right w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (showMatchAnimation && matchedUser) {
     return (
       <MatchAnimation
@@ -4313,6 +4411,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   if (isOutOfSwipes) {
     return (
+      <>
+      {swipeGuideOverlay}
       <div className="h-full w-full flex items-center justify-center">
         <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
           <CardContent className="p-6 text-center flex flex-col items-center">
@@ -4359,6 +4459,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           </CardContent>
         </Card>
       </div>
+      </>
     );
   }
 
@@ -4386,8 +4487,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     };
     
     const adCardTransform = getAdCardTransform();
-    
+
     return (
+      <>
+      {swipeGuideOverlay}
       <div className="h-full w-full relative overflow-hidden"
            style={{
              // Plain in-flow box: MainApp's content wrapper already reserves the header
@@ -4429,6 +4532,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
           />
         </div>
       </div>
+      </>
     );
   }
 
@@ -4583,92 +4687,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
            }}>
 
       {/* --- Swipe Guide Popup for New Users --- */}
-      {showSwipeGuide && (
-        // pointerEvents: 'none' throughout - this is a purely visual demo overlay,
-        // not a modal to dismiss first. A real swipe on the card underneath must
-        // go straight through and count for real (the effect above closes this
-        // the instant that happens); it auto-dismisses on its own otherwise after
-        // the timeout.
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{
-            pointerEvents: 'none',
-            // Dark, softly blurred scrim: the card behind stays visible through it
-            // while the Nope / Yep icons read cleanly on top.
-            background: 'rgba(0,0,0,0.62)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)'
-          }}
-        >
-          <style>{`
-            @keyframes swipeGuideIn {
-              0% { opacity: 0; transform: scale(0.9) translateY(12px); }
-              100% { opacity: 1; transform: scale(1) translateY(0); }
-            }
-            @keyframes ringPulseWhite {
-              0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35); }
-              70% { box-shadow: 0 0 0 14px rgba(255, 255, 255, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
-            }
-            @keyframes ringPulseRed {
-              0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.45); }
-              70% { box-shadow: 0 0 0 14px rgba(225, 29, 72, 0); }
-              100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
-            }
-            @keyframes arrowNudgeLeft {
-              0%, 100% { transform: translateX(0); opacity: 0.55; }
-              50% { transform: translateX(-6px); opacity: 1; }
-            }
-            @keyframes arrowNudgeRight {
-              0%, 100% { transform: translateX(0); opacity: 0.55; }
-              50% { transform: translateX(6px); opacity: 1; }
-            }
-            .swipe-guide-card {
-              animation: swipeGuideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-            }
-            .swipe-guide-icon-left {
-              animation: ringPulseWhite 1.6s ease-out infinite;
-            }
-            .swipe-guide-icon-right {
-              animation: ringPulseRed 1.6s ease-out infinite;
-            }
-            .swipe-guide-arrow-left { animation: arrowNudgeLeft 1.2s ease-in-out infinite; }
-            .swipe-guide-arrow-right { animation: arrowNudgeRight 1.2s ease-in-out infinite; }
-          `}</style>
-          <div className="swipe-guide-card flex flex-row items-center gap-6">
-            {/* Swipe Left - Nope. Arrow sits outboard (further left), pointing
-                further left - away from center, in the actual swipe direction. */}
-            <ChevronLeft className="swipe-guide-arrow-left w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
-            <div
-              className="swipe-guide-icon-left rounded-full flex items-center justify-center shrink-0"
-              style={{
-                width: 72,
-                height: 72,
-                background: 'rgba(255,255,255,0.95)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-              }}
-            >
-              <X className="w-9 h-9" style={{ color: '#ef4444' }} strokeWidth={3} />
-            </div>
-            <div className="w-4" />
-            {/* Swipe Right - Like. Arrow sits outboard (further right), pointing
-                further right - away from center, in the actual swipe direction. */}
-            <div
-              className="swipe-guide-icon-right rounded-full flex items-center justify-center shrink-0"
-              style={{
-                width: 72,
-                height: 72,
-                background: '#e11d48',
-                boxShadow: '0 4px 20px rgba(225,29,72,0.5)',
-              }}
-            >
-              <Heart className="w-9 h-9" style={{ color: 'white' }} strokeWidth={0} fill="white" />
-            </div>
-            <ChevronRight className="swipe-guide-arrow-right w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
-          </div>
-        </div>
-      )}
-      
+      {swipeGuideOverlay}
+
   <div className="flex-1 relative overflow-hidden" style={{
     height: '100%',
     // Match the parent's real height exactly - never a vh-based calc here. On mobile,
@@ -4890,103 +4910,53 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             )}
           </div>
 
-          {/* Expanded details - plain black panel below the photo, same relationship as
-              ProfilePreviewModal's photo box + expanded panel below it (no transform/
-              overlap hack: the caption now lives inside the photo box itself, as an
-              absolute overlay, so this panel is just ordinary sibling content that only
-              takes up space when actually shown). */}
+          {/* Expanded details - plain black panel below the photo, same relationship
+              (and the same simple flex-1 sizing) as Liked Me's and the profile
+              preview's own expanded panel: the photo is a fixed 58% (see
+              discover-image-area above), this is just the ordinary flex-1
+              sibling taking the remaining space - no vh caps, no nested
+              wrapper/filler divs fighting each other, so all three screens
+              now open to the exact same proportion. */}
           {showMoreInfo && (
             <div
-              className="discover-info-area relative z-20 flex-shrink-0 bg-black"
+              className="discover-info-area relative z-20 flex-1 overflow-y-auto bg-black"
               style={{
-                // Its own black background (not just the MatchCard content nested inside it) so
-                // any gap between the photo's bottom edge and wherever that nested content
-                // actually starts painting black can never show the blurred background behind
-                // everything through as a seam. Also overlaps the photo by a hair as extra
-                // insurance against subpixel rounding - same fix as ProfilePreviewModal's
-                // expanded panel.
+                minHeight: 0,
+                // Overlaps the photo by a hair as extra insurance against subpixel
+                // rounding - same fix as the profile preview's expanded panel.
                 marginTop: '-2px',
+                WebkitOverflowScrolling: 'touch',
               }}
+              ref={contentRef}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  // Total panel height (background) reaches almost all the way to the bottom of
-                  // the screen, so there's no gap of photo/transparency below it. bottomNavHeight
-                  // + 92 accounts for the floating nav plus a fixed buffer below it; headerHeight
-                  // accounts for discover-container itself starting that much lower (see its
-                  // `top` above) — that much less vertical space is actually available overall,
-                  // so this needs to know about both (as real measured numbers, not guesses) or
-                  // the panel overclaims space that isn't there, eating into the bottom
-                  // padding/clearance that's supposed to be reserved.
-                  // A definite vh cap, not a percentage: this wrapper's own parent
-                  // (discover-info-area) has no explicit height of its own - it's sized
-                  // by content - so a percentage maxHeight here has nothing definite to
-                  // resolve against and is effectively ignored by the browser. 38vh
-                  // always resolves to a real number, keeping the info panel noticeably
-                  // shorter (was uncapped in practice) and matching Liked Me's and the
-                  // profile preview's own expanded panel proportions - the photo keeps
-                  // the larger share of the card on all three.
-                  maxHeight: '28vh',
-
-                }}
-              >
-                <div
-                  ref={contentRef}
-                  className="w-full pt-1 overflow-y-scroll scrollbar-hide"
-                  style={{
-                    WebkitOverflowScrolling: 'touch',
-                    overscrollBehavior: 'contain',
-                    scrollBehavior: 'smooth',
-                    // The SCROLLABLE zone is explicitly capped short of the panel's total height
-                    // (see the filler div below) — real content can only ever scroll within this
-                    // safe zone, so it can never end up rendered behind the floating nav, no matter
-                    // the scroll position.
-                    maxHeight: '100%',
-                    minHeight: '80px',
-                  }}
-                >
-                  {/* Render MatchCard details area */}
-                  {currentMatch && !isAd(currentMatch) && (
-                    <MatchCard
-                      match={currentMatch}
-                      imageIndex={imageIndex}
-                      showMoreInfo={showMoreInfo}
-                      isPremium={premiumActive}
-                      userImages={currentMatchImages}
-                      preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
-                      preferredLanguageName={userLanguages[currentMatch.id]}
-                      currentUserLatitude={currentUser.latitude}
-                      currentUserLongitude={currentUser.longitude}
-                      onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
-                      onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
-                      calculateAge={calculateAge}
-                      calculateDistance={calculateDistance}
-                      swipeDirection={swipeUI.swipeDirection}
-                      swipeDistance={swipeUI.swipeDistance}
-                      isDragging={swipeUI.isDragging}
-                      isVerified={!!currentMatch.is_verified}
-                      isSwipeAreaOnly={false}
-                      isDetailsAreaOnly={true} // Render only details/info area
-                      getOptimizedUrl={getOptimizedUrl}
-                      preCalculatedDistance={userDistances[currentMatch.id]}
-                      currentUserAdinkraSymbols={currentUser.adinkra_symbols}
-                    />
-                  )}
-                </div>
-                {/* Purely decorative black filler — extends the panel's background down toward the
-                    true bottom of the screen (behind the floating nav) without ever holding real,
-                    scrollable content, so it can never cover up info the user needs to read. */}
-                <div
-                  aria-hidden="true"
-                  style={{
-                    flexShrink: 0,
-                    flexGrow: 1,
-                    background: '#000',
-                    borderRadius: '0 0 0.75rem 0.75rem',
-                  }}
-                />
+              <div className="px-1 pt-1 pb-6">
+                {/* Render MatchCard details area */}
+                {currentMatch && !isAd(currentMatch) && (
+                  <MatchCard
+                    match={currentMatch}
+                    imageIndex={imageIndex}
+                    showMoreInfo={showMoreInfo}
+                    isPremium={premiumActive}
+                    userImages={currentMatchImages}
+                    preloadedBlobImages={preloadedBlobImages[currentMatch.id]}
+                    preferredLanguageName={userLanguages[currentMatch.id]}
+                    currentUserLatitude={currentUser.latitude}
+                    currentUserLongitude={currentUser.longitude}
+                    onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                    onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
+                    calculateAge={calculateAge}
+                    calculateDistance={calculateDistance}
+                    swipeDirection={swipeUI.swipeDirection}
+                    swipeDistance={swipeUI.swipeDistance}
+                    isDragging={swipeUI.isDragging}
+                    isVerified={!!currentMatch.is_verified}
+                    isSwipeAreaOnly={false}
+                    isDetailsAreaOnly={true} // Render only details/info area
+                    getOptimizedUrl={getOptimizedUrl}
+                    preCalculatedDistance={userDistances[currentMatch.id]}
+                    currentUserAdinkraSymbols={currentUser.adinkra_symbols}
+                  />
+                )}
               </div>
             </div>
           )}

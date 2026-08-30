@@ -27,6 +27,13 @@ interface ProfilePreviewModalProps {
   images: string[];
   onClose: () => void;
   onPhotoUpdated?: () => void;
+  /** Told whenever there is/isn't an unsaved crop, so the parent (ProfilePage)
+   * can warn if the user leaves this screen (switches tabs) before saving -
+   * this component itself has no "leave" button of its own; leaving always
+   * happens externally (see ProfilePage's isActiveTab/profileTabSignal
+   * effects), which unmounts this component and loses the unsaved crop
+   * outright, so the warning has to come from the parent. */
+  onPendingCropChange?: (hasPending: boolean) => void;
 }
 
 const BACKGROUND_COLORS = [
@@ -63,7 +70,7 @@ const getSafeImageSrc = (url?: string): string | undefined => {
 // instead of covering the screen; leaving the tab (including tapping the
 // Profile nav icon again) drops back to the real profile page, handled by
 // ProfilePage via onClose/isActiveTab.
-const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated }) => {
+const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange }) => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -74,6 +81,13 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   const [pendingCrop, setPendingCrop] = useState<{ blob: Blob; previewUrl: string; originalUrl: string } | null>(null);
   const [savingCrop, setSavingCrop] = useState(false);
   const [showDiscardWarning, setShowDiscardWarning] = useState(false);
+
+  // Tell the parent whether there's something unsaved - it has no other way
+  // to know, since it's the one that actually unmounts this component when
+  // the user navigates away.
+  useEffect(() => {
+    onPendingCropChange?.(!!pendingCrop);
+  }, [pendingCrop, onPendingCropChange]);
 
   // Revoke the local object URL when it's replaced or the preview goes away.
   useEffect(() => {
