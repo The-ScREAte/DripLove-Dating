@@ -214,6 +214,19 @@ const AdsManagement = () => {
     }
   };
 
+  const MAX_ABOUT_WORDS = 50;
+  const countWords = (text: string): number => {
+    const trimmed = text.trim();
+    return trimmed ? trimmed.split(/\s+/).length : 0;
+  };
+  // Truncates to the word limit rather than rejecting further typing - lets
+  // the admin keep editing normally instead of hitting a wall mid-sentence.
+  const limitWords = (text: string, max: number): string => {
+    const words = text.split(/\s+/);
+    if (words.length <= max) return text;
+    return words.slice(0, max).join(' ');
+  };
+
   // A bare domain like "www.example.com" has no protocol, so it fails
   // type="url" validation (and would 404 as a relative path if used as-is
   // in an href/window.open) - https:// is assumed if nothing else is given.
@@ -399,12 +412,17 @@ const AdsManagement = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">About</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium">Short Description</label>
+                <span className={`text-xs ${countWords(formData.about) >= MAX_ABOUT_WORDS ? 'text-orange-600' : 'text-gray-500'}`}>
+                  {countWords(formData.about)}/{MAX_ABOUT_WORDS} words
+                </span>
+              </div>
               <Textarea
                 value={formData.about}
-                onChange={(e) => setFormData(prev => ({ ...prev, about: e.target.value }))}
-                placeholder="Enter ad description"
-                rows={4}
+                onChange={(e) => setFormData(prev => ({ ...prev, about: limitWords(e.target.value, MAX_ABOUT_WORDS) }))}
+                placeholder="A short, one or two sentence description"
+                rows={3}
                 required
               />
             </div>
@@ -572,12 +590,27 @@ const AdsManagement = () => {
             {ads.map((ad) => (
               <Card key={ad.id}>
                 <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-semibold">{ad.name}</h4>
-                    {!ad.is_active && (
-                      <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium">Paused</span>
+                  <div className="flex gap-3">
+                    {ad.media_type === 'video' && ad.video_url ? (
+                      <div className="w-12 h-12 shrink-0 bg-gray-100 rounded flex items-center justify-center relative">
+                        <Video className="w-5 h-5 text-gray-500" />
+                      </div>
+                    ) : (
+                      <img
+                        loading="lazy"
+                        decoding="async"
+                        src={optimizeImageUrl(ad.image_url, { width: 100, quality: 60 })}
+                        alt={ad.name}
+                        className="w-12 h-12 shrink-0 object-cover rounded"
+                      />
                     )}
-                  </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold truncate">{ad.name}</h4>
+                        {!ad.is_active && (
+                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium shrink-0">Paused</span>
+                        )}
+                      </div>
                   <div className="flex gap-1.5 mt-2">
                     <Button
                       variant="outline"
@@ -619,6 +652,8 @@ const AdsManagement = () => {
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
+                  </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
