@@ -38,6 +38,13 @@ public class MainActivity extends BridgeActivity {
         if (webView != null) {
             WebSettings settings = webView.getSettings();
             
+            // Lock text rendering to 100% regardless of the device's system font-size
+            // (Settings > Display > Font size) - without this, WebView scales every
+            // CSS font-size by that system setting, which is why the same layout can
+            // render with noticeably oversized text on some Android devices/emulators
+            // but not others, even though the CSS itself never changed.
+            settings.setTextZoom(100);
+
             // Enable media playback
             settings.setMediaPlaybackRequiresUserGesture(false);
             

@@ -8,28 +8,33 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         self.window = UIWindow(windowScene: windowScene)
-        self.window?.backgroundColor = UIColor.clear
-        self.window?.isOpaque = false
-        
+        // Opaque black backstop, not .clear: the camera-preview feature (see
+        // FaceVerification.tsx's CameraPreview.start({ toBack: true })) only
+        // needs the WEBVIEW layer to be transparent so its native camera view
+        // - inserted directly behind the webview - can show through. It does
+        // NOT need the window/root view themselves to be transparent, and
+        // making them .clear too left nothing opaque behind the webview on
+        // every other screen. On some iOS/WKWebView versions that renders as
+        // a persistent white screen at launch instead of showing the page's
+        // own (black) CSS background, which is what caused the white-screen
+        // bug - a solid backstop here fixes that without touching the
+        // camera-preview transparency it was originally added for.
+        self.window?.backgroundColor = UIColor.black
+
         let bridgeVC = CAPBridgeViewController()
         self.window?.rootViewController = bridgeVC
-        
+
         // Enable transparent WebView for camera preview
         bridgeVC.webView?.isOpaque = false
         bridgeVC.webView?.backgroundColor = UIColor.clear
         bridgeVC.webView?.scrollView.backgroundColor = UIColor.clear
         bridgeVC.webView?.scrollView.isOpaque = false
-        bridgeVC.view.backgroundColor = UIColor.clear
-        bridgeVC.view.isOpaque = false
-
-        // Defensive: ensure any superviews remain transparent
-        bridgeVC.view.superview?.backgroundColor = UIColor.clear
-        bridgeVC.view.superview?.isOpaque = false
+        bridgeVC.view.backgroundColor = UIColor.black
 
         if #available(iOS 15.0, *) {
-            bridgeVC.webView?.underPageBackgroundColor = UIColor.clear
+            bridgeVC.webView?.underPageBackgroundColor = UIColor.black
         }
-        
+
         self.window?.makeKeyAndVisible()
 
         // Handle deep links on cold start

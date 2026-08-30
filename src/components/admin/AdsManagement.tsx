@@ -14,7 +14,13 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { optimizeImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
 import CropModal from '@/components/shared/CropModal';
-import AdCard from '@/components/discover/AdCard';
+// Lazy, not a static import: AdCard lives in the 'discover-tools' chunk while
+// this file is in 'admin-tools' - a static import here creates a circular
+// chunk dependency (discover-tools <-> admin-tools) that throws a
+// "Cannot access '...' before initialization" TDZ error at load and blanks
+// the whole app. A dynamic import is an async boundary Rollup doesn't fold
+// into that same synchronous cycle.
+const AdCard = React.lazy(() => import('@/components/discover/AdCard'));
 
 // Matches the real card's own proportions (object-cover, full-bleed, no
 // letterboxing) far more closely than a squarer frame would - this is what
@@ -44,6 +50,20 @@ interface Ad {
   created_at: string;
   target_countries: string[];
   is_active: boolean;
+  created_by: string | null;
+  business_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+}
+
+interface AdvertiserApplication {
+  id: string;
+  business_name: string;
+  contact_email: string;
+  contact_phone: string;
+  contact_phone_country: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
 }
 
 // Country options
@@ -81,9 +101,12 @@ const AdsManagement = () => {
     target_countries: [] as string[]
   });
   const { toast } = useToast();
+  const [applications, setApplications] = useState<AdvertiserApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
 
   useEffect(() => {
     fetchAds();
+    fetchApplications();
   }, []);
 
   const fetchAds = async () => {
@@ -105,6 +128,40 @@ const AdsManagement = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchApplications = async () => {
+    setApplicationsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('advertiser_profiles')
+        .select('id, business_name, contact_email, contact_phone, contact_phone_country, status, created_at')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setApplications((data as AdvertiserApplication[]) || []);
+    } catch (error) {
+      console.error('Error fetching advertiser applications:', error);
+    } finally {
+      setApplicationsLoading(false);
+    }
+  };
+
+  const handleReviewApplication = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const { error } = await supabase
+        .from('advertiser_profiles')
+        .update({ status } as any)
+        .eq('id', id);
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+      if (error) throw error;
+      toast({ title: 'Success', description: `Advertiser ${status}` });
+      fetchApplications();
+    } catch (error) {
+      console.error('Error reviewing advertiser application:', error);
+      toast({ title: 'Error', description: 'Failed to update application', variant: 'destructive' });
     }
   };
 
@@ -378,8 +435,43 @@ const AdsManagement = () => {
     }
   };
 
+  const groupedAds = ads.reduce<Record<string, Ad[]>>((groups, ad) => {
+    const key = ad.business_name || 'DripLove (in-house)';
+    (groups[key] = groups[key] || []).push(ad);
+    return groups;
+  }, {});
+
   return (
     <div className="space-y-6">
+      {applications.length > 0 && (
+        <Card>
+          <CardContent className="pt-6 space-y-3">
+            <h3 className="text-lg font-semibold">Pending Advertiser Applications</h3>
+            {applicationsLoading ? (
+              <p className="text-sm text-gray-500">Loading...</p>
+            ) : (
+              applications.map((app) => (
+                <div key={app.id} className="border rounded-lg p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{app.business_name}</p>
+                    <p className="text-xs text-gray-500 truncate">{app.contact_email}</p>
+                    <p className="text-xs text-gray-500">{app.contact_phone_country} {app.contact_phone}</p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleReviewApplication(app.id, 'approved')}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleReviewApplication(app.id, 'rejected')}>
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="pt-6">
           <Collapsible
@@ -586,8 +678,12 @@ const AdsManagement = () => {
         ) : ads.length === 0 ? (
           <p className="text-center text-gray-500">No ads yet</p>
         ) : (
-          <div className="grid gap-4">
-            {ads.map((ad) => (
+          <div className="space-y-6">
+            {Object.entries(groupedAds).map(([businessName, businessAds]) => (
+              <div key={businessName}>
+                <h4 className="text-sm font-semibold text-gray-500 mb-2">{businessName}</h4>
+                <div className="grid gap-4">
+                  {businessAds.map((ad) => (
               <Card key={ad.id}>
                 <CardContent className="pt-4 pb-4">
                   <div className="flex gap-3">
@@ -657,6 +753,9 @@ const AdsManagement = () => {
                   </div>
                 </CardContent>
               </Card>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -673,7 +772,9 @@ const AdsManagement = () => {
           </DialogHeader>
           {previewAd && (
             <div className="flex-1 min-h-0">
-              <AdCard ad={previewAd} />
+              <React.Suspense fallback={null}>
+                <AdCard ad={previewAd} />
+              </React.Suspense>
             </div>
           )}
         </DialogContent>

@@ -22,6 +22,7 @@ import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
 import AdinkraSection from './profile/AdinkraSection';
 import ImageManagement from './profile/ImageManagement';
+import AdvertisementSection from './profile/AdvertisementSection';
 
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
@@ -82,9 +83,12 @@ interface ProfilePageProps {
   // already the active tab - covers the case of tapping it again while the preview
   // is open (isActiveTab alone wouldn't change in that case).
   profileTabSignal?: number;
+  // Bumped by MainApp when the user taps "Advertise" on an ad card elsewhere in the
+  // app - jumps straight to the Advertisement section with its create form open.
+  advertiseSignal?: number;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0 }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0, advertiseSignal = 0 }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   // Screenshots are blocked app-wide by default - Profile is one of the two
@@ -116,7 +120,18 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const showAdinkraSection = openSection === 'adinkra';
   
   const showAccountActionsSection = openSection === 'accountActions';
-  
+  const showAdvertisementSection = openSection === 'advertisement';
+
+  // Jump straight to the Advertisement section (with its create form open)
+  // whenever "Advertise" is tapped on an ad card elsewhere in the app.
+  const [advertiseFormSignal, setAdvertiseFormSignal] = useState(0);
+  useEffect(() => {
+    if (advertiseSignal > 0) {
+      setOpenSection('advertisement');
+      setAdvertiseFormSignal(prev => prev + 1);
+    }
+  }, [advertiseSignal]);
+
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
 
@@ -1208,6 +1223,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               currentUser={currentUser} 
               profile={profile}
               onProfileUpdate={onProfileUpdate}
+            />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="Advertisement"
+            isOpen={showAdvertisementSection}
+            onToggle={() => toggleSection('advertisement')}
+            className="mt-3"
+          >
+            <AdvertisementSection
+              currentUser={currentUser}
+              startWithForm={advertiseFormSignal > 0}
             />
           </CollapsibleSection>
           <CollapsibleSection

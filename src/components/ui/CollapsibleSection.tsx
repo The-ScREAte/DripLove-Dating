@@ -20,7 +20,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   return (
     <Card className={`w-full bg-black border-pink-500/30 ${className}`}>
       <CardHeader
-        className="cursor-pointer hover:bg-pink-500/10 transition-colors duration-200 px-6 py-4"
+        className="cursor-pointer hover:bg-pink-500/10 transition-colors duration-200 px-6 py-2.5"
         onClick={onToggle}
       >
         <div className="flex justify-between items-center">

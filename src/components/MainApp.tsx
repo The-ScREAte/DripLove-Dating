@@ -86,6 +86,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     return new Set(['dripcheck', initialTab]);
   });
   const [profileTabSignal, setProfileTabSignal] = useState(0);
+  const [advertiseSignal, setAdvertiseSignal] = useState(0);
+  const handleNavigateToAdvertise = () => {
+    setActiveTab('profile');
+    setAdvertiseSignal(prev => prev + 1);
+  };
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -1142,20 +1147,33 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 }}
               />
               <div
-                className="relative px-4 py-2 flex justify-between items-center"
+                className="relative flex justify-between items-center"
                 style={{
                   // env(safe-area-inset-top) is now reliable on Android too (see
                   // @capacitor-community/safe-area setup in src/main.tsx), so this no
                   // longer needs a platform branch with a hardcoded Android guess.
-                  paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)'
+                  paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)',
+                  // Scales with viewport width instead of a fixed px-4 py-2, so a
+                  // narrow/small-screen Android phone gets a proportionally smaller
+                  // header instead of the same absolute padding as a large phone.
+                  paddingLeft: 'clamp(10px, 4vw, 16px)',
+                  paddingRight: 'clamp(10px, 4vw, 16px)',
+                  paddingBottom: 'clamp(6px, 2vw, 8px)',
                 }}
               >
-                <img src="/driplove-logo.webp" alt="DripLove Logo" className="h-10" loading="lazy" decoding="async" style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))' }} />
+                <img
+                  src="/driplove-logo.webp"
+                  alt="DripLove Logo"
+                  loading="lazy"
+                  decoding="async"
+                  style={{ height: 'clamp(30px, 9vw, 40px)', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.35))' }}
+                />
                 <div className="text-right">
                   <div
-                    className="text-sm font-bold leading-tight"
+                    className="font-bold leading-tight"
                     style={{
                       color: '#ffffff',
+                      fontSize: 'clamp(11px, 3.2vw, 14px)',
                       textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 1px 8px rgba(0,0,0,0.35)',
                     }}
                   >
@@ -1232,7 +1250,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
               > 
-                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
+                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToAdvertise={handleNavigateToAdvertise} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
               </div>
             </Suspense>
           )}
@@ -1275,6 +1293,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   isPremium={isPremium}
                   isActiveTab={activeTab === 'profile'}
                   profileTabSignal={profileTabSignal}
+                  advertiseSignal={advertiseSignal}
                 />
               </div>
             </Suspense>
@@ -1292,11 +1311,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             // guess. The floating-pill inset from the screen edges/bottom (which
             // `left-3 right-3` + a fixed `bottom` used to provide) is now plain
             // margin instead.
-            className="mx-3 z-[99999] rounded-[28px] flex-shrink-0"
+            className="mx-3 z-[99999] flex-shrink-0"
             style={{
               // env(safe-area-inset-bottom) is now reliable on Android too (see
-              // @capacitor-community/safe-area setup in src/main.tsx).
-              marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + 22px)',
+              // @capacitor-community/safe-area setup in src/main.tsx). The fixed
+              // 22px gap above it is now a clamp so a small-screen phone gets a
+              // proportionally smaller gap instead of the same absolute value as
+              // a large phone.
+              marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + clamp(12px, 4vw, 22px))',
+              borderRadius: 'clamp(20px, 6vw, 28px)',
               // Solid: the nav is the fixed end of the page, same role as the header at
               // the top. Page content stops above it on its own now (a real flex
               // sibling, not an overlay), so there's nothing behind this bar that
@@ -1306,7 +1329,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
             }}
           >
-            <div className="flex justify-around items-center py-1.5 px-1">
+            <div className="flex justify-around items-center" style={{ paddingTop: 'clamp(4px, 1.5vw, 6px)', paddingBottom: 'clamp(4px, 1.5vw, 6px)' }}>
               {[
                 { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon },
                 { label: t('chat.title'), value: 'chat', icon: MessageCircle },
@@ -1316,16 +1339,25 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <button
                   key={value}
                   onClick={() => handleTabChange(value)}
-                  className={`flex flex-col items-center gap-0.5 py-1.5 px-4 rounded-full transition-all duration-200 relative ${
+                  className={`flex flex-col items-center gap-0.5 rounded-full transition-all duration-200 relative ${
                     activeTab === value ? 'text-pink-500 scale-105' : 'text-gray-400'
                   }`}
-                  style={activeTab === value ? {
-                    background: 'linear-gradient(to bottom, rgba(244,114,182,0.22), rgba(244,114,182,0.12))',
-                    boxShadow: 'inset 0 0 0 1px rgba(236,72,153,0.25)',
-                  } : undefined}
+                  style={{
+                    // Scales down on narrow screens instead of a fixed py-1.5 px-4,
+                    // which is what made the whole pill read as oversized on a
+                    // small phone.
+                    paddingTop: 'clamp(4px, 1.5vw, 6px)',
+                    paddingBottom: 'clamp(4px, 1.5vw, 6px)',
+                    paddingLeft: 'clamp(8px, 3.5vw, 16px)',
+                    paddingRight: 'clamp(8px, 3.5vw, 16px)',
+                    ...(activeTab === value ? {
+                      background: 'linear-gradient(to bottom, rgba(244,114,182,0.22), rgba(244,114,182,0.12))',
+                      boxShadow: 'inset 0 0 0 1px rgba(236,72,153,0.25)',
+                    } : undefined),
+                  }}
                 >
-                  <Icon className="w-[18px] h-[18px] shrink-0" />
-                  <span className="text-[10px] font-medium">{label}</span>
+                  <Icon style={{ width: 'clamp(15px, 4.5vw, 18px)', height: 'clamp(15px, 4.5vw, 18px)' }} className="shrink-0" />
+                  <span className="font-medium" style={{ fontSize: 'clamp(9px, 2.6vw, 10px)' }}>{label}</span>
                    {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
                        <span className="text-xs text-white font-bold">

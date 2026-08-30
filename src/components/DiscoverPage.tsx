@@ -93,6 +93,7 @@ interface DiscoverPageProps {
   currentUser: CurrentUser;
   onNavigateToChat?: (userId: string) => void;
   onNavigateToProfile?: () => void;
+  onNavigateToAdvertise?: () => void;
   isPremium?: boolean;
   profileCompletion?: number; // Pass from parent (Profile page calculates it)
   isActiveTab?: boolean; // Whether this tab is currently the visible one (parent keeps it mounted via display:none)
@@ -246,7 +247,7 @@ type WindowWithIntervals = Window & {
   chatMatchesCache?: Map<string, unknown>;
 };
 
-const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPremium, profileCompletion: parentProfileCompletion, isActiveTab = true }: DiscoverPageProps) => {
+const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNavigateToAdvertise, isPremium, profileCompletion: parentProfileCompletion, isActiveTab = true }: DiscoverPageProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -4524,7 +4525,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
              onTouchMove={handleTouchMove}
              onTouchEnd={handleTouchEnd}
              onMouseDown={handleMouseDown}>
-          <AdCard ad={currentMatch} onSwipe={moveToNext} />
+          <AdCard ad={currentMatch} onSwipe={moveToNext} onAdvertiseClick={onNavigateToAdvertise} />
           <SwipeButtons
             onReverse={handleReverse}
             canReverse={false}

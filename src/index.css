@@ -242,14 +242,11 @@ body.keyboard-open .chat-messages-container {
     touch-action: manipulation;
   }
 
-  /* Android-specific: Smaller text for registration forms */
-  body.android .mobile-input-field {
-    font-size: 14px;
-  }
-  
-  body.android label {
-    font-size: 13px;
-  }
+  /* NOTE: .mobile-input-field must stay at 16px on every platform, Android included -
+     Chrome/WebView auto-zooms the page to fit a focused input whenever its font-size
+     is under 16px, regardless of the viewport meta tag. A prior Android-only 14px
+     override here was exactly what caused registration/login inputs to zoom in on
+     focus on Android (iOS/web never had this override, so they never zoomed). */
 
   /* Smooth scrolling for input areas */
   .input-scroll-container {

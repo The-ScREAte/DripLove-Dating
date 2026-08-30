@@ -494,7 +494,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   }}
                 >
                   <div className="relative flex flex-col items-center">
-                    <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
+                    <div className="relative w-12 h-12 flex items-center justify-center overflow-visible">
                       {/* Adinkra Symbol */}
                       <div className="relative z-10">
                         <UserAdinkraDisplay adinkraSymbols={stableMatch.adinkra_symbols} />
@@ -622,7 +622,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       </span>
                     ))}
                     {signHighlight && (
-                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
+                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-6 h-6 shrink-0">
                         <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
                       </span>
                     )}
