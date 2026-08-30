@@ -2978,6 +2978,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentXRef.current = touch.clientX;
     currentYRef.current = touch.clientY;
     isDraggingRef.current = true;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
     setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 }));
   };
 
@@ -3032,6 +3034,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
     setSwipeUI(prev => ({ ...prev, isDragging: false }));
 
     const changedTouch = e.changedTouches && e.changedTouches[0];
@@ -3081,6 +3085,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentXRef.current = e.clientX;
     currentYRef.current = e.clientY;
     isDraggingRef.current = true;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
     setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 }));
 
     // Attach global mouse listeners to ensure we capture mouseup/move even if pointer leaves the element
@@ -3114,6 +3120,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const onWindowMouseUp = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
       setSwipeUI(prev => ({ ...prev, isDragging: false }));
       // compute final deltas
       const deltaX = ev.clientX - startXRef.current;
@@ -4690,7 +4698,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
                 })()}
                 alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-contain object-center bg-black"
                 style={{ position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
