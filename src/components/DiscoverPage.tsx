@@ -3005,7 +3005,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             ? `translate3d(${d}px, 0, 0) rotate(${d * 0.08}deg)`
             : `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
         }
-        setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+        // Android smoothness: the transform above is already on screen this frame.
+        // The React state below only drives the Nope/Yep overlays, so push it in
+        // coarse steps (every ~16px, or when the direction flips) instead of every
+        // frame — a full re-render of this very large page on every touchmove is
+        // what made Android drags stutter.
+        const dir: 'left' | 'right' = d > 0 ? 'right' : 'left';
+        const dist = Math.abs(d);
+        if (
+          dir !== lastPushedDirRef.current ||
+          Math.abs(dist - lastPushedDistRef.current) > 16
+        ) {
+          lastPushedDirRef.current = dir;
+          lastPushedDistRef.current = dist;
+          setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: dist, swipeDirection: dir }));
+        }
         rafScheduledRef.current = false;
       });
     }
