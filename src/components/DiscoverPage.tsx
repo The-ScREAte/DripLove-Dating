@@ -628,7 +628,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // updates profile/swipe state, which can re-run this effect (or briefly flip
   // the page into the loading/out-of-swipes/ad render branch) — the old
   // clearTimeout-on-cleanup let exactly that kill the guide mid-display. Only
-  // the 5s timeout itself hides the guide now.
+  // the 8s timeout itself hides the guide now.
   const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Only show for new users (e.g., if localStorage flag not set)
@@ -640,7 +640,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       setShowSwipeGuide(false);
       localStorage.setItem('driplove_swipe_guide_shown', 'true');
       swipeGuideTimerRef.current = null;
-    }, 5000); // 5 seconds
+    }, 8000); // 8 seconds
   }, [currentUser?.id]);
   // --- END: Swipe Guide Popup State ---
 
@@ -4347,8 +4347,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       `}</style>
       <div className="swipe-guide-card flex flex-col items-center gap-6">
         <p
-          className="text-center text-white font-semibold text-lg px-8 leading-snug"
-          style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)', maxWidth: 320 }}
+          className="font-brush text-center text-white font-bold px-8"
+          style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)', maxWidth: 320, fontSize: '26px' }}
         >
           Love awaits — a beautiful journey begins by swiping on DripLove.
         </p>

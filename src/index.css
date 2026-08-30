@@ -3,6 +3,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Casual brush/handwriting font for the header tagline and the swipe-guide
+   tagline - "Caveat" loaded via Google Fonts in index.html. Slightly larger
+   line-height than normal text needs, since script fonts read cramped at
+   tight line-heights. */
+.font-brush {
+  font-family: 'Caveat', cursive;
+  line-height: 1.15;
+}
+
 /* Chat input keyboard handling - robust solution */
 :root {
   --keyboard-height: 0px;

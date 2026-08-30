@@ -20,7 +20,14 @@ const config: CapacitorConfig = {
       'https://*.supabase.co',
       'https://*.supabase.io',
       'https://accounts.google.com',
-      'https://oauth.googleusercontent.com'
+      'https://oauth.googleusercontent.com',
+      // Stripe Elements (advertiser card collection) - without these, the
+      // native WebView blocks every request to Stripe's domains outright
+      // (confirmed via a direct fetch() test: supabase.co and google.com
+      // succeeded, js.stripe.com/api.stripe.com both failed with "Failed to
+      // fetch"), so the card form's script never loads and never times out
+      // with a visible error - it just silently never renders.
+      'https://*.stripe.com'
     ]
   },
   ios: {

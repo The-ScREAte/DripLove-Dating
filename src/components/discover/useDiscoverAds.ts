@@ -41,6 +41,13 @@ export const useDiscoverAds = ({
         const { data, error } = await supabase
           .from('ads')
           .select('id, name, about, image_url, video_url, link, link_as, media_type, target_countries')
+          // Without this, a newly-submitted advertiser ad (which starts
+          // is_active:false specifically to wait for admin approval) would
+          // show up on Discover immediately, bypassing the approval step
+          // entirely. Previously harmless since only admins created ads
+          // directly (already trusted, always active); no longer true now
+          // that advertisers can submit their own.
+          .eq('is_active', true)
           .order('created_at', { ascending: false });
 
         if (error) throw error;

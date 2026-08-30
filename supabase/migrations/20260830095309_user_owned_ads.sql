@@ -30,20 +30,37 @@ CREATE TABLE IF NOT EXISTS public.advertiser_profiles (
   terms_accepted_at timestamptz NOT NULL DEFAULT now(),
   reviewed_by uuid REFERENCES public.profiles(id),
   reviewed_at timestamptz,
+  -- Card is collected (via Stripe SetupIntent, never touching our own
+  -- servers) right after business info during onboarding, so it's on file
+  -- before an admin approves the advertiser. Nothing is charged yet - actual
+  -- subscription billing (ad price x days live) happens later, when the
+  -- advertiser creates an ad. Only Stripe's own non-sensitive identifiers are
+  -- stored here; the raw card number/CVC never touches this database.
+  stripe_customer_id text,
+  stripe_payment_method_id text,
+  card_brand text,
+  card_last4 text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.advertiser_profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own advertiser profile" ON public.advertiser_profiles;
 CREATE POLICY "Users can view their own advertiser profile"
 ON public.advertiser_profiles FOR SELECT TO authenticated
 USING (auth.uid() = id);
 
+-- A payment method must already be attached before the row can even be
+-- created - the onboarding form collects the card as part of the same
+-- submission, so this just enforces server-side that a bare application
+-- with no card on file can never be inserted.
+DROP POLICY IF EXISTS "Users can create their own advertiser profile" ON public.advertiser_profiles;
 CREATE POLICY "Users can create their own advertiser profile"
 ON public.advertiser_profiles FOR INSERT TO authenticated
-WITH CHECK (auth.uid() = id AND status = 'pending');
+WITH CHECK (auth.uid() = id AND status = 'pending' AND stripe_payment_method_id IS NOT NULL);
 
+DROP POLICY IF EXISTS "Admins can manage advertiser profiles" ON public.advertiser_profiles;
 CREATE POLICY "Admins can manage advertiser profiles"
 ON public.advertiser_profiles FOR ALL TO authenticated
 USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true))
@@ -55,6 +72,8 @@ WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_a
 -- (spam, scam links, inappropriate media) would be a real abuse vector. An
 -- admin approving it is literally them using the existing Resume action in
 -- the admin panel.
+DROP POLICY IF EXISTS "Users can create their own ads" ON public.ads;
+DROP POLICY IF EXISTS "Approved advertisers can create their own ads" ON public.ads;
 CREATE POLICY "Approved advertisers can create their own ads"
 ON public.ads
 FOR INSERT
@@ -68,6 +87,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Users can update their own ads" ON public.ads;
 CREATE POLICY "Users can update their own ads"
 ON public.ads
 FOR UPDATE
@@ -75,6 +95,7 @@ TO authenticated
 USING (auth.uid() = created_by)
 WITH CHECK (auth.uid() = created_by);
 
+DROP POLICY IF EXISTS "Users can delete their own ads" ON public.ads;
 CREATE POLICY "Users can delete their own ads"
 ON public.ads
 FOR DELETE

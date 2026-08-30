@@ -22,7 +22,9 @@ import CropModal from '@/components/shared/CropModal';
 // into that same synchronous cycle.
 const AdCard = React.lazy(() => import('@/components/discover/AdCard'));
 import { COUNTRY_DIAL_CODES, flagEmoji } from '@/utils/countryDialCodes';
-import { Megaphone, Clock, XCircle } from 'lucide-react';
+import { Megaphone, Clock, XCircle, CreditCard, CheckCircle2 } from 'lucide-react';
+import StripeCardStep from './StripeCardStep';
+import PaymentMethodsManager from './PaymentMethodsManager';
 
 // Same frame Discover's real card actually crops to (object-cover, full-bleed).
 const AD_IMAGE_ASPECT = 9 / 16;
@@ -81,7 +83,7 @@ const emptyForm = {
 };
 
 const emptyOnboardingForm = {
-  businessName: '', contactEmail: '', contactPhone: '', contactCountryCode: 'GH', agreed: false,
+  businessName: '', contactEmail: '', contactPhone: '', contactCountryCode: 'US', agreed: false,
 };
 
 // Only the columns "My Ads" actually renders - keeps this section's initial
@@ -105,6 +107,17 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
   const [showOnboardingForm, setShowOnboardingForm] = useState(false);
   const [onboardingForm, setOnboardingForm] = useState(emptyOnboardingForm);
   const [submittingOnboarding, setSubmittingOnboarding] = useState(false);
+  // 'info' = business/contact fields, 'payment' = the Stripe card step that
+  // follows it (card is collected before the application is ever created -
+  // see handleCardSaved). loadingPayment covers the round trip to create the
+  // Stripe SetupIntent between the two steps.
+  const [onboardingStep, setOnboardingStep] = useState<'info' | 'payment'>('info');
+  // Shown once the advertiser account exists (pending or approved) - toggles
+  // between the ad-management view and the card-management view.
+  const [advertiserSection, setAdvertiserSection] = useState<'ads' | 'payment'>('ads');
+  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
+  const [loadingPayment, setLoadingPayment] = useState(false);
 
   const fetchAdvertiserProfile = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -165,22 +178,64 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
     }
   };
 
-  const handleOnboardingSubmit = async (e: React.FormEvent) => {
+  // Shared by both Stripe edge function calls below - they both need the
+  // caller's own access token forwarded so the function can verify who's
+  // asking (and, for the card lookup, that the payment method is actually
+  // theirs) rather than trusting the request blindly.
+  const invokeAuthed = async <T,>(fn: string, body: Record<string, unknown>): Promise<T> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error('Not signed in');
+    const { data, error } = await supabase.functions.invoke(fn, {
+      body,
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (error) throw error;
+    if (data && data.success === false) throw new Error(data.error || `${fn} failed`);
+    return data as T;
+  };
+
+  // Step 1 -> 2: validates the business/contact fields, then asks Stripe for
+  // a SetupIntent to collect the card against. Nothing is written to our own
+  // database yet - the advertiser_profiles row is only created once the card
+  // is actually saved (see handleCardSaved), so there's never a row with
+  // business info but no payment method on file.
+  const handleContinueToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser?.id) return;
     if (!onboardingForm.businessName || !onboardingForm.contactEmail || !onboardingForm.contactPhone) {
       toast({ title: 'Error', description: 'Please fill all required fields', variant: 'destructive' });
       return;
     }
-    if (!onboardingForm.agreed) {
-      toast({ title: 'Error', description: 'Please accept the terms and conditions to continue', variant: 'destructive' });
-      return;
-    }
 
+    setLoadingPayment(true);
+    try {
+      const result = await invokeAuthed<{ clientSecret: string; customerId: string }>('stripe-setup-intent', {});
+      setStripeClientSecret(result.clientSecret);
+      setStripeCustomerId(result.customerId);
+      setOnboardingStep('payment');
+    } catch (error) {
+      console.error('Error starting card setup:', error);
+      toast({ title: 'Error', description: 'Failed to start payment setup. Please try again.', variant: 'destructive' });
+    } finally {
+      setLoadingPayment(false);
+    }
+  };
+
+  // Step 2: the card itself was already confirmed with Stripe directly by
+  // StripeCardStep by this point - this just looks up the brand/last4 for
+  // display and creates the advertiser_profiles row (business info + card
+  // on file, status pending) in one shot.
+  const handleCardSaved = async (paymentMethodId: string) => {
+    if (!currentUser?.id) return;
     const dial = COUNTRY_DIAL_CODES.find(c => c.code === onboardingForm.contactCountryCode)?.dial || '';
 
     setSubmittingOnboarding(true);
     try {
+      const cardInfo = await invokeAuthed<{ brand: string | null; last4: string | null }>(
+        'stripe-confirm-card-setup',
+        { paymentMethodId }
+      );
+
       const { error } = await supabase.from('advertiser_profiles').insert({
         id: currentUser.id,
         business_name: onboardingForm.businessName,
@@ -188,6 +243,10 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
         contact_phone: onboardingForm.contactPhone,
         contact_phone_country: dial,
         status: 'pending',
+        stripe_customer_id: stripeCustomerId,
+        stripe_payment_method_id: paymentMethodId,
+        card_brand: cardInfo.brand,
+        card_last4: cardInfo.last4,
       });
       if (error) throw error;
 
@@ -201,10 +260,13 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
       toast({ title: 'Application submitted', description: "We'll review your details and email you once you're approved to start posting ads." });
       setShowOnboardingForm(false);
+      setOnboardingStep('info');
+      setStripeClientSecret(null);
+      setStripeCustomerId(null);
       fetchAdvertiserProfile();
     } catch (error) {
       console.error('Error submitting advertiser application:', error);
-      toast({ title: 'Error', description: 'Failed to submit your application', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to save your card and submit your application', variant: 'destructive' });
     } finally {
       setSubmittingOnboarding(false);
     }
@@ -396,7 +458,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
         <Megaphone className="w-8 h-8 text-pink-400 mx-auto" />
         <h3 className="text-white font-semibold">Setup to advertise on DripLove</h3>
         <p className="text-xs text-gray-400 max-w-xs mx-auto">
-          Tell us about your business and get approved to run ads to DripLove's users.
+          Get access to millions of users on DripLove all over the world and reach a larger, specific audience.
         </p>
         <Button
           type="button"
@@ -409,9 +471,49 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
     );
   }
 
+  if (advertiserProfile === 'none' && showOnboardingForm && onboardingStep === 'payment' && stripeClientSecret) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-white font-semibold">Add a Payment Method</h3>
+          <p className="text-xs text-gray-400 mt-1">
+            Add a payment method to use for your advertisement with {onboardingForm.businessName}. Payment is
+            securely processed and stored by Stripe - DripLove never sees or stores your card details.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-pink-500/20 bg-pink-500/5 p-3">
+          <p className="text-xs text-gray-300 leading-relaxed">
+            Your card will not be charged today. Once your advertiser account is approved, charges for each
+            ad will be made to this card based on the ad's price and the number of days it runs, in
+            accordance with the Terms and Conditions accepted below.
+          </p>
+        </div>
+
+        <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer">
+          <Checkbox
+            checked={onboardingForm.agreed}
+            onCheckedChange={(checked) => setOnboardingForm(prev => ({ ...prev, agreed: checked === true }))}
+            className="mt-0.5 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600"
+          />
+          I accept the Terms and Conditions, including that my card will be charged for each ad based on its
+          price and the number of days it runs.
+        </label>
+
+        <StripeCardStep
+          clientSecret={stripeClientSecret}
+          submitting={submittingOnboarding}
+          canSubmit={onboardingForm.agreed}
+          onCardSaved={handleCardSaved}
+          onBack={() => setOnboardingStep('info')}
+        />
+      </div>
+    );
+  }
+
   if (advertiserProfile === 'none' && showOnboardingForm) {
     return (
-      <form onSubmit={handleOnboardingSubmit} className="space-y-4">
+      <form onSubmit={handleContinueToPayment} className="space-y-4">
         <div>
           <Label className="block text-sm font-medium mb-2 text-white">Business / Company Name</Label>
           <Input
@@ -464,21 +566,12 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
           </div>
         </div>
 
-        <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer">
-          <Checkbox
-            checked={onboardingForm.agreed}
-            onCheckedChange={(checked) => setOnboardingForm(prev => ({ ...prev, agreed: checked === true }))}
-            className="mt-0.5 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600"
-          />
-          I accept the Terms and Conditions.
-        </label>
-
         <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={() => setShowOnboardingForm(false)} className="flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
             Cancel
           </Button>
-          <Button type="submit" disabled={submittingOnboarding} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white">
-            {submittingOnboarding ? 'Submitting...' : 'Submit'}
+          <Button type="submit" disabled={loadingPayment} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white">
+            {loadingPayment ? 'Loading...' : 'Continue'}
           </Button>
         </div>
       </form>
@@ -487,13 +580,39 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
   if (advertiserProfile !== 'none' && advertiserProfile.status === 'pending') {
     return (
-      <div className="text-center py-4 space-y-2">
-        <Clock className="w-8 h-8 text-pink-400 mx-auto" />
-        <h3 className="text-white font-semibold">Application under review</h3>
-        <p className="text-xs text-gray-400 max-w-xs mx-auto">
-          We're reviewing your advertiser application for {advertiserProfile.business_name}.
-          You'll be able to start creating ads once it's approved.
-        </p>
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={advertiserSection === 'ads' ? 'default' : 'outline'}
+            onClick={() => setAdvertiserSection('ads')}
+            className={advertiserSection === 'ads' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+          >
+            Add Ads
+          </Button>
+          <Button
+            type="button"
+            variant={advertiserSection === 'payment' ? 'default' : 'outline'}
+            onClick={() => setAdvertiserSection('payment')}
+            className={advertiserSection === 'payment' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+          >
+            <CreditCard className="w-4 h-4 mr-1.5" />
+            Payment
+          </Button>
+        </div>
+
+        {advertiserSection === 'payment' ? (
+          <PaymentMethodsManager />
+        ) : (
+          <div className="text-center py-4 space-y-2">
+            <Clock className="w-8 h-8 text-pink-400 mx-auto" />
+            <h3 className="text-white font-semibold">Application under review</h3>
+            <p className="text-xs text-gray-400 max-w-xs mx-auto">
+              We're reviewing your advertiser application for {advertiserProfile.business_name}.
+              You'll be able to start creating ads once it's approved.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -513,6 +632,30 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
   return (
     <>
       <div className="space-y-4">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={advertiserSection === 'ads' ? 'default' : 'outline'}
+            onClick={() => setAdvertiserSection('ads')}
+            className={advertiserSection === 'ads' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+          >
+            Add Ads
+          </Button>
+          <Button
+            type="button"
+            variant={advertiserSection === 'payment' ? 'default' : 'outline'}
+            onClick={() => setAdvertiserSection('payment')}
+            className={advertiserSection === 'payment' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+          >
+            <CreditCard className="w-4 h-4 mr-1.5" />
+            Payment
+          </Button>
+        </div>
+
+        {advertiserSection === 'payment' && <PaymentMethodsManager />}
+
+        {advertiserSection === 'ads' && (
+        <>
           <Collapsible
             open={showCreateForm}
             onOpenChange={(open) => { setShowCreateForm(open); if (!open) resetForm(); }}
@@ -709,10 +852,13 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-white truncate">{ad.name}</h4>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${
-                              ad.is_active ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'
-                            }`}>
-                              {ad.is_active ? 'Live' : 'Pending review'}
+                            <span
+                              className={`flex items-center justify-center w-5 h-5 rounded-full shrink-0 ${
+                                ad.is_active ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'
+                              }`}
+                              title={ad.is_active ? 'Live' : 'Pending review'}
+                            >
+                              {ad.is_active ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                             </span>
                           </div>
                           <div className="flex gap-1.5 mt-2">
@@ -734,6 +880,8 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
               </div>
             )}
           </div>
+        </>
+        )}
       </div>
 
       {/* Preview Modal - renders the real AdCard component for a guaranteed

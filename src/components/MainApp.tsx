@@ -1170,10 +1170,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 />
                 <div className="text-right">
                   <div
-                    className="font-bold leading-tight"
+                    className="font-brush font-bold"
                     style={{
                       color: '#ffffff',
-                      fontSize: 'clamp(11px, 3.2vw, 14px)',
+                      // Script fonts read smaller than a sans font at the same
+                      // px size, so this clamp runs a bit larger than the
+                      // plain-text version did.
+                      fontSize: 'clamp(15px, 4.2vw, 19px)',
                       textShadow: '0 1px 3px rgba(0,0,0,0.5), 0 1px 8px rgba(0,0,0,0.35)',
                     }}
                   >

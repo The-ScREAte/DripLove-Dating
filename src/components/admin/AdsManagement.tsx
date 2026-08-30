@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause, Pencil } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause, Pencil, CreditCard, Check, X, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +14,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { optimizeImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
 import CropModal from '@/components/shared/CropModal';
+import StripeSettings from './StripeSettings';
 // Lazy, not a static import: AdCard lives in the 'discover-tools' chunk while
 // this file is in 'admin-tools' - a static import here creates a circular
 // chunk dependency (discover-tools <-> admin-tools) that throws a
@@ -64,6 +65,17 @@ interface AdvertiserApplication {
   contact_phone_country: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  card_brand: string | null;
+  card_last4: string | null;
+}
+
+interface AdvertiserCard {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number | null;
+  expYear: number | null;
+  isDefault: boolean;
 }
 
 // Country options
@@ -79,6 +91,70 @@ const COUNTRY_OPTIONS = [
   { code: 'TZ', name: 'Tanzania' },
   { code: 'RW', name: 'Rwanda' },
 ];
+
+// Extracted so a single ad's card markup isn't duplicated between the
+// per-business list (nested under each advertiser now) and the standalone
+// in-house ads list below it.
+const AdListItem: React.FC<{
+  ad: Ad;
+  onPreview: (ad: Ad) => void;
+  onEdit: (ad: Ad) => void;
+  onToggleActive: (id: string, currentStatus: boolean) => void;
+  onDelete: (id: string) => void;
+}> = ({ ad, onPreview, onEdit, onToggleActive, onDelete }) => (
+  <Card>
+    <CardContent className="pt-3 pb-3">
+      <div className="flex gap-2.5">
+        {ad.media_type === 'video' && ad.video_url ? (
+          <div className="w-10 h-10 shrink-0 bg-gray-100 rounded flex items-center justify-center relative">
+            <Video className="w-4 h-4 text-gray-500" />
+          </div>
+        ) : (
+          <img
+            loading="lazy"
+            decoding="async"
+            src={optimizeImageUrl(ad.image_url, { width: 100, quality: 60 })}
+            alt={ad.name}
+            className="w-10 h-10 shrink-0 object-cover rounded"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-1.5">
+            <h4 className="text-sm font-semibold break-words">{ad.name}</h4>
+            {!ad.is_active && (
+              <span
+                className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 text-orange-600 shrink-0"
+                title="Paused"
+              >
+                <Clock className="w-3 h-3" />
+              </span>
+            )}
+          </div>
+          <div className="flex gap-1.5 mt-2">
+            <Button variant="outline" size="icon" onClick={() => onPreview(ad)} title="Preview ad" className="h-8 w-8">
+              <Eye className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => onEdit(ad)} title="Edit ad" className="h-8 w-8">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant={ad.is_active ? 'outline' : 'default'}
+              size="icon"
+              onClick={() => onToggleActive(ad.id, ad.is_active)}
+              title={ad.is_active ? 'Pause' : 'Resume'}
+              className={`h-8 w-8 ${ad.is_active ? 'text-orange-600 border-orange-300 hover:bg-orange-50' : 'bg-green-600 hover:bg-green-700'}`}
+            >
+              {ad.is_active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            </Button>
+            <Button variant="destructive" size="icon" onClick={() => onDelete(ad.id)} title="Delete ad" className="h-8 w-8">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
 
 const AdsManagement = () => {
   const [ads, setAds] = useState<Ad[]>([]);
@@ -103,6 +179,10 @@ const AdsManagement = () => {
   const { toast } = useToast();
   const [applications, setApplications] = useState<AdvertiserApplication[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [cardsAdvertiser, setCardsAdvertiser] = useState<AdvertiserApplication | null>(null);
+  const [expandedAdvertiserId, setExpandedAdvertiserId] = useState<string | null>(null);
+  const [advertiserCards, setAdvertiserCards] = useState<AdvertiserCard[]>([]);
+  const [cardsLoading, setCardsLoading] = useState(false);
 
   useEffect(() => {
     fetchAds();
@@ -131,13 +211,15 @@ const AdsManagement = () => {
     }
   };
 
+  // Every advertiser account, any status - this is what lets admin see all
+  // businesses (and their card/account info) in one place, not just the ones
+  // still waiting on a decision.
   const fetchApplications = async () => {
     setApplicationsLoading(true);
     try {
       const { data, error } = await supabase
         .from('advertiser_profiles')
-        .select('id, business_name, contact_email, contact_phone, contact_phone_country, status, created_at')
-        .eq('status', 'pending')
+        .select('id, business_name, contact_email, contact_phone, contact_phone_country, status, created_at, card_brand, card_last4')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setApplications((data as AdvertiserApplication[]) || []);
@@ -148,20 +230,69 @@ const AdsManagement = () => {
     }
   };
 
-  const handleReviewApplication = async (id: string, status: 'approved' | 'rejected') => {
+  const handleReviewApplication = async (advertiser: AdvertiserApplication, status: 'approved' | 'rejected') => {
     try {
       /* eslint-disable @typescript-eslint/no-explicit-any */
       const { error } = await supabase
         .from('advertiser_profiles')
         .update({ status } as any)
-        .eq('id', id);
+        .eq('id', advertiser.id);
       /* eslint-enable @typescript-eslint/no-explicit-any */
       if (error) throw error;
+
+      // In-app notification - "System can insert notifications" allows any
+      // authenticated insert, same as every other in-app notification here.
+      await supabase.from('notifications').insert({
+        user_id: advertiser.id,
+        type: 'advertiser_status',
+        title: status === 'approved' ? "You're approved to advertise!" : 'Advertiser application update',
+        message: status === 'approved'
+          ? `${advertiser.business_name} has been approved. You can now create ads from Profile > Advertisement.`
+          : `${advertiser.business_name}'s advertiser application wasn't approved. Contact support for details.`,
+        is_read: false,
+      });
+
+      // Best-effort email - the DB update above is what actually matters, so
+      // a failed email (e.g. SMTP not configured) never blocks the review.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await supabase.functions.invoke('notify-advertiser-status', {
+            body: { contactEmail: advertiser.contact_email, businessName: advertiser.business_name, status },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+        }
+      } catch (emailError) {
+        console.error('Error emailing advertiser:', emailError);
+      }
+
       toast({ title: 'Success', description: `Advertiser ${status}` });
       fetchApplications();
     } catch (error) {
       console.error('Error reviewing advertiser application:', error);
       toast({ title: 'Error', description: 'Failed to update application', variant: 'destructive' });
+    }
+  };
+
+  const handleViewCards = async (advertiser: AdvertiserApplication) => {
+    setCardsAdvertiser(advertiser);
+    setCardsLoading(true);
+    setAdvertiserCards([]);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not signed in');
+      const { data, error } = await supabase.functions.invoke('stripe-admin-list-payment-methods', {
+        body: { advertiserId: advertiser.id },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data.error);
+      setAdvertiserCards(data?.cards || []);
+    } catch (error) {
+      console.error('Error fetching advertiser cards:', error);
+      toast({ title: 'Error', description: 'Failed to load card info', variant: 'destructive' });
+    } finally {
+      setCardsLoading(false);
     }
   };
 
@@ -441,36 +572,15 @@ const AdsManagement = () => {
     return groups;
   }, {});
 
+  const STATUS_BADGE: Record<AdvertiserApplication['status'], string> = {
+    pending: 'bg-orange-100 text-orange-700',
+    approved: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-700',
+  };
+
   return (
     <div className="space-y-6">
-      {applications.length > 0 && (
-        <Card>
-          <CardContent className="pt-6 space-y-3">
-            <h3 className="text-lg font-semibold">Pending Advertiser Applications</h3>
-            {applicationsLoading ? (
-              <p className="text-sm text-gray-500">Loading...</p>
-            ) : (
-              applications.map((app) => (
-                <div key={app.id} className="border rounded-lg p-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold truncate">{app.business_name}</p>
-                    <p className="text-xs text-gray-500 truncate">{app.contact_email}</p>
-                    <p className="text-xs text-gray-500">{app.contact_phone_country} {app.contact_phone}</p>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleReviewApplication(app.id, 'approved')}>
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleReviewApplication(app.id, 'rejected')}>
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <StripeSettings />
 
       <Card>
         <CardContent className="pt-6">
@@ -671,91 +781,101 @@ const AdsManagement = () => {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <h3 className="text-lg font-semibold">Advertisers</h3>
+          {applicationsLoading ? (
+            <p className="text-sm text-gray-500">Loading...</p>
+          ) : applications.length === 0 ? (
+            <p className="text-sm text-gray-500">No advertiser accounts yet.</p>
+          ) : (
+            applications.map((app) => {
+              const isExpanded = expandedAdvertiserId === app.id;
+              return (
+                <div key={app.id} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedAdvertiserId(isExpanded ? null : app.id)}
+                    className="w-full flex items-start justify-between gap-2 p-2.5 text-left hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                      <p className="text-sm font-semibold break-words">{app.business_name}</p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATUS_BADGE[app.status]}`}>
+                        {app.status}
+                      </span>
+                    </div>
+                    {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0 text-gray-400 mt-0.5" /> : <ChevronDown className="w-4 h-4 shrink-0 text-gray-400 mt-0.5" />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="p-2.5 pt-0 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 text-xs text-gray-500 space-y-0.5">
+                          <p className="truncate">{app.contact_email}</p>
+                          <p>{app.contact_phone_country} {app.contact_phone}</p>
+                          {app.card_brand && app.card_last4 && (
+                            <p>{app.card_brand.charAt(0).toUpperCase() + app.card_brand.slice(1)} •••• {app.card_last4}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <Button size="icon" variant="outline" className="h-8 w-8" title="View cards" onClick={() => handleViewCards(app)}>
+                            <CreditCard className="h-3.5 w-3.5" />
+                          </Button>
+                          {app.status === 'pending' && (
+                            <>
+                              <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700" title="Approve" onClick={() => handleReviewApplication(app, 'approved')}>
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="icon" variant="destructive" className="h-8 w-8" title="Reject" onClick={() => handleReviewApplication(app, 'rejected')}>
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {(groupedAds[app.business_name] || []).length > 0 && (
+                        <div className="pl-3 border-l-2 border-gray-200 space-y-2">
+                          {groupedAds[app.business_name].map((ad) => (
+                            <AdListItem
+                              key={ad.id}
+                              ad={ad}
+                              onPreview={setPreviewAd}
+                              onEdit={handleEditAd}
+                              onToggleActive={handleToggleActive}
+                              onDelete={handleDelete}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ads with no matching advertiser business - DripLove's own in-house
+          ads, created directly here rather than by an advertiser account. */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">My Ads</h3>
+        <h3 className="text-lg font-semibold mb-4">DripLove Ads</h3>
         {loading ? (
           <p className="text-center text-gray-500">Loading ads...</p>
-        ) : ads.length === 0 ? (
-          <p className="text-center text-gray-500">No ads yet</p>
+        ) : (groupedAds['DripLove (in-house)'] || []).length === 0 ? (
+          <p className="text-center text-gray-500">No in-house ads yet</p>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedAds).map(([businessName, businessAds]) => (
-              <div key={businessName}>
-                <h4 className="text-sm font-semibold text-gray-500 mb-2">{businessName}</h4>
-                <div className="grid gap-4">
-                  {businessAds.map((ad) => (
-              <Card key={ad.id}>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex gap-3">
-                    {ad.media_type === 'video' && ad.video_url ? (
-                      <div className="w-12 h-12 shrink-0 bg-gray-100 rounded flex items-center justify-center relative">
-                        <Video className="w-5 h-5 text-gray-500" />
-                      </div>
-                    ) : (
-                      <img
-                        loading="lazy"
-                        decoding="async"
-                        src={optimizeImageUrl(ad.image_url, { width: 100, quality: 60 })}
-                        alt={ad.name}
-                        className="w-12 h-12 shrink-0 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold truncate">{ad.name}</h4>
-                        {!ad.is_active && (
-                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium shrink-0">Paused</span>
-                        )}
-                      </div>
-                  <div className="flex gap-1.5 mt-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setPreviewAd(ad)}
-                      title="Preview ad"
-                      className="h-8 w-8"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleEditAd(ad)}
-                      title="Edit ad"
-                      className="h-8 w-8"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant={ad.is_active ? "outline" : "default"}
-                      size="icon"
-                      onClick={() => handleToggleActive(ad.id, ad.is_active)}
-                      title={ad.is_active ? 'Pause' : 'Resume'}
-                      className={`h-8 w-8 ${ad.is_active ? "text-orange-600 border-orange-300 hover:bg-orange-50" : "bg-green-600 hover:bg-green-700"}`}
-                    >
-                      {ad.is_active ? (
-                        <Pause className="h-3.5 w-3.5" />
-                      ) : (
-                        <Play className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => handleDelete(ad.id)}
-                      title="Delete ad"
-                      className="h-8 w-8"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-                  ))}
-                </div>
-              </div>
+          <div className="grid gap-4">
+            {groupedAds['DripLove (in-house)'].map((ad) => (
+              <AdListItem
+                key={ad.id}
+                ad={ad}
+                onPreview={setPreviewAd}
+                onEdit={handleEditAd}
+                onToggleActive={handleToggleActive}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
@@ -775,6 +895,37 @@ const AdsManagement = () => {
               <React.Suspense fallback={null}>
                 <AdCard ad={previewAd} />
               </React.Suspense>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cardsAdvertiser} onOpenChange={() => setCardsAdvertiser(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{cardsAdvertiser?.business_name} - Cards</DialogTitle>
+          </DialogHeader>
+          {cardsLoading ? (
+            <p className="text-sm text-gray-500 text-center py-4">Loading...</p>
+          ) : advertiserCards.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No cards on file.</p>
+          ) : (
+            <div className="space-y-2">
+              {advertiserCards.map((card) => (
+                <div key={card.id} className="flex items-center justify-between border rounded-lg p-2.5">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {card.brand.charAt(0).toUpperCase() + card.brand.slice(1)} •••• {card.last4}
+                    </p>
+                    {card.expMonth && card.expYear && (
+                      <p className="text-xs text-gray-500">Expires {String(card.expMonth).padStart(2, '0')}/{card.expYear}</p>
+                    )}
+                  </div>
+                  {card.isDefault && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 font-medium">Default</span>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </DialogContent>
