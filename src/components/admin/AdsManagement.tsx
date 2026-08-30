@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Video, Image as ImageIcon, Volume2, VolumeX, Play, Eye, Pause } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +13,24 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { optimizeImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
+import CropModal from '@/components/shared/CropModal';
+import AdCard from '@/components/discover/AdCard';
+
+// Matches the real card's own proportions (object-cover, full-bleed, no
+// letterboxing) far more closely than a squarer frame would - this is what
+// actually crops on Discover, so the crop preview needs to track it closely.
+const AD_IMAGE_ASPECT = 9 / 16;
+
+const LINK_AS_OPTIONS = [
+  'Click here',
+  'Learn more',
+  'Shop now',
+  'Sign up',
+  'Visit site',
+  'Download now',
+  'Get started',
+  'Join now',
+];
 
 interface Ad {
   id: string;
@@ -46,8 +65,9 @@ const AdsManagement = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewAd, setPreviewAd] = useState<Ad | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
-  const videoRef = React.useRef<HTMLVideoElement>(null);
+  // The picked file is cropped BEFORE it ever gets uploaded - this holds a
+  // local object URL for the cropper to work against while that happens.
+  const [croppingFileUrl, setCroppingFileUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     about: '',
@@ -86,13 +106,19 @@ const AdsManagement = () => {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Picking a file only stages it for cropping - nothing is uploaded until
+  // the crop is confirmed (handleCroppedImageUpload below).
+  const handleImageFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    setCroppingFileUrl(URL.createObjectURL(file));
+  };
 
+  const handleCroppedImageUpload = async (blob: Blob) => {
     setUploading(true);
     try {
-      const compressedFile = await compressImage(file);
+      const compressedFile = await compressImage(new File([blob], 'crop.jpg', { type: 'image/jpeg' }));
 
       const mimeToExt: Record<string, string> = {
         'image/jpeg': 'jpg',
@@ -131,6 +157,8 @@ const AdsManagement = () => {
       });
     } finally {
       setUploading(false);
+      if (croppingFileUrl) URL.revokeObjectURL(croppingFileUrl);
+      setCroppingFileUrl(null);
     }
   };
 
@@ -362,7 +390,7 @@ const AdsManagement = () => {
                   <Input
                     type="file"
                     accept="image/*"
-                    onChange={handleImageUpload}
+                    onChange={handleImageFilePicked}
                     disabled={uploading}
                     className="flex-1"
                   />
@@ -411,11 +439,19 @@ const AdsManagement = () => {
 
             <div>
               <label className="block text-sm font-medium mb-2">Link Display Text</label>
-              <Input
+              <Select
                 value={formData.link_as}
-                onChange={(e) => setFormData(prev => ({ ...prev, link_as: e.target.value }))}
-                placeholder="e.g., Click here"
-              />
+                onValueChange={(value) => setFormData(prev => ({ ...prev, link_as: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select display text" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LINK_AS_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -423,32 +459,34 @@ const AdsManagement = () => {
                 Target Countries ({formData.target_countries.length} selected)
               </label>
               <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
-                {COUNTRY_OPTIONS.map((country) => (
-                  <label 
-                    key={country.code} 
-                    className={`flex items-center gap-2 cursor-pointer text-sm p-2 rounded transition-colors ${
-                      formData.target_countries.includes(country.code) 
-                        ? 'bg-purple-50 border border-purple-200' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formData.target_countries.includes(country.code)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormData(prev => ({ ...prev, target_countries: [...prev.target_countries, country.code] }));
-                        } else {
-                          setFormData(prev => ({ ...prev, target_countries: prev.target_countries.filter(c => c !== country.code) }));
-                        }
-                      }}
-                      className="rounded w-4 h-4"
-                    />
-                    <span className={formData.target_countries.includes(country.code) ? 'font-medium' : ''}>
-                      {country.name}
-                    </span>
-                  </label>
-                ))}
+                {COUNTRY_OPTIONS.map((country) => {
+                  const isSelected = formData.target_countries.includes(country.code);
+                  return (
+                    <label
+                      key={country.code}
+                      className={`flex items-center gap-2 cursor-pointer text-sm p-2 rounded transition-colors ${
+                        isSelected
+                          ? 'bg-pink-50 border border-pink-300'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData(prev => ({ ...prev, target_countries: [...prev.target_countries, country.code] }));
+                          } else {
+                            setFormData(prev => ({ ...prev, target_countries: prev.target_countries.filter(c => c !== country.code) }));
+                          }
+                        }}
+                        className="w-4 h-4 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
+                      />
+                      <span className={isSelected ? 'font-medium' : ''}>
+                        {country.name}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
               {formData.target_countries.length === 0 && (
                 <p className="text-xs text-gray-500 mt-1 italic">
@@ -590,70 +628,36 @@ const AdsManagement = () => {
         )}
       </div>
 
-      {/* Preview Modal */}
+      {/* Preview Modal - renders the actual AdCard component used on Discover,
+          not a hand-copied re-implementation, so this is a guaranteed exact
+          match (colors, spacing, feathering, everything) rather than
+          something that can quietly drift out of sync with the real card. */}
       <Dialog open={!!previewAd} onOpenChange={() => setPreviewAd(null)}>
-        <DialogContent className="max-w-md h-[80vh] p-0">
+        <DialogContent className="max-w-sm h-[80vh] p-0 bg-black border border-pink-500/30 overflow-hidden">
           <DialogHeader className="p-4 pb-0">
-            <DialogTitle>Ad Preview</DialogTitle>
+            <DialogTitle className="text-white">Ad Preview</DialogTitle>
           </DialogHeader>
           {previewAd && (
-            <div className="flex-1 flex flex-col h-full overflow-hidden">
-              {/* Ad preview matching AdCard.tsx exactly */}
-              <div className="flex-1 relative overflow-hidden">
-                {previewAd.media_type === 'video' && previewAd.video_url ? (
-                  <>
-                    <video
-                      ref={videoRef}
-                      src={previewAd.video_url}
-                      muted={isMuted}
-                      loop
-                      playsInline
-                      autoPlay
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Mute/Unmute Button */}
-                    <button
-                      onClick={() => setIsMuted(!isMuted)}
-                      className="absolute top-6 right-4 md:top-4 bg-black/50 text-white p-1.5 md:p-2 rounded-full z-10"
-                      aria-label={isMuted ? 'Unmute' : 'Mute'}
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4 md:w-5 md:h-5" /> : <Volume2 className="w-4 h-4 md:w-5 md:h-5" />}
-                    </button>
-                  </>
-                ) : (
-                  <img
-                    src={optimizeImageUrl(previewAd.image_url, { width: 500, quality: 60 })}
-                    alt={previewAd.name}
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                
-                {/* Ad Badge */}
-                <div className="absolute top-6 left-4 md:top-4 bg-yellow-400 text-black px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold">
-                  Sponsored
-                </div>
-              </div>
-
-              {/* Ad Info */}
-              <div className="p-4 bg-white">
-                <h2 className="text-2xl font-bold mb-2">{previewAd.name}</h2>
-                <p className="text-gray-600 mb-4">{previewAd.about}</p>
-                
-                {previewAd.link && (
-                  <Button
-                    onClick={() => window.open(previewAd.link!, '_blank', 'noopener,noreferrer')}
-                    className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
-                  >
-                    <Play className="w-4 h-4 mr-2" />
-                    {previewAd.link_as || 'Click here'}
-                  </Button>
-                )}
-              </div>
+            <div className="flex-1 min-h-0">
+              <AdCard ad={previewAd} />
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {croppingFileUrl && (
+        <CropModal
+          imageUrl={croppingFileUrl}
+          aspect={AD_IMAGE_ASPECT}
+          title="Crop Ad Image"
+          helperText="This frame matches how the ad appears on Discover."
+          onCancel={() => {
+            URL.revokeObjectURL(croppingFileUrl);
+            setCroppingFileUrl(null);
+          }}
+          onCropped={handleCroppedImageUpload}
+        />
+      )}
     </div>
   );
 };
