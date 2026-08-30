@@ -87,8 +87,13 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
         </div>
       </div>
 
-      {/* Ad Info */}
-      <div className="p-4 pb-5 bg-black">
+      {/* Ad Info - overlaps the media box above by a hair (negative margin,
+          not just touching it) as insurance against subpixel rounding
+          between flex children, which otherwise shows as a thin gap/line
+          right where the feathered gradient above is supposed to already
+          be fully solid black - same fix used for this exact seam in
+          Discover's and the profile preview's own expanded info panels. */}
+      <div className="p-4 pb-5 bg-black relative" style={{ marginTop: '-2px' }}>
         <h2 className="text-2xl font-bold mb-2 text-white">{ad.name}</h2>
         <p className="text-gray-300 mb-4 line-clamp-2">{ad.about}</p>
         
