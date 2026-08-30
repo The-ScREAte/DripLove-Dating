@@ -68,6 +68,7 @@ const AdsManagement = () => {
   // The picked file is cropped BEFORE it ever gets uploaded - this holds a
   // local object URL for the cropper to work against while that happens.
   const [croppingFileUrl, setCroppingFileUrl] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     about: '',
@@ -265,6 +266,7 @@ const AdsManagement = () => {
       });
 
       setFormData({ name: '', about: '', image_url: '', video_url: '', media_type: 'image', link: '', link_as: 'Click here', target_countries: [] });
+      setShowCreateForm(false);
       fetchAds();
     } catch (error) {
       console.error('Error creating ad:', error);
@@ -334,7 +336,18 @@ const AdsManagement = () => {
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <h3 className="text-lg font-semibold mb-4">Create New Ad</h3>
+          <Collapsible open={showCreateForm} onOpenChange={setShowCreateForm}>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-between"
+              >
+                <span className="text-base font-semibold">Create New Ad</span>
+                {showCreateForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Name</label>
@@ -495,19 +508,21 @@ const AdsManagement = () => {
               )}
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={loading || uploading}
               className="w-full"
             >
               {loading ? 'Creating...' : 'Create Ad'}
             </Button>
           </form>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 
       <div>
-        <h3 className="text-lg font-semibold mb-4">Saved Ads</h3>
+        <h3 className="text-lg font-semibold mb-4">My Ads</h3>
         {loading ? (
           <p className="text-center text-gray-500">Loading ads...</p>
         ) : ads.length === 0 ? (
@@ -582,41 +597,38 @@ const AdsManagement = () => {
                         {new Date(ad.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex gap-1.5">
                         <Button
                           variant="outline"
                           size="icon"
                           onClick={() => setPreviewAd(ad)}
                           title="Preview ad"
+                          className="h-8 w-8"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="destructive"
                           size="icon"
                           onClick={() => handleDelete(ad.id)}
                           title="Delete ad"
+                          className="h-8 w-8"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                       <Button
                         variant={ad.is_active ? "outline" : "default"}
-                        size="sm"
+                        size="icon"
                         onClick={() => handleToggleActive(ad.id, ad.is_active)}
-                        className={ad.is_active ? "text-orange-600 border-orange-300 hover:bg-orange-50" : "bg-green-600 hover:bg-green-700"}
+                        title={ad.is_active ? 'Pause' : 'Resume'}
+                        className={`h-8 w-8 ${ad.is_active ? "text-orange-600 border-orange-300 hover:bg-orange-50" : "bg-green-600 hover:bg-green-700"}`}
                       >
                         {ad.is_active ? (
-                          <>
-                            <Pause className="h-3 w-3 mr-1" />
-                            Pause
-                          </>
+                          <Pause className="h-3.5 w-3.5" />
                         ) : (
-                          <>
-                            <Play className="h-3 w-3 mr-1" />
-                            Resume
-                          </>
+                          <Play className="h-3.5 w-3.5" />
                         )}
                       </Button>
                     </div>
