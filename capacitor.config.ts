@@ -95,9 +95,20 @@ const config: CapacitorConfig = {
     // launch. Individual screens that should be exempt (Profile, the
     // mini-games) call PrivacyScreen.disable() for as long as they're
     // showing - see src/hooks/useAllowScreenshots.ts.
+    //
+    // preventScreenshots is OFF: this plugin's iOS implementation
+    // (PrivacyScreen.swift, configurePreventionScreenshot) implements it via
+    // a well-known but fragile secure-UITextField hack that re-parents the
+    // ENTIRE app window's CALayer underneath a hidden text field's layer.
+    // That's what caused a blank white screen at launch on iOS (nothing
+    // rendered, not even the index page) - the layer re-parenting doesn't
+    // reliably compose on every iOS version. `enable` alone still covers
+    // Android's FLAG_SECURE and iOS's background/app-switcher hide via a
+    // normal, standard presented view controller - neither of those touch
+    // the window's layer tree, so they're not implicated in this bug.
     PrivacyScreen: {
       enable: true,
-      preventScreenshots: true // iOS only
+      preventScreenshots: false // iOS only - see note above
     }
   },
   cordova: {

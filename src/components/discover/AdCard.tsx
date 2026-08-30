@@ -76,7 +76,10 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe }) => {
             className="w-full h-full object-cover"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        {/* Feathers up from fully solid black at the very bottom edge - matching
+            the opaque black info panel right below it with no visible seam -
+            fading out to transparent higher up in the photo/video. */}
+        <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black via-black/60 to-transparent pointer-events-none" />
         
         {/* Ad Badge */}
         <div className="absolute top-6 left-4 md:top-4 bg-yellow-400 text-black px-2 py-0.5 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs font-bold">
