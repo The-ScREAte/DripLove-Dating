@@ -849,12 +849,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // dismiss first. Gated on swipeDistance crossing a real movement threshold,
   // not just isDragging - that flips true on plain touchdown, before any actual
   // movement, which was dismissing the guide on a tap alone rather than a swipe.
-  useEffect(() => {
-    if (showSwipeGuide && swipeUI.isDragging && swipeUI.swipeDistance > 12) {
-      setShowSwipeGuide(false);
-      localStorage.setItem('driplove_swipe_guide_shown', 'true');
-    }
-  }, [showSwipeGuide, swipeUI.isDragging, swipeUI.swipeDistance]);
+  // NOTE: the guide is no longer dismissed by the first touch/swipe — it stays up
+  // for its full 5 seconds so the user actually gets to read it, while real swipes
+  // underneath still count (the overlay is pointer-events: none).
 
   const isDraggingRef = useRef(false);
   // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
@@ -878,6 +875,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // too (throttled to the same rAF), for the overlay hint/buttons that read
   // swipeDistance/swipeDirection, which can tolerate lagging a frame or two.
   const cardElRef = useRef<HTMLDivElement>(null);
+  // Coarse-step gate for the React state updates during a drag (see handleTouchMove):
+  // keeps Android from re-rendering this whole page on every single touchmove frame.
+  const lastPushedDirRef = useRef<'left' | 'right' | null>(null);
+  const lastPushedDistRef = useRef<number>(0);
 
   const getGenderFilter = useCallback((userPreference: string) => {
     if (userPreference === 'male') {
@@ -2977,6 +2978,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentXRef.current = touch.clientX;
     currentYRef.current = touch.clientY;
     isDraggingRef.current = true;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
     setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 }));
   };
 
@@ -3008,7 +3011,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
             ? `translate3d(${d}px, 0, 0) rotate(${d * 0.08}deg)`
             : `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
         }
-        setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
+        // Android smoothness: the transform above is already on screen this frame.
+        // The React state below only drives the Nope/Yep overlays, so push it in
+        // coarse steps (every ~16px, or when the direction flips) instead of every
+        // frame — a full re-render of this very large page on every touchmove is
+        // what made Android drags stutter.
+        const dir: 'left' | 'right' = d > 0 ? 'right' : 'left';
+        const dist = Math.abs(d);
+        if (
+          dir !== lastPushedDirRef.current ||
+          Math.abs(dist - lastPushedDistRef.current) > 16
+        ) {
+          lastPushedDirRef.current = dir;
+          lastPushedDistRef.current = dist;
+          setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: dist, swipeDirection: dir }));
+        }
         rafScheduledRef.current = false;
       });
     }
@@ -3017,6 +3034,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
     setSwipeUI(prev => ({ ...prev, isDragging: false }));
 
     const changedTouch = e.changedTouches && e.changedTouches[0];
@@ -3066,6 +3085,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     currentXRef.current = e.clientX;
     currentYRef.current = e.clientY;
     isDraggingRef.current = true;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
     setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 }));
 
     // Attach global mouse listeners to ensure we capture mouseup/move even if pointer leaves the element
@@ -3099,6 +3120,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
     const onWindowMouseUp = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
+    lastPushedDirRef.current = null;
+    lastPushedDistRef.current = 0;
       setSwipeUI(prev => ({ ...prev, isDragging: false }));
       // compute final deltas
       const deltaX = ev.clientX - startXRef.current;
@@ -4563,7 +4586,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
         // the timeout.
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center"
-          style={{ pointerEvents: 'none', background: 'rgba(0,0,0,0.35)' }}
+          style={{
+            pointerEvents: 'none',
+            // Dark, softly blurred scrim: the card behind stays visible through it
+            // while the Nope / Yep icons read cleanly on top.
+            background: 'rgba(0,0,0,0.62)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)'
+          }}
         >
           <style>{`
             @keyframes swipeGuideIn {
@@ -4668,7 +4698,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
                   return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
                 })()}
                 alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-contain object-center bg-black"
                 style={{ position: 'relative', zIndex: 1 }}
                 draggable={false}
                 loading="eager"
