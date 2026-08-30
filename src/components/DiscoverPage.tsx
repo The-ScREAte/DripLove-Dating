@@ -623,18 +623,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
 
   // --- BEGIN: Swipe Guide Popup State ---
   const [showSwipeGuide, setShowSwipeGuide] = useState(false);
+  // The timer lives in a ref and is NEVER cancelled by effect cleanup: swiping
+  // updates profile/swipe state, which can re-run this effect (or briefly flip
+  // the page into the loading/out-of-swipes/ad render branch) — the old
+  // clearTimeout-on-cleanup let exactly that kill the guide mid-display. Only
+  // the 5s timeout itself hides the guide now.
+  const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Only show for new users (e.g., if localStorage flag not set)
     if (!currentUser?.id) return;
-    const guideFlag = localStorage.getItem('driplove_swipe_guide_shown');
-    if (!guideFlag) {
-      setShowSwipeGuide(true);
-      const timer = setTimeout(() => {
-        setShowSwipeGuide(false);
-        localStorage.setItem('driplove_swipe_guide_shown', 'true');
-      }, 5000); // 5 seconds
-      return () => clearTimeout(timer);
-    }
+    if (localStorage.getItem('driplove_swipe_guide_shown')) return;
+    if (swipeGuideTimerRef.current) return; // timer already running — don't restart
+    setShowSwipeGuide(true);
+    swipeGuideTimerRef.current = setTimeout(() => {
+      setShowSwipeGuide(false);
+      localStorage.setItem('driplove_swipe_guide_shown', 'true');
+      swipeGuideTimerRef.current = null;
+    }, 5000); // 5 seconds
   }, [currentUser?.id]);
   // --- END: Swipe Guide Popup State ---
 
