@@ -68,34 +68,20 @@ const ImageSlide = React.memo<{
   return (
     // Absolute + inset 0, not w-full/h-full: this is the one element shared by
     // Discover, Liked Me, and the profile preview, so it's the most direct place
-    // to guarantee a tall/portrait photo can never influence this box's own size
-    // - it's always exactly the size of its (already correctly-sized) positioned
-    // ancestor, full stop, regardless of what image is inside it.
-    <div className="absolute inset-0 bg-black overflow-hidden">
-      {/* Blurred, scaled copy of the same photo fills whatever space the
-          contained photo doesn't - so the frame is never letterboxed with dead
-          black bars, while the real photo below is shown in full. */}
-      <img
-        aria-hidden="true"
-        src={imageSrc}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover object-center z-0"
-        style={{ filter: 'blur(22px) brightness(0.55)', transform: 'scale(1.15)' }}
-        draggable={false}
-      />
+    // to guarantee a tall/portrait photo can never influence this box's own size.
+    // Plain black backdrop (no blurred copy): the whole cropped photo is shown,
+    // fully zoomed out, letterboxed against black on every screen and device.
+    <div className="absolute inset-0 bg-black overflow-hidden flex items-center justify-center">
       <img
         key={imageSrc}
         loading="eager"
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        // object-contain, not object-cover: photos are cropped by the user in a
-        // 3:4 frame, but these display boxes are taller/narrower than that, so
-        // object-cover re-cropped the already-cropped photo (the "zoomed in,
-        // parts missing" look). Contain shows exactly what the crop preview
-        // showed, on all three surfaces (Discover, Liked Me, profile preview).
+        // object-contain: photos are cropped by the user in a 3:4 frame; these
+        // display boxes are taller/narrower, so object-cover would re-crop the
+        // already-cropped photo. Contain shows exactly what the crop preview showed.
         className={`w-full h-full object-contain object-center relative z-10 ${styles.optimizedImage}`}
-        style={{ borderRadius: '26px 26px 0 0' }}
         draggable={false}
         onError={() => setHasError(true)}
       />
