@@ -875,6 +875,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, isPr
   // too (throttled to the same rAF), for the overlay hint/buttons that read
   // swipeDistance/swipeDirection, which can tolerate lagging a frame or two.
   const cardElRef = useRef<HTMLDivElement>(null);
+  // Coarse-step gate for the React state updates during a drag (see handleTouchMove):
+  // keeps Android from re-rendering this whole page on every single touchmove frame.
+  const lastPushedDirRef = useRef<'left' | 'right' | null>(null);
+  const lastPushedDistRef = useRef<number>(0);
 
   const getGenderFilter = useCallback((userPreference: string) => {
     if (userPreference === 'male') {
