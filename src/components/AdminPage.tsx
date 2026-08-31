@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import type { Json } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +69,7 @@ interface UserProfile {
   email: string;
   account_status: string;
   created_at: string;
+  date_of_birth: string;
   city: string;
   country: string;
   age: number;
@@ -137,6 +139,7 @@ interface ReportedChatItem {
     content_id: string | null;
     reason: string | null;
     description: string | null;
+    reported_user_id?: string | null;
   };
   message: ChatMessageSummary | null;
   reporter: MinimalProfile | null;
@@ -264,7 +267,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         const { error } = await supabase
           .from('payment_config')
           .update({
-            payment_methods: paymentMethods as unknown,
+            payment_methods: paymentMethods as unknown as Json,
             premium_price: Number(defaultInternationalPrice) || 5,
             premium_price_monthly: Number(defaultInternationalPrice) || 5,
             default_international_price: Number(defaultInternationalPrice) || 5,
@@ -280,7 +283,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         const { error } = await supabase
           .from('payment_config')
           .insert({
-            payment_methods: paymentMethods as unknown,
+            payment_methods: paymentMethods as unknown as Json,
             premium_price: Number(defaultInternationalPrice) || 5,
             premium_price_monthly: Number(defaultInternationalPrice) || 5,
             default_international_price: Number(defaultInternationalPrice) || 5,
@@ -2057,7 +2060,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <p className="text-[11px] text-gray-600 truncate">
                             Reported by: {r.reporter ? `${r.reporter.first_name} ${r.reporter.last_name}` : r.details?.reporter_id}
                             {' • '}
-                            Reported user: {r.reportedUser ? `${r.reportedUser.first_name} ${r.reportedUser.last_name}` : r.details?.reported_user_id || r.details?.reportedUser}
+                            Reported user: {r.reportedUser ? `${r.reportedUser.first_name} ${r.reportedUser.last_name}` : r.details?.reported_user_id}
                           </p>
                           <p className="text-[11px] text-gray-500 mt-1">Reason: {r.details?.reason || '—'}</p>
                           {r.details?.description && <p className="text-[11px] text-gray-500 mt-1">Notes: {r.details.description}</p>}
