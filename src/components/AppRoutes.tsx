@@ -9,7 +9,6 @@ import Index from "@/pages/Index";
 import NotFound from "@/pages/NotFound";
 
 // Lazy load all heavy pages for better performance
-const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
 const AdminPage = lazy(() => import('./AdminPage'));
 const ProfileCompletionPage = lazy(() => import('./ProfileCompletionPage'));
 const EmailConfirmPage = lazy(() => import('./EmailConfirmPage'));
@@ -33,8 +32,6 @@ const RedFlagGreenFlag = lazy(() => import('../pages/RedFlagGreenFlag'));
 
 // Shown while a lazy route's chunk is being fetched. A blank screen here reads as "the tap did
 // nothing" on a slow mobile connection — a visible spinner confirms the navigation registered.
-import type { CurrentUser } from '@/types';
-
 const PageLoader = () => (
   <div className="min-h-screen w-full flex items-center justify-center bg-black">
     <div className="w-8 h-8 rounded-full border-2 border-pink-500/30 border-t-pink-500 animate-spin" />
@@ -62,14 +59,13 @@ const AppRoutes = ({
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Index user={user} isAuthenticated={isAuthenticated} />} />
-        <Route
-          path="/discover"
-          element={
-            isAuthenticated && user
-              ? <DiscoverPage currentUser={user as unknown as CurrentUser} />
-              : <Navigate to="/" replace />
-          }
-        />
+        {/* Nothing in the app links here - the real Discover experience lives in
+            MainApp's tab (mounted at "/"), which has a fully-loaded profile to
+            work with. Rendering DiscoverPage directly from this route only had
+            the raw Supabase auth user available (id/email/metadata, none of the
+            profile fields Discover's matching/ad-targeting logic needs), so this
+            just redirects instead of ever mounting it in a broken state. */}
+        <Route path="/discover" element={<Navigate to="/" replace />} />
         <Route path="/face-verification" element={<FaceVerificationPage />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />

@@ -672,6 +672,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
           admin_id: a.admin_id,
           details: {
             reporter_id: a.reporter_id,
+            reported_user_id: a.reported_user_id,
             content_type: 'message',
             content_id: a.chat_id,
             reason: a.reason,
