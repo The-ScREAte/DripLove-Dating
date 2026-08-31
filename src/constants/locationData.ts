@@ -1166,6 +1166,523 @@ export const locationData: Record<string, CountryData> = {
       { name: 'Sidi Kacem', latitude: 34.2256, longitude: -5.7081, population: 80000 },
       { name: 'Taroudant', latitude: 30.4703, longitude: -8.8767, population: 80000 }
     ]
+  },
+
+  india: {
+    name: 'India',
+    code: 'IN',
+    continent: 'Asia',
+    currency: 'INR',
+    phoneCode: '+91',
+    majorCities: [
+      { name: 'Mumbai', state: 'Maharashtra', latitude: 19.0760, longitude: 72.8777, population: 20400000 },
+      { name: 'Delhi', state: 'Delhi', latitude: 28.7041, longitude: 77.1025, population: 30300000 },
+      { name: 'Bangalore', state: 'Karnataka', latitude: 12.9716, longitude: 77.5946, population: 12300000 },
+      { name: 'Hyderabad', state: 'Telangana', latitude: 17.3850, longitude: 78.4867, population: 10000000 },
+      { name: 'Chennai', state: 'Tamil Nadu', latitude: 13.0827, longitude: 80.2707, population: 10900000 },
+      { name: 'Kolkata', state: 'West Bengal', latitude: 22.5726, longitude: 88.3639, population: 14900000 },
+      { name: 'Pune', state: 'Maharashtra', latitude: 18.5204, longitude: 73.8567, population: 6600000 },
+      { name: 'Ahmedabad', state: 'Gujarat', latitude: 23.0225, longitude: 72.5714, population: 8400000 },
+      { name: 'Jaipur', state: 'Rajasthan', latitude: 26.9124, longitude: 75.7873, population: 3900000 },
+      { name: 'Surat', state: 'Gujarat', latitude: 21.1702, longitude: 72.8311, population: 6900000 },
+      { name: 'Lucknow', state: 'Uttar Pradesh', latitude: 26.8467, longitude: 80.9462, population: 3700000 },
+      { name: 'Kochi', state: 'Kerala', latitude: 9.9312, longitude: 76.2673, population: 2100000 }
+    ]
+  },
+
+  pakistan: {
+    name: 'Pakistan',
+    code: 'PK',
+    continent: 'Asia',
+    currency: 'PKR',
+    phoneCode: '+92',
+    majorCities: [
+      { name: 'Karachi', latitude: 24.8607, longitude: 67.0011, population: 16000000 },
+      { name: 'Lahore', latitude: 31.5497, longitude: 74.3436, population: 13000000 },
+      { name: 'Islamabad', latitude: 33.6844, longitude: 73.0479, population: 1100000 },
+      { name: 'Rawalpindi', latitude: 33.5651, longitude: 73.0169, population: 2100000 },
+      { name: 'Faisalabad', latitude: 31.4504, longitude: 73.1350, population: 3200000 },
+      { name: 'Peshawar', latitude: 34.0151, longitude: 71.5249, population: 1970000 }
+    ]
+  },
+
+  bangladesh: {
+    name: 'Bangladesh',
+    code: 'BD',
+    continent: 'Asia',
+    currency: 'BDT',
+    phoneCode: '+880',
+    majorCities: [
+      { name: 'Dhaka', latitude: 23.8103, longitude: 90.4125, population: 21000000 },
+      { name: 'Chittagong', latitude: 22.3569, longitude: 91.7832, population: 5200000 },
+      { name: 'Khulna', latitude: 22.8456, longitude: 89.5403, population: 1500000 },
+      { name: 'Rajshahi', latitude: 24.3745, longitude: 88.6042, population: 900000 }
+    ]
+  },
+
+  philippines: {
+    name: 'Philippines',
+    code: 'PH',
+    continent: 'Asia',
+    currency: 'PHP',
+    phoneCode: '+63',
+    majorCities: [
+      { name: 'Manila', latitude: 14.5995, longitude: 120.9842, population: 13900000 },
+      { name: 'Quezon City', latitude: 14.6760, longitude: 121.0437, population: 2960000 },
+      { name: 'Davao City', latitude: 7.1907, longitude: 125.4553, population: 1770000 },
+      { name: 'Cebu City', latitude: 10.3157, longitude: 123.8854, population: 960000 }
+    ]
+  },
+
+  indonesia: {
+    name: 'Indonesia',
+    code: 'ID',
+    continent: 'Asia',
+    currency: 'IDR',
+    phoneCode: '+62',
+    majorCities: [
+      { name: 'Jakarta', latitude: -6.2088, longitude: 106.8456, population: 10600000 },
+      { name: 'Surabaya', latitude: -7.2575, longitude: 112.7521, population: 2900000 },
+      { name: 'Bandung', latitude: -6.9175, longitude: 107.6191, population: 2500000 },
+      { name: 'Medan', latitude: 3.5952, longitude: 98.6722, population: 2400000 },
+      { name: 'Bali (Denpasar)', state: 'Bali', latitude: -8.6705, longitude: 115.2126, population: 900000 }
+    ]
+  },
+
+  malaysia: {
+    name: 'Malaysia',
+    code: 'MY',
+    continent: 'Asia',
+    currency: 'MYR',
+    phoneCode: '+60',
+    majorCities: [
+      { name: 'Kuala Lumpur', latitude: 3.1390, longitude: 101.6869, population: 1800000 },
+      { name: 'George Town', latitude: 5.4141, longitude: 100.3288, population: 800000 },
+      { name: 'Johor Bahru', latitude: 1.4927, longitude: 103.7414, population: 1800000 }
+    ]
+  },
+
+  singapore: {
+    name: 'Singapore',
+    code: 'SG',
+    continent: 'Asia',
+    currency: 'SGD',
+    phoneCode: '+65',
+    majorCities: [
+      { name: 'Singapore', latitude: 1.3521, longitude: 103.8198, population: 5700000 }
+    ]
+  },
+
+  thailand: {
+    name: 'Thailand',
+    code: 'TH',
+    continent: 'Asia',
+    currency: 'THB',
+    phoneCode: '+66',
+    majorCities: [
+      { name: 'Bangkok', latitude: 13.7563, longitude: 100.5018, population: 10700000 },
+      { name: 'Chiang Mai', latitude: 18.7883, longitude: 98.9853, population: 1200000 },
+      { name: 'Phuket', latitude: 7.8804, longitude: 98.3923, population: 420000 }
+    ]
+  },
+
+  vietnam: {
+    name: 'Vietnam',
+    code: 'VN',
+    continent: 'Asia',
+    currency: 'VND',
+    phoneCode: '+84',
+    majorCities: [
+      { name: 'Ho Chi Minh City', latitude: 10.8231, longitude: 106.6297, population: 9000000 },
+      { name: 'Hanoi', latitude: 21.0278, longitude: 105.8342, population: 8000000 },
+      { name: 'Da Nang', latitude: 16.0544, longitude: 108.2022, population: 1200000 }
+    ]
+  },
+
+  china: {
+    name: 'China',
+    code: 'CN',
+    continent: 'Asia',
+    currency: 'CNY',
+    phoneCode: '+86',
+    majorCities: [
+      { name: 'Shanghai', latitude: 31.2304, longitude: 121.4737, population: 27000000 },
+      { name: 'Beijing', latitude: 39.9042, longitude: 116.4074, population: 21500000 },
+      { name: 'Guangzhou', latitude: 23.1291, longitude: 113.2644, population: 15300000 },
+      { name: 'Shenzhen', latitude: 22.5431, longitude: 114.0579, population: 12500000 }
+    ]
+  },
+
+  japan: {
+    name: 'Japan',
+    code: 'JP',
+    continent: 'Asia',
+    currency: 'JPY',
+    phoneCode: '+81',
+    majorCities: [
+      { name: 'Tokyo', latitude: 35.6762, longitude: 139.6503, population: 14000000 },
+      { name: 'Osaka', latitude: 34.6937, longitude: 135.5023, population: 2700000 },
+      { name: 'Yokohama', latitude: 35.4437, longitude: 139.6380, population: 3700000 }
+    ]
+  },
+
+  south_korea: {
+    name: 'South Korea',
+    code: 'KR',
+    continent: 'Asia',
+    currency: 'KRW',
+    phoneCode: '+82',
+    majorCities: [
+      { name: 'Seoul', latitude: 37.5665, longitude: 126.9780, population: 9700000 },
+      { name: 'Busan', latitude: 35.1796, longitude: 129.0756, population: 3400000 },
+      { name: 'Incheon', latitude: 37.4563, longitude: 126.7052, population: 3000000 }
+    ]
+  },
+
+  uae: {
+    name: 'United Arab Emirates',
+    code: 'AE',
+    continent: 'Asia',
+    currency: 'AED',
+    phoneCode: '+971',
+    majorCities: [
+      { name: 'Dubai', latitude: 25.2048, longitude: 55.2708, population: 3400000 },
+      { name: 'Abu Dhabi', latitude: 24.4539, longitude: 54.3773, population: 1500000 },
+      { name: 'Sharjah', latitude: 25.3463, longitude: 55.4209, population: 1800000 }
+    ]
+  },
+
+  saudi_arabia: {
+    name: 'Saudi Arabia',
+    code: 'SA',
+    continent: 'Asia',
+    currency: 'SAR',
+    phoneCode: '+966',
+    majorCities: [
+      { name: 'Riyadh', latitude: 24.7136, longitude: 46.6753, population: 7600000 },
+      { name: 'Jeddah', latitude: 21.4858, longitude: 39.1925, population: 4700000 },
+      { name: 'Mecca', latitude: 21.3891, longitude: 39.8579, population: 2400000 }
+    ]
+  },
+
+  turkey: {
+    name: 'Turkey',
+    code: 'TR',
+    continent: 'Asia',
+    currency: 'TRY',
+    phoneCode: '+90',
+    majorCities: [
+      { name: 'Istanbul', latitude: 41.0082, longitude: 28.9784, population: 15500000 },
+      { name: 'Ankara', latitude: 39.9334, longitude: 32.8597, population: 5700000 },
+      { name: 'Izmir', latitude: 38.4237, longitude: 27.1428, population: 4400000 }
+    ]
+  },
+
+  brazil: {
+    name: 'Brazil',
+    code: 'BR',
+    continent: 'South America',
+    currency: 'BRL',
+    phoneCode: '+55',
+    majorCities: [
+      { name: 'São Paulo', latitude: -23.5505, longitude: -46.6333, population: 12300000 },
+      { name: 'Rio de Janeiro', latitude: -22.9068, longitude: -43.1729, population: 6700000 },
+      { name: 'Brasília', latitude: -15.8267, longitude: -47.9218, population: 3100000 },
+      { name: 'Salvador', latitude: -12.9777, longitude: -38.5016, population: 2900000 }
+    ]
+  },
+
+  mexico: {
+    name: 'Mexico',
+    code: 'MX',
+    continent: 'North America',
+    currency: 'MXN',
+    phoneCode: '+52',
+    majorCities: [
+      { name: 'Mexico City', latitude: 19.4326, longitude: -99.1332, population: 9200000 },
+      { name: 'Guadalajara', latitude: 20.6597, longitude: -103.3496, population: 1500000 },
+      { name: 'Monterrey', latitude: 25.6866, longitude: -100.3161, population: 1140000 },
+      { name: 'Cancún', latitude: 21.1619, longitude: -86.8515, population: 890000 }
+    ]
+  },
+
+  argentina: {
+    name: 'Argentina',
+    code: 'AR',
+    continent: 'South America',
+    currency: 'ARS',
+    phoneCode: '+54',
+    majorCities: [
+      { name: 'Buenos Aires', latitude: -34.6037, longitude: -58.3816, population: 3000000 },
+      { name: 'Córdoba', latitude: -31.4201, longitude: -64.1888, population: 1500000 },
+      { name: 'Rosario', latitude: -32.9468, longitude: -60.6393, population: 1300000 }
+    ]
+  },
+
+  colombia: {
+    name: 'Colombia',
+    code: 'CO',
+    continent: 'South America',
+    currency: 'COP',
+    phoneCode: '+57',
+    majorCities: [
+      { name: 'Bogotá', latitude: 4.7110, longitude: -74.0721, population: 7400000 },
+      { name: 'Medellín', latitude: 6.2442, longitude: -75.5812, population: 2500000 },
+      { name: 'Cali', latitude: 3.4516, longitude: -76.5320, population: 2200000 }
+    ]
+  },
+
+  jamaica: {
+    name: 'Jamaica',
+    code: 'JM',
+    continent: 'North America',
+    currency: 'JMD',
+    phoneCode: '+1876',
+    majorCities: [
+      { name: 'Kingston', latitude: 17.9712, longitude: -76.7930, population: 590000 },
+      { name: 'Montego Bay', latitude: 18.4762, longitude: -77.8939, population: 110000 }
+    ]
+  },
+
+  spain: {
+    name: 'Spain',
+    code: 'ES',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+34',
+    majorCities: [
+      { name: 'Madrid', latitude: 40.4168, longitude: -3.7038, population: 3300000 },
+      { name: 'Barcelona', latitude: 41.3874, longitude: 2.1686, population: 1600000 },
+      { name: 'Valencia', latitude: 39.4699, longitude: -0.3763, population: 800000 }
+    ]
+  },
+
+  italy: {
+    name: 'Italy',
+    code: 'IT',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+39',
+    majorCities: [
+      { name: 'Rome', latitude: 41.9028, longitude: 12.4964, population: 2870000 },
+      { name: 'Milan', latitude: 45.4642, longitude: 9.1900, population: 1400000 },
+      { name: 'Naples', latitude: 40.8518, longitude: 14.2681, population: 970000 }
+    ]
+  },
+
+  netherlands: {
+    name: 'Netherlands',
+    code: 'NL',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+31',
+    majorCities: [
+      { name: 'Amsterdam', latitude: 52.3676, longitude: 4.9041, population: 870000 },
+      { name: 'Rotterdam', latitude: 51.9244, longitude: 4.4777, population: 650000 },
+      { name: 'The Hague', latitude: 52.0705, longitude: 4.3007, population: 550000 }
+    ]
+  },
+
+  portugal: {
+    name: 'Portugal',
+    code: 'PT',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+351',
+    majorCities: [
+      { name: 'Lisbon', latitude: 38.7223, longitude: -9.1393, population: 545000 },
+      { name: 'Porto', latitude: 41.1579, longitude: -8.6291, population: 240000 }
+    ]
+  },
+
+  poland: {
+    name: 'Poland',
+    code: 'PL',
+    continent: 'Europe',
+    currency: 'PLN',
+    phoneCode: '+48',
+    majorCities: [
+      { name: 'Warsaw', latitude: 52.2297, longitude: 21.0122, population: 1800000 },
+      { name: 'Kraków', latitude: 50.0647, longitude: 19.9450, population: 780000 }
+    ]
+  },
+
+  sweden: {
+    name: 'Sweden',
+    code: 'SE',
+    continent: 'Europe',
+    currency: 'SEK',
+    phoneCode: '+46',
+    majorCities: [
+      { name: 'Stockholm', latitude: 59.3293, longitude: 18.0686, population: 980000 },
+      { name: 'Gothenburg', latitude: 57.7089, longitude: 11.9746, population: 580000 }
+    ]
+  },
+
+  norway: {
+    name: 'Norway',
+    code: 'NO',
+    continent: 'Europe',
+    currency: 'NOK',
+    phoneCode: '+47',
+    majorCities: [
+      { name: 'Oslo', latitude: 59.9139, longitude: 10.7522, population: 700000 },
+      { name: 'Bergen', latitude: 60.3913, longitude: 5.3221, population: 285000 }
+    ]
+  },
+
+  denmark: {
+    name: 'Denmark',
+    code: 'DK',
+    continent: 'Europe',
+    currency: 'DKK',
+    phoneCode: '+45',
+    majorCities: [
+      { name: 'Copenhagen', latitude: 55.6761, longitude: 12.5683, population: 800000 },
+      { name: 'Aarhus', latitude: 56.1629, longitude: 10.2039, population: 285000 }
+    ]
+  },
+
+  ireland: {
+    name: 'Ireland',
+    code: 'IE',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+353',
+    majorCities: [
+      { name: 'Dublin', latitude: 53.3498, longitude: -6.2603, population: 1200000 },
+      { name: 'Cork', latitude: 51.8985, longitude: -8.4756, population: 220000 }
+    ]
+  },
+
+  switzerland: {
+    name: 'Switzerland',
+    code: 'CH',
+    continent: 'Europe',
+    currency: 'CHF',
+    phoneCode: '+41',
+    majorCities: [
+      { name: 'Zurich', latitude: 47.3769, longitude: 8.5417, population: 430000 },
+      { name: 'Geneva', latitude: 46.2044, longitude: 6.1432, population: 200000 }
+    ]
+  },
+
+  belgium: {
+    name: 'Belgium',
+    code: 'BE',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+32',
+    majorCities: [
+      { name: 'Brussels', latitude: 50.8503, longitude: 4.3517, population: 1200000 },
+      { name: 'Antwerp', latitude: 51.2194, longitude: 4.4025, population: 530000 }
+    ]
+  },
+
+  austria: {
+    name: 'Austria',
+    code: 'AT',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+43',
+    majorCities: [
+      { name: 'Vienna', latitude: 48.2082, longitude: 16.3738, population: 1900000 },
+      { name: 'Graz', latitude: 47.0707, longitude: 15.4395, population: 290000 }
+    ]
+  },
+
+  greece: {
+    name: 'Greece',
+    code: 'GR',
+    continent: 'Europe',
+    currency: 'EUR',
+    phoneCode: '+30',
+    majorCities: [
+      { name: 'Athens', latitude: 37.9838, longitude: 23.7275, population: 660000 },
+      { name: 'Thessaloniki', latitude: 40.6401, longitude: 22.9444, population: 320000 }
+    ]
+  },
+
+  russia: {
+    name: 'Russia',
+    code: 'RU',
+    continent: 'Europe',
+    currency: 'RUB',
+    phoneCode: '+7',
+    majorCities: [
+      { name: 'Moscow', latitude: 55.7558, longitude: 37.6173, population: 12500000 },
+      { name: 'Saint Petersburg', latitude: 59.9311, longitude: 30.3609, population: 5400000 }
+    ]
+  },
+
+  new_zealand: {
+    name: 'New Zealand',
+    code: 'NZ',
+    continent: 'Oceania',
+    currency: 'NZD',
+    phoneCode: '+64',
+    majorCities: [
+      { name: 'Auckland', latitude: -36.8485, longitude: 174.7633, population: 1650000 },
+      { name: 'Wellington', latitude: -41.2865, longitude: 174.7762, population: 420000 }
+    ]
+  },
+
+  zambia: {
+    name: 'Zambia',
+    code: 'ZM',
+    continent: 'Africa',
+    currency: 'ZMW',
+    phoneCode: '+260',
+    majorCities: [
+      { name: 'Lusaka', latitude: -15.3875, longitude: 28.3228, population: 2500000 },
+      { name: 'Kitwe', latitude: -12.8024, longitude: 28.2132, population: 700000 }
+    ]
+  },
+
+  zimbabwe: {
+    name: 'Zimbabwe',
+    code: 'ZW',
+    continent: 'Africa',
+    currency: 'ZWL',
+    phoneCode: '+263',
+    majorCities: [
+      { name: 'Harare', latitude: -17.8292, longitude: 31.0522, population: 1600000 },
+      { name: 'Bulawayo', latitude: -20.1500, longitude: 28.5833, population: 650000 }
+    ]
+  },
+
+  botswana: {
+    name: 'Botswana',
+    code: 'BW',
+    continent: 'Africa',
+    currency: 'BWP',
+    phoneCode: '+267',
+    majorCities: [
+      { name: 'Gaborone', latitude: -24.6282, longitude: 25.9231, population: 260000 }
+    ]
+  },
+
+  rwanda: {
+    name: 'Rwanda',
+    code: 'RW',
+    continent: 'Africa',
+    currency: 'RWF',
+    phoneCode: '+250',
+    majorCities: [
+      { name: 'Kigali', latitude: -1.9706, longitude: 30.1044, population: 1300000 }
+    ]
+  },
+
+  cameroon: {
+    name: 'Cameroon',
+    code: 'CM',
+    continent: 'Africa',
+    currency: 'XAF',
+    phoneCode: '+237',
+    majorCities: [
+      { name: 'Douala', latitude: 4.0511, longitude: 9.7679, population: 3600000 },
+      { name: 'Yaoundé', latitude: 3.8480, longitude: 11.5021, population: 4100000 }
+    ]
   }
 };
 
