@@ -218,18 +218,32 @@ export default function BroadcastNotifications() {
   const loadCountries = async () => {
     setIsLoadingCountries(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('country, id')
-        .not('country', 'is', null)
-        .eq('is_admin', false);
+      // Paginated - a plain .select() here silently caps at Supabase's
+      // default 1000-row limit, which undercounted every country's badge
+      // once the profiles table grew past that.
+      const PAGE_SIZE = 1000;
+      const allProfiles: { country: string | null; id: string }[] = [];
+      for (let page = 0; ; page++) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data: pageRows, error } = await supabase
+          .from('profiles')
+          .select('country, id')
+          .not('country', 'is', null)
+          .eq('is_admin', false)
+          .order('id')
+          .range(from, to);
 
-      if (error) throw error;
+        if (error) throw error;
+        if (!pageRows || pageRows.length === 0) break;
+        allProfiles.push(...pageRows);
+        if (pageRows.length < PAGE_SIZE) break;
+      }
 
       const countryMap = new Map<string, number>();
-      data?.forEach((profile) => {
-        const count = countryMap.get(profile.country) || 0;
-        countryMap.set(profile.country, count + 1);
+      allProfiles.forEach((profile) => {
+        const count = countryMap.get(profile.country as string) || 0;
+        countryMap.set(profile.country as string, count + 1);
       });
 
       const countryList: Country[] = Array.from(countryMap.entries())
