@@ -13,6 +13,9 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '@/hooks/use-toast';
 import { getCountriesList } from '@/constants/locationData';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+// Lazy, not a static import: PhotoCropModal needs its own isolated build
+// chunk (see vite.config.ts) to avoid a circular-chunk crash.
+const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 
 
 interface UserProfileModalProps {
@@ -32,6 +35,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   const [loading, setLoading] = useState(true);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [croppingImageUrl, setCroppingImageUrl] = useState<string | null>(null);
   
   // Admin editing state
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
@@ -302,18 +306,28 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                     onClick={() => handleImageClick(0)}
                   />
                   {isAdmin && (
-                    <button
-                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow hover:bg-red-700 focus:outline-none flex items-center justify-center"
-                      title="Delete image"
-                      onClick={() => handleDeleteImage(userImages[0], 0)}
-                      disabled={deletingImageIndex === 0}
-                    >
-                      {deletingImageIndex === 0 ? (
-                        <span className="w-4 h-4">...</span>
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
+                    <>
+                      <button
+                        className="absolute top-1 left-1 bg-pink-600 text-white rounded-full p-1 shadow hover:bg-pink-700 focus:outline-none flex items-center justify-center"
+                        title="Crop photo"
+                        onClick={() => setCroppingImageUrl(userImages[0])}
+                        disabled={deletingImageIndex === 0}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow hover:bg-red-700 focus:outline-none flex items-center justify-center"
+                        title="Delete image"
+                        onClick={() => handleDeleteImage(userImages[0], 0)}
+                        disabled={deletingImageIndex === 0}
+                      >
+                        {deletingImageIndex === 0 ? (
+                          <span className="w-4 h-4">...</span>
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </>
                   )}
                 </div>
               ) : (
@@ -646,18 +660,28 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                             onClick={() => handleImageClick(index)}
                           />
                           {isAdmin && (
-                            <button
-                              className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 shadow hover:bg-red-700 focus:outline-none opacity-80 group-hover:opacity-100 flex items-center justify-center"
-                              title="Delete image"
-                              onClick={() => handleDeleteImage(image, index)}
-                              disabled={deletingImageIndex === index}
-                            >
-                              {deletingImageIndex === index ? (
-                                <span className="w-4 h-4">...</span>
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
+                            <div className="absolute top-1 right-1 flex gap-1 opacity-80 group-hover:opacity-100">
+                              <button
+                                className="bg-pink-600 text-white rounded-full p-1 shadow hover:bg-pink-700 focus:outline-none flex items-center justify-center"
+                                title="Crop photo"
+                                onClick={() => setCroppingImageUrl(image)}
+                                disabled={deletingImageIndex === index}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                className="bg-red-600 text-white rounded-full p-1 shadow hover:bg-red-700 focus:outline-none flex items-center justify-center"
+                                title="Delete image"
+                                onClick={() => handleDeleteImage(image, index)}
+                                disabled={deletingImageIndex === index}
+                              >
+                                {deletingImageIndex === index ? (
+                                  <span className="w-4 h-4">...</span>
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -876,6 +900,20 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         images={userImages}
         initialIndex={selectedImageIndex}
       />
+
+      {croppingImageUrl && (
+        <React.Suspense fallback={null}>
+          <PhotoCropModal
+            imageUrl={croppingImageUrl}
+            userId={userId}
+            onClose={() => setCroppingImageUrl(null)}
+            onSaved={() => {
+              setCroppingImageUrl(null);
+              fetchUserImages();
+            }}
+          />
+        </React.Suspense>
+      )}
     </>
   );
 };
