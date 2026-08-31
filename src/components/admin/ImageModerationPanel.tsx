@@ -67,7 +67,12 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
-  const [croppingImage, setCroppingImage] = useState<{ userId: string; url: string } | null>(null);
+  // reportedImageId is set only when cropping was opened from the Reported
+  // Images tab - that table keeps its own frozen image_url snapshot from
+  // report time (not a live reference to user_images), so uploadCroppedPhoto
+  // updating user_images alone leaves this tab's own thumbnail looking
+  // unchanged after a "successful" crop. See onSaved below.
+  const [croppingImage, setCroppingImage] = useState<{ userId: string; url: string; reportedImageId?: string } | null>(null);
   const { toast } = useToast();
   
   // Get current admin user for push notifications
@@ -477,7 +482,18 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
             imageUrl={croppingImage.url}
             userId={croppingImage.userId}
             onClose={() => setCroppingImage(null)}
-            onSaved={() => {
+            onSaved={async (newUrl) => {
+              // uploadCroppedPhoto only repoints the live user_images row.
+              // reported_images.image_url is its own frozen snapshot from
+              // report time, so it has to be updated here too, or this tab's
+              // thumbnail keeps showing the pre-crop photo forever.
+              if (croppingImage.reportedImageId) {
+                const { error } = await supabase
+                  .from('reported_images')
+                  .update({ image_url: newUrl })
+                  .eq('id', croppingImage.reportedImageId);
+                if (error) console.error('Error updating reported_images snapshot:', error);
+              }
               setCroppingImage(null);
               fetchPendingImages();
               fetchReportedImages();
@@ -683,7 +699,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                               variant="outline"
                               className="h-7 w-7"
                               title="Crop photo"
-                              onClick={() => setCroppingImage({ userId: report.reported_user_id, url: report.image_url })}
+                              onClick={() => setCroppingImage({ userId: report.reported_user_id, url: report.image_url, reportedImageId: report.id })}
                               disabled={processingReports[report.id]}
                             >
                               <Pencil className="w-3.5 h-3.5" />
