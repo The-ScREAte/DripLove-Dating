@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera } from 'lucide-react';
+import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil } from 'lucide-react';
+const PhotoCropModal = lazy(() => import('@/components/profile/PhotoCropModal'));
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -565,6 +566,18 @@ const ProfileCompletionPage = () => {
       URL.revokeObjectURL(preview);
       return updated;
     });
+  };
+
+  const [croppingImage, setCroppingImage] = useState<{ preview: string } | null>(null);
+
+  const handleCroppedImage = ({ blob, previewUrl, originalUrl }: { blob: Blob; previewUrl: string; originalUrl: string }) => {
+    setImages(prev => prev.map(img => {
+      if (img.preview !== originalUrl) return img;
+      URL.revokeObjectURL(img.preview);
+      const croppedFile = new File([blob], img.file?.name || 'cropped.jpg', { type: 'image/jpeg' });
+      return { ...img, file: croppedFile, preview: previewUrl };
+    }));
+    setCroppingImage(null);
   };
 
   const renderImageStatus = (image: ImageUpload) => {
@@ -1323,21 +1336,43 @@ const ProfileCompletionPage = () => {
                               alt={`Upload ${index + 1}`}
                               className="w-full h-28 object-cover rounded-lg"
                             />
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              className="absolute top-2 right-2 h-6 w-6 p-0"
-                              onClick={() => removeImage(image.preview)}
-                            >
-                              ×
-                            </Button>
+                            <div className="absolute top-2 right-2 flex gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => setCroppingImage({ preview: image.preview })}
+                                className="h-6 w-6 p-0 bg-pink-600 hover:bg-pink-700 rounded-full shadow-md"
+                                title="Crop photo"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className="h-6 w-6 p-0"
+                                onClick={() => removeImage(image.preview)}
+                              >
+                                ×
+                              </Button>
+                            </div>
                             {renderImageStatus(image)}
                           </div>
                         ))}
                       </div>
                     )}
-                    
+
+                    {croppingImage && (
+                      <Suspense fallback={null}>
+                        <PhotoCropModal
+                          imageUrl={croppingImage.preview}
+                          userId={user?.id || ''}
+                          onClose={() => setCroppingImage(null)}
+                          onApply={handleCroppedImage}
+                        />
+                      </Suspense>
+                    )}
+
                     {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
                   </div>
 

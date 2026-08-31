@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera } from 'lucide-react';
+import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil } from 'lucide-react';
+const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
@@ -460,6 +461,18 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       URL.revokeObjectURL(preview);
       return updated;
     });
+  };
+
+  const [croppingImage, setCroppingImage] = useState<{ preview: string } | null>(null);
+
+  const handleCroppedImage = ({ blob, previewUrl, originalUrl }: { blob: Blob; previewUrl: string; originalUrl: string }) => {
+    setImages(prev => prev.map(img => {
+      if (img.preview !== originalUrl) return img;
+      URL.revokeObjectURL(img.preview);
+      const croppedFile = new File([blob], img.file.name, { type: 'image/jpeg' });
+      return { ...img, file: croppedFile, preview: previewUrl };
+    }));
+    setCroppingImage(null);
   };
 
   const renderImageStatus = (image: ImageUpload) => {
@@ -1132,19 +1145,41 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                           className="w-full h-28 object-cover rounded-lg shadow-sm"
                         />
                         {renderImageStatus(image)}
-                        
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 h-8 w-8"
-                          onClick={() => removeImage(image.preview)}
-                        >
-                          ×
-                        </Button>
+
+                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setCroppingImage({ preview: image.preview })}
+                            className="p-0 h-8 w-8 bg-pink-600 hover:bg-pink-700 rounded-full shadow-md"
+                            title="Crop photo"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="p-1 h-8 w-8"
+                            onClick={() => removeImage(image.preview)}
+                          >
+                            ×
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
+                )}
+
+                {croppingImage && (
+                  <React.Suspense fallback={null}>
+                    <PhotoCropModal
+                      imageUrl={croppingImage.preview}
+                      userId=""
+                      onClose={() => setCroppingImage(null)}
+                      onApply={handleCroppedImage}
+                    />
+                  </React.Suspense>
                 )}
 
                 {promoCodeEnabled && (

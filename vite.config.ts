@@ -197,6 +197,17 @@ export default defineConfig(({ mode }) => ({
             return 'admin-tools';
           }
           
+          // PhotoCropModal is now lazy-imported from RegistrationForm/
+          // ProfileCompletionPage, which aren't otherwise chunked (they load
+          // eagerly, pre-auth). Lumping it into 'profile-tools' pulled that
+          // chunk's existing circular dependency (profile-tools <-> discover-
+          // tools <-> profile-page <-> react-libs) into the eager load path,
+          // producing a real "Cannot access 'a' before initialization" crash
+          // on first paint - giving it its own isolated chunk breaks that.
+          if (id.includes('/src/components/profile/PhotoCropModal')) {
+            return 'photo-crop-modal';
+          }
+
           // Profile sub-components
           if (id.includes('/src/components/profile/')) {
             return 'profile-tools';
