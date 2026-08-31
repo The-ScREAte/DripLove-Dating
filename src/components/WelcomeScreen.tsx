@@ -228,7 +228,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           width="160"
           height="128"
         />
-        <p className="text-base sm:text-xl text-white font-semibold text-center break-words px-2">{t('welcome.tagline')}</p>
+        <p
+          className="font-brush font-bold text-white text-center break-words px-2"
+          style={{ fontSize: 'clamp(20px, 5.5vw, 30px)' }}
+        >
+          {t('welcome.tagline')}
+        </p>
         <p className="text-lg sm:text-2xl text-white/95 text-center break-words mt-1 font-bold tracking-wide px-2" 
            style={{ 
              fontFamily: 'cursive, serif',
