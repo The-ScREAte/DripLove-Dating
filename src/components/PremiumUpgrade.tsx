@@ -104,6 +104,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   
   // Enhanced subscription status monitoring
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
+  // Read inside the long-lived IAP store listener below via a ref, same pattern
+  // as canBuyRef/googleCanBuyRef, since that effect only runs once on mount.
+  const refetchSubscriptionRef = useRef(refetchSubscription);
+  React.useEffect(() => {
+    refetchSubscriptionRef.current = refetchSubscription;
+  }, [refetchSubscription]);
 
   const deviceIsNative = isNativeApp();
   const deviceIsAndroid = isAndroid();
@@ -139,10 +145,22 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     function onVerified(r?: unknown) {
       const productId = getProductId(r)
       const isOurProduct = productId === 'com.driplove.dating.premium.monthlysub2' ||
-        productId === 'com.driplove.dating.premium.monthlysub3';
+        productId === 'com.driplove.dating.premium.monthlysub3' ||
+        productId === 'premium_monthly';
       if (isOurProduct) {
+        // Covers both Apple and Google purchases - previously only reset the
+        // Apple loading flag, so a real successful Google Play purchase left
+        // the "Processing..." spinner stuck on and the modal open until the
+        // user manually dismissed it.
         setIapLoading(false);
+        setGoogleIapLoading(false);
         setShowPaymentOptions(false);
+        // The receipt/purchase validator (iap-receipt-validator or
+        // google-iap-validator) writes user_subscriptions under the service
+        // role, which useEnhancedSubscription's 5-minute poll would
+        // eventually pick up on its own - refetch immediately instead so the
+        // premium gate flips right away rather than staying stale.
+        refetchSubscriptionRef.current?.();
       }
     }
 
@@ -531,6 +549,46 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     { name: t('premium.features.unlockCountries.name'), free: t('premium.features.unlockCountries.free'), premium: t('premium.features.unlockCountries.premium'), icon: Globe },
     { name: t('premium.features.prioritySupport.name'), free: t('premium.features.prioritySupport.free'), premium: t('premium.features.prioritySupport.premium'), icon: Crown },
   ], [t]);
+
+  // Defense-in-depth: every screen that opens this component already checks
+  // isPremium before doing so, but this component's own isPremium could still
+  // flip true *while mounted* - right after a purchase completes (via the
+  // refetch above) or after the stale-state window closes on its own. Without
+  // this, a user could sit on the purchase screen and tap an option again
+  // during that window. Once premium is confirmed, show that instead of ever
+  // rendering the payment options again.
+  if (!subscriptionLoading && isPremium && !showPaymentModal) {
+    return (
+      <div
+        className="h-full w-full flex items-center justify-center overflow-y-auto px-4"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(20,10,20,0.92))',
+          paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
+          minHeight: '100%',
+        }}
+      >
+        <div className="max-w-sm w-full text-center py-10">
+          <Crown className="w-14 h-14 mx-auto mb-4 text-yellow-400" />
+          <h2 className="text-xl font-bold text-white mb-2">
+            {t('premium.alreadyPremium.title', "You're Already Premium!")}
+          </h2>
+          <p className="text-gray-400 text-sm mb-6">
+            {subscriptionStatus?.expires_at
+              ? t('premium.alreadyPremium.subtitleWithDate', 'Your plan is active until {{date}}.', {
+                  date: new Date(subscriptionStatus.expires_at).toLocaleDateString(),
+                })
+              : t('premium.alreadyPremium.subtitle', 'Your plan is active - enjoy all the premium features.')}
+          </p>
+          <Button
+            onClick={() => (onClose ? onClose() : window.history.back())}
+            className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold px-8"
+          >
+            {t('premium.back', 'Back')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
   <div

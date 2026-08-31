@@ -173,16 +173,24 @@ serve(async (req) => {
       }
     }
 
-    const expiry = addDays(new Date(), 30)
-
     // Find existing subscription row
     const { data: existing } = await supabase
       .from('user_subscriptions')
-      .select('id, provider_transaction_id, payment_method')
+      .select('id, provider_transaction_id, payment_method, expires_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    // If the user is already premium (e.g. paying again while a subscription
+    // is still active), extend from their current expiry rather than resetting
+    // to "now + 30 days" - matching paystack-webhook's behavior. Otherwise this
+    // could shorten an already-active subscription for anyone with more than
+    // 30 days left, and it always double-counts the days already paid for.
+    const expiry =
+      existing?.expires_at && new Date(existing.expires_at) > new Date()
+        ? addDays(new Date(existing.expires_at), 30)
+        : addDays(new Date(), 30)
 
     const updateBase: Record<string, unknown> = {
       plan_name: 'premium',
