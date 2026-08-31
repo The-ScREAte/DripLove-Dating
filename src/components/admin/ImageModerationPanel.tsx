@@ -5,10 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User, Pencil } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import ImageViewer from '@/components/ImageViewer';
 import { getRawStorageUrl } from '@/utils/imageOptimizer';
+// Lazy, not a static import: PhotoCropModal needs its own isolated build
+// chunk (see vite.config.ts) to avoid a circular-chunk crash with this
+// component's own 'admin-tools' chunk.
+const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 
 interface PendingImage {
   id: string;
@@ -63,6 +67,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
+  const [croppingImage, setCroppingImage] = useState<{ userId: string; url: string } | null>(null);
   const { toast } = useToast();
   
   // Get current admin user for push notifications
@@ -466,6 +471,21 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
         initialIndex={viewerInitialIndex}
       />
 
+      {croppingImage && (
+        <React.Suspense fallback={null}>
+          <PhotoCropModal
+            imageUrl={croppingImage.url}
+            userId={croppingImage.userId}
+            onClose={() => setCroppingImage(null)}
+            onSaved={() => {
+              setCroppingImage(null);
+              fetchPendingImages();
+              fetchReportedImages();
+            }}
+          />
+        </React.Suspense>
+      )}
+
       <Tabs defaultValue="pending" className="w-full">
         <TabsList className="grid w-full grid-cols-2 h-9">
           <TabsTrigger value="pending" className="flex items-center gap-2 text-xs">
@@ -538,6 +558,16 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                               <Eye className="w-3 h-3" />
                             </Button>
                           )}
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-6 w-6"
+                            title="Crop photo"
+                            onClick={() => setCroppingImage({ userId: image.user_id, url: image.image_url })}
+                            disabled={approvingImages[image.id] || rejectingImages[image.id]}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
                           <Button
                             size="icon"
                             className="bg-green-600 hover:bg-green-700 h-6 w-6"
@@ -648,6 +678,16 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                                 <Eye className="w-3.5 h-3.5" />
                               </Button>
                             )}
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-7 w-7"
+                              title="Crop photo"
+                              onClick={() => setCroppingImage({ userId: report.reported_user_id, url: report.image_url })}
+                              disabled={processingReports[report.id]}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="outline"
