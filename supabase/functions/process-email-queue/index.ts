@@ -1,148 +1,27 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import nodemailer from 'npm:nodemailer@6.9.14';
+import {
+  DEFAULT_BATCH_SIZE,
+  DEFAULT_BATCH_DELAY_MS,
+  DAILY_LIMIT_PER_ACCOUNT,
+  MAX_SEND_ATTEMPTS,
+  SmtpAccount,
+  isTemporaryError,
+  isPermanentEmailError,
+  htmlToText,
+  normalizeBodyHtml,
+  buildDripLoveHtml,
+  getErrorMessage,
+  loadAccounts,
+} from '../_shared/email-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DEFAULT_BATCH_SIZE = 15;
-const DEFAULT_BATCH_DELAY_MS = 500;
-const DAILY_LIMIT_PER_ACCOUNT = 450;
 const MAX_QUEUE_ROWS_PER_RUN = 2000; // Safety cap per cron tick.
-
-interface SmtpAccount {
-  email: string;
-  pass: string;
-  fromName: string | null;
-}
-
-const isQuotaError = (message: string): boolean => {
-  const m = message.toLowerCase();
-  return m.includes('limit') || m.includes('quota') || m.includes('5.4.5') || m.includes('too many login attempts');
-};
-
-// Permanent (hard bounce) vs transient: only permanent failures get the recipient
-// suppressed from all future broadcasts. A quota error is the SENDING account's
-// fault, never the recipient's, so isQuotaError is always checked first by callers.
-const isPermanentEmailError = (message: string): boolean => {
-  const m = message.toLowerCase();
-  const codeMatch = m.match(/\b([45]\d{2})\b/);
-  if (codeMatch) return codeMatch[1].startsWith('5');
-  return (
-    m.includes('no such user') ||
-    m.includes('user unknown') ||
-    m.includes('does not exist') ||
-    m.includes('mailbox unavailable') ||
-    m.includes('mailbox not found') ||
-    m.includes('invalid recipient') ||
-    m.includes('recipient rejected') ||
-    m.includes('address rejected') ||
-    m.includes('no mailbox') ||
-    m.includes('unrouteable address')
-  );
-};
-
-const htmlToText = (html: string): string =>
-  String(html || '')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const normalizeBodyHtml = (html: string): string => {
-  const value = String(html || '').trim();
-  if (!value) return '';
-  const bodyMatch = value.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  return bodyMatch ? bodyMatch[1].trim() : value;
-};
-
-const buildDripLoveHtml = (subject: string, htmlContent: string): string => {
-  const bodyContent = normalizeBodyHtml(htmlContent);
-  const previewText = subject ? String(subject).trim() : 'A new message from DripLove';
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${previewText}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#f7f7f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${previewText}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f7f7f7;padding:24px 12px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-          <tr>
-            <td style="padding:16px 20px;border-bottom:1px solid #e5e7eb;background:#ffffff;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="vertical-align:middle;width:40px;">
-                    <img src="https://www.driplove.love/driplove-logo.png" alt="DripLove" width="32" height="32" style="display:block;border-radius:8px;border:0;">
-                  </td>
-                  <td style="vertical-align:middle;padding-left:10px;">
-                    <div style="font-size:16px;font-weight:700;line-height:1.3;color:#111827;">DripLove</div>
-                    <div style="font-size:12px;line-height:1.5;color:#6b7280;">Official account update</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:22px 20px 14px 20px;font-size:15px;line-height:1.7;color:#1f2937;">
-              ${bodyContent}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 20px 18px 20px;font-size:12px;line-height:1.6;color:#6b7280;">
-              <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">Connect with DripLove</div>
-              <div>
-                <a href="https://www.instagram.com/driplove_official?utm_source=qr" style="color:#0b5cff;text-decoration:none;">Instagram</a>
-                <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.tiktok.com/@driplovedating?_r=1&_t=ZN-98auX3Ma9qc" style="color:#0b5cff;text-decoration:none;">TikTok</a>
-                <span style="color:#9ca3af;"> | </span>
-                <a href="https://www.facebook.com/share/1Cp18uWDZP/?mibextid=wwXIfr" style="color:#0b5cff;text-decoration:none;">Facebook</a>
-              </div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
-};
-
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  return 'Unknown SMTP error';
-};
-
-function loadAccounts(): SmtpAccount[] {
-  const accounts: SmtpAccount[] = [];
-  let index = 1;
-
-  while (true) {
-    const suffix = index === 1 ? '' : `_${index}`;
-    const email = Deno.env.get(`SMTP_USER${suffix}`);
-    const pass = Deno.env.get(`SMTP_PASS${suffix}`);
-    if (!email || !pass) break;
-
-    accounts.push({
-      email,
-      pass,
-      fromName: Deno.env.get(`EMAIL_FROM_NAME${suffix}`) || Deno.env.get('EMAIL_FROM_NAME'),
-    });
-    index += 1;
-  }
-
-  return accounts;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -168,7 +47,7 @@ serve(async (req) => {
 
     const { data: pendingRows, error: fetchError } = await supabase
       .from('email_send_queue')
-      .select('id, broadcast_id, recipient')
+      .select('id, broadcast_id, recipient, attempt_count')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
       .limit(MAX_QUEUE_ROWS_PER_RUN);
@@ -256,6 +135,7 @@ serve(async (req) => {
 
     let totalSent = 0;
     let totalFailed = 0;
+    let totalRetrying = 0;
     const newlySuppressed: Array<{ email: string; error: string; broadcastId: string }> = [];
 
     for (const { account, rows } of assignments) {
@@ -292,7 +172,7 @@ serve(async (req) => {
           })
         );
 
-        const rowUpdates: Array<{ id: string; status: 'sent' | 'failed'; error?: string }> = [];
+        const rowUpdates: Array<{ id: string; status: 'sent' | 'failed' | 'pending'; error?: string; attempt_count?: number }> = [];
 
         results.forEach((result, idx) => {
           const row = chunk[idx];
@@ -302,17 +182,32 @@ serve(async (req) => {
             totalSent += 1;
           } else {
             const message = getErrorMessage(result.reason);
-            rowUpdates.push({ id: row.id, status: 'failed', error: message });
-            failedByBroadcast.set(row.broadcast_id, (failedByBroadcast.get(row.broadcast_id) || 0) + 1);
-            totalFailed += 1;
-            if (isQuotaError(message)) {
-              // The sending account is out of quota -- not the recipient's fault.
-              hitQuota = true;
-            } else if (isPermanentEmailError(message)) {
+            const nextAttempt = (row.attempt_count || 0) + 1;
+
+            if (isPermanentEmailError(message)) {
               // Hard bounce: this address will never succeed. Suppress it from every
               // future broadcast instead of leaving it to be re-queued and re-attempted
               // forever.
+              rowUpdates.push({ id: row.id, status: 'failed', error: message, attempt_count: nextAttempt });
               newlySuppressed.push({ email: row.recipient, error: message, broadcastId: row.broadcast_id });
+              failedByBroadcast.set(row.broadcast_id, (failedByBroadcast.get(row.broadcast_id) || 0) + 1);
+              totalFailed += 1;
+            } else if (isTemporaryError(message) && nextAttempt < MAX_SEND_ATTEMPTS) {
+              // Rate-limited / temporarily rejected, and still has retries left -
+              // put it back to pending so the *next* run of this processor (once
+              // any account has quota again) picks it up automatically.
+              rowUpdates.push({ id: row.id, status: 'pending', error: message, attempt_count: nextAttempt });
+              totalRetrying += 1;
+              hitQuota = true; // Stop using this account for the rest of this run.
+            } else {
+              // Either a non-transient error we don't recognize, or a transient
+              // one that has now exhausted its retries - give up on this one
+              // instead of looping forever, but it's NOT suppressed (we never
+              // confirmed the address itself is bad, just that sending kept
+              // failing) so a future manual resend can still try it.
+              rowUpdates.push({ id: row.id, status: 'failed', error: message, attempt_count: nextAttempt });
+              failedByBroadcast.set(row.broadcast_id, (failedByBroadcast.get(row.broadcast_id) || 0) + 1);
+              totalFailed += 1;
             }
           }
           sentFromThisAccount += 1;
@@ -322,7 +217,12 @@ serve(async (req) => {
           rowUpdates.map((u) =>
             supabase
               .from('email_send_queue')
-              .update({ status: u.status, error: u.error ?? null, sent_at: u.status === 'sent' ? new Date().toISOString() : null })
+              .update({
+                status: u.status,
+                error: u.error ?? null,
+                attempt_count: u.attempt_count,
+                sent_at: u.status === 'sent' ? new Date().toISOString() : null,
+              })
               .eq('id', u.id)
           )
         );
@@ -382,9 +282,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         message: 'Queue processing complete',
-        processed: totalSent + totalFailed,
+        processed: totalSent + totalFailed + totalRetrying,
         sent: totalSent,
         failed: totalFailed,
+        retrying: totalRetrying,
         suppressed: suppressedRowIds.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
