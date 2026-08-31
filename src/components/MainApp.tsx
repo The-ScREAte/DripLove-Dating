@@ -99,7 +99,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [isPremium, setIsPremium] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const [userImages, setUserImages] = useState<UserImageRow[]>([]);
+  // Only the columns actually selected below are stored here.
+  const [userImages, setUserImages] = useState<Pick<UserImageRow, 'image_url' | 'is_approved' | 'moderation_status'>[]>([]);
   const { toast } = useToast();
 
   // ⭐ STATE PRESERVATION: Save active tab to sessionStorage whenever it changes
