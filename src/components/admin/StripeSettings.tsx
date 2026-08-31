@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CreditCard } from 'lucide-react';
@@ -89,29 +90,27 @@ const StripeSettings = () => {
           <div className="flex items-center gap-2">
             <CreditCard className="w-5 h-5" />
             <h3 className="font-medium">Payment Mode</h3>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${stripeMode === 'live' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-              {stripeMode.toUpperCase()}
-            </span>
           </div>
-          {/* A real sliding toggle, not two separate buttons - the pink
-              highlight animates left/right to whichever side is active. */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={stripeMode === 'live'}
-            disabled={saving}
-            onClick={() => handleSetMode(stripeMode === 'test' ? 'live' : 'test')}
-            className="relative w-32 h-9 rounded-full bg-gray-200 disabled:opacity-60 shrink-0"
-          >
-            <span
-              className="absolute top-1 bottom-1 w-[60px] rounded-full bg-pink-600 shadow transition-transform duration-200 ease-out"
-              style={{ transform: stripeMode === 'live' ? 'translateX(60px)' : 'translateX(4px)' }}
-            />
-            <span className="relative z-10 grid grid-cols-2 h-full text-xs font-semibold">
-              <span className={stripeMode === 'test' ? 'text-white flex items-center justify-center' : 'text-gray-600 flex items-center justify-center'}>Test</span>
-              <span className={stripeMode === 'live' ? 'text-white flex items-center justify-center' : 'text-gray-600 flex items-center justify-center'}>Live</span>
-            </span>
-          </button>
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant={stripeMode === 'test' ? 'default' : 'outline'}
+              onClick={() => handleSetMode('test')}
+              disabled={saving}
+              className="h-7 px-2.5 text-xs"
+            >
+              Test
+            </Button>
+            <Button
+              size="sm"
+              variant={stripeMode === 'live' ? 'default' : 'outline'}
+              onClick={() => handleSetMode('live')}
+              disabled={saving}
+              className="h-7 px-2.5 text-xs"
+            >
+              Live
+            </Button>
+          </div>
         </div>
 
         {stripeMode === 'test' && (

@@ -479,42 +479,33 @@ export default function ScheduledBroadcasts() {
                       </p>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
                         onClick={() => toggleActive(broadcast)}
-                        className="h-7 text-xs"
+                        className="h-7 w-7"
+                        title={broadcast.is_active ? 'Deactivate' : 'Activate'}
                       >
-                        {broadcast.is_active ? (
-                          <>
-                            <Pause className="w-3 h-3 mr-1" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3 h-3 mr-1" />
-                            Activate
-                          </>
-                        )}
+                        {broadcast.is_active ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                       </Button>
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
                         onClick={() => openEditDialog(broadcast)}
-                        className="h-7 text-xs"
+                        className="h-7 w-7"
+                        title="Edit"
                       >
-                        <Edit className="w-3 h-3 mr-1" />
-                        Edit
+                        <Edit className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon"
                         onClick={() => deleteBroadcast(broadcast.id)}
-                        className="h-7 text-xs text-red-600 hover:text-red-700"
+                        className="h-7 w-7 text-red-600 hover:text-red-700"
+                        title="Delete"
                       >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Delete
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </div>
@@ -708,10 +699,10 @@ export default function ScheduledBroadcasts() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button size="sm" variant="outline" onClick={() => setShowDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} className="bg-purple-600 hover:bg-purple-700">
+            <Button size="sm" onClick={handleSave} className="bg-purple-600 hover:bg-purple-700">
               {editingBroadcast ? 'Update Schedule' : 'Create Schedule'}
             </Button>
           </DialogFooter>

@@ -149,7 +149,7 @@ BEGIN
 
   IF v_promo_code.password_hash LIKE '$2%' THEN
     -- Already a bcrypt hash.
-    v_password_ok := (crypt(password_input, v_promo_code.password_hash) = v_promo_code.password_hash);
+    v_password_ok := (extensions.crypt(password_input, v_promo_code.password_hash) = v_promo_code.password_hash);
   ELSE
     -- Legacy plaintext value (or a not-yet-consumed setup token) -- compare
     -- directly, then upgrade to a real hash so it's never stored in the clear
@@ -157,7 +157,7 @@ BEGIN
     v_password_ok := (v_promo_code.password_hash = password_input);
     IF v_password_ok THEN
       UPDATE public.promo_codes
-      SET password_hash = crypt(password_input, gen_salt('bf'))
+      SET password_hash = extensions.crypt(password_input, extensions.gen_salt('bf'))
       WHERE id = v_promo_code.id;
     END IF;
   END IF;
@@ -233,7 +233,7 @@ BEGIN
   END IF;
 
   UPDATE public.promo_codes
-  SET password_hash = crypt(p_new_password, gen_salt('bf')),
+  SET password_hash = extensions.crypt(p_new_password, extensions.gen_salt('bf')),
       status = CASE WHEN status = 'pending_password' THEN 'active' ELSE status END,
       is_active = true,
       updated_at = now()
@@ -269,7 +269,7 @@ BEGIN
   END IF;
 
   UPDATE public.promo_codes
-  SET password_hash = crypt(p_new_password, gen_salt('bf')),
+  SET password_hash = extensions.crypt(p_new_password, extensions.gen_salt('bf')),
       updated_at = now()
   WHERE id = p_promo_code_id;
 
@@ -357,7 +357,7 @@ BEGIN
   END IF;
 
   IF v_promo_code.password_hash LIKE '$2%' THEN
-    v_password_ok := (crypt(p_password, v_promo_code.password_hash) = v_promo_code.password_hash);
+    v_password_ok := (extensions.crypt(p_password, v_promo_code.password_hash) = v_promo_code.password_hash);
   ELSE
     v_password_ok := (v_promo_code.password_hash = p_password);
   END IF;
@@ -463,7 +463,7 @@ BEGIN
   END IF;
 
   IF v_promo_code.password_hash LIKE '$2%' THEN
-    v_password_ok := (crypt(p_password, v_promo_code.password_hash) = v_promo_code.password_hash);
+    v_password_ok := (extensions.crypt(p_password, v_promo_code.password_hash) = v_promo_code.password_hash);
   ELSE
     v_password_ok := (v_promo_code.password_hash = p_password);
   END IF;

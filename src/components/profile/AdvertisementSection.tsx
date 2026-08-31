@@ -25,6 +25,9 @@ import { COUNTRY_DIAL_CODES, flagEmoji } from '@/utils/countryDialCodes';
 import { Megaphone, Clock, XCircle, CreditCard, CheckCircle2 } from 'lucide-react';
 import StripeCardStep from './StripeCardStep';
 import PaymentMethodsManager from './PaymentMethodsManager';
+import { estimateImpressions, formatImpressions, DEFAULT_AD_RATES, type AdRates } from '@/utils/adEstimator';
+import { computeSpentSoFar, computeDeliveryProgress } from '@/utils/adSpend';
+import { Rocket, TrendingUp } from 'lucide-react';
 
 // Same frame Discover's real card actually crops to (object-cover, full-bleed).
 const AD_IMAGE_ASPECT = 9 / 16;
@@ -60,6 +63,13 @@ interface Ad {
   target_countries: string[];
   is_active: boolean;
   created_by: string | null;
+  budget_per_day: number | null;
+  duration_days: number | null;
+  total_budget: number | null;
+  placement: 'standard' | 'featured' | 'premium' | null;
+  impressions: number;
+  clicks: number;
+  estimated_impressions_max: number | null;
 }
 
 interface AdvertiserProfile {
@@ -80,7 +90,15 @@ interface AdvertisementSectionProps {
 const emptyForm = {
   name: '', about: '', image_url: '', video_url: '', media_type: 'image',
   link: '', link_as: 'Click here', target_countries: [] as string[],
+  // Campaign step (budget/duration/audience/placement) - only used for a
+  // brand new ad, never when editing an existing one.
+  budgetPerDay: '10', durationDays: '7', targetAgeMin: '', targetAgeMax: '',
+  targetGenders: [] as string[], placement: 'standard' as 'standard' | 'featured' | 'premium',
 };
+
+const BUDGET_PRESETS = [1, 5, 10, 25, 50];
+const DURATION_PRESETS = [1, 3, 7, 14, 30];
+const GENDER_OPTIONS = ['Male', 'Female'];
 
 const emptyOnboardingForm = {
   businessName: '', contactEmail: '', contactPhone: '', contactCountryCode: 'US', agreed: false,
@@ -88,7 +106,7 @@ const emptyOnboardingForm = {
 
 // Only the columns "My Ads" actually renders - keeps this section's initial
 // load light, since it's shown inline inside Profile rather than lazily.
-const AD_LIST_COLUMNS = 'id, image_url, video_url, media_type, name, about, link, link_as, created_at, target_countries, is_active, created_by';
+const AD_LIST_COLUMNS = 'id, image_url, video_url, media_type, name, about, link, link_as, created_at, target_countries, is_active, created_by, budget_per_day, duration_days, total_budget, placement, impressions, clicks, estimated_impressions_max';
 
 const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser, startWithForm }) => {
   const { toast } = useToast();
@@ -100,6 +118,13 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
   const [showCreateForm, setShowCreateForm] = useState(!!startWithForm);
   const [editingAdId, setEditingAdId] = useState<string | null>(null);
   const [formData, setFormData] = useState(emptyForm);
+  // 'content' = title/media/link (existing fields), 'campaign' = the new
+  // budget/duration/audience/placement step, shown only for a brand new ad
+  // (editing skips straight to a plain content update, no re-charging).
+  const [adStep, setAdStep] = useState<'content' | 'campaign'>('content');
+  const [adRates, setAdRates] = useState<AdRates>(DEFAULT_AD_RATES);
+  const [launchingCampaign, setLaunchingCampaign] = useState(false);
+  const [expandedMyAdId, setExpandedMyAdId] = useState<string | null>(null);
 
   // Advertiser onboarding: null while loading, 'none' if they've never
   // applied, otherwise the row itself (pending/approved/rejected).
@@ -162,6 +187,17 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
       fetchAds();
     }
   }, [advertiserProfile, fetchAds]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from('app_settings').select('value').eq('id', 'ad_rates').single();
+        if (data?.value) setAdRates(data.value as AdRates);
+      } catch (error) {
+        console.error('Error fetching ad rates:', error);
+      }
+    })();
+  }, []);
 
   // Best-effort - the DB write is what actually matters, so a failed email
   // (e.g. SMTP not configured yet) never blocks the user's submission.
@@ -291,6 +327,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
   const resetForm = () => {
     setFormData(emptyForm);
     setEditingAdId(null);
+    setAdStep('content');
   };
 
   const handleEditAd = (ad: Ad) => {
@@ -360,7 +397,11 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Editing an existing ad updates its content only - never re-charges or
+  // touches campaign fields, so it stays a plain, direct save like before.
+  // A brand NEW ad instead moves on to the campaign step (see
+  // handleLaunchCampaign) rather than inserting anything here.
+  const handleContentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser?.id) return;
 
@@ -379,8 +420,69 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
     if (advertiserProfile === 'none' || advertiserProfile === null || advertiserProfile.status !== 'approved') return;
 
+    if (!editingAdId) {
+      setAdStep('campaign');
+      return;
+    }
+
     setLoading(true);
     try {
+      const payload = {
+        name: formData.name,
+        about: formData.about,
+        image_url: formData.image_url || 'https://via.placeholder.com/400x300',
+        video_url: formData.video_url || null,
+        media_type: formData.media_type,
+        link: formData.link ? normalizeUrl(formData.link) : null,
+        link_as: formData.link_as || 'Click here',
+        target_countries: formData.target_countries,
+      };
+
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const { error } = await supabase.from('ads').update(payload as any).eq('id', editingAdId).eq('created_by', currentUser.id);
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+      if (error) throw error;
+
+      toast({ title: 'Ad updated', description: 'Your changes were saved and will need review before going live again.' });
+      resetForm();
+      setShowCreateForm(false);
+      fetchAds();
+    } catch (error) {
+      console.error('Error saving ad:', error);
+      toast({ title: 'Error', description: 'Failed to save your ad', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charges the advertiser's card on file for the FULL campaign budget
+  // (budgetPerDay x durationDays) upfront, then creates the ad row - content
+  // still has to clear admin review (is_active stays false) before it's
+  // actually shown, same gate as before, just with billing now attached.
+  const handleLaunchCampaign = async () => {
+    if (!currentUser?.id) return;
+    if (advertiserProfile === 'none' || advertiserProfile === null || advertiserProfile.status !== 'approved') return;
+
+    const budgetPerDay = Number(formData.budgetPerDay);
+    const durationDays = Number(formData.durationDays);
+    if (!budgetPerDay || budgetPerDay <= 0) {
+      toast({ title: 'Error', description: 'Please choose a daily budget', variant: 'destructive' });
+      return;
+    }
+    if (!durationDays || durationDays <= 0) {
+      toast({ title: 'Error', description: 'Please choose a duration', variant: 'destructive' });
+      return;
+    }
+
+    setLaunchingCampaign(true);
+    try {
+      const charge = await invokeAuthed<{ paymentIntentId: string; totalBudget: number }>(
+        'stripe-charge-campaign',
+        { budgetPerDay, durationDays }
+      );
+
+      const estimate = estimateImpressions(budgetPerDay, durationDays, formData.target_countries, adRates);
+
       const payload = {
         name: formData.name,
         about: formData.about,
@@ -395,44 +497,48 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
         contact_email: advertiserProfile.contact_email,
         contact_phone: advertiserProfile.contact_phone,
         contact_phone_country: advertiserProfile.contact_phone_country,
-        // The database enforces this too (a trigger forces it false/unchanged
-        // for anyone who isn't an admin) - set explicitly here so the intent
-        // is obvious without relying on that alone.
         is_active: false,
+        budget_per_day: budgetPerDay,
+        duration_days: durationDays,
+        total_budget: charge.totalBudget,
+        placement: formData.placement,
+        target_age_min: formData.targetAgeMin ? Number(formData.targetAgeMin) : null,
+        target_age_max: formData.targetAgeMax ? Number(formData.targetAgeMax) : null,
+        target_genders: formData.targetGenders,
+        estimated_impressions_min: estimate.totalMin,
+        estimated_impressions_max: estimate.totalMax,
+        stripe_payment_intent_id: charge.paymentIntentId,
       };
 
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      const { error } = editingAdId
-        ? await supabase.from('ads').update(payload as any).eq('id', editingAdId).eq('created_by', currentUser.id)
-        : await supabase.from('ads').insert(payload as any);
-      /* eslint-enable @typescript-eslint/no-explicit-any */
+      const { error } = await supabase.from('ads').insert(payload);
       if (error) throw error;
 
-      if (!editingAdId) {
-        notifyAdmin({
-          type: 'ad_submitted',
-          adName: formData.name,
-          adAbout: formData.about,
-          businessName: advertiserProfile.business_name,
-          contactEmail: advertiserProfile.contact_email,
-          contactPhone: `${advertiserProfile.contact_phone_country} ${advertiserProfile.contact_phone}`,
-        });
-      }
+      notifyAdmin({
+        type: 'ad_submitted',
+        adName: formData.name,
+        adAbout: formData.about,
+        businessName: advertiserProfile.business_name,
+        contactEmail: advertiserProfile.contact_email,
+        contactPhone: `${advertiserProfile.contact_phone_country} ${advertiserProfile.contact_phone}`,
+      });
 
       toast({
-        title: editingAdId ? 'Ad updated' : 'Ad submitted',
-        description: editingAdId
-          ? 'Your changes were saved and will need review before going live again.'
-          : "Your ad has been submitted and will go live once it's reviewed.",
+        title: 'Campaign launched!',
+        description: `$${charge.totalBudget.toFixed(2)} charged. Your ad will go live once it's reviewed.`,
       });
       resetForm();
+      setAdStep('content');
       setShowCreateForm(false);
       fetchAds();
     } catch (error) {
-      console.error('Error saving ad:', error);
-      toast({ title: 'Error', description: 'Failed to save your ad', variant: 'destructive' });
+      console.error('Error launching campaign:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to launch your campaign',
+        variant: 'destructive',
+      });
     } finally {
-      setLoading(false);
+      setLaunchingCampaign(false);
     }
   };
 
@@ -667,7 +773,8 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              {adStep === 'content' ? (
+              <form onSubmit={handleContentSubmit} className="space-y-4">
                 <p className="text-xs text-gray-300 bg-pink-500/10 border border-pink-500/20 rounded-lg p-2.5">
                   Ads are reviewed before they go live. You'll see the status on each of your ads below. Within some few hours.
                 </p>
@@ -784,44 +891,219 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                   </Select>
                 </div>
 
-                <div>
-                  <Label className="block text-sm font-medium mb-2 text-white">
-                    Target Countries ({formData.target_countries.length} selected)
-                  </Label>
-                  <p className="text-xs text-gray-400 mb-2">Available to all countries if none are selected.</p>
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-pink-500/20 rounded-md">
-                    {COUNTRY_OPTIONS.map((country) => {
-                      const isSelected = formData.target_countries.includes(country.code);
-                      return (
-                        <label
-                          key={country.code}
-                          className={`flex items-center gap-2 cursor-pointer text-sm p-2 rounded transition-colors ${
-                            isSelected ? 'bg-pink-500/10 border border-pink-500/30' : 'hover:bg-neutral-800'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => {
-                              setFormData(prev => ({
-                                ...prev,
-                                target_countries: checked
-                                  ? [...prev.target_countries, country.code]
-                                  : prev.target_countries.filter(c => c !== country.code),
-                              }));
-                            }}
-                            className="w-4 h-4 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
-                          />
-                          <span className={isSelected ? 'font-medium text-white' : 'text-gray-200'}>{country.name}</span>
-                        </label>
-                      );
-                    })}
+                {editingAdId && (
+                  <div>
+                    <Label className="block text-sm font-medium mb-2 text-white">
+                      Target Countries ({formData.target_countries.length} selected)
+                    </Label>
+                    <p className="text-xs text-gray-400 mb-2">Available to all countries if none are selected.</p>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-pink-500/20 rounded-md">
+                      {COUNTRY_OPTIONS.map((country) => {
+                        const isSelected = formData.target_countries.includes(country.code);
+                        return (
+                          <label
+                            key={country.code}
+                            className={`flex items-center gap-2 cursor-pointer text-sm p-2 rounded transition-colors ${
+                              isSelected ? 'bg-pink-500/10 border border-pink-500/30' : 'hover:bg-neutral-800'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  target_countries: checked
+                                    ? [...prev.target_countries, country.code]
+                                    : prev.target_countries.filter(c => c !== country.code),
+                                }));
+                              }}
+                              className="w-4 h-4 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
+                            />
+                            <span className={isSelected ? 'font-medium text-white' : 'text-gray-200'}>{country.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <Button type="submit" disabled={loading || uploading} className="w-full bg-pink-600 hover:bg-pink-700 text-white">
-                  {loading ? (editingAdId ? 'Saving...' : 'Submitting...') : (editingAdId ? 'Save Changes' : 'Submit Ad')}
+                  {loading ? 'Saving...' : editingAdId ? 'Save Changes' : 'Continue'}
                 </Button>
               </form>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-white font-semibold flex items-center gap-1.5"><Rocket className="w-4 h-4 text-pink-400" />Set Up Your Campaign</h3>
+                    <p className="text-xs text-gray-400 mt-1">"{formData.name}" is ready. Now choose your budget, duration, audience and placement.</p>
+                  </div>
+
+                  <div>
+                    <Label className="block text-sm font-medium mb-2 text-white">1. How much do you want to spend per day?</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {BUDGET_PRESETS.map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, budgetPerDay: String(amount) }))}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
+                            Number(formData.budgetPerDay) === amount ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'
+                          }`}
+                        >
+                          ${amount}/day
+                        </button>
+                      ))}
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formData.budgetPerDay}
+                      onChange={(e) => setFormData(prev => ({ ...prev, budgetPerDay: e.target.value }))}
+                      placeholder="Custom amount"
+                      className="mt-2 bg-black border-pink-500/30 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="block text-sm font-medium mb-2 text-white">2. How long do you want to advertise? (target, not a cutoff)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {DURATION_PRESETS.map((days) => (
+                        <button
+                          key={days}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, durationDays: String(days) }))}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
+                            Number(formData.durationDays) === days ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'
+                          }`}
+                        >
+                          {days} {days === 1 ? 'day' : 'days'}
+                        </button>
+                      ))}
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formData.durationDays}
+                      onChange={(e) => setFormData(prev => ({ ...prev, durationDays: e.target.value }))}
+                      placeholder="Custom days"
+                      className="mt-2 bg-black border-pink-500/30 text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="block text-sm font-medium mb-2 text-white">3. Who do you want to reach?</Label>
+                    <p className="text-xs text-gray-400 mb-2">Countries - available everywhere if none are selected.</p>
+                    <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border border-pink-500/20 rounded-md mb-3">
+                      {COUNTRY_OPTIONS.map((country) => {
+                        const isSelected = formData.target_countries.includes(country.code);
+                        return (
+                          <label key={country.code} className={`flex items-center gap-2 cursor-pointer text-sm p-1.5 rounded transition-colors ${isSelected ? 'bg-pink-500/10 border border-pink-500/30' : 'hover:bg-neutral-800'}`}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  target_countries: checked ? [...prev.target_countries, country.code] : prev.target_countries.filter(c => c !== country.code),
+                                }));
+                              }}
+                              className="w-4 h-4 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
+                            />
+                            <span className={isSelected ? 'font-medium text-white' : 'text-gray-200'}>{country.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2 mb-3">
+                      <Input
+                        type="number"
+                        min={13}
+                        value={formData.targetAgeMin}
+                        onChange={(e) => setFormData(prev => ({ ...prev, targetAgeMin: e.target.value }))}
+                        placeholder="Min age"
+                        className="bg-black border-pink-500/30 text-white"
+                      />
+                      <Input
+                        type="number"
+                        min={13}
+                        value={formData.targetAgeMax}
+                        onChange={(e) => setFormData(prev => ({ ...prev, targetAgeMax: e.target.value }))}
+                        placeholder="Max age"
+                        className="bg-black border-pink-500/30 text-white"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      {GENDER_OPTIONS.map((gender) => {
+                        const isSelected = formData.targetGenders.includes(gender);
+                        return (
+                          <button
+                            key={gender}
+                            type="button"
+                            onClick={() => setFormData(prev => ({
+                              ...prev,
+                              targetGenders: isSelected ? prev.targetGenders.filter(g => g !== gender) : [...prev.targetGenders, gender],
+                            }))}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border ${isSelected ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'}`}
+                          >
+                            {gender}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="block text-sm font-medium mb-2 text-white">4. Where should your ad appear?</Label>
+                    <div className="flex gap-2">
+                      {(['standard', 'featured', 'premium'] as const).map((tier) => (
+                        <button
+                          key={tier}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, placement: tier }))}
+                          className={`flex-1 px-3 py-1.5 rounded-full text-sm font-medium border capitalize ${
+                            formData.placement === tier ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'
+                          }`}
+                        >
+                          {tier}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const estimate = estimateImpressions(
+                      Number(formData.budgetPerDay) || 0,
+                      Number(formData.durationDays) || 0,
+                      formData.target_countries,
+                      adRates
+                    );
+                    const totalBudget = (Number(formData.budgetPerDay) || 0) * (Number(formData.durationDays) || 0);
+                    return (
+                      <div className="rounded-lg border border-pink-500/20 bg-pink-500/5 p-3 space-y-1.5">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-white"><TrendingUp className="w-4 h-4 text-pink-400" />Your Campaign</p>
+                        <p className="text-xs text-gray-300">Budget: ${formData.budgetPerDay || 0}/day &middot; Duration: ~{formData.durationDays || 0} days &middot; Total: ${totalBudget.toFixed(2)}</p>
+                        <p className="text-xs text-gray-300">
+                          Estimated daily impressions: {formatImpressions(estimate.dailyMin)}&ndash;{formatImpressions(estimate.dailyMax)}
+                        </p>
+                        <p className="text-xs text-gray-300">
+                          Estimated total impressions: {formatImpressions(estimate.totalMin)}&ndash;{formatImpressions(estimate.totalMax)}
+                        </p>
+                        <p className="text-[11px] text-gray-500">
+                          This is an estimate, not a guarantee. Duration is a target, not a cutoff - DripLove keeps showing your ad to matching users until it delivers the impressions your budget paid for, even if that takes longer than {formData.durationDays || 0} days.
+                        </p>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setAdStep('content')} disabled={launchingCampaign} className="flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+                      Back
+                    </Button>
+                    <Button type="button" onClick={handleLaunchCampaign} disabled={launchingCampaign} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white">
+                      {launchingCampaign ? 'Launching...' : 'Launch Campaign'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CollapsibleContent>
           </Collapsible>
 
@@ -833,10 +1115,18 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
               <p className="text-center text-gray-400 text-sm py-4">You haven't created any ads yet</p>
             ) : (
               <div className="grid gap-2">
-                {ads.map((ad) => (
+                {ads.map((ad) => {
+                  const hasCampaign = ad.total_budget != null;
+                  const isExpanded = expandedMyAdId === ad.id;
+                  const spentSoFar = computeSpentSoFar(ad);
+                  const progress = computeDeliveryProgress(ad);
+                  return (
                   <Card key={ad.id} className="bg-black border-pink-500/20">
                     <CardContent className="pt-3 pb-3">
-                      <div className="flex gap-3">
+                      <div
+                        className={`flex gap-3 ${hasCampaign ? 'cursor-pointer' : ''}`}
+                        onClick={() => hasCampaign && setExpandedMyAdId(isExpanded ? null : ad.id)}
+                      >
                         {ad.media_type === 'video' && ad.video_url ? (
                           <div className="w-12 h-12 shrink-0 bg-neutral-900 rounded flex items-center justify-center">
                             <Video className="w-5 h-5 text-gray-400" />
@@ -860,8 +1150,18 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                             >
                               {ad.is_active ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                             </span>
+                            {hasCampaign && (
+                              isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gray-500 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-500 ml-auto shrink-0" />
+                            )}
                           </div>
-                          <div className="flex gap-1.5 mt-2">
+                          {hasCampaign && (
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-gray-400">
+                              <span>💰 ${spentSoFar.toFixed(2)} of ${(ad.total_budget || 0).toFixed(2)}</span>
+                              <span>👁 {formatImpressions(ad.impressions || 0)}</span>
+                              <span>🖱 {formatImpressions(ad.clicks || 0)}</span>
+                            </div>
+                          )}
+                          <div className="flex gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
                             <Button variant="outline" size="icon" onClick={() => setPreviewAd(ad)} title="Preview ad" className="h-8 w-8 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
@@ -874,9 +1174,41 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                           </div>
                         </div>
                       </div>
+
+                      {hasCampaign && isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-pink-500/10 space-y-2">
+                          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-pink-500 rounded-full transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-300">
+                            <div>
+                              <p className="text-gray-500">Spent so far</p>
+                              <p className="text-white font-medium">${spentSoFar.toFixed(2)} <span className="text-gray-500 font-normal">/ ${(ad.total_budget || 0).toFixed(2)}</span></p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Views (impressions)</p>
+                              <p className="text-white font-medium">{formatImpressions(ad.impressions || 0)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Clicks</p>
+                              <p className="text-white font-medium">{formatImpressions(ad.clicks || 0)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">CTR</p>
+                              <p className="text-white font-medium">{ad.impressions ? (((ad.clicks || 0) / ad.impressions) * 100).toFixed(1) : '0.0'}%</p>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-gray-500">
+                            {progress >= 1
+                              ? 'This campaign has delivered its full budget of impressions.'
+                              : `${Math.round(progress * 100)}% delivered so far (${formatImpressions(ad.impressions || 0)} of ~${formatImpressions(ad.estimated_impressions_max || 0)} estimated). Duration is a target, not a cutoff - it keeps running until it delivers.`}
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -4525,7 +4525,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
              onTouchMove={handleTouchMove}
              onTouchEnd={handleTouchEnd}
              onMouseDown={handleMouseDown}>
-          <AdCard ad={currentMatch} onSwipe={moveToNext} onAdvertiseClick={onNavigateToAdvertise} />
+          <AdCard ad={currentMatch} onSwipe={moveToNext} onAdvertiseClick={onNavigateToAdvertise} trackAnalytics />
           <SwipeButtons
             onReverse={handleReverse}
             canReverse={false}

@@ -44,7 +44,7 @@ const getCountryName = (code: string): string => {
     'CM': 'Cameroon', 'ET': 'Ethiopia', 'EG': 'Egypt', 'MA': 'Morocco',
     'DZ': 'Algeria', 'TN': 'Tunisia', 'BW': 'Botswana', 'ZW': 'Zimbabwe',
   };
-  return countryNames[code] || code;
+  return countryNames[code] || code || 'Unknown';
 };
 
 export default function EmailBroadcast() {

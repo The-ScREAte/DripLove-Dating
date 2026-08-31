@@ -555,7 +555,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           <div
             className={`absolute inset-x-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
             style={{
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.88) 60%, rgba(0,0,0,1) 85%)',
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 45%, rgba(0,0,0,0.94) 58%, rgba(0,0,0,1) 70%)',
               // Photo box now stops above the nav on its own (see DiscoverPage.tsx's
               // discover-container), so bottom:0 already lands right at the photo's
               // own bottom edge, just above the nav - no extra offset needed.

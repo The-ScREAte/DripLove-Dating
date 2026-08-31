@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Volume2, VolumeX, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { supabase } from '@/integrations/supabase/client';
 
 const ADVERTISE_EMAIL = 'driploveinfo@gmail.com';
 
@@ -22,13 +23,18 @@ interface AdCardProps {
   // sense (e.g. the admin panel's preview dialog), where the mailto link
   // still works as a safe default.
   onAdvertiseClick?: () => void;
+  // Only true for the real Discover swipe deck - the admin preview dialog
+  // and the advertiser's own "Preview ad" both render this same component,
+  // and neither of those should count as a real impression/click.
+  trackAnalytics?: boolean;
 }
 
-const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick }) => {
+const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAnalytics }) => {
   const [isMuted, setIsMuted] = useState(true);
   const [showFullAbout, setShowFullAbout] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isVideo = ad.media_type === 'video' && ad.video_url;
+  const impressionTrackedRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Auto-play video when card is displayed
@@ -39,8 +45,22 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick }) => {
     }
   }, [isVideo]);
 
+  useEffect(() => {
+    if (!trackAnalytics || !ad.id) return;
+    if (impressionTrackedRef.current === ad.id) return; // don't double-count the same card re-rendering
+    impressionTrackedRef.current = ad.id;
+    supabase.rpc('increment_ad_impression', { ad_id: ad.id }).then(({ error }) => {
+      if (error) console.error('Error tracking ad impression:', error);
+    });
+  }, [trackAnalytics, ad.id]);
+
   const handleLinkClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (trackAnalytics && ad.id) {
+      supabase.rpc('increment_ad_click', { ad_id: ad.id }).then(({ error }) => {
+        if (error) console.error('Error tracking ad click:', error);
+      });
+    }
     if (ad.link) {
       window.open(ad.link, '_blank', 'noopener,noreferrer');
     }

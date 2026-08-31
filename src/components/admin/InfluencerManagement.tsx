@@ -417,6 +417,7 @@ const InfluencerManagement = () => {
 
       toast({ title: 'Success', description: `Payout ${action}` });
       fetchPayoutRequests();
+      fetchPromoCodes();
       if (selectedPromoCode) {
         handleViewDetails(selectedPromoCode);
       }
@@ -704,8 +705,8 @@ const InfluencerManagement = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button onClick={handleCreatePromoCode} className="bg-pink-500 hover:bg-pink-600">Create</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleCreatePromoCode} className="bg-pink-500 hover:bg-pink-600">Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -774,8 +775,8 @@ const InfluencerManagement = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-            <Button onClick={handleUpdatePromoCode} className="bg-pink-500 hover:bg-pink-600">Save Changes</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleUpdatePromoCode} className="bg-pink-500 hover:bg-pink-600">Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -873,12 +874,12 @@ const InfluencerManagement = () => {
                           <p className="text-xs text-gray-600 mt-1 italic">Note: {payout.admin_notes}</p>
                         )}
                         {payout.status === 'pending' && (
-                          <div className="flex gap-2 mt-2">
-                            <Button size="sm" className="text-xs h-7 bg-green-500 hover:bg-green-600" onClick={() => handlePayoutAction(payout.id, 'completed')}>
-                              <CheckCircle className="w-3 h-3 mr-1" /> Approve & Mark Paid
+                          <div className="flex items-center gap-1 mt-2">
+                            <Button size="icon" className="h-7 w-7 bg-green-500 hover:bg-green-600" title="Approve & Mark Paid" onClick={() => handlePayoutAction(payout.id, 'completed')}>
+                              <CheckCircle className="w-3.5 h-3.5" />
                             </Button>
-                            <Button size="sm" variant="destructive" className="text-xs h-7" onClick={() => handlePayoutAction(payout.id, 'rejected')}>
-                              <XCircle className="w-3 h-3 mr-1" /> Reject
+                            <Button size="icon" variant="destructive" className="h-7 w-7" title="Reject" onClick={() => handlePayoutAction(payout.id, 'rejected')}>
+                              <XCircle className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         )}

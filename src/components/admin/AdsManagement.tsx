@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause, Pencil, CreditCard, Check, X, Clock } from 'lucide-react';
+import { Trash2, Upload, Video, Image as ImageIcon, Play, Eye, Pause, Pencil, Check, X, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,8 +13,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { optimizeImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
+import { computeSpentSoFar } from '@/utils/adSpend';
 import CropModal from '@/components/shared/CropModal';
 import StripeSettings from './StripeSettings';
+import AdRatesSettings from './AdRatesSettings';
 // Lazy, not a static import: AdCard lives in the 'discover-tools' chunk while
 // this file is in 'admin-tools' - a static import here creates a circular
 // chunk dependency (discover-tools <-> admin-tools) that throws a
@@ -55,6 +57,10 @@ interface Ad {
   business_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  total_budget: number | null;
+  impressions: number;
+  clicks: number;
+  estimated_impressions_max: number | null;
 }
 
 interface AdvertiserApplication {
@@ -67,15 +73,6 @@ interface AdvertiserApplication {
   created_at: string;
   card_brand: string | null;
   card_last4: string | null;
-}
-
-interface AdvertiserCard {
-  id: string;
-  brand: string;
-  last4: string;
-  expMonth: number | null;
-  expYear: number | null;
-  isDefault: boolean;
 }
 
 // Country options
@@ -103,8 +100,8 @@ const AdListItem: React.FC<{
   onDelete: (id: string) => void;
 }> = ({ ad, onPreview, onEdit, onToggleActive, onDelete }) => (
   <Card>
-    <CardContent className="pt-3 pb-3">
-      <div className="flex gap-2.5">
+    <CardContent className="pt-2 pb-2">
+      <div className="flex gap-2">
         {ad.media_type === 'video' && ad.video_url ? (
           <div className="w-10 h-10 shrink-0 bg-gray-100 rounded flex items-center justify-center relative">
             <Video className="w-4 h-4 text-gray-500" />
@@ -130,7 +127,7 @@ const AdListItem: React.FC<{
               </span>
             )}
           </div>
-          <div className="flex gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-1.5">
             <Button variant="outline" size="icon" onClick={() => onPreview(ad)} title="Preview ad" className="h-8 w-8">
               <Eye className="h-3.5 w-3.5" />
             </Button>
@@ -150,6 +147,11 @@ const AdListItem: React.FC<{
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
+          {ad.total_budget != null && (
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              💰 ${computeSpentSoFar(ad).toFixed(2)} of ${ad.total_budget.toFixed(2)} spent &middot; 👁 {(ad.impressions || 0).toLocaleString('en-US')} views
+            </p>
+          )}
         </div>
       </div>
     </CardContent>
@@ -179,10 +181,7 @@ const AdsManagement = () => {
   const { toast } = useToast();
   const [applications, setApplications] = useState<AdvertiserApplication[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
-  const [cardsAdvertiser, setCardsAdvertiser] = useState<AdvertiserApplication | null>(null);
   const [expandedAdvertiserId, setExpandedAdvertiserId] = useState<string | null>(null);
-  const [advertiserCards, setAdvertiserCards] = useState<AdvertiserCard[]>([]);
-  const [cardsLoading, setCardsLoading] = useState(false);
 
   useEffect(() => {
     fetchAds();
@@ -271,28 +270,6 @@ const AdsManagement = () => {
     } catch (error) {
       console.error('Error reviewing advertiser application:', error);
       toast({ title: 'Error', description: 'Failed to update application', variant: 'destructive' });
-    }
-  };
-
-  const handleViewCards = async (advertiser: AdvertiserApplication) => {
-    setCardsAdvertiser(advertiser);
-    setCardsLoading(true);
-    setAdvertiserCards([]);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Not signed in');
-      const { data, error } = await supabase.functions.invoke('stripe-admin-list-payment-methods', {
-        body: { advertiserId: advertiser.id },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (error) throw error;
-      if (data?.success === false) throw new Error(data.error);
-      setAdvertiserCards(data?.cards || []);
-    } catch (error) {
-      console.error('Error fetching advertiser cards:', error);
-      toast({ title: 'Error', description: 'Failed to load card info', variant: 'destructive' });
-    } finally {
-      setCardsLoading(false);
     }
   };
 
@@ -577,10 +554,16 @@ const AdsManagement = () => {
     approved: 'bg-green-100 text-green-700',
     rejected: 'bg-red-100 text-red-700',
   };
+  const STATUS_ICON: Record<AdvertiserApplication['status'], React.ReactNode> = {
+    pending: <Clock className="w-3 h-3" />,
+    approved: <Check className="w-3 h-3" />,
+    rejected: <X className="w-3 h-3" />,
+  };
 
   return (
     <div className="space-y-6">
       <StripeSettings />
+      <AdRatesSettings />
 
       <Card>
         <CardContent className="pt-6">
@@ -791,6 +774,8 @@ const AdsManagement = () => {
           ) : (
             applications.map((app) => {
               const isExpanded = expandedAdvertiserId === app.id;
+              const businessAds = groupedAds[app.business_name] || [];
+              const businessSpent = businessAds.reduce((sum, ad) => sum + computeSpentSoFar(ad), 0);
               return (
                 <div key={app.id} className="border rounded-lg overflow-hidden">
                   <button
@@ -800,9 +785,15 @@ const AdsManagement = () => {
                   >
                     <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                       <p className="text-sm font-semibold break-words">{app.business_name}</p>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${STATUS_BADGE[app.status]}`}>
-                        {app.status}
+                      <span
+                        className={`flex items-center justify-center w-5 h-5 rounded-full shrink-0 ${STATUS_BADGE[app.status]}`}
+                        title={app.status}
+                      >
+                        {STATUS_ICON[app.status]}
                       </span>
+                      {businessSpent > 0 && (
+                        <span className="text-[11px] text-gray-500 shrink-0">💰 ${businessSpent.toFixed(2)} spent</span>
+                      )}
                     </div>
                     {isExpanded ? <ChevronUp className="w-4 h-4 shrink-0 text-gray-400 mt-0.5" /> : <ChevronDown className="w-4 h-4 shrink-0 text-gray-400 mt-0.5" />}
                   </button>
@@ -818,9 +809,6 @@ const AdsManagement = () => {
                           )}
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <Button size="icon" variant="outline" className="h-8 w-8" title="View cards" onClick={() => handleViewCards(app)}>
-                            <CreditCard className="h-3.5 w-3.5" />
-                          </Button>
                           {app.status === 'pending' && (
                             <>
                               <Button size="icon" className="h-8 w-8 bg-green-600 hover:bg-green-700" title="Approve" onClick={() => handleReviewApplication(app, 'approved')}>
@@ -895,37 +883,6 @@ const AdsManagement = () => {
               <React.Suspense fallback={null}>
                 <AdCard ad={previewAd} />
               </React.Suspense>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!cardsAdvertiser} onOpenChange={() => setCardsAdvertiser(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{cardsAdvertiser?.business_name} - Cards</DialogTitle>
-          </DialogHeader>
-          {cardsLoading ? (
-            <p className="text-sm text-gray-500 text-center py-4">Loading...</p>
-          ) : advertiserCards.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No cards on file.</p>
-          ) : (
-            <div className="space-y-2">
-              {advertiserCards.map((card) => (
-                <div key={card.id} className="flex items-center justify-between border rounded-lg p-2.5">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {card.brand.charAt(0).toUpperCase() + card.brand.slice(1)} •••• {card.last4}
-                    </p>
-                    {card.expMonth && card.expYear && (
-                      <p className="text-xs text-gray-500">Expires {String(card.expMonth).padStart(2, '0')}/{card.expYear}</p>
-                    )}
-                  </div>
-                  {card.isDefault && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 font-medium">Default</span>
-                  )}
-                </div>
-              ))}
             </div>
           )}
         </DialogContent>

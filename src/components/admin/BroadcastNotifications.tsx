@@ -442,7 +442,7 @@ export default function BroadcastNotifications() {
       'CA': 'Canada', 'KE': 'Kenya', 'ZA': 'South Africa', 'UG': 'Uganda',
       'TZ': 'Tanzania', 'RW': 'Rwanda',
     };
-    return countryNames[code] || code;
+    return countryNames[code] || code || 'Unknown';
   };
 
   const toggleCountry = (countryCode: string) => {

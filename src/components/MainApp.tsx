@@ -1004,63 +1004,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, []);
 
-  // Memoize the current page component to prevent unnecessary re-renders
-  const currentPageComponent = useMemo(() => {
-    // Don't render pages until profile is loaded
-    if (!profile) {
-      return (
-        <div className="h-full w-full flex items-center justify-center bg-white">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-600"></div>
-        </div>
-      );
-    }
-    
-    switch (activeTab) {
-      case 'dripcheck':
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => setActiveTab('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />;
-      case 'chat':
-        return <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />;
-      case 'liked':
-        return <LikedMePage key={profile.id} currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} onNavigateToChat={handleNavigateToChat} />;
-      case 'profile':
-        return (
-          <ProfilePage
-            currentUser={profile}
-            profile={profile}
-            onProfileUpdate={fetchUserProfile}
-            onLogout={onLogout}
-            onShowTerms={handleShowTerms}
-            onShowPrivacy={handleShowPrivacy}
-            isPremium={isPremium}
-            isActiveTab={activeTab === 'profile'}
-            profileTabSignal={profileTabSignal}
-          />
-        );
-      default:
-        return <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => setActiveTab('profile')} isPremium={isPremium} profileCompletion={profileCompletion} />;
-    }
-  }, [activeTab, profile, isPremium, profileCompletion, handleNavigateToChat, forceRefreshUnreadCount, setIsChatDetailOpen, fetchUserProfile, onLogout, handleShowTerms, handleShowPrivacy]);
-
-  const renderContent = () => {
-    if (showTerms) {
-        return (
-          <Suspense fallback={<TabLoader />}>
-            <TermsOfService onBack={handleBackFromTerms} />
-          </Suspense>
-        );
-    }
-    
-    if (showPrivacy) {
-        return (
-          <Suspense fallback={<TabLoader />}>
-            <PrivacyPolicy onBack={handleBackFromPrivacy} />
-          </Suspense>
-        );
-    }
-
-    return currentPageComponent;
-  };
-
   if (!userId) {
     return (
       <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
@@ -1245,6 +1188,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             position: 'relative',
           }}
         >
+          {showTerms ? (
+            <Suspense fallback={<TabLoader />}>
+              <TermsOfService onBack={handleBackFromTerms} />
+            </Suspense>
+          ) : showPrivacy ? (
+            <Suspense fallback={<TabLoader />}>
+              <PrivacyPolicy onBack={handleBackFromPrivacy} />
+            </Suspense>
+          ) : (
+          <>
           {/* Lazy load tabs on first access, then keep mounted in background */}
           {/* Use visibility instead of conditional rendering to preserve state */}
           {visitedTabs.has('dripcheck') && (
@@ -1300,6 +1253,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 />
               </div>
             </Suspense>
+          )}
+          </>
           )}
         </div>
 
