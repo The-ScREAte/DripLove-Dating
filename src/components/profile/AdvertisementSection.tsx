@@ -332,6 +332,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
   const handleEditAd = (ad: Ad) => {
     setFormData({
+      ...emptyForm,
       name: ad.name, about: ad.about, image_url: ad.image_url, video_url: ad.video_url || '',
       media_type: ad.media_type, link: ad.link || '', link_as: ad.link_as || 'Click here',
       target_countries: ad.target_countries || [],

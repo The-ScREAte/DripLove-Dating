@@ -33,6 +33,8 @@ const RedFlagGreenFlag = lazy(() => import('../pages/RedFlagGreenFlag'));
 
 // Shown while a lazy route's chunk is being fetched. A blank screen here reads as "the tap did
 // nothing" on a slow mobile connection — a visible spinner confirms the navigation registered.
+import type { CurrentUser } from '@/types';
+
 const PageLoader = () => (
   <div className="min-h-screen w-full flex items-center justify-center bg-black">
     <div className="w-8 h-8 rounded-full border-2 border-pink-500/30 border-t-pink-500 animate-spin" />
@@ -64,7 +66,7 @@ const AppRoutes = ({
           path="/discover"
           element={
             isAuthenticated && user
-              ? <DiscoverPage currentUser={user} />
+              ? <DiscoverPage currentUser={user as unknown as CurrentUser} />
               : <Navigate to="/" replace />
           }
         />
