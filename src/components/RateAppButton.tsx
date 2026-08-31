@@ -47,7 +47,11 @@ const RateAppButton: React.FC<RateAppButtonProps> = ({ className, onRatingComple
       // Android-specific message explaining quota behavior
       if (platform === 'android') {
         toast({
-          title: "Thanks for your support! ❤️",
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              <Star className="w-4 h-4 text-yellow-500" /> Thanks for your support
+            </span>
+          ),
           description: "The rating dialog should appear now. If it doesn't, you may have already rated us recently (Google limits how often we can ask). You can always rate us directly in the Play Store!",
           duration: 6000,
         });
@@ -82,7 +86,11 @@ const RateAppButton: React.FC<RateAppButtonProps> = ({ className, onRatingComple
       markUserHasRated('web');
       
       toast({
-        title: "Thank you! ❤️",
+        title: (
+          <span className="inline-flex items-center gap-1.5">
+            <Star className="w-4 h-4 text-yellow-500" /> Thank You
+          </span>
+        ),
         description: "Your feedback helps us improve DripLove",
       });
 

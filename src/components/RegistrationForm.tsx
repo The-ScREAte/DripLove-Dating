@@ -137,7 +137,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       setShowFaceVerification(false);
       
       toast({
-        title: "Face Verified! ✓",
+        title: (
+          <span className="inline-flex items-center gap-1.5">
+            <CheckCircle className="w-4 h-4 text-green-500" /> Face Verified
+          </span>
+        ),
         description: "Your face will be saved when you complete registration.",
       });
     } catch (err) {

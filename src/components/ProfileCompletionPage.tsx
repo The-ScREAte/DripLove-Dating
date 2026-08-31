@@ -178,7 +178,11 @@ const ProfileCompletionPage = () => {
       setShowFaceVerification(false);
       
       toast({
-        title: "Face Verified! ✓",
+        title: (
+          <span className="inline-flex items-center gap-1.5">
+            <CheckCircle className="w-4 h-4 text-green-500" /> Face Verified
+          </span>
+        ),
         description: "Your face will be saved when you complete your profile.",
       });
     } catch (err) {
@@ -633,7 +637,7 @@ const ProfileCompletionPage = () => {
     try {
       const { sendPushNotification } = await import('@/services/pushNotifications');
       await sendPushNotification({
-        title: "Welcome to DripLove! 💕",
+        title: "Welcome to DripLove",
         body: t('profileCompletion.profileSetup'),
         userId: user.id,
         type: 'system',

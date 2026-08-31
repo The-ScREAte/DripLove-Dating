@@ -6,7 +6,7 @@ import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Heart, RotateCcw, Users, Check, X, Globe } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
@@ -490,7 +490,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       if (restoreResult.restored) {
         // Successfully restored - redirect to success page
         toast({
-          title: '✅ Subscription Restored!',
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-500" /> Subscription Restored
+            </span>
+          ),
           description: 'Redirecting to your premium account...',
         });
         // Small delay for toast to show
@@ -519,7 +523,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         
         if (subData?.status === 'active' && new Date(subData.expires_at) > new Date()) {
           toast({
-            title: '✅ Subscription Active!',
+            title: (
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-500" /> Subscription Active
+            </span>
+          ),
             description: 'Your subscription is active. Redirecting...',
           });
           setTimeout(() => {

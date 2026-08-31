@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -1726,7 +1727,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
       // Send test notification
       if (Notification.permission === 'granted') {
-        new Notification('DripLove Test 🔔', {
+        new Notification('DripLove Test', {
           body: 'Notifications are working! You\'ll receive alerts for new messages.',
           icon: '/favicon.ico'
         });
@@ -1991,7 +1992,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
               <div className="mb-6">
                 <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
-                  <span className="text-5xl">💬</span>
+                  <MessageCircle className="w-10 h-10 text-pink-400" />
                 </div>
               </div>
               <h3 className="text-xl font-bold text-white mb-3">

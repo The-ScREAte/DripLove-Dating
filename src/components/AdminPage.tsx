@@ -758,7 +758,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Send push notification to blocked user
       try {
         await sendAdminNotification(
-          '🚫 Account Blocked',
+          'Account Blocked',
           'Your account has been blocked due to community guideline violations. Please contact support if you believe this is an error.',
           reportedUserId
         );
@@ -1185,15 +1185,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       try {
         const notificationMessages = {
           'active': {
-            title: '✅ Account Activated',
-            body: 'Your account has been activated. You can now use all features of the app!'
+            title: 'Account Activated',
+            body: 'Your account has been activated. You can now use all features of the app.'
           },
           'on_hold': {
-            title: '⏸️ Account On Hold',
+            title: 'Account On Hold',
             body: 'Your account has been placed on hold pending review. Please contact support for more information.'
           },
           'blocked': {
-            title: '🚫 Account Blocked',
+            title: 'Account Blocked',
             body: 'Your account has been blocked due to policy violations. Contact support if you believe this is an error.'
           }
         };

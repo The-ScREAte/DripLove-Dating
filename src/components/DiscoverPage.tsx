@@ -49,7 +49,7 @@ import {
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Gamepad2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, X, Crown, Gamepad2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -3422,7 +3422,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
     if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
       toast({
-        title: 'One sec 💕',
+        title: (
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 className="w-4 h-4 animate-spin" /> One Moment
+          </span>
+        ),
         description: 'Checking your swipe balance...',
         duration: 1500,
       });
@@ -3725,7 +3729,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
     if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
       toast({
-        title: 'One sec 💕',
+        title: (
+          <span className="inline-flex items-center gap-1.5">
+            <Loader2 className="w-4 h-4 animate-spin" /> One Moment
+          </span>
+        ),
         description: 'Checking your swipe balance...',
         duration: 1500,
       });
@@ -3912,7 +3920,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // ⭐ NEW: Show notification if this user already liked you (but still allow the pass)
     if (usersWhoLikedMeIds.includes(currentMatch.id)) {
       toast({
-        title: `${currentMatch.first_name} already likes you 💕`,
+        title: (
+          <span className="inline-flex items-center gap-1.5">
+            <Heart className="w-4 h-4 text-pink-500" /> {currentMatch.first_name} already likes you
+          </span>
+        ),
         description: 'Want to give them a chance?',
         duration: 3000,
       });

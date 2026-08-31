@@ -81,8 +81,8 @@ serve(async (req) => {
       )
     }
 
-    const title = "💕 Welcome to DripLove!"
-    const body = "You will find love—no matter how long it takes. Stay assured. 💕💕"
+    const title = "Welcome to DripLove"
+    const body = "You will find love, no matter how long it takes. Stay assured."
 
     // Get user's push tokens
     const { data: tokens } = await supabase

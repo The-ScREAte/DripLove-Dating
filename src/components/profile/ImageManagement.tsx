@@ -530,8 +530,12 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         // Clear replacing state
         setReplacingImageUrl(null);
 
-        toast({ 
-          title: "✅ Image replaced successfully", 
+        toast({
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-500" /> Image Replaced Successfully
+            </span>
+          ),
           description: requiresReview 
             ? "Your new image requires admin review before being visible to others."
             : "Your image has been replaced and is now visible to others.",
@@ -591,14 +595,22 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           
         // Show appropriate success message AFTER successful upload
         if (requiresReview) {
-          toast({ 
-            title: "🔒 Image uploaded - Pending approval", 
+          toast({
+            title: (
+              <span className="inline-flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-amber-500" /> Image Uploaded - Pending Approval
+              </span>
+            ),
             description: "Your image requires admin review before others can see it.",
             variant: "default"
           });
         } else {
-          toast({ 
-            title: "✅ Image uploaded successfully", 
+          toast({
+            title: (
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-green-500" /> Image Uploaded Successfully
+              </span>
+            ),
             description: "Your image has been approved and is now visible to others.",
             variant: "default"
           });
@@ -860,8 +872,8 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
               {/* Pending approval indicator */}
               {userImage.is_approved === false && !pending && (
-                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                  🔒 Reviewing...
+                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                  <Shield className="w-3 h-3" /> Reviewing...
                 </div>
               )}
 
