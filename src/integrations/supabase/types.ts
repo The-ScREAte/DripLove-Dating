@@ -47,44 +47,178 @@ export type Database = {
       ads: {
         Row: {
           about: string
+          budget_per_day: number | null
+          business_name: string | null
+          campaign_ends_at: string | null
+          campaign_started_at: string | null
+          clicks: number
+          contact_email: string | null
+          contact_phone: string | null
+          contact_phone_country: string | null
           created_at: string
+          created_by: string | null
+          duration_days: number | null
+          estimated_impressions_max: number | null
+          estimated_impressions_min: number | null
           id: string
           image_url: string
+          impressions: number
           is_active: boolean
           link: string | null
           link_as: string | null
           media_type: string
           name: string
+          placement: string
+          stripe_payment_intent_id: string | null
+          target_age_max: number | null
+          target_age_min: number | null
           target_countries: string[] | null
+          target_genders: string[]
+          total_budget: number | null
           video_url: string | null
         }
         Insert: {
           about: string
+          budget_per_day?: number | null
+          business_name?: string | null
+          campaign_ends_at?: string | null
+          campaign_started_at?: string | null
+          clicks?: number
+          contact_email?: string | null
+          contact_phone?: string | null
+          contact_phone_country?: string | null
           created_at?: string
+          created_by?: string | null
+          duration_days?: number | null
+          estimated_impressions_max?: number | null
+          estimated_impressions_min?: number | null
           id?: string
           image_url: string
+          impressions?: number
           is_active?: boolean
           link?: string | null
           link_as?: string | null
           media_type?: string
           name: string
+          placement?: string
+          stripe_payment_intent_id?: string | null
+          target_age_max?: number | null
+          target_age_min?: number | null
           target_countries?: string[] | null
+          target_genders?: string[]
+          total_budget?: number | null
           video_url?: string | null
         }
         Update: {
           about?: string
+          budget_per_day?: number | null
+          business_name?: string | null
+          campaign_ends_at?: string | null
+          campaign_started_at?: string | null
+          clicks?: number
+          contact_email?: string | null
+          contact_phone?: string | null
+          contact_phone_country?: string | null
           created_at?: string
+          created_by?: string | null
+          duration_days?: number | null
+          estimated_impressions_max?: number | null
+          estimated_impressions_min?: number | null
           id?: string
           image_url?: string
+          impressions?: number
           is_active?: boolean
           link?: string | null
           link_as?: string | null
           media_type?: string
           name?: string
+          placement?: string
+          stripe_payment_intent_id?: string | null
+          target_age_max?: number | null
+          target_age_min?: number | null
           target_countries?: string[] | null
+          target_genders?: string[]
+          total_budget?: number | null
           video_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      advertiser_profiles: {
+        Row: {
+          business_name: string
+          card_brand: string | null
+          card_last4: string | null
+          contact_email: string
+          contact_phone: string
+          contact_phone_country: string
+          created_at: string
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_payment_method_id: string | null
+          terms_accepted_at: string
+          updated_at: string
+        }
+        Insert: {
+          business_name: string
+          card_brand?: string | null
+          card_last4?: string | null
+          contact_email: string
+          contact_phone: string
+          contact_phone_country: string
+          created_at?: string
+          id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          terms_accepted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          business_name?: string
+          card_brand?: string | null
+          card_last4?: string | null
+          contact_email?: string
+          contact_phone?: string
+          contact_phone_country?: string
+          created_at?: string
+          id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_method_id?: string | null
+          terms_accepted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advertiser_profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advertiser_profiles_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       app_settings: {
         Row: {
@@ -491,6 +625,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_suppression_list: {
+        Row: {
+          broadcast_id: string | null
+          created_at: string
+          email: string
+          last_error: string | null
+          reason: string
+        }
+        Insert: {
+          broadcast_id?: string | null
+          created_at?: string
+          email: string
+          last_error?: string | null
+          reason: string
+        }
+        Update: {
+          broadcast_id?: string | null
+          created_at?: string
+          email?: string
+          last_error?: string | null
+          reason?: string
+        }
+        Relationships: []
       }
       enabled_countries: {
         Row: {
@@ -1919,6 +2077,10 @@ export type Database = {
           status: string
         }[]
       }
+      admin_set_influencer_password: {
+        Args: { p_new_password: string; p_promo_code_id: string }
+        Returns: Json
+      }
       admin_set_premium_subscription: {
         Args: { months_count: number; target_user_id: string }
         Returns: boolean
@@ -2020,6 +2182,14 @@ export type Database = {
           country_name: string
         }[]
       }
+      get_influencer_full_stats: {
+        Args: { p_promo_code_id: string }
+        Returns: Json
+      }
+      get_influencer_referred_users: {
+        Args: { p_code: string; p_password: string }
+        Returns: Json
+      }
       get_influencer_stats_usd: {
         Args: { p_promo_code_id: string }
         Returns: Json
@@ -2062,6 +2232,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_ad_click: { Args: { ad_id: string }; Returns: undefined }
+      increment_ad_impression: { Args: { ad_id: string }; Returns: undefined }
       increment_email_account_usage: {
         Args: { p_account_email: string; p_amount?: number }
         Returns: number
@@ -2130,7 +2302,7 @@ export type Database = {
         Returns: number
       }
       request_influencer_payout: {
-        Args: { p_amount: number; p_promo_code_id: string }
+        Args: { p_amount_ghs: number; p_code: string; p_password: string }
         Returns: Json
       }
       set_influencer_password: {
@@ -2151,6 +2323,10 @@ export type Database = {
         Returns: Json
       }
       validate_promo_code: { Args: { code_input: string }; Returns: Json }
+      validate_promo_code_setup_link: {
+        Args: { p_promo_code_id: string; p_token: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

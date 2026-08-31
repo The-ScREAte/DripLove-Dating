@@ -66,7 +66,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
         { timeout: 1200 }
       );
     } else {
-      timeoutId = window.setTimeout(preloadInBackground, 150);
+      timeoutId = globalThis.setTimeout(preloadInBackground, 150) as unknown as number;
     }
 
     return () => {
