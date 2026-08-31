@@ -637,7 +637,7 @@ const ProfileCompletionPage = () => {
     try {
       const { sendPushNotification } = await import('@/services/pushNotifications');
       await sendPushNotification({
-        title: "Welcome to DripLove",
+        title: "Welcome to DripLove 💕",
         body: t('profileCompletion.profileSetup'),
         userId: user.id,
         type: 'system',

@@ -143,8 +143,8 @@ export const usePushNotifications = (userId?: string) => {
     }
 
     const success = await sendNotification({
-      title: "It's a Match!",
-      body: `You and ${matchedUserName} liked each other!`,
+      title: "It's a Match! 🔥",
+      body: `You and ${matchedUserName} liked each other. Say hello!`,
       userId: targetUserId,
       type: 'match',
       data: { matchedUserName }
@@ -199,8 +199,8 @@ export const usePushNotifications = (userId?: string) => {
     // If threshold reached, send notification
     if (shouldNotify && !isUserActive()) {
       const success = await sendNotification({
-        title: 'New Interest',
-        body: 'People are showing interest in you. Check them out!',
+        title: 'Someone Likes You ✨',
+        body: 'You caught someone\'s eye. Tap to see who\'s interested.',
         userId: targetUserId,
         type: 'like',
         data: { likeCount: likeCount.toString() }
@@ -227,8 +227,8 @@ export const usePushNotifications = (userId?: string) => {
 
     if (shouldNotify && !isUserActive()) {
       const success = await sendNotification({
-        title: 'New Interest',
-        body: 'People are showing interest in you. Check them out!',
+        title: 'Someone Likes You ✨',
+        body: 'You caught someone\'s eye. Tap to see who\'s interested.',
         userId: targetUserId,
         type: 'like',
         data: { likeCount: currentCount.toString() }
