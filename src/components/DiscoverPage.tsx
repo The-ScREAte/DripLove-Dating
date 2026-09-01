@@ -3101,6 +3101,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         } else {
           handlePass();
         }
+        // Snap the (reused) card element back to center with no transition, so the
+        // next profile appears in place instead of flying in from off-screen.
+        if (cardElRef.current) {
+          cardElRef.current.style.transition = 'none';
+          cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+        }
         setExitingCard(false);
         setExitDirection(null);
       }, 400); // Animation duration
@@ -3195,6 +3201,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // Wait for animation to complete before executing action
         setTimeout(() => {
           if (deltaX > 0) handleLike(); else handlePass();
+          if (cardElRef.current) {
+            cardElRef.current.style.transition = 'none';
+            cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+          }
           setExitingCard(false);
           setExitDirection(null);
         }, 400); // Animation duration
