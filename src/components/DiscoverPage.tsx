@@ -3005,7 +3005,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     latestDeltaYRef.current = deltaY;
     if (!rafScheduledRef.current) {
       rafScheduledRef.current = true;
-      requestAnimationFrame(() => {
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        // The drag may have ended (and an exit animation started) between this
+        // frame being scheduled and it running. Writing the transform now would
+        // stomp the exit transform and snap the card back to center.
+        if (!isDraggingRef.current) {
+          rafScheduledRef.current = false;
+          return;
+        }
         const d = latestDeltaRef.current;
         const dy = latestDeltaYRef.current;
         // Write the transform straight to the DOM first, ahead of the state update
