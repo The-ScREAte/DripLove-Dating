@@ -869,6 +869,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const latestDeltaRef = useRef(0);
   const latestDeltaYRef = useRef(0);
   const rafScheduledRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
   // Ref to whichever card element is currently mounted (the regular swipe card
   // or the ad-card variant - only one is ever rendered at a time, both attach
   // the same ref). During an active drag, the transform is written directly to

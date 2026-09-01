@@ -76,15 +76,10 @@ const ImageSlide = React.memo<{
         decoding="async"
         src={imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        // object-cover, not object-contain: registration photos never go through
-        // PhotoCropModal's 3:4 crop at all (only the separate "edit photo" flow
-        // does), so most uploaded photos keep their native camera aspect ratio -
-        // frequently much taller/narrower than this box. object-contain assumed
-        // every photo was already a clean 3:4 crop and shrank anything that
-        // wasn't down to a narrow pillarboxed strip. object-cover fills the box
-        // for every photo regardless of its original shape, cropping symmetrically
-        // from the center instead - the standard behavior for a swipe-card photo.
-        className={`w-full h-full object-cover object-center relative z-10 ${styles.optimizedImage}`}
+        // object-contain on a black box: the whole photo always fits inside the
+        // content area (identical to the profile preview) on every device,
+        // including Android where cover was cropping the sides/top off.
+        className={`w-full h-full object-contain object-center relative z-10 ${styles.optimizedImage}`}
         draggable={false}
         onError={() => setHasError(true)}
       />
