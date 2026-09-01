@@ -3062,18 +3062,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const screenWidth = window.innerWidth;
 
     // Swipe threshold
-    const SWIPE_RATIO = 0.35;
-    const minSwipeDistance = screenWidth * SWIPE_RATIO;
+    const SWIPE_RATIO = 0.25;
+    const minSwipeDistance = Math.min(screenWidth * SWIPE_RATIO, 120);
 
-    // Reset visual smear (flush any pending rAF)
+    // Reset visual smear and kill any frame still queued from the drag — if it ran
+    // after this point it would overwrite the exit transform below.
     latestDeltaRef.current = 0;
     latestDeltaYRef.current = 0;
-    if (rafScheduledRef.current) rafScheduledRef.current = false;
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    rafScheduledRef.current = false;
     setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0 }));
 
     if (Math.abs(deltaX) > minSwipeDistance) {
+      const dir: 'left' | 'right' = deltaX > 0 ? 'right' : 'left';
+      // Drive the fly-away straight on the element too. The card's live transform was
+      // written imperatively during the drag, so React's own style update alone can be
+      // skipped or land a frame late — which is what made the card spring back to
+      // center before vanishing instead of continuing off-screen the way it was thrown.
+      if (cardElRef.current) {
+        const exitX = dir === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
+        const exitY = window.innerHeight * 0.3;
+        const rotation = dir === 'right' ? 24 : -24;
+        cardElRef.current.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+        cardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
+      }
       // Trigger exit animation
-      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      setExitDirection(dir);
       setExitingCard(true);
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
 
@@ -3088,6 +3105,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         setExitDirection(null);
       }, 400); // Animation duration
     } else {
+      // Below threshold: spring back to center from wherever the finger left it.
+      if (cardElRef.current) {
+        cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+        cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+      }
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
     }
   };
