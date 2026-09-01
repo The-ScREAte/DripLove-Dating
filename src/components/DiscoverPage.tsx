@@ -3138,7 +3138,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       latestDeltaYRef.current = deltaY;
       if (!rafScheduledRef.current) {
         rafScheduledRef.current = true;
-        requestAnimationFrame(() => {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          if (!isDraggingRef.current) {
+            rafScheduledRef.current = false;
+            return;
+          }
           const d = latestDeltaRef.current;
           const dy = latestDeltaYRef.current;
           if (cardElRef.current) {
@@ -3157,24 +3162,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const onWindowMouseUp = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-    lastPushedDirRef.current = null;
-    lastPushedDistRef.current = 0;
+      lastPushedDirRef.current = null;
+      lastPushedDistRef.current = 0;
       setSwipeUI(prev => ({ ...prev, isDragging: false }));
       // compute final deltas
       const deltaX = ev.clientX - startXRef.current;
-      const deltaY = Math.abs(ev.clientY - startYRef.current);
 
       // Swipe threshold
-      const SWIPE_MIN_DESKTOP = 80;
-      const minSwipeDistance = SWIPE_MIN_DESKTOP;
-      // Reset visual smear (flush any pending rAF)
+      const minSwipeDistance = 80;
+      // Reset visual smear and cancel any frame still queued from the drag
       latestDeltaRef.current = 0;
       latestDeltaYRef.current = 0;
-      if (rafScheduledRef.current) rafScheduledRef.current = false;
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      rafScheduledRef.current = false;
       setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0, swipeDirection: null }));
       if (Math.abs(deltaX) > minSwipeDistance) {
+        const dir: 'left' | 'right' = deltaX > 0 ? 'right' : 'left';
+        if (cardElRef.current) {
+          const exitX = dir === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
+          const exitY = window.innerHeight * 0.3;
+          const rotation = dir === 'right' ? 24 : -24;
+          cardElRef.current.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+          cardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
+        }
         // Trigger exit animation
-        setExitDirection(deltaX > 0 ? 'right' : 'left');
+        setExitDirection(dir);
         setExitingCard(true);
 
         // Wait for animation to complete before executing action
@@ -3183,6 +3198,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           setExitingCard(false);
           setExitDirection(null);
         }, 400); // Animation duration
+      } else if (cardElRef.current) {
+        cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+        cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
       }
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);
