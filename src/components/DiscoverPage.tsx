@@ -869,6 +869,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const latestDeltaRef = useRef(0);
   const latestDeltaYRef = useRef(0);
   const rafScheduledRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
   // Ref to whichever card element is currently mounted (the regular swipe card
   // or the ad-card variant - only one is ever rendered at a time, both attach
   // the same ref). During an active drag, the transform is written directly to
@@ -3004,7 +3005,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     latestDeltaYRef.current = deltaY;
     if (!rafScheduledRef.current) {
       rafScheduledRef.current = true;
-      requestAnimationFrame(() => {
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        // The drag may have ended (and an exit animation started) between this
+        // frame being scheduled and it running. Writing the transform now would
+        // stomp the exit transform and snap the card back to center.
+        if (!isDraggingRef.current) {
+          rafScheduledRef.current = false;
+          return;
+        }
         const d = latestDeltaRef.current;
         const dy = latestDeltaYRef.current;
         // Write the transform straight to the DOM first, ahead of the state update
@@ -3053,18 +3062,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const screenWidth = window.innerWidth;
 
     // Swipe threshold
-    const SWIPE_RATIO = 0.35;
-    const minSwipeDistance = screenWidth * SWIPE_RATIO;
+    const SWIPE_RATIO = 0.25;
+    const minSwipeDistance = Math.min(screenWidth * SWIPE_RATIO, 120);
 
-    // Reset visual smear (flush any pending rAF)
+    // Reset visual smear and kill any frame still queued from the drag — if it ran
+    // after this point it would overwrite the exit transform below.
     latestDeltaRef.current = 0;
     latestDeltaYRef.current = 0;
-    if (rafScheduledRef.current) rafScheduledRef.current = false;
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    rafScheduledRef.current = false;
     setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0 }));
 
     if (Math.abs(deltaX) > minSwipeDistance) {
+      const dir: 'left' | 'right' = deltaX > 0 ? 'right' : 'left';
+      // Drive the fly-away straight on the element too. The card's live transform was
+      // written imperatively during the drag, so React's own style update alone can be
+      // skipped or land a frame late — which is what made the card spring back to
+      // center before vanishing instead of continuing off-screen the way it was thrown.
+      if (cardElRef.current) {
+        const exitX = dir === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
+        const exitY = window.innerHeight * 0.3;
+        const rotation = dir === 'right' ? 24 : -24;
+        cardElRef.current.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+        cardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
+      }
       // Trigger exit animation
-      setExitDirection(deltaX > 0 ? 'right' : 'left');
+      setExitDirection(dir);
       setExitingCard(true);
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
 
@@ -3075,10 +3101,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         } else {
           handlePass();
         }
+        // Snap the (reused) card element back to center with no transition, so the
+        // next profile appears in place instead of flying in from off-screen.
+        if (cardElRef.current) {
+          cardElRef.current.style.transition = 'none';
+          cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+        }
         setExitingCard(false);
         setExitDirection(null);
       }, 400); // Animation duration
     } else {
+      // Below threshold: spring back to center from wherever the finger left it.
+      if (cardElRef.current) {
+        cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+        cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+      }
       setSwipeUI(prev => ({ ...prev, swipeDirection: null }));
     }
   };
@@ -3107,7 +3144,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       latestDeltaYRef.current = deltaY;
       if (!rafScheduledRef.current) {
         rafScheduledRef.current = true;
-        requestAnimationFrame(() => {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          if (!isDraggingRef.current) {
+            rafScheduledRef.current = false;
+            return;
+          }
           const d = latestDeltaRef.current;
           const dy = latestDeltaYRef.current;
           if (cardElRef.current) {
@@ -3126,32 +3168,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const onWindowMouseUp = (ev: MouseEvent) => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-    lastPushedDirRef.current = null;
-    lastPushedDistRef.current = 0;
+      lastPushedDirRef.current = null;
+      lastPushedDistRef.current = 0;
       setSwipeUI(prev => ({ ...prev, isDragging: false }));
       // compute final deltas
       const deltaX = ev.clientX - startXRef.current;
-      const deltaY = Math.abs(ev.clientY - startYRef.current);
 
       // Swipe threshold
-      const SWIPE_MIN_DESKTOP = 80;
-      const minSwipeDistance = SWIPE_MIN_DESKTOP;
-      // Reset visual smear (flush any pending rAF)
+      const minSwipeDistance = 80;
+      // Reset visual smear and cancel any frame still queued from the drag
       latestDeltaRef.current = 0;
       latestDeltaYRef.current = 0;
-      if (rafScheduledRef.current) rafScheduledRef.current = false;
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      rafScheduledRef.current = false;
       setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0, swipeDirection: null }));
       if (Math.abs(deltaX) > minSwipeDistance) {
+        const dir: 'left' | 'right' = deltaX > 0 ? 'right' : 'left';
+        if (cardElRef.current) {
+          const exitX = dir === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
+          const exitY = window.innerHeight * 0.3;
+          const rotation = dir === 'right' ? 24 : -24;
+          cardElRef.current.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+          cardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
+        }
         // Trigger exit animation
-        setExitDirection(deltaX > 0 ? 'right' : 'left');
+        setExitDirection(dir);
         setExitingCard(true);
 
         // Wait for animation to complete before executing action
         setTimeout(() => {
           if (deltaX > 0) handleLike(); else handlePass();
+          if (cardElRef.current) {
+            cardElRef.current.style.transition = 'none';
+            cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+          }
           setExitingCard(false);
           setExitDirection(null);
         }, 400); // Animation duration
+      } else if (cardElRef.current) {
+        cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+        cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
       }
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);

@@ -590,6 +590,7 @@ export type Database = {
       }
       email_send_queue: {
         Row: {
+          attempt_count: number
           broadcast_id: string
           created_at: string | null
           error: string | null
@@ -599,6 +600,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          attempt_count?: number
           broadcast_id: string
           created_at?: string | null
           error?: string | null
@@ -608,6 +610,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          attempt_count?: number
           broadcast_id?: string
           created_at?: string | null
           error?: string | null
