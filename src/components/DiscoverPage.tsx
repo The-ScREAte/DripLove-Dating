@@ -582,9 +582,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   
   const { preloadImages, cancelImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
-    quality: 60,
-    width: 500
+    // Cards are full-bleed on modern 2x/3x phones - 500px @ q60 was visibly soft.
+    quality: 82,
+    width: 1080
   });
+
 
   // Track in-flight image load requests to avoid duplicate DB calls
   const requestedImageProfileIds = useRef<Set<string>>(new Set());
