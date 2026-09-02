@@ -70,21 +70,27 @@ const ImageSlide = React.memo<{
     // Discover, Liked Me, and the profile preview, so it's the most direct place
     // to guarantee a tall/portrait photo can never influence this box's own size.
     <div className="absolute inset-0 bg-black overflow-hidden flex items-center justify-center">
-      <img
-        key={imageSrc}
-        loading="eager"
-        decoding="async"
-        src={imageSrc}
-        alt={`${matchFirstName} ${matchLastName}`}
-        // object-contain on a black box: the whole photo always fits inside the
-        // content area (identical to the profile preview) on every device,
-        // including Android where cover was cropping the sides/top off.
-        className={`w-full h-full object-contain object-center relative z-10 ${styles.optimizedImage}`}
-        draggable={false}
-        onError={() => setHasError(true)}
-      />
+      {/* Pure-CSS 3:4 frame (the exact aspect the cropper produces). No JS
+          measurement is involved, so it can never render "slim" on first paint
+          and then correct itself later — it is identical on iOS, Android and web. */}
+      <div
+        className="relative overflow-hidden bg-black"
+        style={{ width: '100%', maxWidth: '100%', maxHeight: '100%', aspectRatio: '3 / 4' }}
+      >
+        <img
+          key={imageSrc}
+          loading="eager"
+          decoding="async"
+          src={imageSrc}
+          alt={`${matchFirstName} ${matchLastName}`}
+          className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
+          draggable={false}
+          onError={() => setHasError(true)}
+        />
+      </div>
     </div>
   );
+
 
 });
 ImageSlide.displayName = 'ImageSlide';
