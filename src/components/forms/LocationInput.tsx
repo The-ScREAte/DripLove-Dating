@@ -160,7 +160,8 @@ const LocationInput = ({
       setCityInput('');
       setIsCustomCity(false);
       setCoordinates({});
-      setShowCitySuggestions(true);
+      // Never auto-open the city list - it only opens when the user taps the field.
+      setShowCitySuggestions(false);
       
       // Update parent
       onLocationChange({
@@ -259,8 +260,8 @@ const LocationInput = ({
           variant: "default"
         });
       } else {
-        // No city detected, show suggestions so user can select
-        setShowCitySuggestions(true);
+        // No city detected - leave the list closed; it opens when the user taps the field.
+        setShowCitySuggestions(false);
         
         onLocationChange({
           country: result.countryName,
@@ -374,7 +375,7 @@ const LocationInput = ({
       setCityInput('');
       setIsCustomCity(false);
       setCoordinates({});
-      setShowCitySuggestions(true); // Show suggestions immediately when country is selected
+      setShowCitySuggestions(false); // Stay closed until the user taps the city field
       
       // Lock country immediately after manual selection (can't be changed)
       if (!isProfileEdit) {

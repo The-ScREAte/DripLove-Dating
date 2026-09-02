@@ -53,7 +53,7 @@ const formatRelationshipIntent = (intent?: string | null) => {
 const getSafeImageSrc = (url?: string): string | undefined => {
   if (!url) return undefined;
   if (url.startsWith('blob:')) return url;
-  if (url.includes('supabase')) return optimizeImageUrl(url, { width: 520, quality: 60 });
+  if (url.includes('supabase')) return optimizeImageUrl(url, { width: 1080, quality: 82 });
   return url;
 };
 

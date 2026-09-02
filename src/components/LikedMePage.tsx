@@ -199,12 +199,13 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       // Blob URLs always safe
       if (urlOrBlob.startsWith("blob:")) return urlOrBlob;
 
-      // Optimize remote URLs for faster loading
-      // Grid thumbnails: 400x400 quality 70, Profile images: 520x520 quality 70
+      // Optimize remote URLs for faster loading (sized for retina screens so
+      // cards don't look soft on 2x/3x devices).
       if (urlOrBlob.includes('supabase')) {
-        const width = isGridThumbnail ? 400 : 520;
-        return optimizeImageUrl(urlOrBlob, { width, quality: 60 });
+        const width = isGridThumbnail ? 700 : 1080;
+        return optimizeImageUrl(urlOrBlob, { width, quality: 82 });
       }
+
       return urlOrBlob;
     },
     []
