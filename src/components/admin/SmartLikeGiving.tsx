@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { getCountriesList } from '@/constants/locationData';
-import { Heart, Users, Search, Check, X, Loader2, UserPlus, Filter } from 'lucide-react';
+import { Heart, Users, Search, Check, X, Loader2, UserPlus, Filter, Undo2 } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -34,6 +34,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
   const [existingLikes, setExistingLikes] = useState<Set<string>>(new Set());
   const [loadingLikes, setLoadingLikes] = useState(false);
   const [allReceivers, setAllReceivers] = useState<UserProfile[]>([]);
@@ -256,6 +257,42 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     }
   };
 
+  // Reverts (deletes) every like this giver has given - used to undo likes
+  // that were seeded from a demo/test account (e.g. "Ashley") once real
+  // production data no longer needs them.
+  const handleRevertAllLikes = async () => {
+    if (!selectedGiver || existingLikes.size === 0) return;
+
+    setIsReverting(true);
+    try {
+      const { error, count } = await supabase
+        .from('likes')
+        .delete({ count: 'exact' })
+        .eq('liker_id', selectedGiver);
+
+      if (error) throw error;
+
+      setExistingLikes(new Set());
+      setSelectedReceivers(new Set());
+
+      toast({
+        title: 'Likes Reverted',
+        description: `Removed ${count ?? 'all'} likes given by ${giverUser?.first_name || 'this user'}.`
+      });
+
+      onLikesCreated();
+    } catch (err) {
+      console.error('Error reverting likes:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to revert likes',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
   const giverUser = users.find(u => u.id === selectedGiver);
 
   return (
@@ -453,6 +490,28 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                 <span>Showing {filteredReceivers.length} of {allReceivers.length} users</span>
                 <span className="text-pink-600">{existingLikes.size} already liked by this user</span>
               </div>
+
+              {existingLikes.size > 0 && (
+                <Button
+                  onClick={handleRevertAllLikes}
+                  disabled={isReverting}
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-8 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  {isReverting ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                      Reverting...
+                    </>
+                  ) : (
+                    <>
+                      <Undo2 className="w-3 h-3 mr-2" />
+                      Revert All {existingLikes.size} Likes Given by {giverUser?.first_name || 'This User'}
+                    </>
+                  )}
+                </Button>
+              )}
             </>
           )}
         </div>

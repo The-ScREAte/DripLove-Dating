@@ -80,6 +80,14 @@ const uniqUuids = (values: unknown[]): string[] => Array.from(new Set(values.fil
 
 const likedMePollIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
+// Throttles the "refresh in background" call that fires whenever this page
+// (re)mounts. Without this, switching tabs/navigating back to Liked Me
+// re-triggers a background refetch every time even though the cache is
+// only seconds old, and the wholesale list/image swap it performs is what
+// caused the visible "loads, then reloads to the right thing" flash.
+const LIKED_ME_BACKGROUND_REFRESH_THROTTLE = 20 * 1000; // 20 seconds
+const likedMeLastBackgroundFetchAt = new Map<string, number>();
+
 const hasListChanged = (previous: LikerProfile[], next: LikerProfile[]) => {
   if (previous.length !== next.length) return true;
   const prevMap = new Map(previous.map(p => [p.id, p.updated_at]));
@@ -483,6 +491,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const fetchLikersInBackground = useCallback(async () => {
     if (!currentUser?.id || backgroundFetchingRef.current) return;
     backgroundFetchingRef.current = true;
+    likedMeLastBackgroundFetchAt.set(currentUser.id, Date.now());
 
     try {
       const result = await fetchLikersData(currentUser.id);
@@ -500,6 +509,15 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
           likedMeCache.set(currentUser.id, cacheValue);
           writeCacheToStorage(currentUser.id, cacheValue);
+
+          // Cancel any in-flight blob preload from a previous fetch - otherwise
+          // it can resolve after this swap and stomp a fresh image URL with a
+          // stale blob for a liker who is no longer even in the new list,
+          // which is what made images sometimes show the wrong/broken photo.
+          if (preloadAbortRef.current) {
+            preloadAbortRef.current.abort();
+            preloadAbortRef.current = null;
+          }
 
           setLikers(newLikers);
           setUserImages(newUserImages);
@@ -718,8 +736,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       setUserImages(cached.userImages);
       setLoading(false);
 
-      // 👉 Always refresh in background (non-blocking)
-      fetchLikersInBackground();
+      // 👉 Refresh in background (non-blocking) - but only if we haven't
+      // just done so. Re-firing this on every mount (e.g. switching tabs
+      // back to Liked Me) is what caused the list/images to visibly swap
+      // right after appearing correct.
+      const lastFetch = likedMeLastBackgroundFetchAt.get(currentUser.id) || 0;
+      if (Date.now() - lastFetch > LIKED_ME_BACKGROUND_REFRESH_THROTTLE) {
+        fetchLikersInBackground();
+      }
     } else {
       // No cache at all → do a real fetch
       fetchLikers();

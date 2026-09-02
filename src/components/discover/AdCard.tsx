@@ -5,6 +5,9 @@ import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { supabase } from '@/integrations/supabase/client';
 
 const ADVERTISE_EMAIL = 'driploveinfo@gmail.com';
+// Roughly what fits on 2 lines of the card's "about" text at its normal
+// width - same threshold the old line-clamp-2 approach targeted.
+const ABOUT_TRUNCATE_LENGTH = 80;
 
 interface AdCardProps {
   ad: {
@@ -35,6 +38,12 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAna
   const videoRef = useRef<HTMLVideoElement>(null);
   const isVideo = ad.media_type === 'video' && ad.video_url;
   const impressionTrackedRef = useRef<string | null>(null);
+  const isAboutLong = Boolean(ad.about && ad.about.length > ABOUT_TRUNCATE_LENGTH);
+  // Cut at a word boundary so the truncated text doesn't end mid-word right
+  // before the "...".
+  const truncatedAbout = isAboutLong
+    ? ad.about.slice(0, ABOUT_TRUNCATE_LENGTH).replace(/\s+\S*$/, '')
+    : ad.about;
 
   useEffect(() => {
     // Auto-play video when card is displayed
@@ -149,35 +158,64 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAna
           be fully solid black - same fix used for this exact seam in
           Discover's and the profile preview's own expanded info panels. */}
       <div className="px-4 pt-2 pb-5 bg-black relative" style={{ marginTop: '-2px' }}>
-        <h2 className="text-2xl font-bold mb-2 text-white">{ad.name}</h2>
-        <div className="mb-4 relative">
-          <p className={`text-gray-300 ${showFullAbout ? '' : 'line-clamp-2 pr-14'}`}>{ad.about}</p>
-          {!showFullAbout && ad.about && ad.about.length > 80 && (
-            // Sits on top of the clamped paragraph's last line instead of
-            // its own line below - the pr-14 above reserves room for it on
-            // both lines, and the solid black backdrop masks any text tail
-            // that would otherwise show through underneath the button.
-            <button
-              onClick={toggleAbout}
-              className="absolute right-0 bottom-0 bg-black pl-2 text-xs font-semibold text-pink-400"
-            >
-              See more
-            </button>
-          )}
-          {showFullAbout && ad.about && ad.about.length > 80 && (
-            <button
-              onClick={toggleAbout}
-              className="block text-xs font-semibold text-pink-400 mt-0.5"
-            >
-              See less
-            </button>
+        <h2 className="text-lg font-bold mb-1.5 text-white">{ad.name}</h2>
+        <div className="mb-4">
+          {/* "See more"/"See less" render as part of the paragraph's own text
+              flow (not absolutely positioned over it) so they always land
+              right after the "..." on the same line, wrapping naturally with
+              the text instead of relying on a CSS line-clamp height that
+              doesn't reliably match where an absolutely-positioned button
+              would sit. */}
+          {isAboutLong && !showFullAbout ? (
+            <p className="text-sm text-gray-300">
+              {truncatedAbout}...{' '}
+              <button
+                onClick={toggleAbout}
+                // Global mobile CSS forces every <button> to a 44px
+                // touch-target min-height (src/index.css) - fine for real
+                // buttons, but this is an inline text link inside a
+                // paragraph, and that forced height was blowing out the
+                // line box and leaving a big gap below the text. min-h-0
+                // (a Tailwind utility, so it beats the plain-CSS base rule
+                // regardless of source order) lets it size to its own text.
+                className="text-xs font-semibold text-pink-400 whitespace-nowrap min-h-0 inline"
+              >
+                See more
+              </button>
+            </p>
+          ) : (
+            <p className="text-sm text-gray-300">
+              {ad.about}
+              {isAboutLong && (
+                <>
+                  {' '}
+                  <button
+                    onClick={toggleAbout}
+                    // Global mobile CSS forces every <button> to a 44px
+                // touch-target min-height (src/index.css) - fine for real
+                // buttons, but this is an inline text link inside a
+                // paragraph, and that forced height was blowing out the
+                // line box and leaving a big gap below the text. min-h-0
+                // (a Tailwind utility, so it beats the plain-CSS base rule
+                // regardless of source order) lets it size to its own text.
+                className="text-xs font-semibold text-pink-400 whitespace-nowrap min-h-0 inline"
+                  >
+                    See less
+                  </button>
+                </>
+              )}
+            </p>
           )}
         </div>
 
         {ad.link && (
           <Button
             onClick={handleLinkClick}
-            className="w-full h-9 text-sm bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold"
+            // No fixed h-* here - letting the smaller py-2 padding set the
+            // height (instead of fighting the base Button's own h-10) is
+            // what actually shrinks it; rounded-full makes it a proper pill
+            // instead of the default rounded-md rectangle.
+            className="w-full h-auto py-2 rounded-full text-sm bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold"
           >
             <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
             {ad.link_as || 'Click here'}

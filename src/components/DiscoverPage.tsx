@@ -3022,9 +3022,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // to the finger even when the (much larger) surrounding re-render lags on
         // slower Android hardware.
         if (cardElRef.current) {
-          cardElRef.current.style.transform = currentMatch && isAd(currentMatch)
-            ? `translate3d(${d}px, 0, 0) rotate(${d * 0.08}deg)`
-            : `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
+          cardElRef.current.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
         }
         // Android smoothness: the transform above is already on screen this frame.
         // The React state below only drives the Nope/Yep overlays, so push it in
@@ -3153,9 +3151,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           const d = latestDeltaRef.current;
           const dy = latestDeltaYRef.current;
           if (cardElRef.current) {
-            cardElRef.current.style.transform = currentMatch && isAd(currentMatch)
-              ? `translate3d(${d}px, 0, 0) rotate(${d * 0.08}deg)`
-              : `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
+            cardElRef.current.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
           }
           setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: Math.abs(d), swipeDirection: d > 0 ? 'right' : 'left' }));
           rafScheduledRef.current = false;
@@ -4550,15 +4546,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
         const exitY = window.innerHeight * 0.3; // Fall down effect
         const rotation = exitDirection === 'right' ? 30 : -30;
-        return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
+        return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
       }
       if (swipeUI.isDragging) {
-        return `translate3d(${swipeUI.dragOffset}px, 0, 0) rotate(${swipeUI.dragOffset * 0.08}deg)`;
+        // Same 1:1 finger-follow as the profile card - moves on both axes with a
+        // natural tilt instead of being rail-locked to horizontal only.
+        return `translate3d(${swipeUI.dragOffset}px, ${swipeUI.dragOffsetY}px, 0) rotate(${swipeUI.dragOffset * 0.06}deg) scale(1)`;
       }
-      return '';
+      return 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
     };
-    
+
     const adCardTransform = getAdCardTransform();
+    // Same "flush at rest, rounds in the moment it's picked up or flung away" feel as
+    // the profile card - keeps the ad card visually identical to a real match card
+    // when the user is actually interacting with it.
+    const adCardIsLifted = swipeUI.isDragging || exitingCard;
+    const adCardCornerRadius = adCardIsLifted ? '26px' : '0px';
 
     return (
       <>
@@ -4579,13 +4582,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         <div ref={cardElRef} className="h-full w-full relative z-10 flex flex-col"
              style={{
                transform: adCardTransform,
-               transition: exitingCard 
-                 ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' // Smooth exit with slight bounce
-                 : swipeUI.isDragging 
-                   ? 'none' 
-                   : 'transform 0.2s ease-out',
+               transformOrigin: 'center center',
+               transition: exitingCard
+                 ? 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-radius 0.3s ease' // Smooth exit with slight bounce
+                 : swipeUI.isDragging
+                   ? 'border-radius 0.2s ease' // transform tracks the finger instantly; only radius eases
+                   : 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease, box-shadow 0.3s ease', // Springy snap-back
                willChange: 'transform',
-               boxShadow: swipeUI.isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.08)',
+               borderRadius: adCardCornerRadius,
+               overflow: 'hidden',
+               boxShadow: swipeUI.isDragging
+                 ? '0 14px 34px -8px rgba(0,0,0,0.28)'
+                 : exitingCard
+                   ? '0 20px 44px -10px rgba(0,0,0,0.3)'
+                   : '0 2px 8px rgba(0,0,0,0.08)',
                // Same fix as the main swipe card: this drives its own transform off both
                // axes via JS, so native touch-action panning must be fully disabled here
                // or it fights the manual drag (see the main discover-image-area for the
@@ -4596,6 +4606,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
              onTouchMove={handleTouchMove}
              onTouchEnd={handleTouchEnd}
              onMouseDown={handleMouseDown}>
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none transition-opacity duration-200"
+            style={{
+              border: '1.5px solid rgba(236,72,153,0.95)',
+              borderRadius: adCardCornerRadius,
+              opacity: swipeUI.isDragging ? 1 : 0,
+              zIndex: 30,
+            }}
+          />
           <AdCard ad={currentMatch} onSwipe={moveToNext} onAdvertiseClick={onNavigateToAdvertise} trackAnalytics />
           <SwipeButtons
             onReverse={handleReverse}

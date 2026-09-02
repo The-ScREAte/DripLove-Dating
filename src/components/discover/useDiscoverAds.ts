@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeCountryCode } from '@/utils/countryCode';
@@ -10,6 +10,38 @@ import { normalizeCountryCodeList } from './discoverFeedUtils';
 import { AdData, AdsRow, MatchOrAd } from './discoverTypes';
 
 const isAd = (match: MatchOrAd): match is AdData => (match as AdData).isAd === true;
+
+interface AdCadenceState {
+  totalSwipes: number;
+  nextAdAt: number;
+  adSpinIndex: number;
+}
+
+// Persists the swipe-cadence counters across app closes/reopens - without
+// this, a cold start would reset the countdown to the next ad every time,
+// even mid-way through it. Scoped per user per day so it naturally rolls
+// over daily, same as the ad shuffle seed below.
+const getCadenceStorageKey = (userId: string) => `discoverAdCadence_v1_${userId}_${new Date().toISOString().split('T')[0]}`;
+
+const readCadenceFromStorage = (userId: string): AdCadenceState | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(getCadenceStorageKey(userId));
+    if (!raw) return null;
+    return JSON.parse(raw) as AdCadenceState;
+  } catch {
+    return null;
+  }
+};
+
+const writeCadenceToStorage = (userId: string, state: AdCadenceState) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(getCadenceStorageKey(userId), JSON.stringify(state));
+  } catch {
+    // ignore storage errors
+  }
+};
 
 interface UseDiscoverAdsParams {
   currentUser: CurrentUser;
@@ -24,9 +56,12 @@ export const useDiscoverAds = ({
   currentUser,
   premiumActive,
   potentialMatches,
-  currentIndex,
+  // Deck position is always potentialMatches[0] (moveToNext removes the
+  // swiped item), so this hook doesn't need currentIndex - kept in the
+  // params for API stability with callers.
+  currentIndex: _currentIndex,
   setPotentialMatches,
-  setCurrentIndex,
+  setCurrentIndex: _setCurrentIndex,
 }: UseDiscoverAdsParams) => {
   const [ads, setAds] = useState<AdData[]>([]);
   const [adsLoaded, setAdsLoaded] = useState(false);
@@ -130,70 +165,124 @@ export const useDiscoverAds = ({
     return createDeterministicShuffle(ads, adSeed);
   }, [ads, currentUser?.id]);
 
-  const injectAds = useCallback((matches: PotentialMatch[]): MatchOrAd[] => {
-    if (stableShuffledAds.length === 0) {
-      return matches;
-    }
+  // Ads are no longer pre-mixed into a batch at fetch time - the reactive
+  // swipe-cadence effect below owns all insertion, including the very first
+  // ad of a session. Kept as an identity passthrough so existing callers
+  // that wrap their initial deck in injectAds(...) don't need to change.
+  const injectAds = useCallback((matches: PotentialMatch[]): MatchOrAd[] => matches, []);
 
-    const result: MatchOrAd[] = [];
-    let adIndex = 0;
-    const adFrequency = premiumActive ? 15 : 7;
+  // How many genuinely distinct ad creatives are in rotation (the weighted
+  // array repeats featured/premium placements, so dedupe by id first).
+  const uniqueAdCount = useMemo(
+    () => new Set(stableShuffledAds.map((ad) => ad.id)).size,
+    [stableShuffledAds]
+  );
 
-    for (let i = 0; i < matches.length; i++) {
-      result.push(matches[i]);
+  // ⭐ Smart, randomized, swipe-anchored ad cadence.
+  //
+  // The deck's invariant is "the card currently on screen is always
+  // potentialMatches[0]" (moveToNext removes the swiped item by id). Free
+  // users see their first ad after 5 real swipes, premium users after 8 -
+  // then every ad after that rolls a fresh random gap instead of a fixed
+  // repeating interval, so it doesn't feel mechanical (e.g. 5, then +4 = 9,
+  // then +5 = 14, ...). Premium's gap range sits above free's so premium
+  // consistently sees ads less often, matching what they're paying for.
+  // The random gap is also "smart" about how many distinct ads are actually
+  // available: with only 1-2 creatives in rotation the gap is padded wider
+  // so the same ad doesn't resurface too soon; with a healthy pool of ads
+  // the gap can run tighter.
+  const swipeCadence = useMemo(
+    () => (premiumActive
+      ? { first: 8, min: 6, max: 12 }
+      : { first: 5, min: 4, max: 8 }),
+    [premiumActive]
+  );
 
-      if ((i + 1) % adFrequency === 0) {
-        let selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
-        const last = result[result.length - 1];
-        if (last && isAd(last) && selectedAd?.id && last.id === selectedAd.id) {
-          adIndex++;
-          selectedAd = stableShuffledAds[adIndex % stableShuffledAds.length];
-        }
-        result.push(selectedAd);
-        adIndex++;
-      }
-    }
+  const rollNextGap = useCallback(() => {
+    const scarcityPadding = Math.max(0, 3 - uniqueAdCount) * (premiumActive ? 2 : 1);
+    const span = swipeCadence.max - swipeCadence.min;
+    return swipeCadence.min + Math.floor(Math.random() * (span + 1)) + scarcityPadding;
+  }, [swipeCadence, uniqueAdCount, premiumActive]);
 
-    return result;
-  }, [stableShuffledAds, premiumActive]);
+  // Cumulative real (non-ad) swipes this session, and the cumulative count
+  // at which the next ad is due. Only genuine swipes at the front of the
+  // deck ever move either of these - a background fetch appending profiles
+  // to the tail can't touch them, so the cadence can't drift the way the
+  // old array-position-based approach could.
+  const totalSwipesRef = useRef(0);
+  const nextAdAtRef = useRef(swipeCadence.first);
+  const prevFrontKeyRef = useRef<string | null>(null);
+  const prevFrontWasAdRef = useRef(false);
+  const adSpinIndexRef = useRef(0);
+
+  // Restore the cadence counters for this user/day from storage on mount
+  // (survives an app close/reopen instead of restarting the countdown), or
+  // start fresh at swipeCadence.first if there's nothing saved yet / it's a
+  // new day. prevFrontKeyRef intentionally always starts null - it's just
+  // "have we seen a front card yet in this component lifetime", not part of
+  // the persisted cadence itself.
+  useEffect(() => {
+    const saved = currentUser?.id ? readCadenceFromStorage(currentUser.id) : null;
+    totalSwipesRef.current = saved?.totalSwipes ?? 0;
+    nextAdAtRef.current = saved?.nextAdAt ?? swipeCadence.first;
+    adSpinIndexRef.current = saved?.adSpinIndex ?? 0;
+    prevFrontKeyRef.current = null;
+    prevFrontWasAdRef.current = false;
+  }, [currentUser?.id, swipeCadence.first]);
 
   useEffect(() => {
-    if (!adsLoaded) return;
-    if (stableShuffledAds.length === 0) return;
-    if (potentialMatches.length === 0) return;
-    if (potentialMatches.some((m) => isAd(m))) return;
-
-    const current = potentialMatches[currentIndex];
-    if (!current || isAd(current)) return;
-
-    const profilesOnly = potentialMatches.filter((m): m is PotentialMatch => !isAd(m));
-    const withAds = injectAds(profilesOnly);
-
-    if (withAds.length === profilesOnly.length) return;
-
-    const nextIndex = withAds.findIndex((m) => !isAd(m) && m.id === current.id);
-    if (nextIndex < 0) return;
-
-    const trimmed = withAds.slice(nextIndex);
-
-    if (trimmed.length === potentialMatches.length) {
-      let same = true;
-      for (let i = 0; i < trimmed.length; i++) {
-        const a = trimmed[i];
-        const b = potentialMatches[i];
-        const aKey = isAd(a) ? `ad:${a.id}` : a.id;
-        const bKey = isAd(b) ? `ad:${b.id}` : b.id;
-        if (aKey !== bKey) {
-          same = false;
-          break;
-        }
-      }
-      if (same) return;
+    if (!adsLoaded || stableShuffledAds.length === 0) return;
+    if (potentialMatches.length === 0) {
+      prevFrontKeyRef.current = null;
+      prevFrontWasAdRef.current = false;
+      return;
     }
 
-    setPotentialMatches(trimmed);
-    setCurrentIndex(0);
-  }, [adsLoaded, stableShuffledAds, potentialMatches, currentIndex, injectAds, setPotentialMatches, setCurrentIndex]);
+    const front = potentialMatches[0];
+    const frontKey = isAd(front) ? `ad:${front.id}` : front.id;
+    const persistCadence = () => {
+      if (!currentUser?.id) return;
+      writeCadenceToStorage(currentUser.id, {
+        totalSwipes: totalSwipesRef.current,
+        nextAdAt: nextAdAtRef.current,
+        adSpinIndex: adSpinIndexRef.current,
+      });
+    };
+
+    let cadenceChanged = false;
+    if (prevFrontKeyRef.current !== null && prevFrontKeyRef.current !== frontKey) {
+      // The previous front card is gone - it was swiped.
+      if (prevFrontWasAdRef.current) {
+        // An ad was just shown and swiped away - roll a fresh random gap
+        // for the next one, anchored to the total swipes so far.
+        nextAdAtRef.current = totalSwipesRef.current + rollNextGap();
+      } else {
+        totalSwipesRef.current += 1;
+      }
+      cadenceChanged = true;
+    }
+    prevFrontKeyRef.current = frontKey;
+    prevFrontWasAdRef.current = isAd(front);
+
+    if (cadenceChanged) persistCadence();
+
+    if (isAd(front)) return; // an ad is already up next/current, nothing to insert
+    if (totalSwipesRef.current < nextAdAtRef.current) return;
+    if (potentialMatches.length > 1 && isAd(potentialMatches[1])) return; // already queued
+
+    let selectedAd = stableShuffledAds[adSpinIndexRef.current % stableShuffledAds.length];
+    adSpinIndexRef.current += 1;
+    persistCadence();
+
+    setPotentialMatches(prev => {
+      if (prev.length === 0 || isAd(prev[0])) return prev;
+      if (prev[0].id !== frontKey) return prev; // stale - deck moved on already
+      if (prev.length > 1 && isAd(prev[1])) return prev;
+      const next = prev.slice();
+      next.splice(1, 0, selectedAd);
+      return next;
+    });
+  }, [adsLoaded, stableShuffledAds, potentialMatches, rollNextGap, setPotentialMatches]);
 
   return { adsLoaded, injectAds };
 };
