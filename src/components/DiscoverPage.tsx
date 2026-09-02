@@ -4807,21 +4807,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           >
             {/* ...existing code for overlays, etc... */}
             {nextMatchImages.length > 0 && !isAd(nextMatch) ? (
-              <img
-                src={(() => {
-                  // ⭐ Use blob URL for instant loading if available
-                  const originalUrl = nextMatchImages[0];
-                  const blobUrl = preloadedBlobImages[nextMatch.id]?.[originalUrl];
-                  return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
-                })()}
-                alt={`${nextMatch.first_name}'s photo`}
-                className="w-full h-full object-contain object-center bg-black"
-                style={{ position: 'relative', zIndex: 1 }}
-                draggable={false}
-                loading="eager"
-                decoding="async"
-              />
+              <div className="w-full h-full bg-black flex items-center justify-center">
+                <div
+                  className="relative overflow-hidden bg-black"
+                  style={{ width: '100%', maxWidth: '100%', maxHeight: '100%', aspectRatio: '3 / 4', zIndex: 1 }}
+                >
+                  <img
+                    src={(() => {
+                      // ⭐ Use blob URL for instant loading if available
+                      const originalUrl = nextMatchImages[0];
+                      const blobUrl = preloadedBlobImages[nextMatch.id]?.[originalUrl];
+                      return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
+                    })()}
+                    alt={`${nextMatch.first_name}'s photo`}
+                    className="absolute inset-0 w-full h-full object-cover object-center"
+                    draggable={false}
+                    loading="eager"
+                    decoding="async"
+                  />
+                </div>
+              </div>
             ) : nextMatch && !isAd(nextMatch) ? (
+
               <div className="w-full h-full bg-gradient-to-br from-zinc-800 via-neutral-900 to-black flex items-center justify-center">
                 <span className="text-6xl font-bold text-white/80">
                   {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
