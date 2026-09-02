@@ -63,7 +63,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   isDragging = false,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
-  getOptimizedUrl = (url: string) => optimizeImageUrl(url, { width: 500, quality: 60 }),
+  getOptimizedUrl = (url: string) => optimizeImageUrl(url, { width: 1080, quality: 82 }),
   preCalculatedDistance
   , imageStatus
   , isActiveTab = true
