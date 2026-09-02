@@ -1538,8 +1538,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           // Deliberately NOT setting usingArchivedFallback here - that flag
           // drives a page-level "showing inactive profiles" banner, which
           // would be misleading for a deck that's still ~90% active people.
-          // The per-card "Hasn't been active lately" label (rendered off
-          // PotentialMatch.is_archived) is what surfaces this case instead.
+          // No per-card indicator either (removed) - archived mix-ins are
+          // presented identically to active profiles, by design.
         }
       }
     }

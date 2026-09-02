@@ -22,6 +22,31 @@ allprojects {
         google()
         mavenCentral()
     }
+
+    // Duplicate-class fix: none of our own gradle files declare a Kotlin
+    // version - every bit of Kotlin here is transitive, pulled in by native
+    // plugins (Firebase Messaging, the Play Billing Library, etc). Since
+    // Kotlin 1.8, kotlin-stdlib-jdk7/-jdk8 are just empty pass-through
+    // artifacts - their extension functions were folded directly into
+    // kotlin-stdlib itself. When one dependency pulls a modern plain
+    // kotlin-stdlib (1.8.22, most likely from the Billing Library 9.0.0
+    // upgrade) while an older, not-yet-updated dependency still explicitly
+    // pulls the pre-1.8 split kotlin-stdlib-jdk7/-jdk8 artifacts (1.6.21),
+    // Gradle sees them as different coordinates and packages both - and
+    // since 1.8.22's kotlin-stdlib already contains everything jdk7/jdk8
+    // used to provide, that's a real bytecode-level class collision, not
+    // just a version mismatch. Excluding the split modules project-wide
+    // (JetBrains' own documented fix for this exact migration scenario) and
+    // pinning every module to one kotlin-stdlib version resolves it without
+    // needing to know which specific plugin pulls the stale one.
+    configurations.all {
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+        resolutionStrategy {
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-common:1.8.22'
+        }
+    }
 }
 
 task clean(type: Delete) {

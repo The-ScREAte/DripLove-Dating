@@ -604,17 +604,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </div>
                 )}
 
-                {match.is_archived && (
-                  // Archived (inactive 30+ days) profiles can now be lightly
-                  // mixed into the deck instead of only appearing as an
-                  // all-or-nothing last resort - this makes that visible
-                  // rather than presenting them identically to an active
-                  // profile, per the "don't hide it" design decision.
-                  <div className="inline-flex items-center mt-2 px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-[clamp(10px,2.8vw,12px)] text-gray-300">
-                    Hasn't been active lately
-                  </div>
-                )}
-
                 {match.relationship_intent && (
                   <div className="flex items-center mt-2 text-[clamp(11px,3.2vw,13px)] font-medium text-gray-300">
                     <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
