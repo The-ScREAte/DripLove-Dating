@@ -3,9 +3,16 @@ import React from 'react';
 interface DripCoupleIconProps {
   className?: string;
   size?: number;
+  style?: React.CSSProperties;
 }
 
-const DripCoupleIcon: React.FC<DripCoupleIconProps> = ({ className = '', size = 28 }) => {
+// Matches the same prop contract lucide-react icons use (className + style,
+// with style able to override width/height) - the bottom nav renders this
+// alongside three lucide icons through one shared style={{width,height}}
+// setter, and this component silently ignoring `style` (only `size` did
+// anything) is why this icon alone stayed stuck at its 28px default while
+// the other three actually shrank to match.
+const DripCoupleIcon: React.FC<DripCoupleIconProps> = ({ className = '', size = 28, style }) => {
   return (
     <svg
       width={size}
@@ -14,6 +21,7 @@ const DripCoupleIcon: React.FC<DripCoupleIconProps> = ({ className = '', size = 
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      style={style}
       aria-hidden="true"
     >
       <circle cx="8.5" cy="7" r="2.25" stroke="currentColor" strokeWidth="2" />

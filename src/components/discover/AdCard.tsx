@@ -120,12 +120,25 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAna
             </button>
           </>
         ) : (
-          <img 
-            loading="lazy" 
+          <img
+            // Eager, not lazy: this only ever renders once the ad is
+            // already the front card the user is looking at (never
+            // off-screen), so "lazy" only added a needless deferral -
+            // real preloading now happens ahead of time in
+            // useDiscoverAds.ts, well before this card is ever mounted.
+            loading="eager"
             decoding="async"
             src={optimizeImageUrl(ad.image_url, { width: 500, quality: 60 })}
             alt={ad.name}
             className="w-full h-full object-cover"
+            // Without this, the browser's native HTML5 image-drag-and-drop
+            // takes over the gesture partway through (a plain <img> is
+            // draggable="true" by default) - it hijacks mousemove after the
+            // first frame or two, which is exactly why the ad card visually
+            // froze a few pixels into a drag and never advanced no matter
+            // how far the swipe continued. SlideRenderer's own <img> (real
+            // profile cards) already sets this for the same reason.
+            draggable={false}
           />
         )}
         {/* Feathers up from fully solid black at the very bottom edge - matching

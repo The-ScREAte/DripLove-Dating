@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -238,8 +238,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
           <DialogHeader>
-            <DialogTitle className="text-white">{t('userProfileModal.title', { name: '' })}</DialogTitle>
-            <DialogDescription>{t('userProfileModal.description')}</DialogDescription>
+            <DialogTitle className="text-white">{t('userProfileModal.loading')}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
@@ -255,8 +254,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
           <DialogHeader>
-            <DialogTitle className="text-white">{t('userProfileModal.title', { name: '' })}</DialogTitle>
-            <DialogDescription>{t('userProfileModal.unavailable')}</DialogDescription>
+            <DialogTitle className="text-white">{t('userProfileModal.unavailable')}</DialogTitle>
           </DialogHeader>
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -274,23 +272,22 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <div>
-              <DialogTitle className="text-xl text-white">
-                {t('userProfileModal.title', { name: `${profile?.first_name} ${profile?.last_name}` })}
-              </DialogTitle>
-              <DialogDescription>
-                {t('userProfileModal.description')}
-              </DialogDescription>
-            </div>
+          <DialogHeader className="flex flex-row items-center justify-end">
+            {/* Visually hidden, not removed - Radix requires a DialogTitle for
+                accessibility (it's what aria-labelledby points at), but showing
+                it here duplicated the name that's already the hero heading
+                right below the avatar just beneath it. */}
+            <DialogTitle className="sr-only">
+              {profile?.first_name} {profile?.last_name}
+            </DialogTitle>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               onClick={handleClose}
-              className="h-8 px-3 bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
+              aria-label={t('common.close')}
+              className="h-8 w-8 bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
             >
-              <X className="w-4 h-4 mr-1" />
-              Cancel
+              <X className="w-4 h-4" />
             </Button>
           </DialogHeader>
           

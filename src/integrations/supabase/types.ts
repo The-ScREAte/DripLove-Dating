@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_actions: {
@@ -516,6 +541,60 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      discover_feed_events: {
+        Row: {
+          created_at: string
+          direction: string | null
+          event_type: string
+          id: string
+          liker_id: string
+          liker_last_active_days: number | null
+          mechanism: string
+          position_in_deck: number | null
+          resulted_in_match: boolean | null
+          viewer_id: string
+        }
+        Insert: {
+          created_at?: string
+          direction?: string | null
+          event_type: string
+          id?: string
+          liker_id: string
+          liker_last_active_days?: number | null
+          mechanism: string
+          position_in_deck?: number | null
+          resulted_in_match?: boolean | null
+          viewer_id: string
+        }
+        Update: {
+          created_at?: string
+          direction?: string | null
+          event_type?: string
+          id?: string
+          liker_id?: string
+          liker_last_active_days?: number | null
+          mechanism?: string
+          position_in_deck?: number | null
+          resulted_in_match?: boolean | null
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discover_feed_events_liker_id_fkey"
+            columns: ["liker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discover_feed_events_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_account_usage: {
         Row: {
@@ -2458,6 +2537,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

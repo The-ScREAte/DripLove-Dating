@@ -50,48 +50,60 @@ function shuffleWithSeed<T>(arr: T[], seed: string): T[] {
   return copy;
 }
 
+// Exponential decay half-life-ish constant for recency scoring. With this
+// value: active 2h ago ≈ 0.96, 24h ≈ 0.60, 72h ≈ 0.22, 7 days ≈ 0.03 - a
+// smooth curve instead of a flat "in the last 72h or not" line, so someone
+// active 2 hours ago is meaningfully preferred over someone active 71 hours
+// ago instead of the two being treated identically.
+const RECENCY_DECAY_CONSTANT_HOURS = 48;
+
+// How much a deterministic per-profile jitter can perturb the decay score
+// before sorting. Small relative to the 0-1 decay range on purpose: it's
+// enough to reshuffle people who are all in a similar activity tier (e.g.
+// several people all active within the last few hours), but nowhere near
+// enough for a genuinely stale profile to ever jump ahead of an active one -
+// this is what keeps the "always the single most-recently-active person
+// first, for everyone, every day" staleness a hard sort would produce from
+// happening, while still following the exponential curve, not a bucket line.
+const RECENCY_JITTER_AMPLITUDE = 0.15;
+
+function recencyDecayScore(lastActiveStr: string | null | undefined, now: number): number {
+  if (!lastActiveStr) return 0; // no activity data at all - treat as maximally stale
+  const lastActiveMs = new Date(lastActiveStr).getTime();
+  if (!Number.isFinite(lastActiveMs)) return 0;
+  const hoursSince = Math.max(0, (now - lastActiveMs) / (60 * 60 * 1000));
+  return Math.exp(-hoursSince / RECENCY_DECAY_CONSTANT_HOURS);
+}
+
 /**
- * Categorize profiles by recent activity and reorder for better matching.
- * Active users (logged in within 72h) appear first, shuffled.
- * Less active users appear after, also shuffled.
- * 
- * This is a SOFT weighting - no one is removed, just reordered.
+ * Reorder profiles by a smooth, exponentially-decaying recency score instead
+ * of a binary "active within 72h or not" bucket split. More recently active
+ * people rank higher on a continuous curve; a small deterministic jitter
+ * (seeded, so it's stable for a given user/day) keeps people within a
+ * similar activity tier from always landing in the exact same order, without
+ * ever letting a stale profile leapfrog an active one.
+ *
+ * This is still a SOFT weighting - no one is removed, just reordered.
  */
 export function applyActivityWeighting<T extends { id: string; last_login_at?: string | null; created_at?: string | null }>(
   profiles: T[],
   seed: string = ''
 ): T[] {
   if (profiles.length === 0) return [];
-  
+
   const now = Date.now();
-  const activeProfiles: T[] = [];
-  const lessActiveProfiles: T[] = [];
-  
-  for (const profile of profiles) {
+  const jitterRandom = seededRandom(hashString(`${seed}_recency_jitter`));
+
+  const scored = profiles.map((profile) => {
     // Use last_login_at if available, fallback to created_at (account creation = first activity)
     const lastActiveStr = profile.last_login_at || profile.created_at;
-    
-    if (!lastActiveStr) {
-      // No activity data - treat as less active
-      lessActiveProfiles.push(profile);
-      continue;
-    }
-    
-    const lastActiveMs = new Date(lastActiveStr).getTime();
-    
-    if (now - lastActiveMs <= ACTIVE_WINDOW_MS) {
-      activeProfiles.push(profile);
-    } else {
-      lessActiveProfiles.push(profile);
-    }
-  }
-  
-  // Shuffle each group deterministically for variety, then concatenate
-  // Active users come first for higher match probability
-  const shuffledActive = shuffleWithSeed(activeProfiles, `${seed}_active`);
-  const shuffledLessActive = shuffleWithSeed(lessActiveProfiles, `${seed}_less_active`);
-  
-  return [...shuffledActive, ...shuffledLessActive];
+    const decay = recencyDecayScore(lastActiveStr, now);
+    const jitter = (jitterRandom() - 0.5) * RECENCY_JITTER_AMPLITUDE;
+    return { profile, rank: decay + jitter };
+  });
+
+  scored.sort((a, b) => b.rank - a.rank);
+  return scored.map((s) => s.profile);
 }
 
 /**

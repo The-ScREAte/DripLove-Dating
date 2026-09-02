@@ -11,26 +11,76 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 
-    <title>DripLove - Find Your Perfect Match</title>
-    <meta name="description" content="DripLove - Connect with like-minded people and find your perfect match" />
+    <!-- ⭐ SEO / AI-SEO: this <head> is the entire crawlable surface of the
+         app - it's a client-rendered SPA (see <div id="root"> below), so a
+         crawler or AI answer-engine bot that doesn't execute JS only ever
+         sees what's written here, never the live in-app screens. That's
+         deliberate: the marketing claims below belong here, in metadata
+         search engines and AI crawlers read, not inside the actual app UI
+         users navigate. -->
+    <title>DripLove - Best Dating App to Meet Singles Locally & Worldwide</title>
+    <meta name="description" content="DripLove is the affordable dating app matching thousands of singles every week, both locally and internationally. Smart matching, verified profiles, and real connections - join free and find your perfect match today." />
+    <meta name="keywords" content="best dating app, dating app, online dating, meet singles, local dating, international dating, affordable dating app, cheap dating app, find your match, verified dating profiles, DripLove" />
     <meta name="author" content="DripLove" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://www.driplove.love/" />
 
-    <meta property="og:title" content="DripLove - Find Your Perfect Match" />
-    <meta property="og:description" content="DripLove - Connect with like-minded people and find your perfect match" />
+    <meta property="og:title" content="DripLove - Best Dating App to Meet Singles Locally & Worldwide" />
+    <meta property="og:description" content="DripLove is the affordable dating app matching thousands of singles every week, both locally and internationally. Smart matching, verified profiles, and real connections." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/driplove-logo.png" />
+    <meta property="og:url" content="https://www.driplove.love/" />
+    <meta property="og:site_name" content="DripLove" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://www.driplove.love/driplove-logo.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@driplove" />
-    <meta name="twitter:image" content="/driplove-logo.png" />
-    
+    <meta name="twitter:title" content="DripLove - Best Dating App to Meet Singles Locally & Worldwide" />
+    <meta name="twitter:description" content="The affordable dating app matching thousands of singles every week, locally and internationally." />
+    <meta name="twitter:image" content="https://www.driplove.love/driplove-logo.png" />
+
+    <!-- Structured data so search engines and AI answer engines (ChatGPT,
+         Perplexity, Google AI Overviews, etc.) can parse what DripLove is,
+         not just guess from prose. Deliberately no aggregateRating/review
+         block here - fabricating star ratings in structured data is exactly
+         the kind of thing that gets a site penalized, not promoted. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "DripLove",
+      "url": "https://www.driplove.love/",
+      "logo": "https://www.driplove.love/driplove-logo.png",
+      "description": "DripLove is an affordable dating app that matches thousands of singles every week, connecting people locally and internationally through smart matching and verified profiles.",
+      "sameAs": [
+        "https://twitter.com/driplove"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "MobileApplication",
+      "name": "DripLove",
+      "applicationCategory": "LifestyleApplication",
+      "operatingSystem": "iOS, Android, Web",
+      "url": "https://www.driplove.love/",
+      "description": "DripLove is the affordable dating app matching thousands of singles every week, both locally and internationally, through smart matching and verified profiles.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
     <!-- Apple Sign-In Domain Verification -->
     <meta name="appleid-signin-client-id" content="com.driplove.dating.signin">
     <meta name="appleid-signin-scope" content="name email">
     <meta name="appleid-signin-redirect-uri" content="">
     <meta name="appleid-signin-state" content="">
     <meta name="appleid-signin-use-popup" content="true">
-    
+
     <link rel="icon" href="/favicon.png" type="image/png">
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
   </head>

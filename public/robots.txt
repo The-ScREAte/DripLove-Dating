@@ -10,5 +10,48 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+# AI answer-engine / assistant crawlers - explicitly allowed so DripLove can
+# be discovered and cited by ChatGPT, Claude, Perplexity, Google AI
+# Overviews, and similar. The catch-all "*" below already allows everything,
+# but naming these explicitly is the standard, more reliable signal since
+# some of these bots only honor rules under their own exact user-agent.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
 User-agent: *
 Allow: /
+
+Sitemap: https://www.driplove.love/sitemap.xml

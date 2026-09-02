@@ -203,6 +203,111 @@ export const writePersistentItem = (key: string, value: string) => {
   }
 };
 
+// TIER 1 — reciprocal orientation check.
+//
+// The existing gender filter only ever checked "does this candidate match
+// what the viewer wants" (getGenderFilter in DiscoverPage.tsx, applied via
+// .in('gender', allowedGenders)). It never checked the other direction: does
+// the CANDIDATE'S OWN stated preference include the viewer? A candidate
+// whose preference is "male" could appear in a woman's feed as long as her
+// gender happened to satisfy her own filter - the candidate's preference
+// column was never read. This closes that gap: both directions must agree
+// before a profile is eligible, same as the existing one-directional check,
+// just applied both ways now.
+export const matchesReciprocalPreference = (
+  viewerGender: unknown,
+  candidatePreference: unknown
+): boolean => {
+  const pref = typeof candidatePreference === 'string' ? candidatePreference.toLowerCase().trim() : '';
+  const gender = typeof viewerGender === 'string' ? viewerGender.toLowerCase().trim() : '';
+
+  // "everyone"/"both" accept anyone. A genuinely missing preference or
+  // viewer gender also fails open (nothing to evaluate, so don't filter
+  // anyone out over incomplete data) - preference is a NOT NULL column with
+  // only these four real values in production, so both of those cases are
+  // purely defensive. Anything else (including a value we don't recognize)
+  // falls through to a real equality check and is excluded on a mismatch -
+  // the whole point of this function is to fail CLOSED on orientation
+  // mismatches, not open.
+  if (pref === '' || pref === 'everyone' || pref === 'both') return true;
+  if (gender === '') return true;
+  return pref === gender;
+};
+
+// LIKED-YOU MECHANISM A — liker rotation queue.
+//
+// The always-on priority-liker injection is capped at 15% of the feed per
+// load. Previously, anyone over that cap was simply dropped for that feed
+// build - a popular profile's older likers had no guaranteed path to ever
+// surface, since the same "most recent 50" query would keep re-deriving the
+// same handful of likers as long as they stayed in that top-50 window. This
+// persists which likers have already been shown via injection so future
+// loads can prioritize the ones that haven't had a turn yet, cycling back to
+// already-shown ones only once everyone unseen has been offered a slot.
+const LIKER_ROTATION_KEY_PREFIX = 'driplove_shown_likers_';
+// Bounded so this can't grow unboundedly for a very popular profile; old
+// entries fall off the front once the cap is hit (oldest-shown first).
+const LIKER_ROTATION_MAX_ENTRIES = 300;
+
+interface LikerRotationState {
+  // liker ids, oldest-shown first
+  shown: string[];
+}
+
+const readLikerRotationState = (userId: string): LikerRotationState => {
+  try {
+    const raw = localStorage.getItem(`${LIKER_ROTATION_KEY_PREFIX}${userId}`);
+    if (!raw) return { shown: [] };
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === 'object' && Array.isArray((parsed as LikerRotationState).shown)) {
+      return { shown: (parsed as LikerRotationState).shown.filter((id): id is string => typeof id === 'string') };
+    }
+    return { shown: [] };
+  } catch {
+    return { shown: [] };
+  }
+};
+
+const writeLikerRotationState = (userId: string, state: LikerRotationState) => {
+  try {
+    const trimmed = state.shown.slice(-LIKER_ROTATION_MAX_ENTRIES);
+    localStorage.setItem(`${LIKER_ROTATION_KEY_PREFIX}${userId}`, JSON.stringify({ shown: trimmed }));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+/**
+ * Orders candidate liker ids so unseen-via-injection ones come first,
+ * previously-shown ones cycle back after. Pure ordering - callers still
+ * apply their own cap on top of this.
+ */
+export const orderLikersByRotation = (userId: string, candidateLikerIds: string[]): string[] => {
+  const { shown } = readLikerRotationState(userId);
+  const shownSet = new Set(shown);
+  const unseen = candidateLikerIds.filter((id) => !shownSet.has(id));
+  // Among previously-shown candidates still eligible, oldest-shown first (so
+  // the rotation actually cycles instead of always re-picking the same
+  // recently-shown few).
+  const shownOrderIndex = new Map(shown.map((id, idx) => [id, idx]));
+  const previouslyShown = candidateLikerIds
+    .filter((id) => shownSet.has(id))
+    .sort((a, b) => (shownOrderIndex.get(a) ?? 0) - (shownOrderIndex.get(b) ?? 0));
+  return [...unseen, ...previouslyShown];
+};
+
+/** Records that these liker ids were just shown via injection, for future rotation. */
+export const recordLikersShown = (userId: string, likerIds: string[]): void => {
+  if (likerIds.length === 0) return;
+  const state = readLikerRotationState(userId);
+  const uniqueLikerIds = Array.from(new Set(likerIds));
+  const likerIdSet = new Set(uniqueLikerIds);
+  // Drop any earlier occurrence of these ids, then re-append them at the end
+  // (most-recently-shown), so the rotation order stays oldest-shown-first.
+  const next = [...state.shown.filter((id) => !likerIdSet.has(id)), ...uniqueLikerIds];
+  writeLikerRotationState(userId, { shown: next });
+};
+
 export const normalizeCountryCodeList = (value: unknown, baseCountryCode?: string): string[] => {
   const normalize = (items: unknown[]): string[] => {
     const baseNorm = typeof baseCountryCode === 'string' ? normalizeCountryCode(baseCountryCode) : undefined;

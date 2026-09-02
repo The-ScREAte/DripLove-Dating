@@ -61,11 +61,16 @@ export const uploadCroppedPhoto = async (
     .eq('image_url', originalUrl);
   if (dbError) throw dbError;
 
+  // Best-effort cleanup of the old object - deliberately not awaited. Nothing
+  // downstream depends on it (the DB row already points at newUrl), so it
+  // was only adding a third sequential network round-trip to every crop
+  // save's perceived latency for zero benefit; errors are still swallowed,
+  // it just no longer blocks the caller's UI (toast/spinner) from resolving.
   const urlParts = originalUrl.split('/');
   const bucketIndex = urlParts.findIndex((part) => part === 'user-photos');
   if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
     const oldPath = urlParts.slice(bucketIndex + 1).join('/');
-    await supabase.storage.from('user-photos').remove([oldPath]).catch(() => {});
+    void supabase.storage.from('user-photos').remove([oldPath]).catch(() => {});
   }
 
   return newUrl;

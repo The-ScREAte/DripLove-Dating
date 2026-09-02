@@ -1270,7 +1270,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             // guess. The floating-pill inset from the screen edges/bottom (which
             // `left-3 right-3` + a fixed `bottom` used to provide) is now plain
             // margin instead.
-            className="mx-3 z-[99999] flex-shrink-0"
+            className="z-[99999] flex-shrink-0"
             style={{
               // env(safe-area-inset-bottom) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx). The fixed
@@ -1278,7 +1278,18 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // proportionally smaller gap instead of the same absolute value as
               // a large phone.
               marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + clamp(12px, 4vw, 22px))',
-              borderRadius: 'clamp(20px, 6vw, 28px)',
+              // Bigger side margins than the old flat mx-3 (12px) - that made
+              // the bar stretch nearly edge-to-edge, which is what read as
+              // "too wide" even after the internal item spacing was tightened.
+              // This actually narrows the bar itself, not just what's inside it.
+              marginLeft: 'clamp(28px, 9vw, 46px)',
+              marginRight: 'clamp(28px, 9vw, 46px)',
+              // A large flat value, not a clamp tuned to roughly match the bar's
+              // height - the browser automatically caps an oversized border-radius
+              // at half the box's shorter side, so this always renders as a true
+              // full pill/stadium shape, at any screen size, without needing to
+              // keep re-tuning it against the bar's actual computed height.
+              borderRadius: '9999px',
               // Solid: the nav is the fixed end of the page, same role as the header at
               // the top. Page content stops above it on its own now (a real flex
               // sibling, not an overlay), so there's nothing behind this bar that
@@ -1286,9 +1297,31 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               background: '#000',
               border: '1px solid rgba(236,72,153,0.55)',
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
+              // Without this, the border-radius above only paints a rounded
+              // background/border - it doesn't clip content. The active tab's
+              // own highlight pill can then sit close enough to this
+              // container's edge that it visually squares off the corner
+              // instead of following its curve. Clipping to the same radius
+              // guarantees every corner reads as genuinely rounded, always.
+              overflow: 'hidden',
             }}
           >
-            <div className="flex justify-around items-center" style={{ paddingTop: 'clamp(4px, 1.5vw, 6px)', paddingBottom: 'clamp(4px, 1.5vw, 6px)' }}>
+            <div
+              className="flex justify-between items-center"
+              style={{
+                paddingTop: 'clamp(3px, 1.1vw, 5px)',
+                paddingBottom: 'clamp(3px, 1.1vw, 5px)',
+                // justify-around reserves a HALF-size gap at each edge on top
+                // of a full-size gap between items - with only 4 items in a
+                // wide bar that's what made both the item-to-item spacing
+                // and the edge-to-DripCheck gap read as too loose. Explicit
+                // horizontal padding here + justify-between gives direct
+                // control over the edge inset instead, independent of and
+                // tighter than the between-items spacing.
+                paddingLeft: 'clamp(10px, 3vw, 18px)',
+                paddingRight: 'clamp(10px, 3vw, 18px)',
+              }}
+            >
               {[
                 { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon },
                 { label: t('chat.title'), value: 'chat', icon: MessageCircle },
@@ -1305,18 +1338,24 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                     // Scales down on narrow screens instead of a fixed py-1.5 px-4,
                     // which is what made the whole pill read as oversized on a
                     // small phone.
-                    paddingTop: 'clamp(4px, 1.5vw, 6px)',
-                    paddingBottom: 'clamp(4px, 1.5vw, 6px)',
-                    paddingLeft: 'clamp(8px, 3.5vw, 16px)',
-                    paddingRight: 'clamp(8px, 3.5vw, 16px)',
+                    paddingTop: 'clamp(3px, 1.1vw, 5px)',
+                    paddingBottom: 'clamp(3px, 1.1vw, 5px)',
+                    paddingLeft: 'clamp(7px, 3vw, 14px)',
+                    paddingRight: 'clamp(7px, 3vw, 14px)',
                     ...(activeTab === value ? {
                       background: 'linear-gradient(to bottom, rgba(244,114,182,0.22), rgba(244,114,182,0.12))',
                       boxShadow: 'inset 0 0 0 1px rgba(236,72,153,0.25)',
+                      // rounded-full alone can read more like a rounded rect than a
+                      // true pill once the button's own height shrinks (border-radius
+                      // needs to be at least half the box's height to look like a full
+                      // pill) - pinning it explicitly guarantees the highlight always
+                      // reads as a clean, fully rounded pill regardless of size.
+                      borderRadius: '9999px',
                     } : undefined),
                   }}
                 >
-                  <Icon style={{ width: 'clamp(15px, 4.5vw, 18px)', height: 'clamp(15px, 4.5vw, 18px)' }} className="shrink-0" />
-                  <span className="font-medium" style={{ fontSize: 'clamp(9px, 2.6vw, 10px)' }}>{label}</span>
+                  <Icon style={{ width: 'clamp(13px, 3.8vw, 16px)', height: 'clamp(13px, 3.8vw, 16px)' }} className="shrink-0" />
+                  <span className="font-medium" style={{ fontSize: 'clamp(8px, 2.3vw, 9px)' }}>{label}</span>
                    {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
                        <span className="text-xs text-white font-bold">

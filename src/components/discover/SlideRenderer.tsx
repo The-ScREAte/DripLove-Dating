@@ -69,25 +69,28 @@ const ImageSlide = React.memo<{
     // Absolute + inset 0, not w-full/h-full: this is the one element shared by
     // Discover, Liked Me, and the profile preview, so it's the most direct place
     // to guarantee a tall/portrait photo can never influence this box's own size.
-    <div className="absolute inset-0 bg-black overflow-hidden flex items-center justify-center">
-      {/* Pure-CSS 3:4 frame (the exact aspect the cropper produces). No JS
-          measurement is involved, so it can never render "slim" on first paint
-          and then correct itself later — it is identical on iOS, Android and web. */}
-      <div
-        className="relative overflow-hidden bg-black"
-        style={{ width: '100%', maxWidth: '100%', maxHeight: '100%', aspectRatio: '3 / 4' }}
-      >
-        <img
-          key={imageSrc}
-          loading="eager"
-          decoding="async"
-          src={imageSrc}
-          alt={`${matchFirstName} ${matchLastName}`}
-          className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
-          draggable={false}
-          onError={() => setHasError(true)}
-        />
-      </div>
+    //
+    // Fills the card frame edge-to-edge (Tinder-style full bleed) instead of
+    // being boxed into a fixed 3:4 rect centered inside it. A locked 3:4 box
+    // derives its height from its width, and on a typical phone the actual
+    // card frame is taller than 4:3 once header/nav are subtracted - so the
+    // box rendered shorter than the frame and got letterboxed (visible black
+    // bars top/bottom, "slim"-looking image) instead of touching all four
+    // edges. object-cover on the full-size frame crops evenly as needed
+    // (photos are already cropped to 3:4 by the app's own crop tool, so this
+    // is normally a small, symmetric crop, not a jarring one) with zero bars,
+    // pure CSS, still no JS measurement involved.
+    <div className="absolute inset-0 bg-black overflow-hidden">
+      <img
+        key={imageSrc}
+        loading="eager"
+        decoding="async"
+        src={imageSrc}
+        alt={`${matchFirstName} ${matchLastName}`}
+        className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
+        draggable={false}
+        onError={() => setHasError(true)}
+      />
     </div>
   );
 

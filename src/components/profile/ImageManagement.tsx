@@ -71,15 +71,22 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
     if (!pending || savingCropUrl || !currentUser?.id) return;
     setSavingCropUrl(originalUrl);
     try {
-      await uploadCroppedPhoto(currentUser.id, originalUrl, pending.blob);
+      const newUrl = await uploadCroppedPhoto(currentUser.id, originalUrl, pending.blob);
       URL.revokeObjectURL(pending.previewUrl);
       setPendingCrops((prev) => {
         const next = { ...prev };
         delete next[originalUrl];
         return next;
       });
+      // Optimistic local update instead of waiting on a full re-fetch - we
+      // already know exactly what changed (uploadCroppedPhoto's return value
+      // *is* the new row's image_url), so there's nothing a round-trip back
+      // to the DB would tell us that we don't already know. fetchUserImages
+      // still runs to reconcile with the server, just not blocking the
+      // Save button's spinner/toast on a fourth sequential network call.
+      setUserImages((prev) => prev.map((img) => (img.image_url === originalUrl ? { ...img, image_url: newUrl } : img)));
       toast({ title: 'Photo updated', description: 'Your cropped photo has been saved.' });
-      await fetchUserImages();
+      void fetchUserImages();
       onProfileUpdate?.();
     } catch (error) {
       console.error('Error saving cropped photo:', error);

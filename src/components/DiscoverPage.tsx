@@ -45,7 +45,12 @@ import {
   readPersistentItem,
   writePersistentItem,
   normalizeCountryCodeList,
+  matchesReciprocalPreference,
+  orderLikersByRotation,
+  recordLikersShown,
 } from './discover/discoverFeedUtils';
+import { applyCompatibilityWeighting } from '@/utils/matchScoring';
+import { trackLikedYouShown, trackLikedYouSwiped } from '@/utils/discoverTelemetry';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,6 +140,7 @@ type ProfileRow = Pick<
   | 'date_of_birth'
   | 'interests'
   | 'gender'
+  | 'preference'
   | 'is_verified'
   | 'latitude'
   | 'longitude'
@@ -152,7 +158,13 @@ type ProfileRow = Pick<
   | 'adinkra_symbols'
   | 'created_at'
   | 'last_login_at'
->;
+> & {
+  // Set client-side only when a row was fetched via the archived-users
+  // mix-in, before it's converted to a PotentialMatch - never a real column
+  // read from the query itself (is_archived IS a real column, but this
+  // marks "was deliberately mixed in as archived," which is narrower).
+  __isArchivedMixin?: boolean;
+};
 
 const toPotentialMatch = (
   profile: ProfileRow,
@@ -198,6 +210,8 @@ const toPotentialMatch = (
     messy_organized: profile.messy_organized ?? undefined,
     adinkra_symbols,
     distance: extras?.distance,
+    is_archived: profile.__isArchivedMixin || undefined,
+    last_login_at: profile.last_login_at ?? undefined,
   };
 };
 
@@ -953,7 +967,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     distanceMap: { [key: string]: number },
     limit?: number
   }) => {
-    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
+    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
 
     const countryCodes = Array.from(new Set(unlockedCountries.map(normalizeCountryCode).filter(Boolean)));
     if (countryCodes.length === 0) return [];
@@ -1019,7 +1033,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     ] = await queryTimeout(Promise.all([
       supabase
         .from('profiles')
-        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, unlocked_countries, profile_completion, latitude, longitude')
+        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, gender, interests, introvert_extrovert, spontaneous_planner, messy_organized, unlocked_countries, profile_completion, latitude, longitude')
         .eq('id', userId)
         .single(),
       fetchAllRows<{ liked_id: string }>(() =>
@@ -1139,7 +1153,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const MAX_LOCATION_IDS_FOR_QUERY = 500;
     const locationProfileIdsForQuery = locationProfileIds.slice(0, MAX_LOCATION_IDS_FOR_QUERY);
 
-    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
+    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
 
     const hasUnlockedCountries = premiumForFeed && unlockedCountries.length > 0;
 
@@ -1396,26 +1410,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
 
     // =====================================================
-    // PHASE 2: ARCHIVED FALLBACK (only if Phase 1 returns 0)
+    // ARCHIVED MIX-IN — always attempted, capped at ~10% of the deck
     // =====================================================
-    if (filteredProfiles.length === 0) {
-      // Phase 1 returned 0 active profiles, trying archived fallback
-      // Define allowed countries for archived query
+    // Previously this only ran when the active pool was completely empty,
+    // and then replaced it wholesale with archived (inactive 30+ days)
+    // profiles - all-or-nothing, no cap. Now it always makes a small,
+    // bounded attempt: when there's a healthy active pool, archived
+    // profiles are mixed in lightly (~10% of the final deck) so they get
+    // *some* visibility without dominating it; when the active pool is
+    // genuinely empty, this is the last-resort fill and goes uncapped -
+    // "show when there is no other choice," same as before. Tier 1 (gender/
+    // orientation/age/distance, including the reciprocal-preference check)
+    // still fully applies to archived candidates either way.
+    {
+      const activePoolSizeBeforeArchived = filteredProfiles.length;
+
       const allowedCountryCodes = Array.from(
         new Set([
           ...(baseCountryCode ? [baseCountryCode] : []),
           ...(premiumForFeed ? unlockedCountries : []),
         ])
       ).map((c) => normalizeCountryCode(String(c || ''))).filter(Boolean);
-      
+
       let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
-      
+
       const useDbExclusionArchived = excludedIds.length <= 90;
       if (useDbExclusionArchived && excludedIds.length > 0) {
         archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(excludedIds));
       }
-      
-      // Build country filter based on user type
+
       if (premiumForFeed && allowedCountryCodes.length > 0) {
         archivedQuery = archivedQuery.in('country_code', allowedCountryCodes);
       } else if (baseCountryCode) {
@@ -1423,15 +1446,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       }
 
       // Age filtering is done client-side using date_of_birth (profiles.age column doesn't exist)
-      // We'll filter after fetching based on calculated age
-
-      // Apply distance filtering for local country (use currentUserData for location)
-      // CRITICAL: For free users, use safeUserMaxDistance (capped at 500km)
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
       if (baseCountryCode && userLat && userLon) {
         const radiusInDegrees = safeUserMaxDistance / 111.32;
-
         archivedQuery = archivedQuery
           .gte('latitude', userLat - radiusInDegrees)
           .lte('latitude', userLat + radiusInDegrees)
@@ -1439,45 +1457,93 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           .lte('longitude', userLon + radiusInDegrees);
       }
 
-      const { data: archivedProfiles, error: archivedError } = await archivedQuery
-        .eq('is_archived', true) // PHASE 2: Archived users
-        .eq('account_status', 'active') // Still respect account status
-        .eq('is_admin', false)
-        .in('gender', allowedGenders)
-        .limit(useDbExclusionArchived ? 50 : 300);
+      // A small, bounded fetch is enough for a ≤10% mix-in; only the
+      // last-resort (empty active pool) case needs a larger pull. Smaller
+      // still on Android - this mix-in is a nice-to-have on top of an
+      // already-healthy active deck, not worth extra payload on weaker
+      // connections/hardware for that case specifically.
+      const archivedFetchLimit = activePoolSizeBeforeArchived === 0
+        ? (useDbExclusionArchived ? 50 : 300)
+        : (isAndroidPlatform() ? 15 : 30);
+
+      // This mix-in is a genuine extra network round-trip on top of the
+      // already-completed active-pool fetch above - it must never be able to
+      // stall the whole deck waiting on it. A short, dedicated timeout
+      // (much tighter than the 15s used for the critical-path queries
+      // earlier in this function) means a slow/flaky connection just skips
+      // the archived mix-in for this cycle instead of delaying every card.
+      let archivedProfiles: unknown[] | null = null;
+      let archivedError: unknown = null;
+      try {
+        const result = await queryTimeout(
+          archivedQuery
+            .eq('is_archived', true)
+            .eq('account_status', 'active') // still respect account status/ban state
+            .eq('is_admin', false)
+            .in('gender', allowedGenders)
+            .limit(archivedFetchLimit),
+          4000
+        );
+        archivedProfiles = result.data;
+        archivedError = result.error;
+      } catch {
+        // Timed out or otherwise failed - fine, this whole block is a bonus
+        // on top of an already-valid active deck.
+      }
 
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
-        filteredProfiles = Array.isArray(archivedProfiles) ? (archivedProfiles as unknown as ProfileRow[]) : [];
-        usingArchivedFallback = true;
+        let archivedCandidates: ProfileRow[] = Array.isArray(archivedProfiles) ? (archivedProfiles as unknown as ProfileRow[]) : [];
 
-        // Non-premium must never show other countries, even in archived fallback.
+        // Same Tier 1 checks the active pool gets: exclusions, reciprocal
+        // orientation, and (for free users) country/distance enforcement.
+        archivedCandidates = archivedCandidates.filter((p) => !excludedIdsSet.has(p.id));
+        archivedCandidates = archivedCandidates.filter((p) => matchesReciprocalPreference(currentUserData?.gender, p.preference));
+
         if (!premiumForFeed && baseCountryCode) {
-          filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
-          
-          // CRITICAL: Client-side distance enforcement for free users in archived fallback
+          archivedCandidates = archivedCandidates.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
           if (userLat && userLon) {
-            filteredProfiles = filteredProfiles.filter((p) => {
-              if (!p.latitude || !p.longitude) return true; // Allow profiles without coords
+            archivedCandidates = archivedCandidates.filter((p) => {
+              if (!p.latitude || !p.longitude) return true;
               const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
               distanceMap[p.id] = dist;
               return dist <= safeUserMaxDistance;
             });
           }
         }
-        
-        // Mix archived profiles the same way (explicit country rotation).
-        // ⭐ PER-USER RANDOMIZATION: Use user-specific seed for archived profiles too
+
         if (premiumForFeed && allowedCountryCodes.length > 1) {
           const archivedSeed = getUserFeedSeed(userId) + '_archived';
-          filteredProfiles = mixByCountryRoundRobin(
-            filteredProfiles.filter((p) => allowedCountryCodes.includes(normalizeCountryCode(p.country_code || ''))),
+          archivedCandidates = mixByCountryRoundRobin(
+            archivedCandidates.filter((p) => allowedCountryCodes.includes(normalizeCountryCode(p.country_code || ''))),
             allowedCountryCodes,
             archivedSeed
           );
         }
+
+        if (activePoolSizeBeforeArchived === 0) {
+          // Last resort: archived IS the feed. Uncapped, and this is the one
+          // case where the page-level "you're seeing inactive profiles"
+          // banner (isArchivedFallback) still makes sense to show, since
+          // every card on screen is archived, not just a small mix.
+          archivedCandidates.forEach((p) => { p.__isArchivedMixin = true; });
+          filteredProfiles = archivedCandidates;
+          usingArchivedFallback = true;
+        } else if (archivedCandidates.length > 0) {
+          // Healthy active pool: cap so archived ends up ~10% of the
+          // COMBINED total (active + archived), not 10% of the fetch.
+          const archivedCap = Math.floor(activePoolSizeBeforeArchived * (0.10 / 0.90));
+          const cappedArchived = archivedCandidates.slice(0, archivedCap);
+          cappedArchived.forEach((p) => { p.__isArchivedMixin = true; });
+          filteredProfiles = [...filteredProfiles, ...cappedArchived];
+          // Deliberately NOT setting usingArchivedFallback here - that flag
+          // drives a page-level "showing inactive profiles" banner, which
+          // would be misleading for a deck that's still ~90% active people.
+          // The per-card "Hasn't been active lately" label (rendered off
+          // PotentialMatch.is_archived) is what surfaces this case instead.
+        }
       }
     }
-    
+
     // Update the fallback state
     setIsArchivedFallback(usingArchivedFallback);
 
@@ -1489,6 +1555,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     filteredProfiles = filteredProfiles.filter((p) => !excludedIdsSet.has(p.id));
     localProfiles = localProfiles.filter((p) => !excludedIdsSet.has(p.id));
     intlProfiles = intlProfiles.filter((p) => !excludedIdsSet.has(p.id));
+
+    // TIER 1 — reciprocal orientation check. The gender filter above only
+    // ever checked "does this candidate match what the viewer wants"; this
+    // is the other direction, "does the candidate want the viewer back."
+    // Applied here, once, after everything (premium's mixed pool, free's
+    // direct pool, and the archived phase-2 fallback further above, since
+    // all three write into filteredProfiles by this point) so every path
+    // gets the same fix without duplicating it across every fetch branch.
+    const viewerGenderForReciprocity = currentUserData?.gender;
+    filteredProfiles = filteredProfiles.filter((p) => matchesReciprocalPreference(viewerGenderForReciprocity, p.preference));
+    localProfiles = localProfiles.filter((p) => matchesReciprocalPreference(viewerGenderForReciprocity, p.preference));
+    intlProfiles = intlProfiles.filter((p) => matchesReciprocalPreference(viewerGenderForReciprocity, p.preference));
 
     // ✅ FINAL EMPTY RULE
     // Free users: empty when local is empty
@@ -1583,7 +1661,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
       if (!archivedRetryError && archivedRetryRows && archivedRetryRows.length > 0) {
         filteredProfiles = Array.isArray(archivedRetryRows) ? (archivedRetryRows as unknown as ProfileRow[]) : [];
+        // This retry only ever fires when the pool is genuinely empty at
+        // this point (the guard above), so - same as the primary archived
+        // mix-in's empty-pool branch - it's an uncapped last resort, and the
+        // page-level "showing inactive profiles" banner is warranted.
+        filteredProfiles.forEach((p) => { p.__isArchivedMixin = true; });
         usingArchivedFallback = true;
+
+        // This fetch runs after the shared reciprocal-preference filter
+        // point above (it populates filteredProfiles fresh, bypassing it),
+        // so it needs its own pass - same Tier 1 guarantee as every other
+        // source of candidates.
+        filteredProfiles = filteredProfiles.filter((p) => matchesReciprocalPreference(currentUserData?.gender, p.preference));
 
         if (!premiumForFeed && baseCountryCode) {
           filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
@@ -1725,6 +1814,46 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       shuffled = shuffled.slice(0, androidInitialCap);
     }
 
+    // TIER 2 — compatibility scoring. Biases the deck toward people who
+    // share interests and/or sit close on the personality sliders with the
+    // viewer, plus a soft distance preference - without collapsing it into a
+    // rigid "best score first" sort (see applyCompatibilityWeighting's own
+    // docblock for why: that would fight the fairness/variety machinery
+    // above it, showing the same top-scoring handful to everyone). Runs
+    // last, right before the liked-you injection, since it's meant to be
+    // the finest-grained reorder on top of the pool composition the earlier
+    // steps (country mix, age-bucket stratification, recency) established.
+    //
+    // A candidate never gets scored down for silence: interests/personality
+    // components only ever fire when BOTH the viewer and that candidate
+    // show real signal (see matchScoring.ts for exactly why - in this
+    // schema, an empty/default value can't be told apart from "never
+    // touched," so treating it as a score of zero would incorrectly
+    // penalize people, not just skip them).
+    //
+    // Archived-mixin candidates are deliberately excluded from this scoring
+    // pass and appended after it, always. Caught this by actually running
+    // the feed end-to-end: a nearby archived profile's distance-decay score
+    // alone was enough to land it in the "high compatibility" bucket -
+    // meaning it could jump to the very FRONT of the deck, directly
+    // contradicting "active always fills first, archived only fills gaps."
+    // Tier 2 has no opinion on activity/staleness, so it can't be trusted to
+    // preserve that ordering on its own.
+    const archivedMixinInShuffled = shuffled.filter((p) => p.is_archived);
+    const activeForCompatWeighting = shuffled.filter((p) => !p.is_archived);
+    const compatWeightedActive = applyCompatibilityWeighting(
+      activeForCompatWeighting,
+      {
+        interests: currentUserData?.interests,
+        introvert_extrovert: currentUserData?.introvert_extrovert,
+        spontaneous_planner: currentUserData?.spontaneous_planner,
+        messy_organized: currentUserData?.messy_organized,
+      },
+      distanceMap,
+      `${shuffleSeed}_compat`
+    );
+    shuffled = [...compatWeightedActive, ...archivedMixinInShuffled];
+
     // Save profile order to localStorage (post-mix)
     try {
       const profileIds = shuffled.map(p => p.id);
@@ -1741,22 +1870,90 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // Ignore localStorage errors
     }
 
-    // ⭐ PRIORITY LIKERS: Inject users who liked the current user at natural, sparse positions
-    // Uses variable intervals (25-40 profiles) with random positioning for organic discovery
+    // ⭐ PRIORITY LIKERS (Mechanism A): Inject users who liked the current
+    // user at natural, sparse positions. Uses variable intervals (25-40
+    // profiles) with deterministic-per-day positioning for organic discovery.
+    //
+    // Two eligibility gates now apply before anyone is even considered for
+    // injection, on top of the existing Tier 1 filtering (a liker is only
+    // ever in `shuffled` at all if they already passed gender/orientation/
+    // age/distance/exclusions):
+    //  - Active within the last 14 days (last_login_at) - previously this
+    //    mechanism had no activity check at all, unlike the swipe-fatigue
+    //    rescue (Mechanism B) below, which only ever pulls from a 72h-active
+    //    pool. A liker from months ago could spend one of the scarce 15%-cap
+    //    slots on someone who's since gone quiet.
+    //  - Has at least one approved photo - a like with no way to visually
+    //    recognize the person isn't a useful "premium slot" to spend either.
     if (priorityLikerIds.length > 0) {
       // Get profile data for priority likers that are in our shuffled list
-      const priorityProfiles = shuffled.filter(p => priorityLikerIds.includes(p.id));
-      
+      const priorityProfilesAll = shuffled.filter(p => priorityLikerIds.includes(p.id));
+
+      const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+      const activeLikerIds = new Set(
+        priorityProfilesAll
+          .filter((p) => {
+            if (!p.last_login_at) return false;
+            const lastActiveMs = new Date(p.last_login_at).getTime();
+            return Number.isFinite(lastActiveMs) && (Date.now() - lastActiveMs) <= FOURTEEN_DAYS_MS;
+          })
+          .map((p) => p.id)
+      );
+
+      // Same reasoning as the archived mix-in's fetch: this is an extra
+      // round-trip in service of a nice-to-have eligibility check (don't
+      // spend a scarce priority slot on a liker with no photo), never
+      // allowed to stall the deck it's gating. A short timeout means a
+      // slow/flaky connection just skips the photo gate for this cycle
+      // (falling through to no injected likers this load) rather than
+      // delaying every card behind it.
+      let likersWithPhotoIds = new Set<string>();
+      if (activeLikerIds.size > 0) {
+        try {
+          const { data: likerImageRows } = await queryTimeout(
+            supabase
+              .from('user_images')
+              .select('user_id')
+              .in('user_id', Array.from(activeLikerIds))
+              .eq('is_approved', true),
+            3000
+          );
+          likersWithPhotoIds = new Set((likerImageRows || []).map((row) => row.user_id));
+        } catch {
+          // leave likersWithPhotoIds empty - no likers get injected this
+          // cycle rather than the deck waiting on a stalled query.
+        }
+      }
+
+      const eligiblePriorityProfiles = priorityProfilesAll.filter(
+        (p) => activeLikerIds.has(p.id) && likersWithPhotoIds.has(p.id)
+      );
+
+      // Rotation: unseen-via-injection likers get first claim on the capped
+      // slots; likers already shown on a previous load only cycle back in
+      // once everyone unseen has had a turn. Previously, anyone over the 15%
+      // cap was simply dropped every single load - a popular profile's
+      // backlog of likers had no guaranteed path to ever surface, since the
+      // same "most recent 50" query kept re-deriving the same handful.
+      const eligibleIdsInRotationOrder = orderLikersByRotation(
+        userId,
+        eligiblePriorityProfiles.map((p) => p.id)
+      );
+      const eligibleById = new Map(eligiblePriorityProfiles.map((p) => [p.id, p]));
+      const priorityProfiles = eligibleIdsInRotationOrder
+        .map((id) => eligibleById.get(id))
+        .filter((p): p is typeof shuffled[number] => !!p);
+
       // Remove priority profiles from their current positions
       const nonPriorityProfiles = shuffled.filter(p => !priorityLikerIds.includes(p.id));
-      
+
       // Cap priority likers at 15% of total feed to keep it natural
       const maxPriorityCount = Math.min(
         priorityProfiles.length,
         Math.ceil(nonPriorityProfiles.length * 0.15)
       );
       const limitedPriorityProfiles = priorityProfiles.slice(0, maxPriorityCount);
-      
+
       // Create deterministic but seemingly random injection points
       const seedUserId = currentUser?.id || userId;
       const dateSeed = new Date().toISOString().split('T')[0];
@@ -1798,22 +1995,43 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       }
 
       const injectionSet = new Set(injectionPositions);
-      
+
       // Build final array with injections at calculated positions
       const finalProfiles: typeof shuffled = [];
       let priorityIdx = 0;
-      
+      const injectedLikers: Array<{ id: string; positionInDeck: number; lastActiveDays: number | null }> = [];
+
       for (let i = 0; i < nonPriorityProfiles.length; i++) {
         // Check if we should inject at this position
         if (injectionSet.has(i) && priorityIdx < limitedPriorityProfiles.length) {
-          finalProfiles.push(limitedPriorityProfiles[priorityIdx]);
+          const likerProfile = limitedPriorityProfiles[priorityIdx];
+          // Tagged client-side only, for swipe-outcome telemetry attribution.
+          const taggedLiker = { ...likerProfile, likedYouMechanism: 'A' as const };
+          finalProfiles.push(taggedLiker);
+          const lastActiveDays = likerProfile.last_login_at
+            ? Math.floor((Date.now() - new Date(likerProfile.last_login_at).getTime()) / (24 * 60 * 60 * 1000))
+            : null;
+          injectedLikers.push({ id: likerProfile.id, positionInDeck: finalProfiles.length - 1, lastActiveDays });
           priorityIdx++;
         }
-        
+
         finalProfiles.push(nonPriorityProfiles[i]);
       }
-      
+
       shuffled = finalProfiles;
+
+      if (injectedLikers.length > 0) {
+        recordLikersShown(userId, injectedLikers.map((l) => l.id));
+        for (const liker of injectedLikers) {
+          trackLikedYouShown({
+            viewerId: userId,
+            likerId: liker.id,
+            mechanism: 'A',
+            likerLastActiveDays: liker.lastActiveDays,
+            positionInDeck: liker.positionInDeck,
+          });
+        }
+      }
     }
 
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
@@ -2440,7 +2658,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
           let query = supabase
             .from('profiles')
-            .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
+            .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
             .in('gender', allowedGendersForRecovery)
             .eq('account_status', 'active')
             .eq('is_admin', false)
@@ -2486,6 +2704,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               // Final guard for large exclusion lists (liked/matched/passed/blocked).
               if (excluded.has(p.id)) return false;
               if (locallyExcluded.has(p.id)) return false;
+              if (!matchesReciprocalPreference(currentUser.gender, p.preference)) return false;
               if (!baseCountryCode) return false;
               if (!isLocalCountryForFreeUser(p, baseCountryCode)) return false;
               if (!p.date_of_birth) return false;
@@ -3356,8 +3575,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     loadMoreMatches();
   }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
 
-  // ⭐ SWIPE FATIGUE RESCUE: Inject active profiles after long no-match streaks
-  // This prevents user fatigue and increases retention (Tinder-style behavior)
+  // ⭐ SWIPE FATIGUE RESCUE (Mechanism B): Inject active profiles after long
+  // no-match streaks. This prevents user fatigue and increases retention
+  // (Tinder-style behavior). Trigger (8-swipe no-match streak, 3-minute
+  // cooldown) and the 72h activity gate are unchanged - both were already
+  // the right behavior. What's new: previously, if the in-memory deck
+  // didn't happen to have at least 5 remaining profiles, this bailed out
+  // entirely and did nothing, even if the viewer had plenty of eligible
+  // (active, liked-me) candidates that just weren't loaded into the deck
+  // yet. Now it expands the pool with a small, targeted DB fetch for those
+  // specific missing likers when the in-memory eligible count is low.
   useEffect(() => {
     // Early exit conditions - these are lightweight checks
     if (noMatchStreak < FATIGUE_RESCUE_THRESHOLD) return;
@@ -3366,49 +3593,118 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     const now = Date.now();
     if (now - lastRescueRef.current < RESCUE_COOLDOWN_MS) return;
-    
-    // Get rescue candidates from remaining profiles
+
     const remainingProfiles = potentialMatches
       .slice(currentIndex)
       .filter((p): p is PotentialMatch => !isAd(p));
-    
-    if (remainingProfiles.length < 5) return; // Not enough profiles to rescue from
-    
-    // Get active rescue candidates
+
+    if (remainingProfiles.length === 0) return;
+
     const todaySeed = todayStr();
     const likedMeSet = new Set(usersWhoLikedMeIds);
-    const rescueCandidates = getSwipeFatigueRescueCandidates(
-      remainingProfiles,
-      3, // Inject up to 3 rescue profiles
-      `${currentUser?.id || 'anon'}_${todaySeed}_rescue`,
-      likedMeSet
-    );
-    
-    if (rescueCandidates.length === 0) return;
-    
-    // Inject rescue profiles near the front of the queue (positions 2-5)
-    setPotentialMatches(prev => {
-      const currentProfiles = prev.slice(currentIndex);
-      const rescueIds = new Set(rescueCandidates.map(p => p.id));
-      
-      // Remove rescue profiles from their current positions
-      const withoutRescue = currentProfiles.filter(p => !isAd(p) ? !rescueIds.has(p.id) : true);
-      
-      // Inject at positions 2, 4, 6 (skip first profile which is current)
-      const injected = injectRescueProfiles(withoutRescue, rescueCandidates, {
-        maxPercent: 0.15,
-        spacing: [2, 4],
-        startPosition: 1,
-        seed: `${currentUser?.id || 'anon'}_${todaySeed}_rescue_spacing`
+    const SEVENTY_TWO_HOURS_MS = 72 * 60 * 60 * 1000;
+    const isActiveWithin72h = (p: PotentialMatch): boolean => {
+      if (!p.last_login_at) return false;
+      const lastActiveMs = new Date(p.last_login_at).getTime();
+      return Number.isFinite(lastActiveMs) && (Date.now() - lastActiveMs) <= SEVENTY_TWO_HOURS_MS;
+    };
+    const eligibleInMemoryLikers = remainingProfiles.filter((p) => likedMeSet.has(p.id) && isActiveWithin72h(p));
+
+    const runRescue = async () => {
+      let candidatePool = remainingProfiles;
+
+      if (eligibleInMemoryLikers.length < 5 && likedMeSet.size > 0 && currentUser?.id) {
+        const inMemoryIds = new Set(remainingProfiles.map((p) => p.id));
+        const missingLikerIds = Array.from(likedMeSet).filter((id) => !inMemoryIds.has(id));
+
+        if (missingLikerIds.length > 0) {
+          const nowTs = Date.now();
+          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const locallyExcluded = new Set<string>();
+          for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+            if (data.action === 'like' || (nowTs - data.timestamp) < thirtyDaysMs) locallyExcluded.add(id);
+          }
+          const fetchIds = missingLikerIds.filter((id) => !locallyExcluded.has(id)).slice(0, 50);
+
+          if (fetchIds.length > 0) {
+            try {
+              const { data: freshRows } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
+                .in('id', fetchIds)
+                .eq('account_status', 'active')
+                .eq('is_admin', false)
+                .eq('is_archived', false);
+
+              const freshProfiles = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
+                .filter((p) => matchesReciprocalPreference(currentUser?.gender, p.preference))
+                .map((p) => toPotentialMatch(p, { images: [] }));
+
+              candidatePool = [...remainingProfiles, ...freshProfiles];
+            } catch {
+              // DB expansion is a bonus, not a requirement - fall through and
+              // rescue from whatever was already in memory.
+            }
+          }
+        }
+      }
+
+      const rescueCandidates = getSwipeFatigueRescueCandidates(
+        candidatePool,
+        3, // Inject up to 3 rescue profiles
+        `${currentUser?.id || 'anon'}_${todaySeed}_rescue`,
+        likedMeSet
+      );
+
+      if (rescueCandidates.length === 0) return;
+
+      const taggedRescueCandidates = rescueCandidates.map((p) => ({ ...p, likedYouMechanism: 'B' as const }));
+
+      // Inject rescue profiles near the front of the queue (positions 2-5)
+      setPotentialMatches(prev => {
+        const currentProfiles = prev.slice(currentIndex);
+        const rescueIds = new Set(taggedRescueCandidates.map(p => p.id));
+
+        // Remove rescue profiles from their current positions
+        const withoutRescue = currentProfiles.filter(p => !isAd(p) ? !rescueIds.has(p.id) : true);
+
+        // Inject at positions 2, 4, 6 (skip first profile which is current)
+        const injected = injectRescueProfiles(withoutRescue, taggedRescueCandidates, {
+          maxPercent: 0.15,
+          spacing: [2, 4],
+          startPosition: 1,
+          seed: `${currentUser?.id || 'anon'}_${todaySeed}_rescue_spacing`
+        });
+
+        return [...prev.slice(0, currentIndex), ...injected];
       });
-      
-      return [...prev.slice(0, currentIndex), ...injected];
-    });
-    
-    lastRescueRef.current = now;
-    // Reset streak after rescue
-    setNoMatchStreak(0);
-  }, [noMatchStreak, potentialMatches, currentIndex, currentUser?.id, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback]);
+
+      lastRescueRef.current = now;
+      // Reset streak after rescue
+      setNoMatchStreak(0);
+
+      if (currentUser?.id) {
+        // Position is approximate (index within the rescue batch, not the
+        // exact post-spacing deck offset) - adequate for the aggregate
+        // "did this mechanism correlate with matches" measurement this
+        // exists for, not meant to be pixel-precise.
+        rescueCandidates.forEach((p, idx) => {
+          const lastActiveDays = p.last_login_at
+            ? Math.floor((Date.now() - new Date(p.last_login_at).getTime()) / (24 * 60 * 60 * 1000))
+            : null;
+          trackLikedYouShown({
+            viewerId: currentUser.id,
+            likerId: p.id,
+            mechanism: 'B',
+            likerLastActiveDays: lastActiveDays,
+            positionInDeck: idx,
+          });
+        });
+      }
+    };
+
+    void runRescue();
+  }, [noMatchStreak, potentialMatches, currentIndex, currentUser, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback]);
   // Automatically preloads upcoming profiles based on current position
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
@@ -3560,6 +3856,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Optimistic path: advance UI immediately, then persist the action in background.
     const prevMatch = currentMatch;
 
+    // Closes the loop on the liked-you mechanisms: if this card was actually
+    // surfaced via Mechanism A or B (tagged when injected), record what
+    // happened to it. Silent no-op for every ordinary card (the vast
+    // majority of swipes), since likedYouMechanism is only ever set on
+    // injected profiles.
+    const reportLikedYouOutcome = (direction: 'like' | 'pass', resultedInMatch: boolean) => {
+      if (prevMatch.likedYouMechanism && currentUser?.id) {
+        trackLikedYouSwiped({
+          viewerId: currentUser.id,
+          likerId: prevMatch.id,
+          mechanism: prevMatch.likedYouMechanism,
+          direction,
+          resultedInMatch,
+        });
+      }
+    };
+
     // ✅ Increment local swipe count immediately (persists across refresh/app close).
     bumpLocalSwipeCount(1);
 
@@ -3668,25 +3981,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               .maybeSingle();
 
             if (mutualLike) {
+              reportLikedYouOutcome('like', true);
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
-              
+
               if (registerMatchAndCheckIsFirst()) {
                 isFirstEverMatchRef.current = true;
               }
-              
+
               // Clear chat cache to force refresh when user opens ChatPage
               if (typeof window !== 'undefined') {
                 const win = window as WindowWithIntervals;
                 win.chatMatchesCache?.delete(currentUser.id);
               }
-              
+
               // Trigger global event to notify ChatPage of new match
               if (typeof window !== 'undefined') {
                 const event = new CustomEvent('newMatch', { detail: { userId: currentUser.id } });
                 window.dispatchEvent(event);
               }
-              
+
               // Send match notification to the other user
               try {
                 const matchedUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
@@ -3694,6 +4008,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               } catch (notificationError) {
                 // ignore notification errors
               }
+            } else {
+              reportLikedYouOutcome('like', false);
             }
           } catch (fallbackErr) {
             // ✅ DO NOT rollback on network/RPC failures.
@@ -3719,9 +4035,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             typeof rpcData === 'object' &&
             Boolean((rpcData as Record<string, unknown>).match);
           if (hasMatch) {
+            reportLikedYouOutcome('like', true);
             // ⭐ SWIPE FATIGUE RESCUE: Reset streak on match
             setNoMatchStreak(0);
-            
+
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
 
@@ -3749,9 +4066,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               // ignore notification errors
             }
           } else {
+            reportLikedYouOutcome('like', false);
             // ⭐ SWIPE FATIGUE RESCUE: Increment streak on no-match like
             setNoMatchStreak(prev => prev + 1);
-            
+
             // Like was recorded but no match - send like notification
             try {
               const { count, error: countError } = await supabase
@@ -3892,6 +4210,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const passerId = currentUser.id;
     const passedId = prevMatch.id;
     const premiumParam = premiumActive;
+
+    // Closes the loop on the liked-you mechanisms - a pass is a definitive
+    // outcome with no async result to wait for, unlike a like (which might
+    // still turn into a match), so this fires immediately.
+    if (prevMatch.likedYouMechanism && currentUser?.id) {
+      trackLikedYouSwiped({
+        viewerId: currentUser.id,
+        likerId: prevMatch.id,
+        mechanism: prevMatch.likedYouMechanism,
+        direction: 'pass',
+        resultedInMatch: false,
+      });
+    }
 
     // Immediately advance UI
     moveToNext(prevMatch);
@@ -4730,6 +5061,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // Calculate swipe overlay opacity and transform
   const swipeOpacity = Math.min(swipeUI.swipeDistance / 100, 0.8);
 
+  // Blur + dark tint on the next card visible behind the one being dragged,
+  // so a user mid-swipe can't already see who's next before they've actually
+  // committed to the swipe.
+  //
+  // Earlier version revealed progressively based on drag distance vs.
+  // minSwipeDistance (screenWidth * 0.25, capped 120px) - but that's the
+  // distance that merely REGISTERS a swipe as valid on release, not how far
+  // people actually drag before letting go. A real drag routinely travels
+  // 200-300px+ while the finger is still down, well past that ~100px mark,
+  // so the old formula saturated to "fully revealed" while the user was
+  // still barely a third of the way across the screen, still holding -
+  // exactly the "reveals everything mid-swipe" bug reported.
+  //
+  // Fixed: no distance-based reveal during the hold at all. Fully
+  // blurred+dark for the entire drag, no matter how far, and it only clears
+  // the instant the swipe actually completes (finger lifts past threshold,
+  // exitingCard fires and the card starts flying away) - "hidden until the
+  // swipe goes completely through," exactly as asked. A drag that doesn't
+  // clear the threshold and springs back never reveals it at all.
+  //
+  // CSS blur is a real GPU cost on low-end Android WebViews (same reasoning
+  // DominantColorImageBg already applies to its own backdrop blur) - capped
+  // lower there. Opacity does most of the actual hiding work everywhere and
+  // is essentially free on any device, so it isn't reduced by platform.
+  const NEXT_CARD_MAX_BLUR_PX = isAndroidPlatform() ? 7 : 15;
+  const NEXT_CARD_MAX_DARK_OPACITY = 0.3;
+  const nextCardRevealProgress = exitingCard ? 1 : 0;
+  const nextCardBlurPx = NEXT_CARD_MAX_BLUR_PX * (1 - nextCardRevealProgress);
+  const nextCardDarkOpacity = NEXT_CARD_MAX_DARK_OPACITY * (1 - nextCardRevealProgress);
+
   // Simple card transform for smooth dragging - use translate3d for GPU acceleration
   const cardTransform = (() => {
     if (exitingCard && exitDirection) {
@@ -4805,15 +5166,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         {/* ...existing code... */}
         {nextMatch && (
           <DominantColorImageBg
-            imageUrl={nextMatchImages[0] ? getOptimizedUrl(nextMatchImages[0]) : undefined}
+            // Raw URL, not getOptimizedUrl(...) - DominantColorImageBg applies
+            // its own tiny 40px/q20 transform for this blurred backdrop, but
+            // optimizeImageUrl() no-ops on a URL that's already been through
+            // the /render/image/ endpoint (which getOptimizedUrl produces),
+            // so passing the already-1080px-optimized URL here silently
+            // defeated the "cheap tiny thumbnail" and loaded the full-size
+            // photo as the blur backdrop on every card transition instead.
+            imageUrl={nextMatchImages[0] || undefined}
           >
             {/* ...existing code for overlays, etc... */}
             {nextMatchImages.length > 0 && !isAd(nextMatch) ? (
-              <div className="w-full h-full bg-black flex items-center justify-center">
-                <div
-                  className="relative overflow-hidden bg-black"
-                  style={{ width: '100%', maxWidth: '100%', maxHeight: '100%', aspectRatio: '3 / 4', zIndex: 1 }}
-                >
+              // Full-bleed, same as SlideRenderer's ImageSlide - no fixed 3:4
+              // box centered inside this frame (that letterboxed on typical
+              // taller-than-4:3 phone screens instead of filling edge-to-edge).
+              // Keyed by id: once moveToNext() promotes this card to front and
+              // assigns a NEW next-card behind it, this forces a clean remount
+              // instead of reusing the same DOM node. Without the key, the old
+              // node (mid-transition, having just animated to "revealed") got
+              // reused for the brand-new photo and re-animated from that stale
+              // revealed state back to hidden - a visible "reveals, then pops
+              // blurry again" glitch right after every completed swipe, plus
+              // the wasted extra animation pass was the actual slowdown. A
+              // fresh mount just paints its correct hidden state immediately,
+              // no transition to fight.
+              <div key={nextMatch.id} className="relative w-full h-full bg-black overflow-hidden">
                   <img
                     src={(() => {
                       // ⭐ Use blob URL for instant loading if available
@@ -4823,11 +5200,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                     })()}
                     alt={`${nextMatch.first_name}'s photo`}
                     className="absolute inset-0 w-full h-full object-cover object-center"
+                    style={{
+                      filter: `blur(${nextCardBlurPx}px)`,
+                      // Constant scale, never transitioned - only large enough
+                      // to keep the blur's own edge-softening from revealing a
+                      // hairline of the frame's black background. Letting this
+                      // animate too (scale 1.2 -> 1 alongside the blur/opacity
+                      // clearing) was a second simultaneous moving property
+                      // compounding into the reveal looking like a "pop"
+                      // instead of one clean, single fade.
+                      transform: 'scale(1.1)',
+                      transition: swipeUI.isDragging ? 'none' : 'filter 0.25s ease',
+                      willChange: 'filter',
+                    }}
                     draggable={false}
                     loading="eager"
                     decoding="async"
                   />
-                </div>
+                  {/* Black tint on top of the blur - the blur alone still let too
+                      much of the next photo read through at a glance. Fades out
+                      in lockstep with the blur, so both clear together as one
+                      single smooth reveal right as the swipe actually completes. */}
+                  <div
+                    className="absolute inset-0 pointer-events-none bg-black"
+                    style={{
+                      opacity: nextCardDarkOpacity,
+                      transition: swipeUI.isDragging ? 'none' : 'opacity 0.25s ease',
+                    }}
+                  />
               </div>
             ) : nextMatch && !isAd(nextMatch) ? (
 

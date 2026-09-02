@@ -38,6 +38,16 @@ export interface PotentialMatch {
   messy_organized?: number;
   adinkra_symbols?: string[];
   distance?: number; // Precomputed distance in km
+  last_login_at?: string | null; // Used for the liked-you activity gate (DiscoverPage.tsx)
+  // Set only on profiles mixed in from the archived (inactive 30+ days) pool,
+  // so the UI can show a "Hasn't been active lately" label instead of
+  // presenting them identically to an active profile.
+  is_archived?: boolean;
+  // Set only on a profile that was surfaced via one of the "liked you"
+  // injection mechanisms (see DiscoverPage.tsx) - client-side only, used to
+  // attribute a swipe outcome back to the mechanism that surfaced it for
+  // telemetry. Never sent to the server as part of the profile itself.
+  likedYouMechanism?: 'A' | 'B';
 }
 
 export interface ChatMatch {
