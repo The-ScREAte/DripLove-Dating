@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react';
 import { CurrentUser } from '@/types';
 import { useLikeBackInjection } from '@/hooks/useLikeBackInjection';
 import { MatchOrAd } from './discoverTypes';
+import { getTrustedBaseCountryCode, normalizeCountryCodeList } from './discoverFeedUtils';
 
 interface SwipeRecord {
   action: 'like' | 'pass';
@@ -52,6 +53,15 @@ export const useDiscoverLikeBack = ({
     return premiumActive ? userMax : Math.min(userMax, FREE_USER_MAX);
   })();
 
+  // Same country rule as every other candidate source on Discover: premium =
+  // home + unlocked countries, free = home country only (further distance-
+  // capped inside the hook). Liked-back injection must never bypass it.
+  const baseCountryCode = getTrustedBaseCountryCode(currentUser?.country_code, currentUser?.country);
+  const unlockedCountries = useMemo(
+    () => (premiumActive ? normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode) : []),
+    [premiumActive, currentUser?.unlocked_countries, baseCountryCode]
+  );
+
   const {
     onSwipe: onLikeBackSwipe,
     isLikedMeProfile,
@@ -64,7 +74,8 @@ export const useDiscoverLikeBack = ({
     inQueueIds: inQueueIdsSet,
     locallySwipedIds: locallySwipedProfileIds.current,
     isPremium: premiumActive,
-    userCountryCode: currentUser?.country_code || currentUser?.country,
+    userCountryCode: baseCountryCode,
+    unlockedCountries,
     userLatitude: currentUser?.latitude,
     userLongitude: currentUser?.longitude,
     maxDistance: likeBackMaxDistance,

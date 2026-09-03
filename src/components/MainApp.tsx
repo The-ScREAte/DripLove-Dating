@@ -103,7 +103,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [isPremium, setIsPremium] = useState(false);
+  // undefined = premium status not yet resolved. DiscoverPage (and others)
+  // key off `isPremium !== undefined` to know whether it's safe to enforce
+  // the free-tier swipe limit - defaulting this to `false` made every app
+  // load/resume briefly look like a free user to that check, which could
+  // wrongly trigger the "out of swipes" block for an actual premium user
+  // who already had >=29 swipes that day.
+  const [isPremium, setIsPremium] = useState<boolean | undefined>(undefined);
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
   // Only the columns actually selected below are stored here.

@@ -33,12 +33,16 @@ export const useSubscription = (userId: string | undefined) => {
     }
 
     try {
-      // Check if user is authenticated first
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setLoading(false);
-        return;
-      }
+      // NOTE: previously bailed out here (setLoading(false), no data) if
+      // getSession() came back empty - which happens routinely for a brief
+      // moment right after login while the session is still settling. That
+      // made `loading` flip to false without ever having fetched the real
+      // subscription, and DiscoverPage's premium-resolved gate treats
+      // `!loading` as "we know the answer now" - so a premium user could get
+      // checked against the free swipe limit during that window. The RPC
+      // call below is SECURITY DEFINER and does its own auth handling
+      // (falls through to the existing catch/fallback on any real failure),
+      // so there's no need to gate on session presence here at all.
 
       // Use real-time subscription status checker
       const { data, error } = await supabase.rpc('get_current_subscription_status', {

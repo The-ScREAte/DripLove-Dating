@@ -586,9 +586,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
                     <span>
                       {match.city}, {match.country}
-                      {match.distance !== undefined ? (
+                      {match.distance !== undefined && match.distance < 999 ? (
                         <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km away</span>
-                      ) : preCalculatedDistance !== undefined ? (
+                      ) : preCalculatedDistance !== undefined && preCalculatedDistance < 999 ? (
                         <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km away</span>
                       ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
                         <span className="ml-2">

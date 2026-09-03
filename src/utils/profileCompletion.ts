@@ -147,7 +147,7 @@ export const calculateProfileCompletion = (
   let completedWeight = 0;
   const missingFields: string[] = [];
 
-  Object.entries(completionCriteria).forEach(([key, criteria]) => {
+  Object.values(completionCriteria).forEach((criteria) => {
     totalWeight += criteria.weight;
     if (criteria.completed) {
       completedWeight += criteria.weight;
@@ -165,76 +165,6 @@ export const calculateProfileCompletion = (
   return { completion, missingFields, showVerifiedBadge, completionCriteria };
 };
 
-// Check if user has reached daily swipe limit and profile completion requirements
-export const checkSwipeRestrictions = async (
-  userId: string,
-  profileCompletion: number,
-  isPremium: boolean
-): Promise<{
-  canSwipe: boolean;
-  reason?: string;
-  swipesUsedToday?: number;
-  swipeLimit?: number | string;
-  requiresProfileCompletion?: boolean;
-}> => {
-  if (!userId) {
-    return { canSwipe: false, reason: 'User not authenticated' };
-  }
-
-  try {
-    // Get today's swipe usage
-    const todayDate = new Date().toISOString().split('T')[0];
-    
-    const { data, error } = await supabase
-      .from('user_usage')
-      .select('swipes_used')
-      .eq('user_id', userId)
-      .eq('date', todayDate)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      // Removed for production: console.error('Error fetching swipe usage:', error);
-      // Fallback: allow swiping if we can't check usage
-      return { canSwipe: true };
-    }
-
-    const swipesUsedToday = data?.swipes_used || 0;
-    
-    // Profile completion restriction: EVERYONE needs 70% completion after 5 swipes
-    if (swipesUsedToday >= 5 && profileCompletion < 70) {
-      return {
-        canSwipe: false,
-        reason: 'Profile completion required',
-        swipesUsedToday,
-        swipeLimit: isPremium ? 'unlimited' : 12,
-        requiresProfileCompletion: true
-      };
-    }
-
-    // Daily limit check (free users: 20, premium users: 55)
-    const swipeLimit = isPremium ? 55 : 20;
-    if (swipesUsedToday >= swipeLimit) {
-      return {
-        canSwipe: false,
-        reason: 'Daily limit reached',
-        swipesUsedToday,
-        swipeLimit,
-        requiresProfileCompletion: false
-      };
-    }
-
-    return {
-      canSwipe: true,
-      swipesUsedToday,
-      swipeLimit,
-      requiresProfileCompletion: false
-    };
-  } catch (error) {
-    // Removed for production: console.error('Error checking swipe restrictions:', error);
-    // Fallback: allow swiping if there's an error
-    return { canSwipe: true };
-  }
-};
 
 // Get current user's swipe count for today
 export const getTodaySwipeCount = async (userId: string): Promise<number> => {

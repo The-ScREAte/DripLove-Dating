@@ -27,9 +27,11 @@ interface UseLikeBackInjectionOptions {
   inQueueIds: Set<string>;
   locallySwipedIds: Map<string, { action: 'like' | 'pass'; timestamp: number }>;
   boostMode?: boolean; // Optional: 90% injection rate for turbo mode
-  // Location-based filtering for free users
+  // Country/location filtering: premium = home + unlocked countries (no
+  // distance cap), free = home country only (distance-capped).
   isPremium?: boolean;
   userCountryCode?: string;
+  unlockedCountries?: string[]; // Premium only; already excludes home country
   userLatitude?: number;
   userLongitude?: number;
   maxDistance?: number; // Max distance in km (free users max 500km)
@@ -99,6 +101,7 @@ export function useLikeBackInjection({
   boostMode = false,
   isPremium = false,
   userCountryCode,
+  unlockedCountries = [],
   userLatitude,
   userLongitude,
   maxDistance = 500,
@@ -115,6 +118,9 @@ export function useLikeBackInjection({
   const locallySwipedIdsRef = useRef(locallySwipedIds);
   const likedMeIdsRef = useRef(likedMeIds);
   const likerProfilesRef = useRef(likerProfiles);
+  const unlockedCountriesRef = useRef(unlockedCountries);
+  const isPremiumRef = useRef(isPremium);
+  const userCountryCodeRef = useRef(userCountryCode);
 
   useEffect(() => {
     blockedIdsRef.current = blockedIds;
@@ -122,6 +128,20 @@ export function useLikeBackInjection({
     inQueueIdsRef.current = inQueueIds;
     locallySwipedIdsRef.current = locallySwipedIds;
   }, [blockedIds, passedTodayIds, inQueueIds, locallySwipedIds]);
+
+  // `unlockedCountries` is a plain array from a parent prop that may get a
+  // fresh identity on unrelated re-renders - a ref plus a stable string key
+  // (below) avoids recreating the fetch/candidate callbacks every render,
+  // same reasoning as the Set/Map refs above.
+  const unlockedCountriesKey = (unlockedCountries || []).join(',');
+  useEffect(() => {
+    unlockedCountriesRef.current = unlockedCountries;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlockedCountriesKey]);
+  useEffect(() => {
+    isPremiumRef.current = isPremium;
+    userCountryCodeRef.current = userCountryCode;
+  }, [isPremium, userCountryCode]);
 
   useEffect(() => {
     likedMeIdsRef.current = likedMeIds;
@@ -210,6 +230,21 @@ export function useLikeBackInjection({
         return;
       }
 
+      // Country rule (same as every other candidate source on Discover):
+      // premium = home + unlocked countries, free = home country only. Fail
+      // closed - without a known allowed-country set, show nobody rather
+      // than everybody.
+      const likeBackUserCC = normalizeCountryCode(userCountryCode);
+      const likeBackAllowedCountryCodes = Array.from(new Set([
+        ...(likeBackUserCC ? [likeBackUserCC] : []),
+        ...(isPremium ? unlockedCountriesRef.current.map(normalizeCountryCode).filter(Boolean) : []),
+      ]));
+
+      if (likeBackAllowedCountryCodes.length === 0) {
+        setLikedMeIds([]);
+        return;
+      }
+
       // Fetch profiles with image count for quality filter
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -222,6 +257,7 @@ export function useLikeBackInjection({
           messy_organized, adinkra_symbols, is_verified
         `)
         .in('id', candidates)
+        .in('country_code', likeBackAllowedCountryCodes)
         .eq('account_status', 'active')
         .eq('is_admin', false);
 
@@ -270,7 +306,7 @@ export function useLikeBackInjection({
     } finally {
       fetchInFlightRef.current = false;
     }
-  }, [userId]);
+  }, [userId, isPremium, userCountryCode, unlockedCountriesKey]);
 
   // Initial fetch
   useEffect(() => {
@@ -328,6 +364,16 @@ export function useLikeBackInjection({
 
             if (!profile) return;
 
+            // Same country rule as the initial fetch: premium = home +
+            // unlocked countries, free = home country only.
+            const realtimeUserCC = normalizeCountryCode(userCountryCodeRef.current);
+            const realtimeAllowedCountryCodes = new Set([
+              ...(realtimeUserCC ? [realtimeUserCC] : []),
+              ...(isPremiumRef.current ? unlockedCountriesRef.current.map(normalizeCountryCode).filter(Boolean) : []),
+            ]);
+            const profileCC = normalizeCountryCode(profile.country_code || profile.country || '');
+            if (!profileCC || !realtimeAllowedCountryCodes.has(profileCC)) return;
+
             // Check image count
             const { count } = await supabase
               .from('user_images')
@@ -382,13 +428,19 @@ export function useLikeBackInjection({
     return swipes > 0 && swipes % everyNSwipes === 0;
   }, [likedMeIds.length, everyNSwipes]);
 
-  // Get injection candidate - respects location filtering for free users
+  // Get injection candidate - country-restricted for everyone (premium =
+  // home + unlocked countries, free = home country only), plus a distance
+  // cap for free users specifically.
   const getInjectionCandidate = useCallback((): LikerProfile | null => {
     const userCC = normalizeCountryCode(userCountryCode);
+    const allowedCountryCodes = new Set([
+      ...(userCC ? [userCC] : []),
+      ...(isPremium ? unlockedCountries.map(normalizeCountryCode).filter(Boolean) : []),
+    ]);
 
-    // Free users must have a known country; otherwise fail-closed.
-    if (!isPremium && !userCC) return null;
-    
+    // Fail-closed: with no known allowed country, show nobody.
+    if (allowedCountryCodes.size === 0) return null;
+
     for (const id of likedMeIds) {
       if (
         !blockedIds.has(id) &&
@@ -399,48 +451,46 @@ export function useLikeBackInjection({
       ) {
         const profile = likerProfiles.get(id);
         if (!profile) continue;
-        
-        // For FREE users: enforce same country AND distance filtering
-        if (!isPremium) {
-          const profileCC = normalizeCountryCode(profile.country_code);
-          const profileCN = normalizeCountryCode(profile.country);
 
-          // If both exist but disagree, treat as bad data and skip.
-          if (profileCC && profileCN && profileCC !== profileCN) {
-            continue;
-          }
+        const profileCC = normalizeCountryCode(profile.country_code);
+        const profileCN = normalizeCountryCode(profile.country);
 
-          const effectiveProfileCC = profileCC || profileCN;
-          
-          // Must be same country
-          if (!effectiveProfileCC || userCC !== effectiveProfileCC) {
+        // If both exist but disagree, treat as bad data and skip.
+        if (profileCC && profileCN && profileCC !== profileCN) {
+          continue;
+        }
+
+        const effectiveProfileCC = profileCC || profileCN;
+
+        // Must be home country, or (premium) one of the unlocked countries.
+        if (!effectiveProfileCC || !allowedCountryCodes.has(effectiveProfileCC)) {
+          continue;
+        }
+
+        // Free users only: must also be within max distance (if coordinates available)
+        if (
+          !isPremium &&
+          userLatitude != null &&
+          userLongitude != null &&
+          profile.latitude != null &&
+          profile.longitude != null
+        ) {
+          const distance = calculateDistanceKm(
+            userLatitude,
+            userLongitude,
+            profile.latitude,
+            profile.longitude
+          );
+          if (distance > maxDistance) {
             continue;
-          }
-          
-          // Must be within max distance (if coordinates available)
-          if (
-            userLatitude != null && 
-            userLongitude != null && 
-            profile.latitude != null && 
-            profile.longitude != null
-          ) {
-            const distance = calculateDistanceKm(
-              userLatitude, 
-              userLongitude, 
-              profile.latitude, 
-              profile.longitude
-            );
-            if (distance > maxDistance) {
-              continue;
-            }
           }
         }
-        
+
         return profile;
       }
     }
     return null;
-  }, [likedMeIds, likerProfiles, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds, isPremium, userCountryCode, userLatitude, userLongitude, maxDistance]);
+  }, [likedMeIds, likerProfiles, blockedIds, passedTodayIds, inQueueIds, locallySwipedIds, isPremium, userCountryCode, unlockedCountries, userLatitude, userLongitude, maxDistance]);
 
   // Convert liker profile to PotentialMatch format
   const likerToMatch = useCallback((liker: LikerProfile): PotentialMatch => {

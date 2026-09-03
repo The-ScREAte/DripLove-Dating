@@ -28,7 +28,6 @@ import { useDiscoverAds } from './discover/useDiscoverAds';
 import { AdData, MatchOrAd } from './discover/discoverTypes';
 import { useDiscoverLikeBack } from './discover/useDiscoverLikeBack';
 import {
-  isUuid,
   uniqUuids,
   todayStr,
   applyLightActivityWeighting,
@@ -36,7 +35,6 @@ import {
   readCachedSwipeCount,
   writeCachedSwipeCount,
   formatUuidInFilter,
-  hashStringToInt,
   getTrustedBaseCountryCode,
   isLocalCountryForFreeUser,
   mixByCountryRoundRobin,
@@ -116,17 +114,6 @@ interface PassedUser {
   user_id: string;
   passed_at: Date;
 }
-
-type WindowWithCdvPurchase = Window & {
-  CdvPurchase?: {
-    store?: {
-      get?: (id: string) => unknown;
-      when?: () => {
-        productUpdated: (cb: () => void) => void;
-      };
-    };
-  };
-};
 
 interface UserImageRow {
   image_url: string;
@@ -274,75 +261,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const navigate = useNavigate();
 
   
-  // Track viewport height safely (no SSR crash)
-  const [vh, setVh] = useState<number>(() => (typeof window !== 'undefined' ? window.innerHeight : 800));
-  useEffect(() => {
-    const onResize = () => setVh(window.innerHeight);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  // Real rendered height of the app's fixed header/bottom nav, published by MainApp.tsx
-  // as CSS custom properties (measured via ResizeObserver, not guessed). Some of the
-  // expanded-panel height math below is plain JS, not CSS, so it needs these as numbers
-  // too - read once and kept in sync on resize, same cadence as `vh` above.
-  const rafIds = useRef<number[]>([]);
-  const readHeightVar = (name: string, fallback: number): number => {
-    if (typeof window === 'undefined') return fallback;
-    const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
-    const parsed = parseFloat(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  };
-  const [headerHeight, setHeaderHeight] = useState<number>(() => readHeightVar('--app-header-height', 72));
-  const [bottomNavHeight, setBottomNavHeight] = useState<number>(() => readHeightVar('--app-bottom-nav-height', 96));
-  useEffect(() => {
-    const sync = () => {
-      setHeaderHeight(readHeightVar('--app-header-height', 72));
-      setBottomNavHeight(readHeightVar('--app-bottom-nav-height', 96));
-    };
-    sync();
-    // The very first `sync()` above can race MainApp's own ResizeObserver (it hasn't
-    // measured the real header/nav yet on first paint, so this reads the CSS-level
-    // fallback instead of the real value) - a couple of rAF-delayed re-syncs catch
-    // the real value the moment it lands, without waiting for an actual window
-    // resize event (which mobile browsers may not fire again for a long time).
-    const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(sync);
-      rafIds.current.push(raf2);
-    });
-    rafIds.current.push(raf1);
-    window.addEventListener('resize', sync);
-    return () => {
-      window.removeEventListener('resize', sync);
-      rafIds.current.forEach((id) => cancelAnimationFrame(id));
-      rafIds.current = [];
-    };
-  }, [vh]);
-  
-  // IAP: Track if buy is enabled
-  const [canBuy, setCanBuy] = useState(false);
-  useEffect(() => {
-    function onProductUpdated() {
-      const win = window as WindowWithCdvPurchase;
-      const p = win.CdvPurchase?.store?.get?.('com.driplove.dating.premium.monthlysub1');
-      const product = p as { getOffer?: () => unknown; offers?: unknown[] } | undefined;
-
-      // More robust offer detection (handles plugin variations)
-      const offer = (typeof product?.getOffer === 'function' ? product.getOffer() : undefined)
-        ?? (Array.isArray(product?.offers) ? product.offers[0] : undefined);
-      setCanBuy(!!offer);
-    }
-    const win = window as WindowWithCdvPurchase;
-    const store = win.CdvPurchase?.store;
-    if (store?.when) {
-      store.when().productUpdated(onProductUpdated);
-    }
-    onProductUpdated();
-    // No off/unsubscribe in plugin
-  }, []);
-  // ...existing code...
-
-  // Example: Add Buy/Restore buttons to your UI (place where appropriate)
   const [potentialMatches, setPotentialMatches] = useState<MatchOrAd[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
@@ -383,7 +301,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const [showRatingFunnel, setShowRatingFunnel] = useState(false);
   const [showVerifyPrompt, setShowVerifyPrompt] = useState(false);
   const isFirstEverMatchRef = useRef(false);
-  const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
   // Store users who liked the current user (for "they liked you" notification)
   const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
   // New: Store images by userId for instant access
@@ -394,9 +311,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   useEffect(() => {
     userImagesRef.current = userImages;
   }, [userImages]);
-  // We avoid storing HTMLImageElement objects in state to prevent GC pressure
-  // and rely on useImagePreloader for actual image loading status.
-  const [preloadedImages, setPreloadedImages] = useState<{ [key: string]: string[] }>({});
   // Store distances from location service
   const [userDistances, setUserDistances] = useState<{ [key: string]: number }>({});
   // Store preloaded blob URLs for instant image rendering
@@ -406,9 +320,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const [reverseUsageToday, setReverseUsageToday] = useState(0);
   // Local computed completion (fallback when parent/DB completion is unavailable)
   const [computedProfileCompletion, setComputedProfileCompletion] = useState(0);
-  const [profileMissingFields, setProfileMissingFields] = useState<string[]>([]);
-  const [userProfileImages, setUserProfileImages] = useState<UserImageRow[]>([]);
-  const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
+  const [, setUserProfileImages] = useState<UserImageRow[]>([]);
   // DB is the source of truth; keep a local cache for refresh/app restarts.
   // Do NOT default to 0; unknown count must block swiping until DB fetch completes.
   const [todaySwipeCount, setTodaySwipeCount] = useState<number | null>(null);
@@ -425,7 +337,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   
   // Dynamic content height management
   const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState(0);
+  const [, setContentHeight] = useState(0);
   // PHASE 0: Required refs (must exist before any fetching logic)
   const initializedUserRef = useRef<string | null>(null);
   const lastPremiumActiveRef = useRef<boolean | null>(null);
@@ -566,7 +478,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, []);
 
   // Helper to revoke blob URLs for a profile to free memory
-  const revokeBlobUrlsForProfile = useCallback((profileId: string, imageUrls: string[]) => {
+  const revokeBlobUrlsForProfile = useCallback((profileId: string) => {
     setPreloadedBlobImages(prev => {
       const profileBlobs = prev[profileId];
       if (profileBlobs) {
@@ -588,9 +500,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, []);
   
   const { toast } = useToast();
-  const { sendMatchNotification, sendMultipleLikesNotification, recordUserActivity } = usePushNotifications(currentUser?.id);
+  const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
   const {
-    subscription,
     loading: subscriptionLoading,
     isPremium: isPremiumFromSubscription,
     checkUsageLimit,
@@ -603,7 +514,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const premiumActive = Boolean(isPremium) || isPremiumFromSubscription();
   const premiumResolved = isPremium !== undefined || !subscriptionLoading;
   
-  const { preloadImages, cancelImages, getOptimizedUrl, isImageLoaded, isImageLoading, clearCache } = useImagePreloader({
+  const { preloadImages, cancelImages, getOptimizedUrl, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
     // Cards are full-bleed on modern 2x/3x phones - 500px @ q60 was visibly soft.
     quality: 82,
@@ -616,12 +527,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
   // ⭐ LIKE-BACK INJECTION: 25% injection of users who liked the current user
   // ⭐ FIX: Store blocked IDs in state (populated from fetchPotentialMatchesData)
-  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [blockedUserIds] = useState<string[]>([]);
   const {
     onLikeBackSwipe,
-    isLikedMeProfile,
-    likeBackCandidateCount,
-    refreshLikeBackCandidates,
   } = useDiscoverLikeBack({
     currentUser,
     premiumActive,
@@ -631,7 +539,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     isAd,
   });
 
-  const { adsLoaded, injectAds } = useDiscoverAds({
+  const { injectAds } = useDiscoverAds({
     currentUser,
     premiumActive,
     potentialMatches,
@@ -762,13 +670,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const dbCompletion = (profile as unknown as { profile_completion?: unknown })?.profile_completion;
         if (typeof dbCompletion === 'number' && Number.isFinite(dbCompletion)) {
           setComputedProfileCompletion(dbCompletion);
-          // Missing fields not available from DB field; keep calculated missing fields best-effort.
-          const completionResult = calculateProfileCompletion(profile, userImages);
-          setProfileMissingFields(completionResult.missingFields);
         } else {
           const completionResult = calculateProfileCompletion(profile, userImages);
           setComputedProfileCompletion(completionResult.completion);
-          setProfileMissingFields(completionResult.missingFields);
         }
 
         // Swipe count is fetched in a dedicated effect (cache-first + DB in parallel).
@@ -981,11 +885,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const countryCodes = Array.from(new Set(unlockedCountries.map(normalizeCountryCode).filter(Boolean)));
     if (countryCodes.length === 0) return [];
 
-    const perCountryLimit = Math.max(40, Math.ceil(limit / Math.max(1, countryCodes.length)));
+    // Unlocked countries are what premium is paying for - each one should feel
+    // like a real, healthy pool, not a token handful. Some unlocked countries
+    // simply have far fewer active users than the viewer's home country, so an
+    // active-only fetch alone starves them. Per country: fetch active first,
+    // then top up with archived from that SAME country when active supply is
+    // short, up to perCountryLimit.
+    const perCountryLimit = Math.max(60, Math.ceil(limit / Math.max(1, countryCodes.length)));
 
     const results = await Promise.all(
       countryCodes.map(async (countryCode) => {
-        let query = supabase
+        let activeQuery = supabase
           .from('profiles')
           .select(PROFILE_SELECT)
           .eq('country_code', countryCode)
@@ -996,15 +906,40 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           .limit(perCountryLimit);
 
         if (excludedIds.length > 0) {
-          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
+          activeQuery = activeQuery.not('id', 'in', formatUuidInFilter(excludedIds));
         }
 
-        const { data, error } = await query;
-        if (error) {
-          return [];
+        const { data: activeData, error: activeError } = await activeQuery;
+        const activeRows: ProfileRow[] = (!activeError && Array.isArray(activeData))
+          ? (activeData as unknown as ProfileRow[])
+          : [];
+
+        if (activeRows.length >= perCountryLimit) {
+          return activeRows;
         }
-        const rows: ProfileRow[] = Array.isArray(data) ? (data as unknown as ProfileRow[]) : [];
-        return rows;
+
+        const archivedTopUpLimit = perCountryLimit - activeRows.length;
+        const archivedExcludedIds = uniqUuids([...excludedIds, ...activeRows.map((p) => p.id)]);
+        let archivedQuery = supabase
+          .from('profiles')
+          .select(PROFILE_SELECT)
+          .eq('country_code', countryCode)
+          .in('gender', allowedGenders)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .eq('is_archived', true)
+          .limit(archivedTopUpLimit);
+
+        if (archivedExcludedIds.length > 0) {
+          archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(archivedExcludedIds));
+        }
+
+        const { data: archivedData, error: archivedError } = await archivedQuery;
+        const archivedRows: ProfileRow[] = (!archivedError && Array.isArray(archivedData))
+          ? (archivedData as unknown as ProfileRow[])
+          : [];
+
+        return [...activeRows, ...archivedRows];
       })
     );
 
@@ -1177,63 +1112,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Phase 1: active users only
     
     if (premiumForFeed) {
-      // STEP 1: fetch local distance-based profiles (local country only)
-      localProfiles = locationProfileIdsForQuery.length
+      // STEP 1: Premium sees the ENTIRE home country - no distance cap.
+      // Distance is a free-tier restriction only; premium pays specifically
+      // for full-country + unlocked-country visibility. (distanceMap may
+      // already hold a real km value for some of these from the unconditional
+      // locationService call above - that's kept for display; it never
+      // restricts *inclusion* here.)
+      localProfiles = baseCountryCode
         ? await (async () => {
             let query = supabase
               .from('profiles')
               .select(PROFILE_SELECT)
-              .in('id', locationProfileIdsForQuery);
+              .eq('country_code', baseCountryCode)
+              .in('gender', allowedGenders)
+              .eq('account_status', 'active')
+              .eq('is_admin', false)
+              .eq('is_archived', false);
 
-            if (baseCountryCode) {
-              query = query.eq('country_code', baseCountryCode);
-            }
             const useDbExclusionPremium = excludedIds.length <= 90;
             if (useDbExclusionPremium && excludedIds.length > 0) {
               query = query.not('id', 'in', formatUuidInFilter(excludedIds));
             }
 
             const { data: profiles, error } = await query
-              .in('gender', allowedGenders)
-              .eq('account_status', 'active')
-              .eq('is_admin', false)
-              .eq('is_archived', false)
               .limit(useDbExclusionPremium ? 100 : 500);
 
             if (error) throw error;
-            return Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+            const rows = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+            rows.forEach((p) => (distanceMap[p.id] ??= 999));
+            return rows;
           })()
         : [];
-
-      // Premium fallback: if distance-local is empty, still fetch local country.
-      if (baseCountryCode && localProfiles.length === 0) {
-        try {
-          let fallbackQuery = supabase
-            .from('profiles')
-            .select(PROFILE_SELECT)
-            .eq('country_code', baseCountryCode)
-            .eq('account_status', 'active')
-            .eq('is_admin', false)
-            .eq('is_archived', false)
-            .in('gender', allowedGenders)
-            .limit(excludedIds.length <= 90 ? 80 : 400);
-
-          if (excludedIds.length > 0 && excludedIds.length <= 90) {
-            fallbackQuery = fallbackQuery.not('id', 'in', formatUuidInFilter(excludedIds));
-          }
-
-          const { data: fallbackLocal, error: fallbackError } = await fallbackQuery;
-          const fallbackRows: ProfileRow[] = Array.isArray(fallbackLocal)
-            ? (fallbackLocal as unknown as ProfileRow[])
-            : [];
-          if (!fallbackError && fallbackRows.length > 0) {
-            fallbackRows.forEach((p) => (distanceMap[p.id] ??= 999));
-            localProfiles = fallbackRows;
-          }
-        } catch (e) {
-          // ignore fallback errors; premium can still show intl
-        }
-      }
 
       // STEP 2: fetch unlocked country profiles (premium only, no distance filter)
 
@@ -1457,7 +1366,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // Age filtering is done client-side using date_of_birth (profiles.age column doesn't exist)
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
-      if (baseCountryCode && userLat && userLon) {
+      // Premium-only bug: this box is centered on the viewer's own lat/lon,
+      // so applying it while the query above is also pulling unlocked
+      // countries (allowedCountryCodes) silently excluded every archived
+      // candidate from those countries - their coordinates are obviously
+      // outside a radius drawn around the viewer's home country, even
+      // though country_code already correctly matched them. Free users
+      // aren't affected (they only ever query baseCountryCode), and this
+      // mirrors how fetchUnlockedCountryProfiles (the active-pool
+      // equivalent) already has no distance filter at all for premium.
+      if (!premiumForFeed && baseCountryCode && userLat && userLon) {
         const radiusInDegrees = safeUserMaxDistance / 111.32;
         archivedQuery = archivedQuery
           .gte('latitude', userLat - radiusInDegrees)
@@ -1652,7 +1570,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
-      if (baseCountryCode && userLat && userLon) {
+      // Same bug as the primary archived mix-in above: this box is centered
+      // on the viewer's own coordinates, so applying it while also querying
+      // unlocked countries silently excludes every archived candidate from
+      // those countries. This is the true last-resort fetch (runs only when
+      // the pool is genuinely empty), so this was the main reason a premium
+      // user with unlocked countries could still hit "No more profiles"
+      // despite a large archived pool existing in those countries.
+      if (!premiumForFeed && baseCountryCode && userLat && userLon) {
         const radiusInDegrees = safeUserMaxDistance / 111.32;
         archivedRetryQuery = archivedRetryQuery
           .gte('latitude', userLat - radiusInDegrees)
@@ -2320,7 +2245,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // ⭐ SMART INITIAL IMAGE PRELOADING: Load images with priority
         // First 8 profiles: 1 image each (already loaded in images object)
         // Now preload them with correct priority
-        Object.entries(images).forEach(([profileId, imageUrls], index) => {
+        Object.entries(images).forEach(([, imageUrls], index) => {
           if (imageUrls.length > 0) {
             if (index === 0) {
               // Current profile: preload first 3 images with high priority
@@ -2606,10 +2531,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     setIsLoading(true);
   }, [currentUser?.id]);
 
-  // One-time self-heal when client cache gets stuck on false empty state.
-  const emptyStateRecoveryAttemptedRef = useRef(false);
+  // Self-heal when client cache/pagination gets stuck on a false empty
+  // state. Cooldown-gated, not one-shot: it used to permanently disable
+  // itself after firing once per user/premium-status change, so on a long
+  // swiping session, the FIRST "no more profiles" of the session could
+  // self-heal correctly, but any later one (even minutes afterward, even
+  // with a huge archived/unlocked-country pool genuinely still available)
+  // would never get checked again - directly working against "keep loading
+  // until they truly run out." A cooldown lets it re-check as many times
+  // as the user actually hits empty, while still preventing tight loops.
+  const lastEmptyStateRecoveryAtRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A genuine, always-changing dependency to force the effect below to
+  // re-run on a timer - toggling noMoreProfiles false-then-true in the same
+  // tick wouldn't work here, since React 18 batches synchronous state
+  // updates and would just compute the same end value (true) it started
+  // with, seeing no change at all.
+  const [emptyStateRetryTick, setEmptyStateRetryTick] = useState(0);
+  const EMPTY_STATE_RECOVERY_COOLDOWN_MS = 15_000;
   useEffect(() => {
-    emptyStateRecoveryAttemptedRef.current = false;
+    lastEmptyStateRecoveryAtRef.current = 0;
   }, [currentUser?.id, premiumActive]);
 
   useEffect(() => {
@@ -2617,9 +2558,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     if (!hasCompletedInitialFetch) return;
     if (!noMoreProfiles) return;
     if (potentialMatches.length > 0) return;
-    if (emptyStateRecoveryAttemptedRef.current) return;
+    const now = Date.now();
+    if (now - lastEmptyStateRecoveryAtRef.current < EMPTY_STATE_RECOVERY_COOLDOWN_MS) return;
 
-    emptyStateRecoveryAttemptedRef.current = true;
+    lastEmptyStateRecoveryAtRef.current = now;
     let isCancelled = false;
 
     const runRecovery = async () => {
@@ -2633,7 +2575,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const [{ data: currentUserData }, likesRes, matchesRes, blocksRes, passesRes] = await Promise.all([
           supabase
             .from('profiles')
-            .select('max_distance, distance_preference, country, country_code, min_age, max_age, latitude, longitude')
+            .select('max_distance, distance_preference, country, country_code, min_age, max_age, latitude, longitude, unlocked_countries')
             .eq('id', userId)
             .single(),
           fetchAllRows<{ liked_id: string }>(() => supabase.from('likes').select('liked_id').eq('liker_id', userId)),
@@ -2652,6 +2594,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           const maxDistance = Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? Math.min(maxDistanceRaw, 500) : 50;
           const minAge = Number(currentUserData.min_age ?? 18);
           const maxAge = Number(currentUserData.max_age ?? 99);
+          // BUG FIX: this whole recovery pass used to be written as if every
+          // user were free - hardcoded to baseCountryCode only, active
+          // profiles only, and a distance box centered on the viewer's own
+          // coordinates applied unconditionally. For a premium user with
+          // unlocked countries, that silently hid every candidate from
+          // those countries (and every archived one everywhere) right at
+          // the one check that's supposed to catch a false "no more
+          // profiles" - so it never could. Same allowedCountryCodes/gating
+          // pattern used by the main fetch above.
+          const allowedCountryCodes = Array.from(
+            new Set([
+              ...(baseCountryCode ? [baseCountryCode] : []),
+              ...(premiumActive ? normalizeCountryCodeList(currentUserData.unlocked_countries, baseCountryCode) : []),
+            ])
+          ).map((c) => normalizeCountryCode(String(c || ''))).filter(Boolean);
 
           const excluded = new Set<string>([userId]);
           (likesRes || []).forEach((x) => x?.liked_id && excluded.add(x.liked_id));
@@ -2664,33 +2621,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             if (b?.blocker_id) excluded.add(b.blocker_id);
           });
           (passesRes.data || []).forEach((p) => p?.passed_id && excluded.add(p.passed_id));
-
-          let query = supabase
-            .from('profiles')
-            .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
-            .in('gender', allowedGendersForRecovery)
-            .eq('account_status', 'active')
-            .eq('is_admin', false)
-            .eq('is_archived', false)
-            .limit(200);
-
-          if (baseCountryCode) {
-            query = query.eq('country_code', baseCountryCode);
-          }
-
-          // Only use DB exclusion when the set is small enough for PostgREST URLs
-          if (excluded.size > 0 && excluded.size <= 90) {
-            query = query.not('id', 'in', formatUuidInFilter(Array.from(excluded)));
-          }
-
-          if (currentUserData.latitude && currentUserData.longitude) {
-            const radiusInDegrees = maxDistance / 111.32;
-            query = query
-              .gte('latitude', currentUserData.latitude - radiusInDegrees)
-              .lte('latitude', currentUserData.latitude + radiusInDegrees)
-              .gte('longitude', currentUserData.longitude - radiusInDegrees)
-              .lte('longitude', currentUserData.longitude + radiusInDegrees);
-          }
 
           // Swipes are optimistic: the deck removes a card immediately and persists
           // the like/pass to the DB in the background afterward. This query only
@@ -2707,25 +2637,72 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             }
           }
 
-          const { data: rows } = await query;
-          const recoveredProfiles = (Array.isArray(rows) ? (rows as ProfileRow[]) : [])
-            .filter((p) => {
-              // Final guard for large exclusion lists (liked/matched/passed/blocked).
-              if (excluded.has(p.id)) return false;
-              if (locallyExcluded.has(p.id)) return false;
-              if (!matchesReciprocalPreference(currentUser.gender, p.preference)) return false;
-              if (!baseCountryCode) return false;
-              if (!isLocalCountryForFreeUser(p, baseCountryCode)) return false;
-              if (!p.date_of_birth) return false;
-              const age = calculateAge(p.date_of_birth);
-              if (!Number.isFinite(age) || age < minAge || age > maxAge) return false;
-              if (currentUserData.latitude && currentUserData.longitude && p.latitude && p.longitude) {
-                const d = calculateDistance(currentUserData.latitude, currentUserData.longitude, p.latitude, p.longitude);
-                if (d > maxDistance) return false;
-              }
-              return true;
-            })
-            .map((p) => toPotentialMatch(p, { images: [] }));
+          const runRecoveryQuery = async (archived: boolean): Promise<ProfileRow[]> => {
+            let query = supabase
+              .from('profiles')
+              .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
+              .in('gender', allowedGendersForRecovery)
+              .eq('account_status', 'active')
+              .eq('is_admin', false)
+              .eq('is_archived', archived)
+              .limit(200);
+
+            if (premiumActive && allowedCountryCodes.length > 0) {
+              query = query.in('country_code', allowedCountryCodes);
+            } else if (baseCountryCode) {
+              query = query.eq('country_code', baseCountryCode);
+            }
+
+            // Only use DB exclusion when the set is small enough for PostgREST URLs
+            if (excluded.size > 0 && excluded.size <= 90) {
+              query = query.not('id', 'in', formatUuidInFilter(Array.from(excluded)));
+            }
+
+            // Distance is a free-tier concept only - premium browses unlocked
+            // countries with no radius, same as the main fetch's international path.
+            if (!premiumActive && currentUserData.latitude && currentUserData.longitude) {
+              const radiusInDegrees = maxDistance / 111.32;
+              query = query
+                .gte('latitude', currentUserData.latitude - radiusInDegrees)
+                .lte('latitude', currentUserData.latitude + radiusInDegrees)
+                .gte('longitude', currentUserData.longitude - radiusInDegrees)
+                .lte('longitude', currentUserData.longitude + radiusInDegrees);
+            }
+
+            const { data: rows } = await query;
+            return (Array.isArray(rows) ? (rows as ProfileRow[]) : [])
+              .filter((p) => {
+                // Final guard for large exclusion lists (liked/matched/passed/blocked).
+                if (excluded.has(p.id)) return false;
+                if (locallyExcluded.has(p.id)) return false;
+                if (!matchesReciprocalPreference(currentUser.gender, p.preference)) return false;
+                if (premiumActive) {
+                  const cc = normalizeCountryCode(p.country_code || '');
+                  if (!cc || !allowedCountryCodes.includes(cc)) return false;
+                } else {
+                  if (!baseCountryCode) return false;
+                  if (!isLocalCountryForFreeUser(p, baseCountryCode)) return false;
+                }
+                if (!p.date_of_birth) return false;
+                const age = calculateAge(p.date_of_birth);
+                if (!Number.isFinite(age) || age < minAge || age > maxAge) return false;
+                if (!premiumActive && currentUserData.latitude && currentUserData.longitude && p.latitude && p.longitude) {
+                  const d = calculateDistance(currentUserData.latitude, currentUserData.longitude, p.latitude, p.longitude);
+                  if (d > maxDistance) return false;
+                }
+                return true;
+              });
+          };
+
+          // Active pool first; only reach for archived if active is genuinely empty -
+          // same tiering the rest of Discover uses, which this recovery pass
+          // previously skipped entirely (it only ever checked is_archived = false).
+          let recoveredRows = await runRecoveryQuery(false);
+          if (!isCancelled && recoveredRows.length === 0) {
+            recoveredRows = await runRecoveryQuery(true);
+          }
+
+          const recoveredProfiles = recoveredRows.map((p) => toPotentialMatch(p, { images: [] }));
 
           if (!isCancelled && recoveredProfiles.length > 0) {
             setPotentialMatches(injectAds(recoveredProfiles));
@@ -2783,22 +2760,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       if (isCancelled) return;
       // The direct DB sanity query above already found no eligible candidates,
       // AND we just cleared all local caches.  There is genuinely nobody left to
-      // show, so settle into the exhausted empty state rather than calling
-      // forceRefresh() — which would reset hasCompletedInitialFetch→false and
-      // isLoading→true and could stall forever if the re-triggered fetch never
-      // completes (e.g. for users who truly have 0 eligible profiles).
+      // show right now, so settle into the exhausted empty state rather than
+      // calling forceRefresh() — which would reset hasCompletedInitialFetch→false
+      // and isLoading→true and could stall forever if the re-triggered fetch
+      // never completes (e.g. for users who truly have 0 eligible profiles).
       locallySwipedProfileIds.current.clear();
       setNoMoreProfiles(true);
       setEmptyStateMode('exhausted');
       setIsLoading(false);
       // hasCompletedInitialFetch stays true so the UI renders the empty state
       // card instead of the spinner.
+
+      // Keep checking, on the same cooldown, instead of going silent forever.
+      // setNoMoreProfiles(true) above is a no-op re-render when it's already
+      // true (React bails out on an unchanged boolean), so without this timer
+      // nothing would ever re-run this effect again once genuinely empty -
+      // "no more profiles" would stick even if a candidate becomes eligible
+      // moments later (someone else's account/like activity, a swipe elsewhere
+      // freeing a slot, etc.), only fixable by the user manually refreshing.
+      retryTimerRef.current = setTimeout(() => {
+        if (isCancelled) return;
+        lastEmptyStateRecoveryAtRef.current = 0; // allow the next run immediately
+        setEmptyStateRetryTick((t) => t + 1);
+      }, EMPTY_STATE_RECOVERY_COOLDOWN_MS);
     };
 
     void runRecovery();
 
     return () => {
       isCancelled = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
   }, [
     currentUser?.id,
@@ -2810,6 +2801,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     currentUser?.preference,
     getGenderFilter,
     injectAds,
+    emptyStateRetryTick,
   ]);
 
   // Expose force refresh to window for ProfilePage to trigger
@@ -3283,10 +3275,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     const changedTouch = e.changedTouches && e.changedTouches[0];
     const endX = changedTouch ? changedTouch.clientX : currentXRef.current;
-    const endY = changedTouch ? changedTouch.clientY : currentYRef.current;
 
     const deltaX = endX - startXRef.current;
-    const deltaY = Math.abs(endY - startYRef.current);
     const screenWidth = window.innerWidth;
 
     // Swipe threshold
@@ -3448,7 +3438,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   
   // Note: mousemove/mouseup handling is wired globally from mouseDown to ensure robust behavior
 
-  const handleImageAreaClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleImageAreaClick = () => {
     // Prevent swipe action if dragging occurred
     if (Math.abs(swipeUI.dragOffset) > 10) return;
 
@@ -3626,7 +3616,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const inMemoryIds = new Set(remainingProfiles.map((p) => p.id));
         const missingLikerIds = Array.from(likedMeSet).filter((id) => !inMemoryIds.has(id));
 
-        if (missingLikerIds.length > 0) {
+        // Same country rule as every other candidate source in this file:
+        // premium = home + unlocked countries, free = home country only
+        // (further distance-capped below). A liker outside that set must
+        // never surface here just because they liked the viewer first -
+        // country/plan restrictions apply regardless of which mechanism
+        // found the candidate.
+        const rescueBaseCountryCode = getTrustedBaseCountryCode(currentUser?.country_code, currentUser?.country);
+        const rescueUnlockedCountries = premiumActive
+          ? normalizeCountryCodeList(currentUser?.unlocked_countries, rescueBaseCountryCode)
+          : [];
+        const rescueAllowedCountryCodes = Array.from(new Set([
+          ...(rescueBaseCountryCode ? [rescueBaseCountryCode] : []),
+          ...rescueUnlockedCountries,
+        ])).filter(Boolean);
+
+        if (missingLikerIds.length > 0 && rescueAllowedCountryCodes.length > 0) {
           const nowTs = Date.now();
           const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
           const locallyExcluded = new Set<string>();
@@ -3645,13 +3650,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                   .from('profiles')
                   .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
                   .in('id', fetchIds)
+                  .in('country_code', rescueAllowedCountryCodes)
                   .eq('account_status', 'active')
                   .eq('is_admin', false)
                   .eq('is_archived', false),
                 new Promise<{ data: null }>((_, reject) => setTimeout(() => reject(new Error('rescue expansion timeout')), 3000)),
               ]);
 
+              const rescueUserLat = currentUser?.latitude;
+              const rescueUserLon = currentUser?.longitude;
+              const rescueMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
+              const rescueMaxDistance = Number(rescueMaxDistanceRaw);
+              const safeRescueMaxDistance = premiumActive
+                ? Infinity
+                : Math.min(Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : 50, 500);
+
               const freshProfiles = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
+                .filter((p) => {
+                  // Defense-in-depth: re-check country client-side too, same
+                  // as the other fetches in this file.
+                  const cc = normalizeCountryCode(p.country_code || '');
+                  if (!cc || !rescueAllowedCountryCodes.includes(cc)) return false;
+                  if (!premiumActive && rescueUserLat && rescueUserLon && p.latitude && p.longitude) {
+                    const dist = calculateDistance(rescueUserLat, rescueUserLon, p.latitude, p.longitude);
+                    if (dist > safeRescueMaxDistance) return false;
+                  }
+                  return true;
+                })
                 .filter((p) => matchesReciprocalPreference(currentUser?.gender, p.preference))
                 .map((p) => toPotentialMatch(p, { images: [] }));
 
@@ -3719,7 +3744,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     };
 
     void runRescue();
-  }, [noMatchStreak, potentialMatches, currentIndex, currentUser, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback]);
+  }, [noMatchStreak, potentialMatches, currentIndex, currentUser, usersWhoLikedMeIds, RESCUE_COOLDOWN_MS, isArchivedFallback, premiumActive]);
   // Automatically preloads upcoming profiles based on current position
   useEffect(() => {
     if (!hasCompletedInitialFetch || potentialMatches.length === 0) return;
@@ -3882,12 +3907,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         ),
         variant: 'destructive'
       });
-      setShowProfileCompletionModal(true);
       return;
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 20 swipes, Premium users: 200 swipes
+    // Free users: 29 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 29;
 
     // Block purely based on the authoritative swipe count.
@@ -3937,8 +3961,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     // Revoke blob URLs after animation completes (400ms) to free memory
     setTimeout(() => {
-      const imagesToRevoke = userImages[prevMatch.id] || [];
-      revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
+      revokeBlobUrlsForProfile(prevMatch.id);
     }, 450);
 
     // Capture values now to avoid stale closures inside the queue job
@@ -4203,12 +4226,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         ),
         variant: 'destructive'
       });
-      setShowProfileCompletionModal(true);
       return;
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 20 swipes, Premium users: 200 swipes
+    // Free users: 29 swipes, Premium users: 200 swipes
     const swipeLimit = premiumActive ? 200 : 29;
 
     // Block purely based on the authoritative swipe count.
@@ -4242,8 +4264,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     // Revoke blob URLs after animation completes (400ms) to free memory
     setTimeout(() => {
-      const imagesToRevoke = userImages[prevMatch.id] || [];
-      revokeBlobUrlsForProfile(prevMatch.id, imagesToRevoke);
+      revokeBlobUrlsForProfile(prevMatch.id);
     }, 450);
 
     // Optimistically add to passed list
@@ -5421,7 +5442,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 preferredLanguageName={userLanguages[currentMatch.id]} // ⭐ No DB call needed
                 currentUserLatitude={currentUser.latitude}
                 currentUserLongitude={currentUser.longitude}
-                onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                onImageClick={handleImageAreaClick}
                 onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
                 onImageIndexChange={(currentIdx: number, totalImages: number) => {
                   // ⭐ SMART PROGRESSIVE LOADING: Load more images as user slides through them
@@ -5486,7 +5507,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                     preferredLanguageName={userLanguages[currentMatch.id]}
                     currentUserLatitude={currentUser.latitude}
                     currentUserLongitude={currentUser.longitude}
-                    onImageClick={() => handleImageAreaClick({} as React.MouseEvent<HTMLDivElement>)}
+                    onImageClick={handleImageAreaClick}
                     onToggleInfo={() => setShowMoreInfo(!showMoreInfo)}
                     calculateAge={calculateAge}
                     calculateDistance={calculateDistance}
