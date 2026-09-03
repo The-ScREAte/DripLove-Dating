@@ -897,7 +897,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
 
-      // Use the reject_image function which has admin privileges and deletes the image
+      // reject_image() has admin privileges and marks the row rejected
+      // (keeping it, and its storage file, for the audit trail) rather than
+      // deleting it - it's just hidden from other users from then on.
       const { error } = await supabase.rpc('reject_image', {
         image_id: imageId,
         admin_notes: 'Rejected by admin'
@@ -909,10 +911,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       // Remove from pending list immediately
       setPendingImages(prev => prev.filter(img => img.id !== imageId));
-      
+
       toast({
         title: 'Image rejected',
-        description: 'Image permanently deleted from database'
+        description: 'Image rejected and hidden from other users'
       });
 
     } catch (error) {

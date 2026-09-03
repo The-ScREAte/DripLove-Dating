@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "@/components/AppRoutes";
-import { initKeyboardHandler, destroyKeyboardHandler } from "@/utils/keyboardHandler";
+import { useGlobalKeyboardOffset } from "@/hooks/useGlobalKeyboardOffset";
 import { detectDeviceLanguage } from "@/utils/languageSync";
 import i18n from "@/i18n/config";
 
@@ -33,14 +33,10 @@ const App = ({
   // Add error boundary to prevent crashes
   const [hasError, setHasError] = React.useState(false);
   
-  // Initialize keyboard handler for mobile devices
-  React.useEffect(() => {
-    const keyboardHandler = initKeyboardHandler();
-    
-    return () => {
-      destroyKeyboardHandler();
-    };
-  }, []);
+  // Keep focused inputs visible above the on-screen keyboard, app-wide
+  // (login, admin, broadcast, everywhere) - see hook for why the previous
+  // handler silently didn't work on iOS.
+  useGlobalKeyboardOffset();
 
   // Detect and set device language on app start
   React.useEffect(() => {

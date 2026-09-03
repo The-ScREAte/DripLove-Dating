@@ -9,13 +9,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, AlertTriangle, CheckCircle, RefreshCw, Camera, Pencil } from 'lucide-react';
+import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { moderateImage, saveModerationResult, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
-import { detectHumanFace, verifyUploadedImage } from '@/utils/faceVerificationUtils';
+import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 
@@ -36,17 +35,22 @@ interface UserImage {
   moderation_status?: string;
 }
 
+interface ModerationDecision {
+  status: 'approved' | 'rejected';
+  message: string;
+  hasFace?: boolean | null;
+}
+
 const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagementProps) => {
   const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [moderating, setModerating] = useState(false);
-  const [moderationResult, setModerationResult] = useState<ModerationResult | null>(null);
+  const [moderationResult, setModerationResult] = useState<ModerationDecision | null>(null);
   const [replacingImageUrl, setReplacingImageUrl] = useState<string | null>(null);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [referenceFaceData, setReferenceFaceData] = useState<string | null>(null);
   const [croppingImageUrl, setCroppingImageUrl] = useState<string | null>(null);
   // Same deferred pattern as the profile preview's own crop: "OK" in the
   // modal only applies the crop locally so it can be reviewed against the
@@ -162,66 +166,27 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
     if (!currentUser?.id) return;
 
     try {
-      // Try to fetch with moderation columns first
+      // image_order = -1 marks a rejected image kept only for the admin
+      // audit trail (see reject_image()) - it no longer occupies a visible
+      // slot, so it's excluded here.
       const { data: images, error } = await supabase
         .from('user_images')
         .select('image_url, is_approved, moderation_status')
         .eq('user_id', currentUser.id)
+        .neq('image_order', -1)
         .order('image_order', { ascending: true });
 
-      if (error && error.message.includes('does not exist')) {
-        // Fallback to basic fetch if moderation columns don't exist yet
-        const { data: basicImages, error: basicError } = await supabase
-          .from('user_images')
-          .select('image_url, image_order')
-          .eq('user_id', currentUser.id)
-          .order('image_order', { ascending: true });
-        
-        if (basicError) throw basicError;
-        setUserImages(basicImages?.map(img => ({ 
-          image_url: img.image_url,
-          is_approved: img.image_order === -1 ? false : true, // -1 means pending
-          moderation_status: img.image_order === -1 ? 'pending' : 'approved'
-        })) || []);
-      } else if (error) {
-        throw error;
-      } else if (images) {
-        // Type assertion for the successful case - convert via unknown first
-        const typedImages = images as unknown as Array<{
-          image_url: string;
-          is_approved?: boolean;
-          moderation_status?: string;
-        }>;
-        
-        setUserImages(typedImages.map(img => ({
-          image_url: img.image_url,
-          is_approved: img.is_approved ?? true,
-          moderation_status: img.moderation_status ?? 'approved'
-        })));
-        
-        // Load reference face from first approved image for face verification
-        if (isVerified && typedImages.length > 0) {
-          const firstImage = typedImages[0];
-          if ((firstImage.is_approved ?? true) && firstImage.image_url) {
-            try {
-              const response = await fetch(firstImage.image_url);
-              const blob = await response.blob();
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64 = (reader.result as string).replace(/^data:image\/\w+;base64,/, '');
-                setReferenceFaceData(base64);
-              };
-              reader.readAsDataURL(blob);
-            } catch (err) {
-              console.error('Failed to load reference face:', err);
-            }
-          }
-        }
-      }
+      if (error) throw error;
+
+      setUserImages((images || []).map(img => ({
+        image_url: img.image_url,
+        is_approved: img.is_approved ?? true,
+        moderation_status: img.moderation_status ?? 'approved'
+      })));
     } catch (error) {
       console.error('Error fetching user images:', error);
     }
-  }, [currentUser?.id, isVerified]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     fetchUserImages();
@@ -300,143 +265,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       return;
     }
 
-    let moderationResult: ModerationResult | null = null;
-    
-    // Determine if this image requires face verification
-    // Face verification is required for:
-    // 1. Replacing images at positions 1 or 2 (imageOrder 1 or 2)
-    // 2. Adding new images when total count is < 2
-    let targetImageOrder = 0;
-    let requiresFaceVerification = false;
-    
-    if (replacingImageUrl) {
-      // Find the order of the image being replaced
-      const existingImage = userImages.findIndex(img => img.image_url === replacingImageUrl);
-      targetImageOrder = existingImage + 1; // Convert to 1-indexed
-      requiresFaceVerification = targetImageOrder <= 2;
-    } else {
-      // New image - check if we're adding to first 2 positions
-      targetImageOrder = userImages.length + 1;
-      requiresFaceVerification = targetImageOrder <= 2;
-    }
-
-    try {
-      moderationResult = await moderateImage(compressedFile);
-      
-      // For first 2 image positions, verify face matches the user's verified face
-      if (requiresFaceVerification && moderationResult.isApproved) {
-        if (isVerified && referenceFaceData) {
-          // User is verified - compare with their verified face
-          const faceResult = await verifyUploadedImage(
-            compressedFile,
-            referenceFaceData,
-            targetImageOrder - 1, // Convert to 0-indexed
-            true // User is verified
-          );
-          
-          if (faceResult.requiresReview) {
-            // Face doesn't match or no face detected - send to review
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              faceVerificationFailed: true,
-              faceVerificationReason: faceResult.reason || 'Face does not match your verified face'
-            };
-            toast({ 
-              title: "Image needs review", 
-              description: "First 2 photos must show your verified face. This image will be reviewed by our team.", 
-              variant: "default" 
-            });
-          }
-        } else if (isVerified && !referenceFaceData) {
-          // User is verified but we couldn't load reference face - fallback to face detection
-          const faceDetection = await detectHumanFace(compressedFile);
-          if (!faceDetection.hasFace) {
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              faceVerificationFailed: true,
-              faceVerificationReason: 'First 2 photos must show your face clearly'
-            };
-            toast({ 
-              title: "Image needs review", 
-              description: "Your first 2 photos must show your face. This image will be reviewed by our team.", 
-              variant: "default" 
-            });
-          }
-        } else {
-          // User is not verified - shouldn't happen but handle gracefully
-          const faceDetection = await detectHumanFace(compressedFile);
-          if (!faceDetection.hasFace) {
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              faceVerificationFailed: true,
-              faceVerificationReason: 'Face verification required'
-            };
-            toast({ 
-              title: "Image needs review", 
-              description: "Please complete face verification first.", 
-              variant: "default" 
-            });
-          }
-        }
-      }
-      
-      // For images at position 3+, check if it's a human figure
-      if (!requiresFaceVerification && moderationResult.isApproved) {
-        const faceDetection = await detectHumanFace(compressedFile);
-        if (!faceDetection.hasFace) {
-          // No human figure detected - send to review
-          moderationResult.details = {
-            ...moderationResult.details,
-            requiresReview: true,
-            noHumanDetected: true
-          };
-          toast({ 
-            title: "Image uploaded", 
-            description: "No human figure detected. This image will be reviewed by our team.", 
-            variant: "default" 
-          });
-        }
-      }
-      
-      setModerationResult(moderationResult);
-      
-      // Only block if image is completely rejected (not approved)
-      if (!moderationResult.isApproved) {
-        toast({ 
-          title: "Image rejected", 
-          description: moderationResult.message || "This image cannot be uploaded.", 
-          variant: "destructive" 
-        });
-        setModerating(false);
-        event.target.value = '';
-        return;
-      }
-      
-      // Show info toast if image requires review (and we haven't already shown a toast)
-      if (moderationResult.details?.requiresReview && 
-          !moderationResult.details?.faceVerificationFailed &&
-          !moderationResult.details?.noHumanDetected) {
-        toast({ 
-          title: "Image uploaded", 
-          description: "Your image has been uploaded but requires admin approval before being visible to others.", 
-          variant: "default" 
-        });
-      }
-
-    } catch (error) {
-      console.error('Moderation error:', error);
-      // STRICT: If moderation fails, require manual review
-      moderationResult = {
-        isApproved: false, // Changed to false - no auto-approval on error
-        confidence: 0,
-        flags: ['MODERATION_FAILED'],
-        details: { requiresReview: true },
-        message: "Moderation check failed - image requires admin review before approval"
-      };
-    }
+    const wasReplacing = !!replacingImageUrl;
 
     setModerating(false);
     setUploading(true);
@@ -445,8 +274,8 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       // 🔒 Wrap compressed result in a proper File object to ensure correct MIME type
       // This fixes the application/json content-type bug from blob-like compression output
       const safeFile = new File(
-        [compressedFile], 
-        `${Date.now()}.jpg`, 
+        [compressedFile],
+        `${Date.now()}.jpg`,
         { type: 'image/jpeg' }
       );
 
@@ -455,9 +284,9 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       // Upload to storage with explicit content type
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('user-photos')
-        .upload(fileName, safeFile, { 
+        .upload(fileName, safeFile, {
           contentType: 'image/jpeg',  // 🔥 REQUIRED - prevents application/json
-          cacheControl: '3600', 
+          cacheControl: '3600',
           upsert: false,
         });
 
@@ -479,7 +308,9 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       if (!urlData?.publicUrl) throw new Error("Failed to generate public image URL");
 
       const publicUrl = urlData.publicUrl;
-      
+
+      let imageOrder: number;
+
       // If replacing an existing image
       if (replacingImageUrl) {
         // Get the image order of the image being replaced
@@ -492,7 +323,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
         if (orderError) throw orderError;
 
-        const imageOrder = existingImage?.image_order || 1;
+        imageOrder = existingImage?.image_order || 1;
 
         // Delete old image from storage
         const urlParts = replacingImageUrl.split('/');
@@ -510,46 +341,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           .delete()
           .eq('user_id', currentUser.id)
           .eq('image_url', replacingImageUrl);
-
-        // Determine if image needs review
-        const requiresReview = moderationResult?.details?.requiresReview || false;
-        
-        // Insert new image with the same order
-        const insertData = {
-          user_id: currentUser.id, 
-          image_url: publicUrl, 
-          image_order: imageOrder,
-          is_approved: !requiresReview,
-          moderation_status: requiresReview ? 'pending' : 'approved',
-          moderation_notes: requiresReview 
-            ? `AI flagged: ${moderationResult?.message || 'Requires manual review'}`
-            : `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
-          flagged_content: moderationResult?.flags || [],
-          confidence_score: Math.round(moderationResult?.confidence || 50)
-        };
-
-        const { error: dbError } = await supabase
-          .from('user_images')
-          .insert(insertData);
-
-        if (dbError) throw dbError;
-
-        // Clear replacing state
-        setReplacingImageUrl(null);
-
-        toast({
-          title: (
-            <span className="inline-flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-green-500" /> Image Replaced Successfully
-            </span>
-          ),
-          description: requiresReview 
-            ? "Your new image requires admin review before being visible to others."
-            : "Your image has been replaced and is now visible to others.",
-          variant: "default"
-        });
       } else {
-        // Normal upload flow (not replacing)
         // Get the next available image order
         const { data: existingImages, error: orderError } = await supabase
           .from('user_images')
@@ -565,70 +357,103 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
         // Find the next available order
         let nextImageOrder = 1;
         const existingOrders = existingImages?.map(img => img.image_order).filter(order => order > 0).sort((a, b) => a - b) || [];
-        
+
         for (let i = 1; i <= 7; i++) {
           if (!existingOrders.includes(i)) {
             nextImageOrder = i;
             break;
           }
         }
-
-        // Determine if image needs review
-        const requiresReview = moderationResult?.details?.requiresReview || false;
-        
-        // Prepare insert data
-        const insertData = {
-          user_id: currentUser.id, 
-          image_url: publicUrl, 
-          image_order: nextImageOrder,
-          is_approved: !requiresReview,
-          moderation_status: requiresReview ? 'pending' : 'approved',
-          moderation_notes: requiresReview 
-            ? `AI flagged: ${moderationResult?.message || 'Requires manual review'}`
-            : `Auto-approved: ${moderationResult?.message || 'Passed content guidelines'}`,
-          flagged_content: moderationResult?.flags || [],
-          confidence_score: Math.round(moderationResult?.confidence || 50)
-        };
-
-        // Insert to database
-        const { error: dbError } = await supabase
-          .from('user_images')
-          .insert(insertData);
-
-        if (dbError) {
-          console.error('Error inserting image:', dbError);
-          throw dbError;
-        }
-          
-        // Show appropriate success message AFTER successful upload
-        if (requiresReview) {
-          toast({
-            title: (
-              <span className="inline-flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-amber-500" /> Image Uploaded - Pending Approval
-              </span>
-            ),
-            description: "Your image requires admin review before others can see it.",
-            variant: "default"
-          });
-        } else {
-          toast({
-            title: (
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle className="w-4 h-4 text-green-500" /> Image Uploaded Successfully
-              </span>
-            ),
-            description: "Your image has been approved and is now visible to others.",
-            variant: "default"
-          });
-        }
+        imageOrder = nextImageOrder;
       }
-        
+
+      // Insert the row with only the columns a user is allowed to set - the
+      // DB grants added alongside moderate-image block writing is_approved/
+      // moderation_status directly, so those stay at their pending defaults
+      // until the moderate-image edge function (below) makes the real call.
+      const { data: insertedRow, error: dbError } = await supabase
+        .from('user_images')
+        .insert({ user_id: currentUser.id, image_url: publicUrl, image_order: imageOrder })
+        .select('id')
+        .single();
+
+      if (dbError) {
+        console.error('Error inserting image:', dbError);
+        throw dbError;
+      }
+
+      setReplacingImageUrl(null);
+      setUploading(false);
+      setModerating(true);
+
+      // Real, server-side moderation: only confirmed explicit content (AWS
+      // Rekognition nudity/explicit-content labels) ever removes a photo.
+      // Everything else goes live immediately - a face that doesn't clearly
+      // match the account's verified face never blocks the photo, it just
+      // queues a non-blocking glance for admins in the background.
+      let decision: ModerationDecision;
+      try {
+        const imageBase64 = await fileToBase64(compressedFile);
+        const { data: modData, error: modError } = await supabase.functions.invoke('moderate-image', {
+          body: { imageId: insertedRow.id, imageBase64 },
+        });
+
+        if (modError || !modData?.success) {
+          throw modError || new Error(modData?.error || 'Moderation check failed');
+        }
+
+        decision = { status: modData.status, message: modData.message, hasFace: modData.hasFace };
+      } catch (modErr) {
+        console.error('Moderation error:', modErr);
+        // Fail open, not closed: the photo is already live (inserted above)
+        // and only confirmed explicit content should ever pull it back down.
+        decision = {
+          status: 'approved',
+          message: "This photo is live. Our automated check couldn't complete, so it's been queued for a quick manual glance.",
+        };
+      }
+
+      setModerationResult(decision);
+
+      if (decision.status === 'approved') {
+        toast({
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+              {wasReplacing ? 'Image Replaced Successfully' : 'Image Uploaded Successfully'}
+            </span>
+          ),
+          description: wasReplacing
+            ? "Your image has been replaced and is now visible to others."
+            : "Your image has been approved and is now visible to others.",
+          variant: "default"
+        });
+        // Friendly, non-blocking nudge - slot 1 is the one place we ask for
+        // a clear face photo, but a missing one never blocks the upload.
+        if (imageOrder === 1 && decision.hasFace === false) {
+          toast({
+            title: "Tip",
+            description: "Photos with your face tend to get more matches - consider making your first photo a clear face photo.",
+            variant: "default"
+          });
+        }
+      } else {
+        toast({
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              <Shield className="w-4 h-4 text-red-500" /> Image Removed
+            </span>
+          ),
+          description: decision.message,
+          variant: "destructive"
+        });
+      }
+
       // Refresh the image list
       await fetchUserImages();
     } catch (error) {
       console.error('Error uploading image:', error);
-      
+
       // Provide more specific error messages
       let errorMessage = "Failed to upload image.";
       if (error instanceof Error) {
@@ -642,14 +467,15 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           errorMessage = `Upload failed: ${error.message}`;
         }
       }
-      
-      toast({ 
-        title: "Upload failed", 
-        description: errorMessage, 
-        variant: "destructive" 
+
+      toast({
+        title: "Upload failed",
+        description: errorMessage,
+        variant: "destructive"
       });
     } finally {
       setUploading(false);
+      setModerating(false);
       setModerationResult(null);
       setReplacingImageUrl(null); // Always clear replace state
       event.target.value = '';
@@ -835,7 +661,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             />
             <p className="text-xs text-gray-400 flex items-center gap-1 mt-2">
               <Shield className="w-3 h-3" />
-              Pending images will be reviewed and approved within 24 hours or less for security.
+              Your photo goes live right away. We automatically screen for explicit content, and remove anything that violates our guidelines.
             </p>
             {moderating && (
               <div className="text-sm text-purple-600 mt-2 flex items-center">
@@ -851,12 +677,12 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             )}
             {moderationResult && !uploading && (
               <div className={`text-sm mt-2 flex items-center ${
-                moderationResult.isApproved ? 'text-green-600' : 'text-red-600'
+                moderationResult.status === 'approved' ? 'text-green-600' : 'text-red-500'
               }`}>
-                {moderationResult.isApproved ? (
+                {moderationResult.status === 'approved' ? (
                   <CheckCircle className="w-4 h-4 mr-2" />
                 ) : (
-                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  <Shield className="w-4 h-4 mr-2" />
                 )}
                 {moderationResult.message}
               </div>

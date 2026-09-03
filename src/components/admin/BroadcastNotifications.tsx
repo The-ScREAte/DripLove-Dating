@@ -9,10 +9,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, Bell, Download } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, Bell, Download, ShieldOff } from 'lucide-react';
 import EmailExport from './EmailExport';
 import EmailBroadcast from './EmailBroadcast';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
+import SuppressedEmails from './SuppressedEmails';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -703,7 +704,7 @@ export default function BroadcastNotifications() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="email" className="text-xs">
             <Mail className="w-3.5 h-3.5 mr-1.5" />
             Email
@@ -719,6 +720,10 @@ export default function BroadcastNotifications() {
           <TabsTrigger value="history" className="text-xs">
             <History className="w-3.5 h-3.5 mr-1.5" />
             History
+          </TabsTrigger>
+          <TabsTrigger value="suppressed" className="text-xs">
+            <ShieldOff className="w-3.5 h-3.5 mr-1.5" />
+            Excluded
           </TabsTrigger>
         </TabsList>
 
@@ -1140,6 +1145,11 @@ export default function BroadcastNotifications() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* EXCLUDED (SUPPRESSED) EMAILS TAB */}
+        <TabsContent value="suppressed" className="mt-3">
+          <SuppressedEmails />
         </TabsContent>
       </Tabs>
 

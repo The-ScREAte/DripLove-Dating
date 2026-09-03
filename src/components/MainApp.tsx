@@ -1096,7 +1096,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   // env(safe-area-inset-top) is now reliable on Android too (see
                   // @capacitor-community/safe-area setup in src/main.tsx), so this no
                   // longer needs a platform branch with a hardcoded Android guess.
-                  paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)',
+                  // Floor nudged up from 8px to 16px - a bit of breathing room above
+                  // the logo/header text even on devices with no safe-area inset.
+                  paddingTop: 'clamp(16px, env(safe-area-inset-top, 16px), 40px)',
                   // Scales with viewport width instead of a fixed px-4 py-2, so a
                   // narrow/small-screen Android phone gets a proportionally smaller
                   // header instead of the same absolute padding as a large phone.

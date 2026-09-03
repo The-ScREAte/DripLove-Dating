@@ -71,9 +71,16 @@ import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
 import RatingFunnel from './RatingFunnel';
+import VerifyIdentityPrompt from './VerifyIdentityPrompt';
 import HoppingLogo from '@/components/HoppingLogo';
 import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
+import { isVerifyPromptEligible, markVerifyPromptTriggered } from '@/utils/verifyPromptStorage';
 import { CurrentUser, PotentialMatch } from '@/types';
+
+// How many lifetime swipes before an unverified user sees the "verify your
+// identity" prompt (shown once, ever - see verifyPromptStorage.ts). Set to 1
+// for now to validate the flow end to end; raise to ~15 once that's done.
+const SWIPES_BEFORE_VERIFY_PROMPT = 1;
 
 // Paginated fetch for tables that can exceed Supabase's 1000-row default limit.
 // Returns all matching rows by fetching in pages of `pageSize`.
@@ -373,6 +380,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   const [showRatingFunnel, setShowRatingFunnel] = useState(false);
+  const [showVerifyPrompt, setShowVerifyPrompt] = useState(false);
   const isFirstEverMatchRef = useRef(false);
   const [realSwipeCount, setRealSwipeCount] = useState(0); // Track actual user swipes (excluding ads)
   // Store users who liked the current user (for "they liked you" notification)
@@ -3771,6 +3779,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     } catch (err) {
       console.error('Error persisting swipe count:', err);
     }
+
+    maybeShowVerifyPrompt(userId);
+  };
+
+  // Lifetime swipe count (distinct from the daily usage tracked above) -
+  // used only to decide when to nudge an unverified user toward identity
+  // verification. Runs after every swipe, like and pass alike.
+  const maybeShowVerifyPrompt = async (userId: string) => {
+    if (currentUser?.face_descriptor) return; // already verified
+    if (!isVerifyPromptEligible()) return; // already shown once, ever
+
+    try {
+      const { data: newCount, error } = await supabase.rpc('increment_swipe_count', {
+        user_id_param: userId,
+      });
+
+      if (error) {
+        console.error('Failed to increment swipe count:', error);
+        return;
+      }
+
+      if (typeof newCount === 'number' && newCount >= SWIPES_BEFORE_VERIFY_PROMPT) {
+        markVerifyPromptTriggered();
+        setShowVerifyPrompt(true);
+      }
+    } catch (err) {
+      console.error('Error incrementing swipe count:', err);
+    }
   };
 
   // Optimistic UI: move to next card instantly, then process like in background
@@ -5484,6 +5520,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       <RatingFunnel
         open={showRatingFunnel}
         onClose={() => setShowRatingFunnel(false)}
+      />
+      <VerifyIdentityPrompt
+        open={showVerifyPrompt}
+        onClose={() => setShowVerifyPrompt(false)}
       />
     </>
   );

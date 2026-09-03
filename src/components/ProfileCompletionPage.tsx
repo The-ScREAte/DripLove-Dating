@@ -16,9 +16,8 @@ import { occupationOptions, industryOptions } from '@/constants/professionOption
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import PromoCodeInput from '@/components/forms/PromoCodeInput';
-import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
-import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUtils';
+import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
@@ -31,14 +30,12 @@ const TermsAcceptance = lazy(() => import('./TermsAcceptance'));
 interface ImageUpload {
   file: File | null;
   preview: string;
-  moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
 }
 
 type StoredImageUpload = {
   preview: string
-  moderationResult?: ModerationResult
   status: ImageUpload['status']
   hash?: string
 }
@@ -105,7 +102,6 @@ const ProfileCompletionPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [faceVerified, setFaceVerified] = useState(false);
-  const [faceImageData, setFaceImageData] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isFinalizingTerms, setIsFinalizingTerms] = useState(false);
 
@@ -113,7 +109,6 @@ const ProfileCompletionPage = () => {
   useEffect(() => {
     const savedFace = localStorage.getItem('pending_face_verification_profile');
     if (savedFace) {
-      setFaceImageData(savedFace);
       setFaceVerified(true);
     }
   }, []);
@@ -173,7 +168,6 @@ const ProfileCompletionPage = () => {
 
       // Store in localStorage (not DB yet)
       localStorage.setItem('pending_face_verification_profile', faceImageBase64);
-      setFaceImageData(faceImageBase64);
       setFaceVerified(true);
       setShowFaceVerification(false);
       
@@ -252,7 +246,6 @@ const ProfileCompletionPage = () => {
             .map((img) => ({
               file: null,
               preview: img.preview,
-              moderationResult: img.moderationResult,
               status: img.status,
               hash: img.hash,
             }))
@@ -268,7 +261,6 @@ const ProfileCompletionPage = () => {
   useEffect(() => {
     const serializable = images.map(img => ({
       preview: img.preview,
-      moderationResult: img.moderationResult,
       status: img.status,
       hash: img.hash // Save hash for duplicate detection
     }));
@@ -431,134 +423,20 @@ const ProfileCompletionPage = () => {
       }
 
       const preview = URL.createObjectURL(compressedFile);
-      const newImage: ImageUpload = { 
-        file: compressedFile, 
-        preview, 
-        status: 'moderating',
+      // Real moderation (AWS Rekognition nudity/celebrity/face-match checks)
+      // can only run once this photo is uploaded and has a database row,
+      // which happens at final submit below - there's no row yet to check a
+      // verified face against while still picking photos. Every photo is
+      // just marked pending here; the toast at final submit reports the
+      // real per-photo outcome.
+      const newImage: ImageUpload = {
+        file: compressedFile,
+        preview,
+        status: 'pending',
         hash: fileHash // Store hash for future comparisons
       };
 
       setImages(prev => [...prev, newImage]);
-
-      // Determine the position of this new image (0-indexed)
-      const imagePosition = images.length;
-
-      // AI Moderation
-      try {
-        const moderationResult = await moderateImage(compressedFile);
-        
-        // For first 2 images (positions 0 and 1), also verify face matches
-        let requiresFaceReview = false;
-        if (imagePosition < 2 && faceImageData) {
-          // Compare with verified face
-          const faceResult = await verifyUploadedImage(
-            compressedFile,
-            faceImageData,
-            imagePosition,
-            faceVerified
-          );
-          
-          if (faceResult.requiresReview) {
-            requiresFaceReview = true;
-            // Update moderation result to reflect face verification failure
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              faceVerificationFailed: true,
-              faceVerificationReason: faceResult.reason
-            };
-          }
-        } else if (imagePosition < 2 && !faceImageData) {
-          // User already has face_descriptor from profile - use faceVerified state
-          if (faceVerified) {
-            // User has verified face but no faceImageData in state
-            // The face descriptor is stored in DB, not the image
-            // For this case, we'll do a human face detection instead
-            const faceDetection = await detectHumanFace(compressedFile);
-            if (!faceDetection.hasFace) {
-              requiresFaceReview = true;
-              moderationResult.details = {
-                ...moderationResult.details,
-                requiresReview: true,
-                faceVerificationFailed: true,
-                faceVerificationReason: 'No face detected in uploaded image'
-              };
-            }
-          } else {
-            // Face verification not completed - send to review
-            requiresFaceReview = true;
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              faceVerificationFailed: true,
-              faceVerificationReason: 'Face verification not completed'
-            };
-          }
-        }
-        
-        // For images at positions 2+ (3rd image onwards), just check for human figure
-        if (imagePosition >= 2 && moderationResult.isApproved) {
-          const faceDetection = await detectHumanFace(compressedFile);
-          if (!faceDetection.hasFace) {
-            // No human face detected - send to review
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              noHumanDetected: true
-            };
-          }
-        }
-        
-        setImages(prev => prev.map(img => 
-          img.preview === preview 
-            ? { 
-                ...img, 
-                moderationResult,
-                status: !moderationResult.isApproved 
-                  ? 'rejected' 
-                  : (moderationResult.details?.requiresReview || requiresFaceReview)
-                    ? 'pending' 
-                    : 'approved'
-              }
-            : img
-        ));
-
-        if (!moderationResult.isApproved) {
-          toast({
-            title: t('profileCompletion.imageRejected'),
-            description: moderationResult.message || t('profileCompletion.violatesGuidelines'),
-            variant: "destructive"
-          });
-        } else if (moderationResult.details?.requiresReview || requiresFaceReview) {
-          const reviewReason = moderationResult.details?.faceVerificationReason 
-            || (moderationResult.details?.noHumanDetected ? "No human figure detected" : null)
-            || t('profileCompletion.willBeReviewed');
-          toast({
-            title: t('profileCompletion.imageNeedsReview'),
-            description: reviewReason,
-            variant: "default"
-          });
-        } else {
-          toast({
-            title: t('profileCompletion.imageApproved'),
-            description: t('profileCompletion.imageLooksGood'),
-            variant: "default"
-          });
-        }
-      } catch (error) {
-        console.error('Moderation error:', error);
-        setImages(prev => prev.map(img => 
-          img.preview === preview 
-            ? { ...img, status: 'pending', moderationResult: {
-                isApproved: true,
-                confidence: 0,
-                flags: ['MODERATION_FAILED'],
-                details: { requiresReview: true },
-                message: "Moderation check failed - will be reviewed manually"
-              }}
-            : img
-        ));
-      }
     }
 
     event.target.value = '';
@@ -905,8 +783,42 @@ const ProfileCompletionPage = () => {
         }
       }
 
+      // Index face in AWS Rekognition with user's name (now, after profile
+      // is saved, but BEFORE uploading photos below) - moderate-image's face
+      // match for each photo searches this Rekognition collection, so the
+      // user's own face has to be indexed first or every photo would come
+      // back as a false "doesn't match verified identity".
+      const pendingFace = localStorage.getItem('pending_face_verification_profile');
+      if (pendingFace && user.id) {
+        try {
+          const userName = `${formData.firstName} ${formData.lastName}`;
+          const { error: faceError } = await supabase.functions.invoke("face-verify", {
+            body: {
+              action: "index_face",
+              front: pendingFace,
+              userId: user.id,
+              userName: userName, // Include user's name for admin identification
+            },
+          });
+
+          if (faceError) {
+            console.error('Face indexing error:', faceError);
+          }
+          // The face-verify edge function persists profiles.face_descriptor itself
+          // (server-side, service role, after confirming caller identity) - the
+          // client no longer writes verification status directly.
+
+          // Clear localStorage after successful indexing
+          localStorage.removeItem('pending_face_verification_profile');
+        } catch (faceErr) {
+          console.error('Face indexing exception:', faceErr);
+        }
+      }
+
       const uploadFailures: string[] = [];
       let successfulUploads = 0;
+      let removedCount = 0;
+      let showedFaceTip = false;
 
       for (let index = 0; index < approvedImages.length; index++) {
         const image = approvedImages[index];
@@ -939,23 +851,45 @@ const ProfileCompletionPage = () => {
             data: { publicUrl }
           } = supabase.storage.from('user-photos').getPublicUrl(filePath);
 
-          const { error: dbError } = await supabase
+          // Existing rows for this user were already cleared above, so this
+          // is always a fresh insert - only the columns a user is allowed to
+          // set (DB grants block is_approved/moderation_status from the
+          // client). moderate-image makes the real call right after.
+          const { data: insertedRow, error: dbError } = await supabase
             .from('user_images')
-            .upsert(
-              {
-                user_id: user.id,
-                image_url: publicUrl,
-                image_order: index + 1,
-                is_approved: image.status === 'approved',
-                moderation_status: image.status === 'approved' ? 'approved' : 'pending',
-                flagged_content: image.moderationResult?.flags || [],
-                confidence_score: image.moderationResult?.confidence || 0
-              },
-              { onConflict: 'user_id,image_order' }
-            );
+            .insert({
+              user_id: user.id,
+              image_url: publicUrl,
+              image_order: index + 1,
+            })
+            .select('id')
+            .single();
 
           if (dbError) throw dbError;
           successfulUploads++;
+
+          try {
+            const imageBase64 = await fileToBase64(image.file);
+            const { data: modData, error: modError } = await supabase.functions.invoke('moderate-image', {
+              body: { imageId: insertedRow.id, imageBase64 },
+            });
+            if (modError || !modData?.success) {
+              console.error('Moderation error:', modError || modData?.error);
+            } else if (modData.status === 'rejected') {
+              // Only confirmed explicit content is ever removed - everything
+              // else went live already.
+              removedCount++;
+            } else if (index === 0 && modData.hasFace === false && !showedFaceTip) {
+              showedFaceTip = true;
+              toast({
+                title: 'Tip',
+                description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
+                variant: 'default',
+              });
+            }
+          } catch (modErr) {
+            console.error('Moderation exception:', modErr);
+          }
         } catch (uploadErr) {
           const errorMessage = uploadErr instanceof Error ? uploadErr.message : 'Unknown upload error';
           console.error('Error uploading image:', uploadErr);
@@ -975,32 +909,12 @@ const ProfileCompletionPage = () => {
         });
       }
 
-      // Index face in AWS Rekognition with user's name (only now, after profile is saved)
-      const pendingFace = localStorage.getItem('pending_face_verification_profile');
-      if (pendingFace && user.id) {
-        try {
-          const userName = `${formData.firstName} ${formData.lastName}`;
-          const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
-            body: {
-              action: "index_face",
-              front: pendingFace,
-              userId: user.id,
-              userName: userName, // Include user's name for admin identification
-            },
-          });
-
-          if (faceError) {
-            console.error('Face indexing error:', faceError);
-          }
-          // The face-verify edge function persists profiles.face_descriptor itself
-          // (server-side, service role, after confirming caller identity) - the
-          // client no longer writes verification status directly.
-
-          // Clear localStorage after successful indexing
-          localStorage.removeItem('pending_face_verification_profile');
-        } catch (faceErr) {
-          console.error('Face indexing exception:', faceErr);
-        }
+      if (removedCount > 0) {
+        toast({
+          title: 'Photos removed',
+          description: `${removedCount} of your photos ${removedCount === 1 ? 'was' : 'were'} removed for violating our content guidelines.`,
+          variant: 'destructive'
+        });
       }
 
       // Profile completed - navigate to terms
@@ -1328,7 +1242,7 @@ const ProfileCompletionPage = () => {
                     </div>
                     <p className="text-[11px] text-gray-500 text-center flex items-center justify-center gap-1">
                       <Shield className="w-3 h-3" />
-                      Reviewed within 24h.
+                      Photos go live right away; explicit content is auto-removed.
                     </p>
 
                     {images.length > 0 && (

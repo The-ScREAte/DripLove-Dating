@@ -20,6 +20,8 @@ interface PendingImage {
   is_approved: boolean;
   moderation_status: string;
   moderation_notes?: string;
+  moderation_reason?: string;
+  face_similarity?: number | null;
   created_at: string;
   user_id: string;
   profile?: {
@@ -28,6 +30,22 @@ interface PendingImage {
     email: string;
   };
 }
+
+// Legacy reason codes from before the default-to-live policy change are
+// kept here too, so any pre-existing pending/flagged backlog still renders
+// a readable label instead of a raw code.
+const MODERATION_REASON_LABELS: Record<string, string> = {
+  explicit_content: 'Explicit nudity or sexual content',
+  face_weak_match: 'Face is a weak match to verified identity',
+  face_no_match: "Face doesn't match verified identity",
+  moderation_check_failed: 'Automatic check failed',
+  nudity_or_inappropriate: 'Nudity or inappropriate content',
+  celebrity_detected: 'Public figure or celebrity detected',
+  face_mismatch: "Doesn't match verified identity",
+  no_face_detected: 'No face detected',
+  identity_not_verified: 'Identity not verified',
+  moderation_failed: 'Automatic check failed',
+};
 
 interface ReportedImage {
   id: string;
@@ -58,11 +76,18 @@ interface ImageModerationPanelProps {
 
 const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  // Live photos (moderation_status='approved') that moderate-image flagged
+  // with a non-blocking moderation_reason - a weak/no face match, or the AI
+  // check itself failing. Already visible to everyone; this is just a
+  // worklist for admins to glance at, not an approval queue.
+  const [faceReviewImages, setFaceReviewImages] = useState<PendingImage[]>([]);
   const [reportedImages, setReportedImages] = useState<ReportedImage[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
+  const [loadingFaceReview, setLoadingFaceReview] = useState(false);
   const [loadingReported, setLoadingReported] = useState(false);
   const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
   const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
+  const [clearingFaceReview, setClearingFaceReview] = useState<Record<string, boolean>>({});
   const [processingReports, setProcessingReports] = useState<Record<string, boolean>>({});
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
@@ -100,10 +125,12 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
           is_approved,
           moderation_status,
           moderation_notes,
+          moderation_reason,
+          face_similarity,
           created_at,
           user_id
         `)
-        .or('is_approved.eq.false,moderation_status.eq.pending')
+        .in('moderation_status', ['pending', 'flagged'])
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -137,6 +164,57 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       });
     } finally {
       setLoadingPending(false);
+    }
+  }, [toast]);
+
+  const fetchFaceReviewImages = useCallback(async () => {
+    try {
+      setLoadingFaceReview(true);
+      const { data, error } = await supabase
+        .from('user_images')
+        .select(`
+          id,
+          image_url,
+          is_approved,
+          moderation_status,
+          moderation_notes,
+          moderation_reason,
+          face_similarity,
+          created_at,
+          user_id
+        `)
+        .eq('moderation_status', 'approved')
+        .not('moderation_reason', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(img => img.user_id))];
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+
+        setFaceReviewImages(data.map(img => ({
+          ...img,
+          profile: profiles?.find(p => p.id === img.user_id)
+        })));
+      } else {
+        setFaceReviewImages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching face review images:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load photos needing a glance',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingFaceReview(false);
     }
   }, [toast]);
 
@@ -189,8 +267,9 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
 
   useEffect(() => {
     fetchPendingImages();
+    fetchFaceReviewImages();
     fetchReportedImages();
-  }, [fetchPendingImages, fetchReportedImages]);
+  }, [fetchPendingImages, fetchFaceReviewImages, fetchReportedImages]);
 
   const handleApproveImage = async (imageId: string) => {
     try {
@@ -244,17 +323,16 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
     try {
       setRejectingImages(prev => ({ ...prev, [imageId]: true }));
 
-      // Get image details before rejecting
-      const imageToReject = pendingImages.find(img => img.id === imageId);
+      // Get image details before rejecting - the image being rejected may
+      // be coming from the legacy Pending tab or the live Face Review tab.
+      const imageToReject = pendingImages.find(img => img.id === imageId)
+        || faceReviewImages.find(img => img.id === imageId);
 
-      // First get the image URL before deleting from database
-      const { data: imageData } = await supabase
-        .from('user_images')
-        .select('image_url')
-        .eq('id', imageId)
-        .single();
-
-      // Delete from database using RPC function
+      // reject_image() now marks the row moderation_status='rejected' and
+      // frees its image_order slot instead of deleting it, so there's an
+      // audit trail of what was rejected and why - the row and its storage
+      // file are deliberately left in place, just hidden from other users
+      // (RLS only surfaces is_approved = true rows to non-owners).
       const { error } = await supabase.rpc('reject_image', {
         image_id: imageId,
         admin_notes: 'Rejected by admin - inappropriate content'
@@ -277,33 +355,14 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
         }
       }
 
-      // Delete from storage if we have the image URL
-      if (imageData?.image_url) {
-        try {
-          const fileName = imageData.image_url.split('/').pop();
-          if (fileName) {
-            const { error: storageError } = await supabase.storage
-              .from('user-photos')
-              .remove([fileName]);
-            
-            if (storageError) {
-              console.error('Storage deletion error:', storageError);
-              // Continue even if storage deletion fails
-            }
-          }
-        } catch (storageError) {
-          console.error('Storage deletion exception:', storageError);
-          // Continue even if storage deletion fails
-        }
-      }
-
       toast({
         title: 'Success',
-        description: 'Image rejected and permanently removed from database and storage'
+        description: 'Image rejected and hidden from other users'
       });
 
-      // Remove the rejected image from state immediately
+      // Remove the rejected image from whichever list it was showing in
       setPendingImages(prev => prev.filter(img => img.id !== imageId));
+      setFaceReviewImages(prev => prev.filter(img => img.id !== imageId));
     } catch (error) {
       console.error('Error rejecting image:', error);
       toast({
@@ -313,6 +372,37 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       });
     } finally {
       setRejectingImages(prev => ({ ...prev, [imageId]: false }));
+    }
+  };
+
+  const handleClearFaceReview = async (imageId: string) => {
+    try {
+      setClearingFaceReview(prev => ({ ...prev, [imageId]: true }));
+
+      // Just clears moderation_reason - the photo was already live the
+      // whole time, this only marks that a human looked at it.
+      const { error } = await supabase.rpc('clear_face_review', {
+        image_id: imageId,
+        admin_notes: 'Reviewed by admin - no issue found'
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Marked as reviewed'
+      });
+
+      setFaceReviewImages(prev => prev.filter(img => img.id !== imageId));
+    } catch (error) {
+      console.error('Error clearing face review:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to mark as reviewed',
+        variant: 'destructive'
+      });
+    } finally {
+      setClearingFaceReview(prev => ({ ...prev, [imageId]: false }));
     }
   };
 
@@ -503,10 +593,14 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       )}
 
       <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-9">
+        <TabsList className="grid w-full grid-cols-3 h-9">
           <TabsTrigger value="pending" className="flex items-center gap-2 text-xs">
             <Clock className="w-3 h-3" />
             Pending Approval ({pendingImages.length})
+          </TabsTrigger>
+          <TabsTrigger value="face-review" className="flex items-center gap-2 text-xs">
+            <Eye className="w-3 h-3" />
+            Needs a Glance ({faceReviewImages.length})
           </TabsTrigger>
           <TabsTrigger value="reported" className="flex items-center gap-2 text-xs">
             <AlertTriangle className="w-3 h-3" />
@@ -541,21 +635,34 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                             className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => handleImageClick(image.image_url)}
                           />
-                          <Badge className="absolute top-1 right-1 bg-yellow-500 text-[10px] h-4">
-                            Pending
+                          <Badge className={`absolute top-1 right-1 text-[10px] h-4 ${
+                            image.moderation_status === 'flagged' ? 'bg-red-500' : 'bg-yellow-500'
+                          }`}>
+                            {image.moderation_status === 'flagged' ? 'Flagged' : 'Pending'}
                           </Badge>
                         </div>
-                        
+
                         <div className="space-y-1 mb-2">
                           <div className="flex items-center gap-1 text-[10px]">
                             <User className="w-2.5 h-2.5" />
                             <span className="font-medium truncate">
-                              {image.profile ? 
-                                `${image.profile.first_name} ${image.profile.last_name}` : 
+                              {image.profile ?
+                                `${image.profile.first_name} ${image.profile.last_name}` :
                                 'Unknown User'
                               }
                             </span>
                           </div>
+                          {image.moderation_reason && (
+                            <div className="flex items-center gap-1 text-[9px] text-red-500">
+                              <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">
+                                {MODERATION_REASON_LABELS[image.moderation_reason] || image.moderation_reason}
+                                {image.moderation_reason === 'face_mismatch' && typeof image.face_similarity === 'number'
+                                  ? ` (${Math.round(image.face_similarity)}%)`
+                                  : ''}
+                              </span>
+                            </div>
+                          )}
                           <div className="text-[9px] text-gray-500">
                             {new Date(image.created_at).toLocaleDateString()}
                           </div>
@@ -598,6 +705,110 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                             variant="destructive"
                             className="h-6 w-6"
                             title="Reject"
+                            onClick={() => handleRejectImage(image.id)}
+                            disabled={rejectingImages[image.id]}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="face-review" className="mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Eye className="w-4 h-4" />
+                Live Photos Needing a Glance
+              </CardTitle>
+              <p className="text-xs text-gray-500">
+                These are already visible to everyone - AWS Rekognition just couldn't clearly match the face to the
+                account's verified identity. Nothing is blocked; this is only a worklist.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loadingFaceReview ? (
+                <div className="text-center py-6 text-sm">Loading...</div>
+              ) : faceReviewImages.length === 0 ? (
+                <div className="text-center py-6 text-gray-500 text-sm">Nothing needs a glance right now</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {faceReviewImages.map((image) => (
+                    <Card key={image.id} className="border-blue-200">
+                      <CardContent className="p-2">
+                        <div className="relative mb-2">
+                          <img
+                            loading="lazy"
+                            decoding="async"
+                            src={getRawStorageUrl(image.image_url)}
+                            alt="Live, needs a glance"
+                            className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => handleImageClick(image.image_url)}
+                          />
+                          <Badge className="absolute top-1 right-1 bg-blue-500 text-[10px] h-4">
+                            Live
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-1 mb-2">
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <User className="w-2.5 h-2.5" />
+                            <span className="font-medium truncate">
+                              {image.profile ?
+                                `${image.profile.first_name} ${image.profile.last_name}` :
+                                'Unknown User'
+                              }
+                            </span>
+                          </div>
+                          {image.moderation_reason && (
+                            <div className="flex items-center gap-1 text-[9px] text-blue-500">
+                              <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">
+                                {MODERATION_REASON_LABELS[image.moderation_reason] || image.moderation_reason}
+                                {typeof image.face_similarity === 'number'
+                                  ? ` (${Math.round(image.face_similarity)}%)`
+                                  : ''}
+                              </span>
+                            </div>
+                          )}
+                          <div className="text-[9px] text-gray-500">
+                            {new Date(image.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {onViewProfile && (
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="text-blue-600 hover:text-blue-700 h-6 w-6"
+                              title="View User"
+                              onClick={() => onViewProfile(image.user_id)}
+                              disabled={clearingFaceReview[image.id] || rejectingImages[image.id]}
+                            >
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                          )}
+                          <Button
+                            size="icon"
+                            className="bg-green-600 hover:bg-green-700 h-6 w-6"
+                            title="Looks fine - mark reviewed"
+                            onClick={() => handleClearFaceReview(image.id)}
+                            disabled={clearingFaceReview[image.id]}
+                          >
+                            <CheckCircle className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            className="h-6 w-6"
+                            title="Remove photo"
                             onClick={() => handleRejectImage(image.id)}
                             disabled={rejectingImages[image.id]}
                           >

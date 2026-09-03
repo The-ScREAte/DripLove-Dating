@@ -17,10 +17,9 @@ import PromoCodeInput from '@/components/forms/PromoCodeInput';
 import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
-import { moderateImage, ModerationResult } from '@/utils/photoModeration';
 import { compressImage } from '@/utils/imageCompression';
 import { useToast } from '@/hooks/use-toast';
-import { verifyUploadedImage, detectHumanFace } from '@/utils/faceVerificationUtils';
+import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { useTranslation } from 'react-i18next';
 import FaceVerification from '@/components/FaceVerification';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
@@ -34,7 +33,6 @@ interface RegistrationFormProps {
 interface ImageUpload {
   file: File;
   preview: string;
-  moderationResult?: ModerationResult;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
 }
@@ -75,7 +73,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [faceVerified, setFaceVerified] = useState(false);
-  const [faceImageData, setFaceImageData] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -90,7 +87,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   React.useEffect(() => {
     const savedFace = localStorage.getItem('pending_face_verification');
     if (savedFace) {
-      setFaceImageData(savedFace);
       setFaceVerified(true);
     }
   }, []);
@@ -132,7 +128,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       // Store in localStorage (not DB yet)
       localStorage.setItem('pending_face_verification', faceImageBase64);
-      setFaceImageData(faceImageBase64);
       setFaceVerified(true);
       setShowFaceVerification(false);
       
@@ -162,11 +157,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Only restore preview/status/moderationResult/hash, not File
+        // Only restore preview/status/hash, not File
         setImages(parsed.map((img: any) => ({
           file: null, // File cannot be restored
           preview: img.preview,
-          moderationResult: img.moderationResult,
           status: img.status,
           hash: img.hash // Restore hash for duplicate detection
         })));
@@ -179,7 +173,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     // Only save serializable data including hash
     const serializable = images.map(img => ({
       preview: img.preview,
-      moderationResult: img.moderationResult,
       status: img.status,
       hash: img.hash // Save hash for duplicate detection
     }));
@@ -326,134 +319,20 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
 
       const preview = URL.createObjectURL(compressedFile);
-      const newImage: ImageUpload = { 
-        file: compressedFile, 
-        preview, 
-        status: 'moderating',
+      const newImage: ImageUpload = {
+        file: compressedFile,
+        preview,
+        // Real moderation (AWS Rekognition nudity/celebrity/face-match
+        // checks) can only run once this photo is actually uploaded and has
+        // a database row, which doesn't happen until final submit below -
+        // there's no account yet to check a verified face against while
+        // still picking photos. So every photo is just marked pending here;
+        // the toast at final submit reports the real per-photo outcome.
+        status: 'pending',
         hash: fileHash // Store hash for future comparisons
       };
 
       setImages(prev => [...prev, newImage]);
-
-      // Determine the position of this new image (0-indexed)
-      const imagePosition = images.length;
-      
-      // AI Moderation
-      try {
-        const moderationResult = await moderateImage(compressedFile);
-        
-        // For first 2 images (positions 0 and 1), also verify face matches
-        let requiresFaceReview = false;
-        if (imagePosition < 2 && faceImageData) {
-          // Compare with verified face
-          const faceResult = await verifyUploadedImage(
-            compressedFile,
-            faceImageData,
-            imagePosition,
-            faceVerified
-          );
-          
-          if (faceResult.requiresReview) {
-            requiresFaceReview = true;
-            // Update moderation result to reflect face verification failure
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              faceVerificationFailed: true,
-              faceVerificationReason: faceResult.reason
-            };
-          }
-        } else if (imagePosition < 2 && !faceImageData) {
-          // Face verification not completed but trying to upload first 2 images
-          requiresFaceReview = true;
-          moderationResult.details = {
-            ...moderationResult.details,
-            requiresReview: true,
-            faceVerificationFailed: true,
-            faceVerificationReason: 'Face verification not completed'
-          };
-        }
-        
-        // For images at positions 2+ (3rd image onwards), just check for human figure
-        if (imagePosition >= 2 && moderationResult.isApproved) {
-          const faceDetection = await detectHumanFace(compressedFile);
-          if (!faceDetection.hasFace) {
-            // No human face detected - send to review
-            moderationResult.details = {
-              ...moderationResult.details,
-              requiresReview: true,
-              noHumanDetected: true
-            };
-          }
-        }
-
-        setImages(prev => prev.map(img => 
-          img.preview === preview 
-            ? { 
-                ...img, 
-                moderationResult,
-                status: !moderationResult.isApproved 
-                  ? 'rejected' 
-                  : (moderationResult.details?.requiresReview || requiresFaceReview)
-                    ? 'pending' 
-                    : 'approved'
-              }
-            : img
-        ));
-
-        // Save updated images to sessionStorage
-        setTimeout(() => {
-          const serializable = images.map(img => ({
-            preview: img.preview,
-            moderationResult: img.moderationResult,
-            status: img.status
-          }));
-          sessionStorage.setItem('registration_images', JSON.stringify(serializable));
-        }, 0);
-
-        if (!moderationResult.isApproved) {
-          toast({
-            title: "Image rejected",
-            description: moderationResult.message || "This image violates our community guidelines.",
-            variant: "destructive"
-          });
-        } else if (moderationResult.details?.requiresReview || requiresFaceReview) {
-          const reviewReason = moderationResult.details?.faceVerificationReason 
-            || (moderationResult.details?.noHumanDetected ? "No human figure detected" : null)
-            || "Image requires additional verification";
-          toast({
-            title: "Image needs review",
-            description: `${reviewReason}. Our team will review this image.`,
-            variant: "default"
-          });
-        } else {
-          toast({
-            title: "Image approved",
-            description: "Your image looks good and has been approved!",
-            variant: "default"
-          });
-        }
-      } catch (error) {
-        setImages(prev => prev.map(img => 
-          img.preview === preview 
-            ? { ...img, status: 'pending', moderationResult: {
-                isApproved: true,
-                confidence: 0,
-                flags: ['MODERATION_FAILED'],
-                details: { requiresReview: true },
-                message: "Moderation check failed - will be reviewed manually"
-              }}
-            : img
-        ));
-        setTimeout(() => {
-          const serializable = images.map(img => ({
-            preview: img.preview,
-            moderationResult: img.moderationResult,
-            status: img.status
-          }));
-          sessionStorage.setItem('registration_images', JSON.stringify(serializable));
-        }, 0);
-      }
     }
 
     event.target.value = '';
@@ -824,76 +703,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
-    // 3. Upload approved images to storage and save to DB (after user is created)
-    
-    let imageOrder = 1;
-    for (const image of imagesWithFiles) {
-      try {
-        if (!image.file) {
-          continue;
-        }
-        
-        // Upload to storage (extension must match MIME type after compression)
-        const mimeToExt: Record<string, string> = {
-          'image/jpeg': 'jpg',
-          'image/png': 'png',
-          'image/webp': 'webp',
-          'image/gif': 'gif'
-        };
-        const fileExt = mimeToExt[image.file.type] || 'jpg';
-        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-        const filePath = `${userId}/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('user-photos')
-          .upload(filePath, image.file, {
-            contentType: image.file.type,
-            cacheControl: '3600'
-          });
-          
-        if (uploadError) {
-          throw uploadError;
-        }
-        
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('user-photos')
-          .getPublicUrl(filePath);
-        
-        // Save to database with proper image order (1-based index, max 7)
-        const { error: dbError } = await supabase
-          .from('user_images')
-          .insert({
-            user_id: userId,
-            image_url: publicUrl,
-            image_order: imageOrder,
-            is_approved: image.status === 'approved',
-            moderation_status: image.status === 'approved' ? 'approved' : 'pending',
-            flagged_content: image.moderationResult?.flags || [],
-            confidence_score: image.moderationResult?.confidence || 0
-          });
-          
-        if (dbError) {
-          throw dbError;
-        }
-        
-        imageOrder++;
-      } catch (error) {
-        toast({
-          title: 'Image Upload Error',
-          description: `Image ${imageOrder} failed to upload. You can add it later from your profile.`,
-          variant: 'destructive',
-        });
-        // Continue with other images instead of failing completely
-      }
-    }
-
-    // 4. Index face in AWS Rekognition with user's name (only now, after user is created)
+    // 3. Index face in AWS Rekognition with user's name (now, after user is
+    // created, but BEFORE uploading photos below) - moderate-image's face
+    // match for each photo searches this Rekognition collection, so the
+    // user's own face has to be indexed first or every photo would come
+    // back as a false "doesn't match verified identity".
     const pendingFace = localStorage.getItem('pending_face_verification');
     if (pendingFace && userId) {
       try {
         const userName = `${formData.firstName} ${formData.lastName}`;
-        const { data: faceData, error: faceError } = await supabase.functions.invoke("face-verify", {
+        const { error: faceError } = await supabase.functions.invoke("face-verify", {
           body: {
             action: "index_face",
             front: pendingFace,
@@ -913,6 +732,98 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         localStorage.removeItem('pending_face_verification');
       } catch (faceErr) {
         console.error('Face indexing exception:', faceErr);
+      }
+    }
+
+    // 4. Upload approved images to storage and save to DB (after user is
+    // created). is_approved/moderation_status are never set by the client -
+    // DB grants enforce that - each row starts pending and moderate-image
+    // (AWS Rekognition: nudity/explicit-content labels, celebrity
+    // recognition, face match against the collection above) makes the real
+    // call right after its row exists.
+    let imageOrder = 1;
+    for (const image of imagesWithFiles) {
+      try {
+        if (!image.file) {
+          continue;
+        }
+
+        // Upload to storage (extension must match MIME type after compression)
+        const mimeToExt: Record<string, string> = {
+          'image/jpeg': 'jpg',
+          'image/png': 'png',
+          'image/webp': 'webp',
+          'image/gif': 'gif'
+        };
+        const fileExt = mimeToExt[image.file.type] || 'jpg';
+        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `${userId}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('user-photos')
+          .upload(filePath, image.file, {
+            contentType: image.file.type,
+            cacheControl: '3600'
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-photos')
+          .getPublicUrl(filePath);
+
+        // Save to database with proper image order (1-based index, max 7)
+        const { data: insertedRow, error: dbError } = await supabase
+          .from('user_images')
+          .insert({
+            user_id: userId,
+            image_url: publicUrl,
+            image_order: imageOrder,
+          })
+          .select('id')
+          .single();
+
+        if (dbError) {
+          throw dbError;
+        }
+
+        try {
+          const imageBase64 = await fileToBase64(image.file);
+          const { data: modData, error: modError } = await supabase.functions.invoke('moderate-image', {
+            body: { imageId: insertedRow.id, imageBase64 },
+          });
+          if (modError || !modData?.success) {
+            console.error('Moderation error:', modError || modData?.error);
+          } else if (modData.status === 'rejected') {
+            // Only confirmed explicit content is ever removed - everything
+            // else went live already.
+            toast({
+              title: 'Photo removed',
+              description: modData.message || 'One of your photos was removed for violating our content guidelines.',
+              variant: 'destructive',
+            });
+          } else if (imageOrder === 1 && modData.hasFace === false) {
+            toast({
+              title: 'Tip',
+              description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
+              variant: 'default',
+            });
+          }
+        } catch (modErr) {
+          console.error('Moderation exception:', modErr);
+        }
+
+        imageOrder++;
+      } catch (error) {
+        toast({
+          title: 'Image Upload Error',
+          description: `Image ${imageOrder} failed to upload. You can add it later from your profile.`,
+          variant: 'destructive',
+        });
+        // Continue with other images instead of failing completely
       }
     }
 
@@ -1136,7 +1047,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 </div>
                 <p className="text-[11px] text-gray-500 flex items-center justify-center gap-1">
                   <Shield className="w-3 h-3" />
-                  Reviewed within 24h.
+                  Photos go live right away; explicit content is auto-removed.
                 </p>
                 
                 {images.length > 0 && (
