@@ -62,6 +62,7 @@ import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
+import { readCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { getLanguageName } from '@/utils/languageNames';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
@@ -508,11 +509,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     refetchSubscription
   } = useSubscription(currentUser?.id);
 
-  // Treat the user as premium if either:
-  // - Parent explicitly says they are premium, OR
-  // - Subscription hook reports an active premium plan.
-  const premiumActive = Boolean(isPremium) || isPremiumFromSubscription();
-  const premiumResolved = isPremium !== undefined || !subscriptionLoading;
+  // Premium status comes from two independent signals - the parent's `isPremium`
+  // prop and this page's own useSubscription() hook - and both must have had a
+  // chance to answer before we trust "not premium" enough to enforce the free
+  // swipe cap. Previously this was an OR, so the page could enforce the cap the
+  // instant *either* signal settled (often the DB swipe count, which loads
+  // fast) even though the other was still mid-flight and would have said
+  // "premium" a moment later - a paying user could get capped at 29 during
+  // that window. Requiring BOTH closes that race.
+  const premiumResolved = isPremium !== undefined && !subscriptionLoading;
+
+  // Last confirmed premium status for this device (see premiumStatusCache).
+  // Used only while the live signals above haven't both resolved yet, so a
+  // slow/flaky lookup can't transiently demote a paying user to the free cap.
+  const cachedPremium = readCachedPremiumStatus(currentUser?.id);
+
+  const premiumActive = Boolean(isPremium) || isPremiumFromSubscription() || (!premiumResolved && cachedPremium === true);
   
   const { preloadImages, cancelImages, getOptimizedUrl, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
@@ -613,11 +625,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       try {
         const swipeCount = await getTodaySwipeCount(currentUser.id);
         if (cancelled) return;
-        setTodaySwipeCount(prev => {
-          const next = Math.max(prev ?? 0, swipeCount);
-          writeCachedSwipeCount(currentUser.id, next);
-          return next;
-        });
+        // Trust the DB value once it loads - it's the authoritative count.
+        // This used to be Math.max(cached, dbValue), which meant a stale-high
+        // cache (e.g. from an earlier session that swiped a lot today) could
+        // never be corrected back down by a fresh DB read, permanently
+        // overstating usage - including making a server-side admin reset of
+        // this user's daily count invisible on that device for the rest of
+        // the day. In-flight optimistic swipes from *this* session are
+        // already accounted for separately via pendingSwipesRef (see
+        // effectiveSwipeCount in handleLike/executePassLogic), so nothing is
+        // lost by letting the DB value win here.
+        setTodaySwipeCount(swipeCount);
+        writeCachedSwipeCount(currentUser.id, swipeCount);
         loadedFromDb = true;
       } catch {
         // If DB fetch fails, keep cached value (if any). If none, user stays blocked.
@@ -3844,7 +3863,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     if (!currentMatch) return;
 
     // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
-    if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
+    // Also wait for premium status to positively resolve (both live signals settled, or the
+    // cached status already makes premiumActive true) - otherwise a fast DB-count load racing
+    // ahead of a slower premium check would get evaluated against the free cap.
+    if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null || (!premiumResolved && !premiumActive)) {
       toast({
         title: (
           <span className="inline-flex items-center gap-1.5">
@@ -4171,7 +4193,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // Function to execute pass after user confirms (used when "they liked you" popup is shown)
   const executePassLogic = async (matchToPass: PotentialMatch) => {
     // Prevent refresh from “resetting” swipes: don’t allow swiping until the DB swipe count is loaded.
-    if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null) {
+    // Also wait for premium status to positively resolve (both live signals settled, or the
+    // cached status already makes premiumActive true) - otherwise a fast DB-count load racing
+    // ahead of a slower premium check would get evaluated against the free cap.
+    if (!hasLoadedSwipeCountFromDb || todaySwipeCount === null || (!premiumResolved && !premiumActive)) {
       toast({
         title: (
           <span className="inline-flex items-center gap-1.5">

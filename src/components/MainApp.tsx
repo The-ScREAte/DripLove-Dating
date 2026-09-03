@@ -16,6 +16,7 @@ import { useActivityTracker } from '@/hooks/useActivityTracker';
 import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import ProfilePage from '@/components/ProfilePage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
+import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type UserImageRow = Database['public']['Tables']['user_images']['Row'];
@@ -241,22 +242,34 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
             if (fallbackError) {
               console.error('[MainApp] Subscription fallback failed:', fallbackError);
-              setIsPremium(false);
+              // Both the RPC and the direct query failed - a transient lookup
+              // failure, not a confirmed downgrade. Trust the last confirmed
+              // status for this device instead of demoting a paying user to
+              // the free swipe cap.
+              const cachedPremium = readCachedPremiumStatus(data.id);
+              setIsPremium(cachedPremium === true);
             } else {
               const entitledByStatus = fallback?.status === 'active' || fallback?.status === 'cancelled';
               const notExpired = !fallback?.expires_at || new Date(fallback.expires_at) > new Date();
-              setIsPremium(!!fallback && fallback.plan_name === 'premium' && entitledByStatus && notExpired);
+              const entitled = !!fallback && fallback.plan_name === 'premium' && entitledByStatus && notExpired;
+              setIsPremium(entitled);
+              writeCachedPremiumStatus(data.id, entitled);
             }
           } else {
             const statusRaw = Array.isArray(subData) ? subData[0] : subData;
             const status = (statusRaw && typeof statusRaw === 'object')
               ? (statusRaw as { plan_name?: unknown; is_active?: unknown })
               : null;
-            setIsPremium(Boolean(status && status.plan_name === 'premium' && status.is_active === true));
+            const entitled = Boolean(status && status.plan_name === 'premium' && status.is_active === true);
+            setIsPremium(entitled);
+            writeCachedPremiumStatus(data.id, entitled);
           }
         } catch (subErr) {
           console.error('[MainApp] Subscription check failed:', subErr);
-          setIsPremium(false);
+          // Transient failure (network blip, thrown exception) - not a
+          // confirmed status change. Fall back to the last confirmed answer.
+          const cachedPremium = readCachedPremiumStatus(data.id);
+          setIsPremium(cachedPremium === true);
         }
       }
     } catch (err) {

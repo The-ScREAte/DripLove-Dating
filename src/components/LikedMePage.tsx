@@ -412,12 +412,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     }
 
     // 5. Fetch all profiles in one go
+    // NOTE: deliberately does NOT filter on is_archived. That flag just marks
+    // a lower-priority/backfill pool Discover tops decks up with when a
+    // country's active supply is thin (see DiscoverPage's active-then-archived
+    // top-up query) - it does not mean removed, deleted, or unmatchable. Their
+    // likes are real rows in `likes` and swiping on them in Discover produces
+    // a genuine match, so excluding them here only hid real likers from this
+    // list without stopping them from being liked back / matched elsewhere.
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .in('id', likerIds)
-      .neq('is_admin', true)
-      .eq('is_archived', false);
+      .neq('is_admin', true);
 
     if (profileError) throw profileError;
 
