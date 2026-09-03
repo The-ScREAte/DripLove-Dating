@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       admin_actions: {
@@ -1306,6 +1281,7 @@ export type Database = {
           spontaneous_planner: number | null
           terms_accepted: boolean | null
           terms_accepted_at: string | null
+          total_swipe_count: number
           unlocked_countries: string[] | null
           updated_at: string | null
           zip_code: string | null
@@ -1359,6 +1335,7 @@ export type Database = {
           spontaneous_planner?: number | null
           terms_accepted?: boolean | null
           terms_accepted_at?: string | null
+          total_swipe_count?: number
           unlocked_countries?: string[] | null
           updated_at?: string | null
           zip_code?: string | null
@@ -1412,6 +1389,7 @@ export type Database = {
           spontaneous_planner?: number | null
           terms_accepted?: boolean | null
           terms_accepted_at?: string | null
+          total_swipe_count?: number
           unlocked_countries?: string[] | null
           updated_at?: string | null
           zip_code?: string | null
@@ -1872,6 +1850,7 @@ export type Database = {
         Row: {
           confidence_score: number | null
           created_at: string | null
+          face_similarity: number | null
           flagged_content: string[] | null
           id: string
           image_order: number
@@ -1879,13 +1858,16 @@ export type Database = {
           is_approved: boolean | null
           moderated_at: string | null
           moderated_by: string | null
+          moderation_labels: Json | null
           moderation_notes: string | null
+          moderation_reason: string | null
           moderation_status: string | null
           user_id: string
         }
         Insert: {
           confidence_score?: number | null
           created_at?: string | null
+          face_similarity?: number | null
           flagged_content?: string[] | null
           id?: string
           image_order: number
@@ -1893,13 +1875,16 @@ export type Database = {
           is_approved?: boolean | null
           moderated_at?: string | null
           moderated_by?: string | null
+          moderation_labels?: Json | null
           moderation_notes?: string | null
+          moderation_reason?: string | null
           moderation_status?: string | null
           user_id: string
         }
         Update: {
           confidence_score?: number | null
           created_at?: string | null
+          face_similarity?: number | null
           flagged_content?: string[] | null
           id?: string
           image_order?: number
@@ -1907,7 +1892,9 @@ export type Database = {
           is_approved?: boolean | null
           moderated_at?: string | null
           moderated_by?: string | null
+          moderation_labels?: Json | null
           moderation_notes?: string | null
+          moderation_reason?: string | null
           moderation_status?: string | null
           user_id?: string
         }
@@ -2201,6 +2188,10 @@ export type Database = {
         }[]
       }
       cleanup_incomplete_users: { Args: never; Returns: undefined }
+      clear_face_review: {
+        Args: { admin_notes?: string; image_id: string }
+        Returns: boolean
+      }
       create_admin_user: {
         Args: {
           admin_email: string
@@ -2333,6 +2324,10 @@ export type Database = {
               error: true
             } & "Could not choose the best candidate function between: public.increment_redirect_clicks(redirect_id => text), public.increment_redirect_clicks(redirect_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
           }
+      increment_swipe_count: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
       increment_unread_count: {
         Args: { field_name: string; match_id_input: string }
         Returns: undefined
@@ -2383,6 +2378,10 @@ export type Database = {
         Args: { p_stale_after: string }
         Returns: number
       }
+      remove_email_suppression: {
+        Args: { target_email: string }
+        Returns: boolean
+      }
       request_influencer_payout: {
         Args: { p_amount_ghs: number; p_code: string; p_password: string }
         Returns: Json
@@ -2427,12 +2426,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2456,11 +2455,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2481,11 +2480,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2506,11 +2505,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2523,11 +2522,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2537,9 +2536,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
