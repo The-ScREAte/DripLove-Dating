@@ -958,14 +958,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // Shared data fetching logic - optimized for speed
   const fetchPotentialMatchesData = useCallback(async (userId: string, allowedGenders: string[]) => {
     // Create timeout wrapper for all database queries (15 second timeout)
-    const queryTimeout = <T,>(promise: Promise<T>, timeoutMs = 15000): Promise<T> => {
+    // Accepts any thenable so Supabase query builders (which are PromiseLike,
+    // not real Promises) can be passed directly.
+    const queryTimeout = <T,>(promise: PromiseLike<T>, timeoutMs = 15000): Promise<T> => {
       return Promise.race([
-        promise,
+        Promise.resolve(promise),
         new Promise<T>((_, reject) => 
           setTimeout(() => reject(new Error('Database query timeout')), timeoutMs)
         )
       ]);
     };
+
 
     const [
       { data: currentUserData },
