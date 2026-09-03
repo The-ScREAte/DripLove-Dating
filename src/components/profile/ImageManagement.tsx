@@ -566,24 +566,18 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       <CardContent>
         {/* Face Verification Section - Only show if NOT verified */}
         {!isVerified && !showFaceVerification && (
-          <div className="mb-4 bg-black border border-purple-500/30 rounded-lg p-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                <Camera className="w-5 h-5 text-purple-400" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-purple-300 text-sm">Get Verified</p>
-                <p className="text-xs text-purple-400/80">Verified profiles get more matches!</p>
-              </div>
-              <Button
-                onClick={() => setShowFaceVerification(true)}
-                size="sm"
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs px-3"
-              >
-                <Shield className="w-3 h-3 mr-1" />
-                Verify
-              </Button>
-            </div>
+          <div
+            id="verify-identity-card"
+            className="mb-4 bg-black border border-purple-500/30 rounded-lg p-3 flex flex-col items-center gap-2 text-center"
+          >
+            <p className="font-medium text-purple-300 text-sm">Verify Identity</p>
+            <Button
+              onClick={() => setShowFaceVerification(true)}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs h-7 px-4 rounded-full"
+            >
+              <Camera className="w-3 h-3 mr-1" />
+              Verify
+            </Button>
           </div>
         )}
 
@@ -659,10 +653,6 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                 }
               }}
             />
-            <p className="text-xs text-gray-400 flex items-center gap-1 mt-2">
-              <Shield className="w-3 h-3" />
-              Your photo goes live right away. We automatically screen for explicit content, and remove anything that violates our guidelines.
-            </p>
             {moderating && (
               <div className="text-sm text-purple-600 mt-2 flex items-center">
                 <Shield className="animate-pulse w-4 h-4 mr-2" />

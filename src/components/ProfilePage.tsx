@@ -86,9 +86,12 @@ interface ProfilePageProps {
   // Bumped by MainApp when the user taps "Advertise" on an ad card elsewhere in the
   // app - jumps straight to the Advertisement section with its create form open.
   advertiseSignal?: number;
+  // Bumped by MainApp when the swipe-triggered "Verify Your Identity" prompt is
+  // accepted - jumps straight to the Photos section, which shows the Verify card.
+  verifySignal?: number;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0, advertiseSignal = 0 }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0, advertiseSignal = 0, verifySignal = 0 }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   // Screenshots are blocked app-wide by default - Profile is one of the two
@@ -131,6 +134,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       setAdvertiseFormSignal(prev => prev + 1);
     }
   }, [advertiseSignal]);
+
+  // Jump straight to the Photos section (revealing the "Verify Identity" card)
+  // whenever the swipe-triggered verify prompt is accepted elsewhere in the app.
+  useEffect(() => {
+    if (verifySignal > 0) {
+      setOpenSection('photos');
+      requestAnimationFrame(() => {
+        document.getElementById('verify-identity-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  }, [verifySignal]);
 
   const { toast } = useToast();
   const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);

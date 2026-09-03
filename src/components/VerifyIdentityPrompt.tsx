@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck } from 'lucide-react';
@@ -7,14 +6,16 @@ import { ShieldCheck } from 'lucide-react';
 interface VerifyIdentityPromptProps {
   open: boolean;
   onClose: () => void;
+  // Takes the user to Profile with the Photos section expanded (showing the
+  // "Verify Identity" card there), rather than jumping straight into the
+  // camera capture flow.
+  onVerifyNow?: () => void;
 }
 
-const VerifyIdentityPrompt = ({ open, onClose }: VerifyIdentityPromptProps) => {
-  const navigate = useNavigate();
-
+const VerifyIdentityPrompt = ({ open, onClose, onVerifyNow }: VerifyIdentityPromptProps) => {
   const handleVerifyNow = () => {
     onClose();
-    navigate('/face-verification');
+    onVerifyNow?.();
   };
 
   return (

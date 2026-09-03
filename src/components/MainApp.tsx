@@ -91,6 +91,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('profile');
     setAdvertiseSignal(prev => prev + 1);
   };
+  // Jump to Profile with the Photos section expanded (revealing the "Verify
+  // Identity" card) - used by DiscoverPage's swipe-triggered verify prompt.
+  const [verifySignal, setVerifySignal] = useState(0);
+  const handleNavigateToVerify = () => {
+    setActiveTab('profile');
+    setVerifySignal(prev => prev + 1);
+  };
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -1209,7 +1216,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
               > 
-                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToAdvertise={handleNavigateToAdvertise} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
+                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToAdvertise={handleNavigateToAdvertise} onNavigateToVerify={handleNavigateToVerify} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
               </div>
             </Suspense>
           )}
@@ -1253,6 +1260,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   isActiveTab={activeTab === 'profile'}
                   profileTabSignal={profileTabSignal}
                   advertiseSignal={advertiseSignal}
+                  verifySignal={verifySignal}
                 />
               </div>
             </Suspense>
