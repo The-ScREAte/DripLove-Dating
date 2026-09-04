@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { Capacitor } from '@capacitor/core'
+import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache'
 
 interface SubscriptionStatus {
   plan_name: string
@@ -111,6 +112,21 @@ export function useEnhancedSubscription() {
         return
       }
 
+      // Optimistically restore the last *confirmed* premium answer for this
+      // device so subscribers don't see the non-premium state flash while
+      // the lookups below are still in flight. Overwritten by the real
+      // result a moment later; only a cached `true` is ever trusted.
+      if (readCachedPremiumStatus(user.id) === true) {
+        setSubscriptionStatus((prev) => prev ?? {
+          plan_name: 'premium',
+          status: 'active',
+          expires_at: null,
+          is_active: true,
+          payment_method: undefined
+        })
+      }
+
+
       // First, quickly check user_subscriptions table for immediate feedback
       const { data: quickCheck } = await supabase
         .from('user_subscriptions')
@@ -195,6 +211,8 @@ export function useEnhancedSubscription() {
         const status = data[0]
         // Update with the comprehensive result
         setSubscriptionStatus(status)
+        // Confirmed answer - remember it for the optimistic seed above.
+        writeCachedPremiumStatus(user.id, status.plan_name === 'premium' && !!status.is_active)
       } else {
         // Comprehensive check found no subscription, confirm free status
         // (but don't change if quick check already set premium - avoid flicker)
@@ -206,6 +224,7 @@ export function useEnhancedSubscription() {
             is_active: false,
             payment_method: undefined
           })
+          writeCachedPremiumStatus(user.id, false)
         }
       }
     } catch (error) {

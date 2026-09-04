@@ -9,6 +9,7 @@ import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
@@ -676,17 +677,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       const profileExists = !!existingProfile;
       let result;
 
+      const profilePayload = { id: currentUser.id, ...updateData } as unknown as Database['public']['Tables']['profiles']['Insert'];
+
       if (profileExists) {
         const { data, error } = await supabase
           .from('profiles')
-          .upsert({ id: currentUser.id, ...updateData })
+          .upsert(profilePayload)
           .select();
         if (error) throw new Error('Update failed: ' + error.message);
         result = data;
       } else {
         const { data, error } = await supabase
           .from('profiles')
-          .insert({ id: currentUser.id, ...updateData })
+          .insert(profilePayload)
           .select();
         if (error) throw new Error('Insert failed: ' + error.message);
         result = data;
@@ -955,7 +958,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   <div className="px-3 py-1.5">
           <div className="flex justify-center">
             <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
-              {!isPremium && (
+              {/* Only render the upsell once premium is positively known to be
+                  false - `undefined` means "still resolving", and showing the
+                  crown then made subscribers briefly think they weren't. */}
+              {isPremium === false && (
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
                   size="sm"

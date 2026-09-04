@@ -111,7 +111,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // load/resume briefly look like a free user to that check, which could
   // wrongly trigger the "out of swipes" block for an actual premium user
   // who already had >=29 swipes that day.
-  const [isPremium, setIsPremium] = useState<boolean | undefined>(undefined);
+  // Seed optimistically from the last *confirmed* premium answer for this
+  // device so a paying user never sees the free/upsell UI flash while the
+  // subscription RPC is still in flight. We only ever seed `true` - a
+  // cached `false` stays `undefined` so nothing is enforced prematurely.
+  const [isPremium, setIsPremium] = useState<boolean | undefined>(
+    () => (readCachedPremiumStatus(userId) === true ? true : undefined)
+  );
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
   // Only the columns actually selected below are stored here.
@@ -211,7 +217,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         const { data: images, error: imagesError } = await supabase
           .from('user_images')
           .select('image_url, is_approved, moderation_status')
-          .eq('user_id', data.id);
+          .eq('user_id', data.id)
+          // image_order = -1 marks a rejected/superseded row kept only for
+          // the admin audit trail - same exclusion ProfilePage/ImageManagement
+          // use, so completion here matches what the user actually sees.
+          .neq('image_order', -1);
 
         if (!imagesError && images) {
           setUserImages(images);
@@ -665,6 +675,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           .select('user_id, image_url, image_order')
           .in('user_id', likerIds)
           .eq('is_approved', true)
+          .neq('image_order', -1)
           .order('image_order', { ascending: true });
 
         if (imagesError && imagesError.message.includes('does not exist')) {
@@ -710,6 +721,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 .select('user_id, image_url, image_order')
                 .in('user_id', likerIds)
                 .eq('is_approved', true)
+          .neq('image_order', -1)
                 .order('image_order', { ascending: true });
 
               if (allImages) {
