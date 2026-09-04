@@ -217,7 +217,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         const { data: images, error: imagesError } = await supabase
           .from('user_images')
           .select('image_url, is_approved, moderation_status')
-          .eq('user_id', data.id);
+          .eq('user_id', data.id)
+          // image_order = -1 marks a rejected/superseded row kept only for
+          // the admin audit trail - same exclusion ProfilePage/ImageManagement
+          // use, so completion here matches what the user actually sees.
+          .neq('image_order', -1);
 
         if (!imagesError && images) {
           setUserImages(images);
