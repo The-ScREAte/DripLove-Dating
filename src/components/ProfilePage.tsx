@@ -958,7 +958,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   <div className="px-3 py-1.5">
           <div className="flex justify-center">
             <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
-              {!isPremium && (
+              {/* Only render the upsell once premium is positively known to be
+                  false - `undefined` means "still resolving", and showing the
+                  crown then made subscribers briefly think they weren't. */}
+              {isPremium === false && (
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
                   size="sm"
