@@ -111,6 +111,21 @@ export function useEnhancedSubscription() {
         return
       }
 
+      // Optimistically restore the last *confirmed* premium answer for this
+      // device so subscribers don't see the non-premium state flash while
+      // the lookups below are still in flight. Overwritten by the real
+      // result a moment later; only a cached `true` is ever trusted.
+      if (readCachedPremiumStatus(user.id) === true) {
+        setSubscriptionStatus((prev) => prev ?? {
+          plan_name: 'premium',
+          status: 'active',
+          expires_at: null,
+          is_active: true,
+          payment_method: undefined
+        })
+      }
+
+
       // First, quickly check user_subscriptions table for immediate feedback
       const { data: quickCheck } = await supabase
         .from('user_subscriptions')
