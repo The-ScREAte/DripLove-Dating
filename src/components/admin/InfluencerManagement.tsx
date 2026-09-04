@@ -203,12 +203,15 @@ const InfluencerManagement = () => {
     }
 
     try {
-      // Check if code already exists
+      // Check if code already exists among ACTIVE (non-deleted) codes - a
+      // soft-deleted influencer's old code (deleted_at set, see handleDelete
+      // below) must be reusable, matching the DB's partial unique index.
       const { data: existing } = await supabase
         .from('promo_codes')
         .select('id')
         .ilike('code', formData.code.trim())
-        .single();
+        .is('deleted_at', null)
+        .maybeSingle();
 
       if (existing) {
         toast({ title: 'Error', description: 'This promo code already exists', variant: 'destructive' });

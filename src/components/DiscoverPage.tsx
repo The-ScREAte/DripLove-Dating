@@ -1426,7 +1426,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         } else if (archivedCandidates.length > 0) {
           // Healthy active pool: cap so archived ends up ~10% of the
           // COMBINED total (active + archived), not 10% of the fetch.
-          const archivedCap = Math.floor(activePoolSizeBeforeArchived * (0.10 / 0.90));
+          //
+          // BUG FIX: for a small-but-nonzero active pool (e.g. 1-8 active
+          // matches, common for a niche country/gender/age combo once most
+          // of the small active pool has been swiped), this floor()'d down
+          // to 0 - silently dropping the archived mix-in entirely on every
+          // fetch cycle, even with hundreds of eligible archived candidates
+          // sitting right there. That produced a near-empty deck each time
+          // and made the app look "out of profiles" long before the real
+          // pool was exhausted. Now falls back to a flat minimum batch
+          // whenever the proportional formula would round to 0.
+          const proportionalCap = Math.floor(activePoolSizeBeforeArchived * (0.10 / 0.90));
+          const archivedCap = proportionalCap > 0
+            ? proportionalCap
+            : Math.min(archivedCandidates.length, 10);
           const cappedArchived = archivedCandidates.slice(0, archivedCap);
           cappedArchived.forEach((p) => { p.__isArchivedMixin = true; });
           filteredProfiles = [...filteredProfiles, ...cappedArchived];
@@ -3279,7 +3292,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   };
 
   // Function to load more matches when running low - optimized for 5 at a time
-  const loadMoreMatches = useCallback(async () => {
+  const loadMoreMatches = useCallback(async (hasRemainingCards: boolean = false) => {
     if (!currentUser?.id || isLoadingMore) return;
 
     try {
@@ -3292,13 +3305,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
       const { matches, images, distances } = result;
 
+      // BUG FIX: this is called proactively while the user still has real
+      // cards on screen (both the "≤25/14 remaining" effect below and the
+      // per-swipe "≤5 remaining" trigger call this as a background prefetch,
+      // not a last resort). fetchPotentialMatchesData can itself flip
+      // noMoreProfiles(true) internally when ITS query comes back empty -
+      // but an empty background-prefetch attempt does NOT mean the deck is
+      // exhausted, since there are still cards left to swipe through. Setting
+      // that flag here used to permanently block every future refill attempt
+      // (both triggers below early-return on `noMoreProfiles`), so a single
+      // failed background fetch would silently stop all further background
+      // loading for the rest of the session - the user would coast through
+      // their remaining cards with zero retries, then hit a hard "no more
+      // profiles" wall the moment the deck actually reached 0, undoing the
+      // whole point of prefetching early. Now: while real cards remain, a
+      // failed attempt just no-ops (the cooldown lets the next trigger try
+      // again) instead of latching the app into a false exhausted state.
+      if (hasRemainingCards) {
+        setNoMoreProfiles(false);
+      }
+
       // CRITICAL FIX: Don't set noMoreProfiles if we got results but they're duplicates
       // This happens when the query returns profiles we already have
       // Instead, only set noMoreProfiles if the DB returned 0 profiles at all
       if (matches.length === 0) {
-        // Truly no profiles available from DB
-        setNoMoreProfiles(true);
-        setEmptyStateMode('exhausted');
+        if (!hasRemainingCards) {
+          // Truly no profiles available from DB, and the deck is genuinely
+          // empty right now - this is the real last-resort case.
+          setNoMoreProfiles(true);
+          setEmptyStateMode('exhausted');
+        }
         return;
       }
 
@@ -3404,7 +3440,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     if (now - lastAutoRefillAttemptAtRef.current < COOLDOWN_MS) return;
     lastAutoRefillAttemptAtRef.current = now;
 
-    loadMoreMatches();
+    // remainingReal is always > 0 here (the length===0 guard above already
+    // returned) - this is always a background prefetch with real cards still
+    // on screen, never the true last-resort case.
+    loadMoreMatches(true);
   }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
 
   // ⭐ SWIPE FATIGUE RESCUE (Mechanism B): Inject active profiles after long
@@ -4500,13 +4539,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // ⭐ SMART BACKGROUND LOADING: Check if we're running low on profiles and trigger background load
       const remainingProfiles = newMatches.filter(m => !isAd(m)).length;
       if (remainingProfiles <= 5 && !isLoadingMore && hasCompletedInitialFetch && !noMoreProfiles) {
-        // Running low on profiles - trigger background load
+        // Running low on profiles - trigger background load.
+        // remainingProfiles > 0 means the deck still has at least one real
+        // card left (this is a proactive prefetch); 0 means this swipe was
+        // the last card and the deck is genuinely empty right now.
+        const stillHasCards = remainingProfiles > 0;
         const now = Date.now();
         const COOLDOWN_MS = 10_000; // 10 second cooldown
         if (now - lastAutoRefillAttemptAtRef.current >= COOLDOWN_MS) {
           lastAutoRefillAttemptAtRef.current = now;
           setTimeout(() => {
-            loadMoreMatches();
+            loadMoreMatches(stillHasCards);
           }, 100); // Small delay to not block the swipe animation
         }
       }

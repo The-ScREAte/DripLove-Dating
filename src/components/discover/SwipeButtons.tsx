@@ -24,18 +24,18 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   const isAndroid = platform === 'android';
 
   // Adjust bottom position based on platform — lifted to clear the floating pill nav.
-  // Nudged down slightly - it was sitting high enough to get covered by content
-  // above it (the card's own bottom info/caption panel).
   //
-  // clamp(), not Tailwind's sm: breakpoint - the old bottom-28/bottom-20 with a
-  // matching sm: value was really just two fixed states that snapped at 640px,
-  // not an actual scale-with-screen-size behavior (the "mobile" and "sm" values
-  // were identical, so it never even visibly changed at that breakpoint). This
-  // scales continuously with viewport width instead, same pattern the bottom
-  // nav bar itself already uses.
+  // Previously a vw-based clamp() guess at the nav's height - that caps out
+  // (stops scaling) past ~467px viewport width, while the real nav bar keeps
+  // growing on wider/tablet viewports, so the button ended up sitting under
+  // the nav on medium screens. MainApp measures the real nav height via
+  // ResizeObserver and publishes it as --app-bottom-nav-height (see
+  // MainApp.tsx), so this now always clears the actual nav at any screen
+  // size instead of estimating it. The extra gap is nudged up a touch from
+  // before per feedback that it sat too close to the nav even on phones.
   const bottomOffset = (isAndroid || isIOS)
-    ? 'clamp(96px, 24vw, 112px)'
-    : 'clamp(78px, 19vw, 86px)';
+    ? 'calc(var(--app-bottom-nav-height, 88px) + clamp(14px, 3vw, 22px))'
+    : 'calc(var(--app-bottom-nav-height, 64px) + clamp(10px, 2.4vw, 16px))';
 
   return (
   <div

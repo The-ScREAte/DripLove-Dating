@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, RefreshCw, ArrowDownToLine } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -1752,7 +1752,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     }
   };
 
-  // Pull to refresh handlers for the matches list
+  // Pull to refresh handlers for the matches list.
+  // Higher trigger threshold + rubber-band damping (finger travel > visual
+  // pull) so a small/incidental drag near the top doesn't fire a refresh -
+  // matches the same fix applied to LikedMePage's pull-to-refresh.
+  const PULL_TRIGGER_THRESHOLD = 70; // was 50
+  const PULL_MAX_VISUAL = 90;
+  const PULL_DAMPING = 0.55;
+
   const handleTouchStart = (e: React.TouchEvent) => {
     // Only start pull when at top of scroll and not currently in a conversation
     const container = e.currentTarget as HTMLElement;
@@ -1763,14 +1770,25 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (startY > 0 && !isRefreshing) {
+      const container = e.currentTarget as HTMLElement;
+      if (container.scrollTop > 0) {
+        setStartY(0);
+        setPullDistance(0);
+        return;
+      }
       const currentY = e.touches[0].clientY;
-      const distance = Math.max(0, Math.min(100, currentY - startY));
+      const rawDistance = currentY - startY;
+      if (rawDistance <= 0) {
+        setPullDistance(0);
+        return;
+      }
+      const distance = Math.max(0, Math.min(PULL_MAX_VISUAL, rawDistance * PULL_DAMPING));
       setPullDistance(distance);
     }
   };
 
   const handleTouchEnd = () => {
-    if (pullDistance > 50 && !isRefreshing) {
+    if (pullDistance > PULL_TRIGGER_THRESHOLD && !isRefreshing) {
       // Trigger a user-visible refresh
       void fetchMatches(true);
     } else {
@@ -1980,11 +1998,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     {/* Pull to refresh indicator */}
     {pullDistance > 0 && (
       <div
-        className="flex items-center justify-center bg-black transition-all duration-200"
+        className="flex items-center justify-center gap-2 bg-black transition-all duration-200"
         style={{ height: `${pullDistance}px` }}
       >
+        {isRefreshing ? (
+          <RefreshCw className="w-4 h-4 text-pink-400 animate-spin" strokeWidth={2.5} />
+        ) : (
+          <ArrowDownToLine
+            className="w-4 h-4 text-pink-400 transition-transform duration-150"
+            strokeWidth={2.5}
+            style={{ transform: pullDistance > PULL_TRIGGER_THRESHOLD ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          />
+        )}
         <div className="text-pink-400 text-sm">
-          {pullDistance > 50 ? (isRefreshing ? `🔄 ${t('chat.refreshing')}` : `↓ ${t('chat.releaseToRefresh')}`) : `↓ ${t('chat.pullToRefresh')}`}
+          {pullDistance > PULL_TRIGGER_THRESHOLD ? (isRefreshing ? t('chat.refreshing') : t('chat.releaseToRefresh')) : t('chat.pullToRefresh')}
         </div>
       </div>
     )}

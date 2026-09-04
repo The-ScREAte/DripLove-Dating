@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Users, Heart, X, Calendar, MapPin, ArrowLeft, ArrowUp, ArrowDown,
-  Briefcase, GraduationCap, Crown, Lock, Languages
+  Briefcase, GraduationCap, Crown, Lock, Languages, RefreshCw, ArrowDownToLine
 } from 'lucide-react';
 
 // ANDROID FIX: Use platform utils instead of synchronous Capacitor import
@@ -1277,26 +1277,45 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     loadFullImages(liker.id);
   };
 
-  // Pull to refresh handlers
+  // Pull to refresh handlers.
+  // handleTouchStart used to check e.currentTarget.scrollTop, but
+  // currentTarget here is the outer non-scrolling wrapper (it's a flex
+  // column, header + flex-1 list - it never scrolls itself, so its
+  // scrollTop is always 0). That armed pull-to-refresh on literally every
+  // touch anywhere on the page, not just when the actual list
+  // (scrollContainerRef) was scrolled to its top - hence "very sensitive".
+  const PULL_TRIGGER_THRESHOLD = 70; // was 50 - needs a more deliberate pull
+  const PULL_MAX_VISUAL = 90;
+  const PULL_DAMPING = 0.55; // rubber-band feel: finger travel > visual pull
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!selectedProfile) {
-      const container = e.currentTarget as HTMLElement;
-      if (container.scrollTop === 0) {
-        setStartY(e.touches[0].clientY);
-      }
+    if (!selectedProfile && (scrollContainerRef.current?.scrollTop ?? 0) === 0) {
+      setStartY(e.touches[0].clientY);
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!selectedProfile && startY > 0 && !isRefreshing) {
+      // If the list has scrolled away from the top mid-gesture (or was
+      // never really at the top), abandon the pull instead of tracking it.
+      if ((scrollContainerRef.current?.scrollTop ?? 0) > 0) {
+        setStartY(0);
+        setPullDistance(0);
+        return;
+      }
       const currentY = e.touches[0].clientY;
-      const distance = Math.max(0, Math.min(100, currentY - startY));
+      const rawDistance = currentY - startY;
+      if (rawDistance <= 0) {
+        setPullDistance(0);
+        return;
+      }
+      const distance = Math.max(0, Math.min(PULL_MAX_VISUAL, rawDistance * PULL_DAMPING));
       setPullDistance(distance);
     }
   };
 
   const handleTouchEnd = () => {
-    if (!selectedProfile && pullDistance > 50 && !isRefreshing) {
+    if (!selectedProfile && pullDistance > PULL_TRIGGER_THRESHOLD && !isRefreshing) {
       fetchLikers(true);
     } else {
       setPullDistance(0);
@@ -1837,11 +1856,20 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       {/* Pull to refresh indicator */}
       {pullDistance > 0 && (
         <div
-          className="flex items-center justify-center bg-black transition-all duration-200"
+          className="flex items-center justify-center gap-2 bg-black transition-all duration-200"
           style={{ height: `${pullDistance}px` }}
         >
+          {isRefreshing ? (
+            <RefreshCw className="w-4 h-4 text-pink-400 animate-spin" strokeWidth={2.5} />
+          ) : (
+            <ArrowDownToLine
+              className="w-4 h-4 text-pink-400 transition-transform duration-150"
+              strokeWidth={2.5}
+              style={{ transform: pullDistance > PULL_TRIGGER_THRESHOLD ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          )}
           <div className="text-pink-400 text-sm">
-            {pullDistance > 50 ? (isRefreshing ? `🔄 ${t('matches.refreshing')}` : `↓ ${t('matches.releaseToRefresh')}`) : `↓ ${t('matches.pullToRefresh')}`}
+            {pullDistance > PULL_TRIGGER_THRESHOLD ? (isRefreshing ? t('matches.refreshing') : t('matches.releaseToRefresh')) : t('matches.pullToRefresh')}
           </div>
         </div>
       )}
@@ -1850,9 +1878,12 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     className="flex-shrink-0 shadow-sm border-b border-pink-500/30 px-4 py-4"
     style={{
       background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))',
-      // env(safe-area-inset-top) is now reliable on Android too (see
-      // @capacitor-community/safe-area setup in src/main.tsx).
-      marginTop: 'clamp(0px, calc(env(safe-area-inset-top, 0px) + 23px), 50px)'
+      // No extra top offset here - MainApp's persistent app header is a real
+      // flex sibling above this page's content box, so this box already
+      // starts exactly at the header's bottom edge. The old marginTop here
+      // was a leftover from before that flex-layout refactor (when pages had
+      // to reserve space for a position:fixed header via a pixel guess) and
+      // was just adding a redundant gap between the two headers.
     }}
   >
         <div className="flex items-center justify-between mb-1">

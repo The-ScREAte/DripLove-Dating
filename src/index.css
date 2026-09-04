@@ -52,6 +52,20 @@ html.platform-web {
 .eq-bar:nth-child(2) { animation-delay: -0.3s; }
 .eq-bar:nth-child(3) { animation-delay: 0s; }
 
+/* ProfilePage scrollable content's top padding - clears MainApp's header +
+   ProfilePage's own fixed toolbar/progress-bar header stacked above it.
+   md: adds the same extra ~16px the toolbar itself gets at that breakpoint
+   (see ProfilePage.tsx's top-[...] md:top-[...] classes), so content never
+   sits under the toolbar on tablet/medium screens. */
+.top-pad-clear-headers {
+  padding-top: clamp(140px, calc(env(safe-area-inset-top, 10px) + 120px), 190px);
+}
+@media (min-width: 768px) {
+  .top-pad-clear-headers {
+    padding-top: clamp(156px, calc(env(safe-area-inset-top, 10px) + 136px), 206px);
+  }
+}
+
 /* The app is dark-themed everywhere (the shadcn `.dark` class this design system ships
    with is never actually toggled - every screen just paints its own bg-black directly),
    so body's real baseline needs to be black on every platform, not just web. Without
