@@ -111,7 +111,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // load/resume briefly look like a free user to that check, which could
   // wrongly trigger the "out of swipes" block for an actual premium user
   // who already had >=29 swipes that day.
-  const [isPremium, setIsPremium] = useState<boolean | undefined>(undefined);
+  // Seed optimistically from the last *confirmed* premium answer for this
+  // device so a paying user never sees the free/upsell UI flash while the
+  // subscription RPC is still in flight. We only ever seed `true` - a
+  // cached `false` stays `undefined` so nothing is enforced prematurely.
+  const [isPremium, setIsPremium] = useState<boolean | undefined>(
+    () => (readCachedPremiumStatus(userId) === true ? true : undefined)
+  );
   const [unreadCount, setUnreadCount] = useState(0);
   const [profileCompletion, setProfileCompletion] = useState(0);
   // Only the columns actually selected below are stored here.
