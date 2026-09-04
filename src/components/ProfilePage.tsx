@@ -676,17 +676,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       const profileExists = !!existingProfile;
       let result;
 
+      const profilePayload = { id: currentUser.id, ...updateData } as unknown as Database['public']['Tables']['profiles']['Insert'];
+
       if (profileExists) {
         const { data, error } = await supabase
           .from('profiles')
-          .upsert({ id: currentUser.id, ...updateData })
+          .upsert(profilePayload)
           .select();
         if (error) throw new Error('Update failed: ' + error.message);
         result = data;
       } else {
         const { data, error } = await supabase
           .from('profiles')
-          .insert({ id: currentUser.id, ...updateData })
+          .insert(profilePayload)
           .select();
         if (error) throw new Error('Insert failed: ' + error.message);
         result = data;
