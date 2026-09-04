@@ -211,6 +211,8 @@ export function useEnhancedSubscription() {
         const status = data[0]
         // Update with the comprehensive result
         setSubscriptionStatus(status)
+        // Confirmed answer - remember it for the optimistic seed above.
+        writeCachedPremiumStatus(user.id, status.plan_name === 'premium' && !!status.is_active)
       } else {
         // Comprehensive check found no subscription, confirm free status
         // (but don't change if quick check already set premium - avoid flicker)
@@ -222,6 +224,7 @@ export function useEnhancedSubscription() {
             is_active: false,
             payment_method: undefined
           })
+          writeCachedPremiumStatus(user.id, false)
         }
       }
     } catch (error) {
