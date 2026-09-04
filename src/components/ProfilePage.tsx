@@ -9,6 +9,7 @@ import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
