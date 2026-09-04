@@ -872,6 +872,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           .select('image_url, image_order')
           .eq('user_id', profileId)
           .eq('is_approved', true)
+          .neq('image_order', -1)
           .order('image_order', { ascending: true });
 
         return images?.map(img => img.image_url) || [];
@@ -1839,6 +1840,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         .select('user_id, image_url, image_order')
         .in('user_id', firstEightIds)
         .eq('is_approved', true)
+          .neq('image_order', -1)
         .order('user_id', { ascending: true })
         .order('image_order', { ascending: true });
 
@@ -2281,6 +2283,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           .select('user_id, image_url, image_order')
           .in('user_id', idsToLoad)
           .eq('is_approved', true)
+          .neq('image_order', -1)
           .order('user_id', { ascending: true })
           .order('image_order', { ascending: true })
           .returns<UserImageRow[]>();

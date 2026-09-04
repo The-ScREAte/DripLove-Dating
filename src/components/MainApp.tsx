@@ -671,6 +671,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           .select('user_id, image_url, image_order')
           .in('user_id', likerIds)
           .eq('is_approved', true)
+          .neq('image_order', -1)
           .order('image_order', { ascending: true });
 
         if (imagesError && imagesError.message.includes('does not exist')) {
@@ -716,6 +717,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 .select('user_id, image_url, image_order')
                 .in('user_id', likerIds)
                 .eq('is_approved', true)
+          .neq('image_order', -1)
                 .order('image_order', { ascending: true });
 
               if (allImages) {

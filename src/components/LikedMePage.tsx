@@ -454,6 +454,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         .select('user_id, image_url, image_order')
         .in('user_id', likerIds)
         .eq('is_approved', true)
+          .neq('image_order', -1)
         .order('image_order', { ascending: true });
 
       if (imagesError && imagesError.message.includes('does not exist')) {
@@ -672,7 +673,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         .from('user_images')
         .select('image_url')
         .eq('user_id', profileId)
-        .eq('is_approved', true) // Only show approved images
+        .eq('is_approved', true)
+          .neq('image_order', -1) // Only show approved images
         .order('image_order')
         .abortSignal(controller.signal);
 
