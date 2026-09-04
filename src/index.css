@@ -38,6 +38,20 @@ html.platform-web {
   --frame-inset: calc((100vw - var(--frame-width)) / 2);
 }
 
+/* Mini "now playing" equalizer bars for the music-link badge - three bars
+   bouncing out of phase so the badge reads as "this is playable audio". */
+@keyframes eq-bounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar {
+  animation: eq-bounce 0.9s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.eq-bar:nth-child(1) { animation-delay: -0.6s; }
+.eq-bar:nth-child(2) { animation-delay: -0.3s; }
+.eq-bar:nth-child(3) { animation-delay: 0s; }
+
 /* The app is dark-themed everywhere (the shadcn `.dark` class this design system ships
    with is never actually toggled - every screen just paints its own bg-black directly),
    so body's real baseline needs to be black on every platform, not just web. Without

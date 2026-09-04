@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_actions: {
@@ -1247,6 +1272,7 @@ export type Database = {
           email: string
           exercise_level: string | null
           face_descriptor: string | null
+          favorites: Json
           first_name: string
           fun_fact: string | null
           gender: string | null
@@ -1301,6 +1327,7 @@ export type Database = {
           email: string
           exercise_level?: string | null
           face_descriptor?: string | null
+          favorites?: Json
           first_name: string
           fun_fact?: string | null
           gender?: string | null
@@ -1355,6 +1382,7 @@ export type Database = {
           email?: string
           exercise_level?: string | null
           face_descriptor?: string | null
+          favorites?: Json
           first_name?: string
           fun_fact?: string | null
           gender?: string | null
@@ -2280,6 +2308,80 @@ export type Database = {
         }[]
       }
       get_my_profile_broadcast_unread_count: { Args: never; Returns: number }
+      get_random_discover_profiles: {
+        Args: {
+          p_allowed_genders: string[]
+          p_allowed_ids?: string[]
+          p_archived: boolean
+          p_country_codes: string[]
+          p_excluded_ids?: string[]
+          p_lat?: number
+          p_limit?: number
+          p_lon?: number
+          p_radius_degrees?: number
+        }
+        Returns: {
+          account_status: string | null
+          adinkra_symbols: string[] | null
+          bio: string | null
+          city: string | null
+          country: string
+          country_code: string | null
+          created_at: string | null
+          date_of_birth: string
+          distance_preference: number | null
+          drinking: string | null
+          education_level: string | null
+          email: string
+          exercise_level: string | null
+          face_descriptor: string | null
+          favorites: Json
+          first_name: string
+          fun_fact: string | null
+          gender: string | null
+          id: string
+          industry: string | null
+          interests: string[] | null
+          introvert_extrovert: number | null
+          is_admin: boolean | null
+          is_archived: boolean | null
+          is_custom_city: boolean | null
+          is_verified: boolean
+          last_googled: string | null
+          last_login_at: string | null
+          last_name: string
+          latitude: number | null
+          like_me_cooldown_until: string | null
+          login_count: number | null
+          longitude: number | null
+          max_age: number | null
+          max_distance: number | null
+          messy_organized: number | null
+          min_age: number | null
+          occupation: string | null
+          perfect_first_date: string | null
+          preference: string
+          preferred_language: string | null
+          profile_completion: number
+          promo_code_used: string | null
+          relationship_intent: string | null
+          sleeping_schedule: string | null
+          smoking: string | null
+          spontaneous_planner: number | null
+          terms_accepted: boolean | null
+          terms_accepted_at: string | null
+          total_swipe_count: number
+          unlocked_countries: string[] | null
+          updated_at: string | null
+          zip_code: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_subscription: {
         Args: { user_id_param: string }
         Returns: {
@@ -2536,6 +2638,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

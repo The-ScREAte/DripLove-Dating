@@ -20,6 +20,7 @@ import WorkEducationSection from './profile/WorkEducationSection';
 import PersonalitySection from './profile/PersonalitySection';
 import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
+import FavoritesSection from './profile/FavoritesSection';
 import AdinkraSection from './profile/AdinkraSection';
 import ImageManagement from './profile/ImageManagement';
 import AdvertisementSection from './profile/AdvertisementSection';
@@ -34,6 +35,7 @@ import PremiumUpgrade from './PremiumUpgrade';
 import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
 import { occupationOptions, industryOptions, educationLevelOptions } from '@/constants/professionOptions';
+import { FavoriteEntry, parseFavorites } from '@/constants/favorites';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -120,6 +122,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const showPersonalitySection = openSection === 'personality';
   const showFunQuestionsSection = openSection === 'funQuestions';
   const showInterestsSection = openSection === 'interests';
+  const showFavoritesSection = openSection === 'favorites';
   const showAdinkraSection = openSection === 'adinkra';
   
   const showAccountActionsSection = openSection === 'accountActions';
@@ -362,6 +365,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     perfect_first_date: '',
     last_googled: '',
     interests: [] as string[],
+    favorites: [] as FavoriteEntry[],
     adinkra_symbols: [] as string[],
     preferred_language: 'en',
     unlocked_countries: [] as string[],
@@ -455,6 +459,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           perfect_first_date: profile.perfect_first_date || '',
           last_googled: profile.last_googled || '',
           interests: Array.isArray(profile.interests) ? profile.interests : [],
+          favorites: parseFavorites(profile.favorites),
           adinkra_symbols: Array.isArray(profile.adinkra_symbols) ? profile.adinkra_symbols : [],
           preferred_language: detectedLanguage,
           unlocked_countries: Array.isArray(profile.unlocked_countries) ? profile.unlocked_countries : [],
@@ -497,6 +502,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           perfect_first_date: '',
           last_googled: '',
           interests: [],
+          favorites: [],
           adinkra_symbols: [],
           preferred_language: 'en',
           unlocked_countries: [],
@@ -550,6 +556,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const handleInterestsChange = (interests: string[]) => {
     if (isEditing) {
       setEditedProfile(prev => ({ ...prev, interests }));
+    }
+  };
+
+  const handleFavoritesChange = (favorites: FavoriteEntry[]) => {
+    if (isEditing) {
+      setEditedProfile(prev => ({ ...prev, favorites }));
     }
   };
 
@@ -649,6 +661,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         perfect_first_date: editedProfile.perfect_first_date?.trim() || null,
         last_googled: editedProfile.last_googled?.trim() || null,
         interests: Array.isArray(editedProfile.interests) ? editedProfile.interests : [],
+        favorites: parseFavorites(editedProfile.favorites),
         adinkra_symbols: Array.isArray(editedProfile.adinkra_symbols) ? editedProfile.adinkra_symbols : [],
         preferred_language: editedProfile.preferred_language || 'en',
         updated_at: new Date().toISOString(),
@@ -772,6 +785,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         perfect_first_date: profile.perfect_first_date || '',
         last_googled: profile.last_googled || '',
         interests: profile.interests || [],
+        favorites: parseFavorites(profile.favorites),
         adinkra_symbols: profile.adinkra_symbols || [],
         preferred_language: detectedLanguage,
         unlocked_countries: Array.isArray(profile.unlocked_countries) ? profile.unlocked_countries : [],
@@ -804,10 +818,16 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         }
 
         // This code always runs on all platforms
+        // image_order = -1 marks a rejected/superseded row kept only for the
+        // admin audit trail - it no longer occupies a visible profile slot,
+        // so it must be excluded here exactly like ImageManagement.tsx does,
+        // or a stale "approved but unslotted" row would show up in the
+        // preview/completion count without appearing in the real Photos tab.
         const { data: images, error } = await supabase
           .from('user_images')
           .select('image_url, is_approved, moderation_status')
-          .eq('user_id', currentUser.id);
+          .eq('user_id', currentUser.id)
+          .neq('image_order', -1);
 
         if (error) {
           // Only log non-table existence errors
@@ -853,6 +873,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       education_level: profile.education_level || '',
       date_of_birth: profile.date_of_birth || '',
       interests: profile.interests || [],
+      favorites: parseFavorites(profile.favorites),
       images: previewImages,
       is_verified: profile.is_verified,
       gender: profile.gender || '',
@@ -1326,11 +1347,24 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onToggle={() => toggleSection('interests')}
             className="mt-3"
           >
-            <InterestsSection 
-              editedProfile={editedProfile} 
-              profile={profile} 
-              isEditing={isEditing} 
-              onInterestsChange={handleInterestsChange} 
+            <InterestsSection
+              editedProfile={editedProfile}
+              profile={profile}
+              isEditing={isEditing}
+              onInterestsChange={handleInterestsChange}
+            />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title={t('profile.favorites')}
+            isOpen={showFavoritesSection}
+            onToggle={() => toggleSection('favorites')}
+            className="mt-3"
+          >
+            <FavoritesSection
+              editedProfile={editedProfile}
+              profile={profile}
+              isEditing={isEditing}
+              onFavoritesChange={handleFavoritesChange}
             />
           </CollapsibleSection>
           <CollapsibleSection

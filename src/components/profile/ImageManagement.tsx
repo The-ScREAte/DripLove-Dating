@@ -9,7 +9,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil } from 'lucide-react';
+import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/utils/imageCompression';
@@ -17,6 +17,7 @@ import FaceVerification from '@/components/FaceVerification';
 import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
+import { invokeImageModeration } from '@/utils/invokeImageModeration';
 
 interface ImageManagementProps {
   currentUser: {
@@ -36,7 +37,7 @@ interface UserImage {
 }
 
 interface ModerationDecision {
-  status: 'approved' | 'rejected';
+  status: 'approved' | 'rejected' | 'pending';
   message: string;
   hasFace?: boolean | null;
 }
@@ -391,27 +392,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       // Everything else goes live immediately - a face that doesn't clearly
       // match the account's verified face never blocks the photo, it just
       // queues a non-blocking glance for admins in the background.
-      let decision: ModerationDecision;
-      try {
-        const imageBase64 = await fileToBase64(compressedFile);
-        const { data: modData, error: modError } = await supabase.functions.invoke('moderate-image', {
-          body: { imageId: insertedRow.id, imageBase64 },
-        });
-
-        if (modError || !modData?.success) {
-          throw modError || new Error(modData?.error || 'Moderation check failed');
-        }
-
-        decision = { status: modData.status, message: modData.message, hasFace: modData.hasFace };
-      } catch (modErr) {
-        console.error('Moderation error:', modErr);
-        // Fail open, not closed: the photo is already live (inserted above)
-        // and only confirmed explicit content should ever pull it back down.
-        decision = {
-          status: 'approved',
-          message: "This photo is live. Our automated check couldn't complete, so it's been queued for a quick manual glance.",
-        };
-      }
+      // invokeImageModeration retries transient invoke failures a few times
+      // before giving up - and if it still can't complete, it reports an
+      // honest 'pending' outcome rather than claiming the photo is live
+      // when the DB row (still moderation_status='pending' by default)
+      // disagrees.
+      const imageBase64 = await fileToBase64(compressedFile);
+      const decision: ModerationDecision = await invokeImageModeration(insertedRow.id, imageBase64);
 
       setModerationResult(decision);
 
@@ -437,6 +424,16 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             variant: "default"
           });
         }
+      } else if (decision.status === 'pending') {
+        toast({
+          title: (
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-amber-500" /> Photo Queued for Review
+            </span>
+          ),
+          description: decision.message,
+          variant: "default"
+        });
       } else {
         toast({
           title: (
@@ -667,10 +664,16 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             )}
             {moderationResult && !uploading && (
               <div className={`text-sm mt-2 flex items-center ${
-                moderationResult.status === 'approved' ? 'text-green-600' : 'text-red-500'
+                moderationResult.status === 'approved'
+                  ? 'text-green-600'
+                  : moderationResult.status === 'pending'
+                    ? 'text-amber-500'
+                    : 'text-red-500'
               }`}>
                 {moderationResult.status === 'approved' ? (
                   <CheckCircle className="w-4 h-4 mr-2" />
+                ) : moderationResult.status === 'pending' ? (
+                  <Clock className="w-4 h-4 mr-2" />
                 ) : (
                   <Shield className="w-4 h-4 mr-2" />
                 )}

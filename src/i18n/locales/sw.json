@@ -151,6 +151,7 @@
     "perfectFirstDate": "Tarehe kamili ya kwanza",
     "lastGoogled": "Uliyotafuta mwisho",
     "interests": "Mapendekezo",
+    "favorites": "Favorites",
     "selectInterests": "Chagua Mapenzi Yako",
     "adinkra": "Alama za Kitamaduni",
     "selectAdinkra": "Chagua Alama Zako za Kitamaduni",
@@ -326,6 +327,7 @@
       "spontaneousVsPlanner": "Wa Ghafla vs Mpangaji: {{percentage}}%",
       "messyVsOrganized": "Uchafu vs Mpangilio: {{percentage}}%",
       "interests": "Mambo Yanayopendeza",
+      "favorites": "Favorites",
       "language": "Lugha"
     }
   },
@@ -353,6 +355,7 @@
     "showLess": "Onyesha Kidogo",
     "about": "Kuhusu",
     "interests": "Mapenzi",
+    "favorites": "Favorites",
     "yearsOld": "miaka",
     "pullToRefresh": "Vuta ili kuonyesha upya",
     "releaseToRefresh": "Achia ili kuonyesha upya",

@@ -29,6 +29,8 @@ import type { PotentialMatch } from '@/types';
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
 import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './discover/MatchCardHelpers';
+import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink, parseFavorites } from '@/constants/favorites';
+import MusicLinkBadge from './discover/MusicLinkBadge';
 import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
 
 // =========================================================
@@ -816,6 +818,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return theirs.find(symbol => mine.includes(symbol)) || theirs[0];
   }, [selectedProfile, currentUser]);
 
+  // Structured favorites (jsonb) - parsed once so both the compact preview
+  // row and the expanded panel can read plain FavoriteEntry objects.
+  const selectedProfileFavorites = useMemo(
+    () => parseFavorites(selectedProfile?.favorites),
+    [selectedProfile]
+  );
+
+  const musicHighlight = useMemo(
+    () => findFavoriteWithLink(selectedProfileFavorites),
+    [selectedProfileFavorites]
+  );
+
   // Same 4-color palette Discover's swipe card uses for non-photo slide backgrounds.
   const slideBackgroundColors = useMemo(() => [
     'bg-gradient-to-br from-pink-600 to-rose-900',
@@ -1388,7 +1402,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     </div>
                   </div>
 
-                  {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+                  {!showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
                     <div className="flex items-center gap-1.5 flex-wrap mt-2">
                       {previewHighlights.map((highlight, index) => (
                         <span
@@ -1402,6 +1416,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                         <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
                           <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
                         </span>
+                      )}
+                      {musicHighlight?.link && (
+                        <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
                       )}
                     </div>
                   )}
@@ -1513,24 +1530,28 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                   <div className="space-y-2">
                     {selectedProfile.smoking && (
                       <div className="flex items-center text-sm">
+                        <span className="mr-2 flex-shrink-0" aria-hidden="true">🚬</span>
                         <span className="font-semibold mr-2 text-white">Smoking:</span>
                         <span className="text-gray-200">{selectedProfile.smoking}</span>
                       </div>
                     )}
                     {selectedProfile.drinking && (
                       <div className="flex items-center text-sm">
+                        <span className="mr-2 flex-shrink-0" aria-hidden="true">🍸</span>
                         <span className="font-semibold mr-2 text-white">Drinking:</span>
                         <span className="text-gray-200">{selectedProfile.drinking}</span>
                       </div>
                     )}
                     {selectedProfile.exercise_level && (
                       <div className="flex items-center text-sm">
+                        <span className="mr-2 flex-shrink-0" aria-hidden="true">🏋️</span>
                         <span className="font-semibold mr-2 text-white">Exercise:</span>
                         <span className="text-gray-200">{selectedProfile.exercise_level}</span>
                       </div>
                     )}
                     {selectedProfile.sleeping_schedule && (
                       <div className="flex items-center text-sm">
+                        <span className="mr-2 flex-shrink-0" aria-hidden="true">😴</span>
                         <span className="font-semibold mr-2 text-white">Sleep:</span>
                         <span className="text-gray-200">{selectedProfile.sleeping_schedule}</span>
                       </div>
@@ -1578,6 +1599,23 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {selectedProfileFavorites.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">{t('matches.favorites')}</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedProfileFavorites.map((favorite, index) => (
+                      <span key={index} className="inline-flex items-center gap-1 h-6 leading-none px-2 py-0 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs">
+                        <span className="text-[11px] leading-none">{favoriteEmoji(favorite.category)}</span>
+                        <span className="leading-none">{formatFavoriteLabel(favorite)}</span>
+                        {favorite.link && (
+                          <MusicLinkBadge link={favorite.link} label={formatFavoriteLabel(favorite)} variant="inline" />
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedProfile.preferred_language && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Language</h4>
@@ -1603,6 +1641,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 [selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) ||
                 selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry ||
                 (selectedProfile.interests && selectedProfile.interests.length > 0) ||
+                selectedProfileFavorites.length > 0 ||
                 selectedProfile.preferred_language ||
                 selectedProfile.relationship_intent
               ) && (
@@ -1733,7 +1772,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlight, slideBackgroundColors, currentSlide, showMoreInfo, platform, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
+  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, platform, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showMatchAnimation && matchedProfile) {

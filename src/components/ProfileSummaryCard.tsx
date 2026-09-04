@@ -102,27 +102,24 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
     if (!currentUser?.id) return;
 
     try {
-      // Fetch total matches using count
-      const { count: matchesCount, error: matchesError } = await supabase
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Drip Weekly: matches made in the last 7 days
+      const { count: matchesCount } = await supabase
         .from('matches')
         .select('id', { count: 'exact', head: true })
-        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+        .gte('created_at', sevenDaysAgo);
 
-      // Ignore errors; stats will default to 0 if needed
-
-      // Fetch active chats (matches with recent messages in last 7 days)
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: matchesData, error: matchesDataError } = await supabase
+      const { data: matchesData } = await supabase
         .from('matches')
         .select('id')
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
 
-      // Ignore errors; stats will default to 0 if needed
-
       // Count active chats by checking which matches have recent messages
       let activeChatsCount = 0;
       if (matchesData && matchesData.length > 0) {
-        const { data: recentChats, error: chatsError } = await supabase
+        const { data: recentChats } = await supabase
           .from('chats')
           .select('match_id')
           .in('match_id', matchesData.map(m => m.id))
@@ -134,13 +131,12 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
         }
       }
 
-      // Fetch total likes given using count
-      const { count: likesCount, error: likesError } = await supabase
+      // Drip Weekly: likes given in the last 7 days
+      const { count: likesCount } = await supabase
         .from('likes')
         .select('id', { count: 'exact', head: true })
-        .eq('liker_id', currentUser.id);
-
-      // Ignore errors; stats will default to 0 if needed
+        .eq('liker_id', currentUser.id)
+        .gte('created_at', sevenDaysAgo);
 
       const finalStats = {
         totalMatches: matchesCount || 0,
@@ -162,36 +158,36 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
   return (
     <div className="mx-auto w-full max-w-3xl px-4">
       <Card className="shadow-lg bg-black border-pink-500/40 w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-white">
-            <Users className="w-5 h-5 text-pink-400" />
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="flex items-center space-x-1.5 text-sm text-white">
+            <Users className="w-4 h-4 text-pink-400" />
             <span>{t('profile.yourDripLoveSummary')}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="space-y-2">
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="space-y-1">
               <div className="flex justify-center">
-                <Heart className="w-6 h-6 text-red-400" />
+                <Heart className="w-4 h-4 text-red-400" />
               </div>
-              <div className="text-2xl font-bold text-red-400">{stats.totalMatches}</div>
-              <p className="text-xs text-gray-400">{t('profile.totalMatches')}</p>
+              <div className="text-lg font-bold text-red-400">{stats.totalMatches}</div>
+              <p className="text-[10px] leading-tight text-gray-400">{t('profile.totalMatches')}</p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <div className="flex justify-center">
-                <MessageCircle className="w-6 h-6 text-blue-400" />
+                <MessageCircle className="w-4 h-4 text-blue-400" />
               </div>
-              <div className="text-2xl font-bold text-blue-400">{stats.activeChats}</div>
-              <p className="text-xs text-gray-400">{t('profile.activeChats')}</p>
+              <div className="text-lg font-bold text-blue-400">{stats.activeChats}</div>
+              <p className="text-[10px] leading-tight text-gray-400">{t('profile.activeChats')}</p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <div className="flex justify-center">
-                <Users className="w-6 h-6 text-purple-400" />
+                <Users className="w-4 h-4 text-purple-400" />
               </div>
-              <div className="text-2xl font-bold text-purple-400">{stats.totalLikes}</div>
-              <p className="text-xs text-gray-400">{t('profile.likesGiven')}</p>
+              <div className="text-lg font-bold text-purple-400">{stats.totalLikes}</div>
+              <p className="text-[10px] leading-tight text-gray-400">{t('profile.likesGiven')}</p>
             </div>
           </div>
         </CardContent>

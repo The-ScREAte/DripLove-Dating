@@ -17,6 +17,7 @@ import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheType
 import ProfilePage from '@/components/ProfilePage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
+import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type UserImageRow = Database['public']['Tables']['user_images']['Row'];
@@ -220,6 +221,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         }
       } catch (imgErr) {
         console.error('[MainApp] Failed to fetch images for profile completion:', imgErr);
+      }
+
+      // Best-effort: silently retry moderation for any of this user's own
+      // photos still stuck at 'pending' from an earlier failed attempt (see
+      // invokeImageModeration.ts). Fire-and-forget - never blocks profile
+      // load, and failures here are logged, not surfaced.
+      if (data?.id) {
+        void reconcileStuckPendingImages(data.id);
       }
 
       // Check premium status (must respect cancelled-but-not-expired grace period)

@@ -153,6 +153,7 @@
     "perfectFirstDate": "Primeiro encontro perfeito",
     "lastGoogled": "Última pesquisa",
     "interests": "Interesses",
+    "favorites": "Favorites",
     "selectInterests": "Selecione Seus Interesses",
     "adinkra": "Signos Culturais",
     "selectAdinkra": "Selecione Seus Signos Culturais",
@@ -326,6 +327,7 @@
       "spontaneousVsPlanner": "Espontâneo vs Planejador: {{percentage}}%",
       "messyVsOrganized": "Desorganizado vs Organizado: {{percentage}}%",
       "interests": "Interesses",
+      "favorites": "Favorites",
       "language": "Idioma"
     }
   },
@@ -353,6 +355,7 @@
     "showLess": "Mostrar Menos",
     "about": "Sobre",
     "interests": "Interesses",
+    "favorites": "Favorites",
     "yearsOld": "anos",
     "pullToRefresh": "Puxe para atualizar",
     "releaseToRefresh": "Solte para atualizar",

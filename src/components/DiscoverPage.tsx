@@ -34,7 +34,6 @@ import {
   getUserFeedSeed,
   readCachedSwipeCount,
   writeCachedSwipeCount,
-  formatUuidInFilter,
   getTrustedBaseCountryCode,
   isLocalCountryForFreeUser,
   mixByCountryRoundRobin,
@@ -44,8 +43,6 @@ import {
   writePersistentItem,
   normalizeCountryCodeList,
   matchesReciprocalPreference,
-  orderLikersByRotation,
-  recordLikersShown,
 } from './discover/discoverFeedUtils';
 import { applyCompatibilityWeighting } from '@/utils/matchScoring';
 import { trackLikedYouShown, trackLikedYouSwiped } from '@/utils/discoverTelemetry';
@@ -62,6 +59,7 @@ import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
 import { calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
+import { parseFavorites } from '@/constants/favorites';
 import { readCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { getLanguageName } from '@/utils/languageNames';
 import PremiumUpgrade from './PremiumUpgrade';
@@ -135,6 +133,7 @@ type ProfileRow = Pick<
   | 'education_level'
   | 'date_of_birth'
   | 'interests'
+  | 'favorites'
   | 'gender'
   | 'preference'
   | 'is_verified'
@@ -171,6 +170,8 @@ const toPotentialMatch = (
     ? interestsRaw.filter((i): i is string => typeof i === 'string')
     : [];
 
+  const favorites = parseFavorites(profile.favorites);
+
   const adinkraRaw = profile.adinkra_symbols;
   const adinkra_symbols = Array.isArray(adinkraRaw)
     ? adinkraRaw.filter((i): i is string => typeof i === 'string')
@@ -188,6 +189,7 @@ const toPotentialMatch = (
     education_level: profile.education_level ?? '',
     date_of_birth: profile.date_of_birth ?? '',
     interests,
+    favorites,
     images: extras?.images ?? [],
     is_verified: profile.is_verified ?? undefined,
     gender: profile.gender ?? '',
@@ -899,8 +901,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     distanceMap: { [key: string]: number },
     limit?: number
   }) => {
-    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
-
     const countryCodes = Array.from(new Set(unlockedCountries.map(normalizeCountryCode).filter(Boolean)));
     if (countryCodes.length === 0) return [];
 
@@ -914,21 +914,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     const results = await Promise.all(
       countryCodes.map(async (countryCode) => {
-        let activeQuery = supabase
-          .from('profiles')
-          .select(PROFILE_SELECT)
-          .eq('country_code', countryCode)
-          .in('gender', allowedGenders)
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .eq('is_archived', false)
-          .limit(perCountryLimit);
-
-        if (excludedIds.length > 0) {
-          activeQuery = activeQuery.not('id', 'in', formatUuidInFilter(excludedIds));
-        }
-
-        const { data: activeData, error: activeError } = await activeQuery;
+        // ⭐ FAIRNESS: get_random_discover_profiles orders by random() server-side,
+        // so this isn't the same fixed slice of profiles every time - see the
+        // migration for why a plain .limit() without ORDER BY was letting whole
+        // segments of real users go permanently unseen.
+        const { data: activeData, error: activeError } = await supabase.rpc('get_random_discover_profiles', {
+          p_country_codes: [countryCode],
+          p_allowed_genders: allowedGenders,
+          p_archived: false,
+          p_excluded_ids: excludedIds,
+          p_limit: perCountryLimit,
+        });
         const activeRows: ProfileRow[] = (!activeError && Array.isArray(activeData))
           ? (activeData as unknown as ProfileRow[])
           : [];
@@ -939,21 +935,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         const archivedTopUpLimit = perCountryLimit - activeRows.length;
         const archivedExcludedIds = uniqUuids([...excludedIds, ...activeRows.map((p) => p.id)]);
-        let archivedQuery = supabase
-          .from('profiles')
-          .select(PROFILE_SELECT)
-          .eq('country_code', countryCode)
-          .in('gender', allowedGenders)
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .eq('is_archived', true)
-          .limit(archivedTopUpLimit);
-
-        if (archivedExcludedIds.length > 0) {
-          archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(archivedExcludedIds));
-        }
-
-        const { data: archivedData, error: archivedError } = await archivedQuery;
+        const { data: archivedData, error: archivedError } = await supabase.rpc('get_random_discover_profiles', {
+          p_country_codes: [countryCode],
+          p_allowed_genders: allowedGenders,
+          p_archived: true,
+          p_excluded_ids: archivedExcludedIds,
+          p_limit: archivedTopUpLimit,
+        });
         const archivedRows: ProfileRow[] = (!archivedError && Array.isArray(archivedData))
           ? (archivedData as unknown as ProfileRow[])
           : [];
@@ -1068,8 +1056,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       .map(([id, _]) => id));
     const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
     
-    const priorityLikerIds = usersWhoLikedMeIds.filter(id => !locallySwipedIds.includes(id));
-    
     const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? 50;
     const userMaxDistance = Number(userMaxDistanceRaw);
     // CRITICAL: Free users capped at 500km max, premium users can use their full setting
@@ -1119,8 +1105,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const MAX_LOCATION_IDS_FOR_QUERY = 500;
     const locationProfileIdsForQuery = locationProfileIds.slice(0, MAX_LOCATION_IDS_FOR_QUERY);
 
-    const PROFILE_SELECT = 'id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at';
-
     const hasUnlockedCountries = premiumForFeed && unlockedCountries.length > 0;
 
 
@@ -1142,22 +1126,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // restricts *inclusion* here.)
       localProfiles = baseCountryCode
         ? await (async () => {
-            let query = supabase
-              .from('profiles')
-              .select(PROFILE_SELECT)
-              .eq('country_code', baseCountryCode)
-              .in('gender', allowedGenders)
-              .eq('account_status', 'active')
-              .eq('is_admin', false)
-              .eq('is_archived', false);
-
-            const useDbExclusionPremium = excludedIds.length <= 90;
-            if (useDbExclusionPremium && excludedIds.length > 0) {
-              query = query.not('id', 'in', formatUuidInFilter(excludedIds));
-            }
-
-            const { data: profiles, error } = await query
-              .limit(useDbExclusionPremium ? 100 : 500);
+            // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+            // RPC params travel in the POST body, not the URL, so the excluded-ids
+            // list no longer needs the ~90-UUID URL-length workaround either.
+            const { data: profiles, error } = await supabase.rpc('get_random_discover_profiles', {
+              p_country_codes: [baseCountryCode],
+              p_allowed_genders: allowedGenders,
+              p_archived: false,
+              p_excluded_ids: excludedIds,
+              p_limit: 100,
+            });
 
             if (error) throw error;
             const rows = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
@@ -1262,28 +1240,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // Free user with no country set - return empty feed (fail closed)
         filteredProfiles = [];
       } else if (locationProfileIdsForQuery.length > 0) {
-        let query = supabase
-          .from('profiles')
-          .select(PROFILE_SELECT)
-          .in('id', locationProfileIdsForQuery)
-          .eq('country_code', baseCountryCode); // Always filter by country for free users
-
-        // PERF: Only apply not.in() when exclusion list is small enough to be reliable.
-        // With 2000+ likes, formatUuidInFilter truncates to ~94 UUIDs, making the filter
-        // ineffective. Instead, fetch a larger batch and rely on client-side excludedIdsSet.
-        const useDbExclusion = excludedIds.length <= 90;
-        if (useDbExclusion && excludedIds.length > 0) {
-          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
-        }
-
-        // Fetch more profiles when DB exclusion is unreliable to compensate for client-side filtering
-        const fetchLimit = useDbExclusion ? 100 : 500;
-        const { data: profiles, error } = await query
-          .in('gender', allowedGenders)
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .eq('is_archived', false)
-          .limit(fetchLimit);
+        // ⭐ FAIRNESS: server-side ORDER BY random() within the location
+        // service's candidate set - see get_random_discover_profiles. RPC
+        // params travel in the POST body, so the full excluded-ids list is
+        // always usable (no more ~90-UUID URL-length workaround).
+        const { data: profiles, error } = await supabase.rpc('get_random_discover_profiles', {
+          p_country_codes: [baseCountryCode],
+          p_allowed_genders: allowedGenders,
+          p_archived: false,
+          p_excluded_ids: excludedIds,
+          p_limit: 100,
+          p_allowed_ids: locationProfileIdsForQuery,
+        });
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
@@ -1292,37 +1260,23 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // Apply bounding box distance filter if user has coordinates
         const userLat = currentUserData?.latitude;
         const userLon = currentUserData?.longitude;
-        
-        let query = supabase.from('profiles').select(PROFILE_SELECT)
-          .eq('country_code', baseCountryCode); // Always filter by country for free users
+        const radiusInDegrees = (userLat && userLon) ? safeUserMaxDistance / 111.32 : null;
 
-        // Apply distance bounding box for free users (CRITICAL for location enforcement)
-        if (userLat && userLon) {
-          const radiusInDegrees = safeUserMaxDistance / 111.32;
-          query = query
-            .gte('latitude', userLat - radiusInDegrees)
-            .lte('latitude', userLat + radiusInDegrees)
-            .gte('longitude', userLon - radiusInDegrees)
-            .lte('longitude', userLon + radiusInDegrees);
-        }
-
-        // Same logic: skip DB exclusion when list is too large for PostgREST URL
-        const useDbExclusionFallback = excludedIds.length <= 90;
-        if (useDbExclusionFallback && excludedIds.length > 0) {
-          query = query.not('id', 'in', formatUuidInFilter(excludedIds));
-        }
-
-        const fallbackFetchLimit = useDbExclusionFallback ? 100 : 500;
-        const { data: profiles, error } = await query
-          .in('gender', allowedGenders)
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .eq('is_archived', false)
-          .limit(fallbackFetchLimit);
+        // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+        const { data: profiles, error } = await supabase.rpc('get_random_discover_profiles', {
+          p_country_codes: [baseCountryCode],
+          p_allowed_genders: allowedGenders,
+          p_archived: false,
+          p_excluded_ids: excludedIds,
+          p_limit: 100,
+          p_lat: userLat && userLon ? userLat : null,
+          p_lon: userLat && userLon ? userLon : null,
+          p_radius_degrees: radiusInDegrees,
+        });
 
         if (error) throw error;
         filteredProfiles = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
-        
+
         // Reset archived fallback flag if we found active profiles
         if (filteredProfiles.length > 0) {
           usingArchivedFallback = false;
@@ -1372,48 +1326,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         ])
       ).map((c) => normalizeCountryCode(String(c || ''))).filter(Boolean);
 
-      let archivedQuery = supabase.from('profiles').select(PROFILE_SELECT);
-
-      const useDbExclusionArchived = excludedIds.length <= 90;
-      if (useDbExclusionArchived && excludedIds.length > 0) {
-        archivedQuery = archivedQuery.not('id', 'in', formatUuidInFilter(excludedIds));
-      }
-
-      if (premiumForFeed && allowedCountryCodes.length > 0) {
-        archivedQuery = archivedQuery.in('country_code', allowedCountryCodes);
-      } else if (baseCountryCode) {
-        archivedQuery = archivedQuery.eq('country_code', baseCountryCode);
-      }
+      const archivedCountryCodes = premiumForFeed && allowedCountryCodes.length > 0
+        ? allowedCountryCodes
+        : (baseCountryCode ? [baseCountryCode] : []);
 
       // Age filtering is done client-side using date_of_birth (profiles.age column doesn't exist)
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
-      // Premium-only bug: this box is centered on the viewer's own lat/lon,
-      // so applying it while the query above is also pulling unlocked
-      // countries (allowedCountryCodes) silently excluded every archived
-      // candidate from those countries - their coordinates are obviously
-      // outside a radius drawn around the viewer's home country, even
-      // though country_code already correctly matched them. Free users
-      // aren't affected (they only ever query baseCountryCode), and this
-      // mirrors how fetchUnlockedCountryProfiles (the active-pool
-      // equivalent) already has no distance filter at all for premium.
-      if (!premiumForFeed && baseCountryCode && userLat && userLon) {
-        const radiusInDegrees = safeUserMaxDistance / 111.32;
-        archivedQuery = archivedQuery
-          .gte('latitude', userLat - radiusInDegrees)
-          .lte('latitude', userLat + radiusInDegrees)
-          .gte('longitude', userLon - radiusInDegrees)
-          .lte('longitude', userLon + radiusInDegrees);
-      }
+      // Premium-only bug: this box used to be centered on the viewer's own
+      // lat/lon while the query also pulled unlocked countries, silently
+      // excluding every archived candidate from those countries - their
+      // coordinates are obviously outside a radius drawn around the viewer's
+      // home country, even though country_code already correctly matched
+      // them. Free users aren't affected (they only ever query
+      // baseCountryCode), and this mirrors how fetchUnlockedCountryProfiles
+      // (the active-pool equivalent) already has no distance filter at all
+      // for premium.
+      const archivedRadiusInDegrees = (!premiumForFeed && baseCountryCode && userLat && userLon)
+        ? safeUserMaxDistance / 111.32
+        : null;
 
       // A small, bounded fetch is enough for a ≤10% mix-in; only the
       // last-resort (empty active pool) case needs a larger pull. Smaller
       // still on Android - this mix-in is a nice-to-have on top of an
       // already-healthy active deck, not worth extra payload on weaker
       // connections/hardware for that case specifically.
-      const archivedFetchLimit = activePoolSizeBeforeArchived === 0
-        ? (useDbExclusionArchived ? 50 : 300)
-        : (isAndroidPlatform() ? 15 : 30);
+      const archivedFetchLimit = activePoolSizeBeforeArchived === 0 ? 300 : (isAndroidPlatform() ? 15 : 30);
 
       // This mix-in is a genuine extra network round-trip on top of the
       // already-completed active-pool fetch above - it must never be able to
@@ -1421,23 +1359,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // (much tighter than the 15s used for the critical-path queries
       // earlier in this function) means a slow/flaky connection just skips
       // the archived mix-in for this cycle instead of delaying every card.
+      // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
       let archivedProfiles: unknown[] | null = null;
       let archivedError: unknown = null;
-      try {
-        const result = await queryTimeout(
-          archivedQuery
-            .eq('is_archived', true)
-            .eq('account_status', 'active') // still respect account status/ban state
-            .eq('is_admin', false)
-            .in('gender', allowedGenders)
-            .limit(archivedFetchLimit),
-          4000
-        );
-        archivedProfiles = result.data;
-        archivedError = result.error;
-      } catch {
-        // Timed out or otherwise failed - fine, this whole block is a bonus
-        // on top of an already-valid active deck.
+      if (archivedCountryCodes.length > 0) {
+        try {
+          const result = await queryTimeout(
+            supabase.rpc('get_random_discover_profiles', {
+              p_country_codes: archivedCountryCodes,
+              p_allowed_genders: allowedGenders,
+              p_archived: true,
+              p_excluded_ids: excludedIds,
+              p_limit: archivedFetchLimit,
+              p_lat: archivedRadiusInDegrees != null ? userLat : null,
+              p_lon: archivedRadiusInDegrees != null ? userLon : null,
+              p_radius_degrees: archivedRadiusInDegrees,
+            }),
+            4000
+          );
+          archivedProfiles = result.data;
+          archivedError = result.error;
+        } catch {
+          // Timed out or otherwise failed - fine, this whole block is a bonus
+          // on top of an already-valid active deck.
+        }
       }
 
       if (!archivedError && archivedProfiles && archivedProfiles.length > 0) {
@@ -1578,42 +1523,37 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         ])
       ).map((c) => normalizeCountryCode(String(c || ''))).filter(Boolean);
 
-      let archivedRetryQuery = supabase.from('profiles').select(PROFILE_SELECT);
-
-      if (excludedIds.length > 0) {
-        archivedRetryQuery = archivedRetryQuery.not('id', 'in', formatUuidInFilter(excludedIds));
-      }
-
-      if (premiumForFeed && allowedCountryCodes.length > 0) {
-        archivedRetryQuery = archivedRetryQuery.in('country_code', allowedCountryCodes);
-      } else if (baseCountryCode) {
-        archivedRetryQuery = archivedRetryQuery.eq('country_code', baseCountryCode);
-      }
+      const archivedRetryCountryCodes = premiumForFeed && allowedCountryCodes.length > 0
+        ? allowedCountryCodes
+        : (baseCountryCode ? [baseCountryCode] : []);
 
       const userLat = currentUserData?.latitude;
       const userLon = currentUserData?.longitude;
-      // Same bug as the primary archived mix-in above: this box is centered
-      // on the viewer's own coordinates, so applying it while also querying
-      // unlocked countries silently excludes every archived candidate from
-      // those countries. This is the true last-resort fetch (runs only when
-      // the pool is genuinely empty), so this was the main reason a premium
-      // user with unlocked countries could still hit "No more profiles"
-      // despite a large archived pool existing in those countries.
-      if (!premiumForFeed && baseCountryCode && userLat && userLon) {
-        const radiusInDegrees = safeUserMaxDistance / 111.32;
-        archivedRetryQuery = archivedRetryQuery
-          .gte('latitude', userLat - radiusInDegrees)
-          .lte('latitude', userLat + radiusInDegrees)
-          .gte('longitude', userLon - radiusInDegrees)
-          .lte('longitude', userLon + radiusInDegrees);
-      }
+      // Same bug as the primary archived mix-in above: this box used to be
+      // centered on the viewer's own coordinates, so applying it while also
+      // querying unlocked countries silently excluded every archived
+      // candidate from those countries. This is the true last-resort fetch
+      // (runs only when the pool is genuinely empty), so this was the main
+      // reason a premium user with unlocked countries could still hit "No
+      // more profiles" despite a large archived pool existing in those
+      // countries.
+      const archivedRetryRadiusInDegrees = (!premiumForFeed && baseCountryCode && userLat && userLon)
+        ? safeUserMaxDistance / 111.32
+        : null;
 
-      const { data: archivedRetryRows, error: archivedRetryError } = await archivedRetryQuery
-        .eq('is_archived', true)
-        .eq('account_status', 'active')
-        .eq('is_admin', false)
-        .in('gender', allowedGenders)
-        .limit(50);
+      // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+      const { data: archivedRetryRows, error: archivedRetryError } = archivedRetryCountryCodes.length > 0
+        ? await supabase.rpc('get_random_discover_profiles', {
+            p_country_codes: archivedRetryCountryCodes,
+            p_allowed_genders: allowedGenders,
+            p_archived: true,
+            p_excluded_ids: excludedIds,
+            p_limit: 50,
+            p_lat: archivedRetryRadiusInDegrees != null ? userLat : null,
+            p_lon: archivedRetryRadiusInDegrees != null ? userLon : null,
+            p_radius_degrees: archivedRetryRadiusInDegrees,
+          })
+        : { data: [], error: null };
 
       if (!archivedRetryError && archivedRetryRows && archivedRetryRows.length > 0) {
         filteredProfiles = Array.isArray(archivedRetryRows) ? (archivedRetryRows as unknown as ProfileRow[]) : [];
@@ -1795,20 +1735,45 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // contradicting "active always fills first, archived only fills gaps."
     // Tier 2 has no opinion on activity/staleness, so it can't be trusted to
     // preserve that ordering on its own.
-    const archivedMixinInShuffled = shuffled.filter((p) => p.is_archived);
-    const activeForCompatWeighting = shuffled.filter((p) => !p.is_archived);
-    const compatWeightedActive = applyCompatibilityWeighting(
-      activeForCompatWeighting,
-      {
-        interests: currentUserData?.interests,
-        introvert_extrovert: currentUserData?.introvert_extrovert,
-        spontaneous_planner: currentUserData?.spontaneous_planner,
-        messy_organized: currentUserData?.messy_organized,
-      },
-      distanceMap,
-      `${shuffleSeed}_compat`
-    );
-    shuffled = [...compatWeightedActive, ...archivedMixinInShuffled];
+    //
+    // ⭐ STABILITY FIX: when a saved order was restored, only run this scoring
+    // pass over the newly-appended profiles (people not in yesterday/earlier's
+    // saved order) - never over the already-ordered prefix. A seeded shuffle is
+    // only stable against its ORIGINAL input; feeding it its own prior output
+    // (which restoring-then-rescoring effectively does, every single reload)
+    // produces a genuinely different permutation each time even with an
+    // identical seed, because Fisher-Yates walks the array's current order,
+    // not some seed-derived absolute position. That was silently reshuffling
+    // the whole deck - including the card currently on top - on every
+    // refresh/relaunch, even though nothing had been swiped. Restricting
+    // rescoring to only the unordered tail keeps the already-decided prefix
+    // byte-for-byte identical across reloads, so the top card only ever
+    // changes because it was actually swiped.
+    const previouslyOrderedIds = new Set(savedOrderIds);
+    const applyCompatWeighting = (pool: typeof shuffled, seedSuffix: string) => {
+      const archivedMixin = pool.filter((p) => p.is_archived);
+      const activePool = pool.filter((p) => !p.is_archived);
+      const weightedActive = applyCompatibilityWeighting(
+        activePool,
+        {
+          interests: currentUserData?.interests,
+          introvert_extrovert: currentUserData?.introvert_extrovert,
+          spontaneous_planner: currentUserData?.spontaneous_planner,
+          messy_organized: currentUserData?.messy_organized,
+        },
+        distanceMap,
+        `${shuffleSeed}${seedSuffix}`
+      );
+      return [...weightedActive, ...archivedMixin];
+    };
+
+    if (savedOrderValid) {
+      const alreadyOrdered = shuffled.filter((p) => previouslyOrderedIds.has(p.id));
+      const freshlyAdded = shuffled.filter((p) => !previouslyOrderedIds.has(p.id));
+      shuffled = [...alreadyOrdered, ...applyCompatWeighting(freshlyAdded, '_compat_new')];
+    } else {
+      shuffled = applyCompatWeighting(shuffled, '_compat');
+    }
 
     // Save profile order to localStorage (post-mix)
     try {
@@ -1826,169 +1791,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // Ignore localStorage errors
     }
 
-    // ⭐ PRIORITY LIKERS (Mechanism A): Inject users who liked the current
-    // user at natural, sparse positions. Uses variable intervals (25-40
-    // profiles) with deterministic-per-day positioning for organic discovery.
-    //
-    // Two eligibility gates now apply before anyone is even considered for
-    // injection, on top of the existing Tier 1 filtering (a liker is only
-    // ever in `shuffled` at all if they already passed gender/orientation/
-    // age/distance/exclusions):
-    //  - Active within the last 14 days (last_login_at) - previously this
-    //    mechanism had no activity check at all, unlike the swipe-fatigue
-    //    rescue (Mechanism B) below, which only ever pulls from a 72h-active
-    //    pool. A liker from months ago could spend one of the scarce 15%-cap
-    //    slots on someone who's since gone quiet.
-    //  - Has at least one approved photo - a like with no way to visually
-    //    recognize the person isn't a useful "premium slot" to spend either.
-    if (priorityLikerIds.length > 0) {
-      // Get profile data for priority likers that are in our shuffled list
-      const priorityProfilesAll = shuffled.filter(p => priorityLikerIds.includes(p.id));
-
-      const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
-      const activeLikerIds = new Set(
-        priorityProfilesAll
-          .filter((p) => {
-            if (!p.last_login_at) return false;
-            const lastActiveMs = new Date(p.last_login_at).getTime();
-            return Number.isFinite(lastActiveMs) && (Date.now() - lastActiveMs) <= FOURTEEN_DAYS_MS;
-          })
-          .map((p) => p.id)
-      );
-
-      // Same reasoning as the archived mix-in's fetch: this is an extra
-      // round-trip in service of a nice-to-have eligibility check (don't
-      // spend a scarce priority slot on a liker with no photo), never
-      // allowed to stall the deck it's gating. A short timeout means a
-      // slow/flaky connection just skips the photo gate for this cycle
-      // (falling through to no injected likers this load) rather than
-      // delaying every card behind it.
-      let likersWithPhotoIds = new Set<string>();
-      if (activeLikerIds.size > 0) {
-        try {
-          const { data: likerImageRows } = await queryTimeout(
-            supabase
-              .from('user_images')
-              .select('user_id')
-              .in('user_id', Array.from(activeLikerIds))
-              .eq('is_approved', true),
-            3000
-          );
-          likersWithPhotoIds = new Set((likerImageRows || []).map((row) => row.user_id));
-        } catch {
-          // leave likersWithPhotoIds empty - no likers get injected this
-          // cycle rather than the deck waiting on a stalled query.
-        }
-      }
-
-      const eligiblePriorityProfiles = priorityProfilesAll.filter(
-        (p) => activeLikerIds.has(p.id) && likersWithPhotoIds.has(p.id)
-      );
-
-      // Rotation: unseen-via-injection likers get first claim on the capped
-      // slots; likers already shown on a previous load only cycle back in
-      // once everyone unseen has had a turn. Previously, anyone over the 15%
-      // cap was simply dropped every single load - a popular profile's
-      // backlog of likers had no guaranteed path to ever surface, since the
-      // same "most recent 50" query kept re-deriving the same handful.
-      const eligibleIdsInRotationOrder = orderLikersByRotation(
-        userId,
-        eligiblePriorityProfiles.map((p) => p.id)
-      );
-      const eligibleById = new Map(eligiblePriorityProfiles.map((p) => [p.id, p]));
-      const priorityProfiles = eligibleIdsInRotationOrder
-        .map((id) => eligibleById.get(id))
-        .filter((p): p is typeof shuffled[number] => !!p);
-
-      // Remove priority profiles from their current positions
-      const nonPriorityProfiles = shuffled.filter(p => !priorityLikerIds.includes(p.id));
-
-      // Cap priority likers at 15% of total feed to keep it natural
-      const maxPriorityCount = Math.min(
-        priorityProfiles.length,
-        Math.ceil(nonPriorityProfiles.length * 0.15)
-      );
-      const limitedPriorityProfiles = priorityProfiles.slice(0, maxPriorityCount);
-
-      // Create deterministic but seemingly random injection points
-      const seedUserId = currentUser?.id || userId;
-      const dateSeed = new Date().toISOString().split('T')[0];
-      const injectionSeed = `${seedUserId}_priority_${dateSeed}`;
-      
-      // Simple hash function for deterministic "randomness"
-      const simpleHash = (str: string, index: number) => {
-        let hash = 0;
-        const combined = str + index;
-        for (let i = 0; i < combined.length; i++) {
-          hash = ((hash << 5) - hash) + combined.charCodeAt(i);
-          hash = hash & hash;
-        }
-        return Math.abs(hash);
-      };
-      
-      // Calculate injection positions with variable intervals
-      const injectionPositions: number[] = [];
-      let currentPos = 0;
-      let injectionIndex = 0;
-      
-      while (injectionIndex < limitedPriorityProfiles.length && currentPos < nonPriorityProfiles.length) {
-        // Variable interval: 25-40 profiles for most injections
-        // First injection happens earlier (8-15 profiles) for early engagement
-        const minInterval = injectionIndex === 0 ? 8 : 25;
-        const maxInterval = injectionIndex === 0 ? 15 : 40;
-        
-        // Use deterministic hash to pick interval and offset
-        const intervalRange = maxInterval - minInterval;
-        const interval = minInterval + (simpleHash(injectionSeed, injectionIndex) % intervalRange);
-        const offset = simpleHash(injectionSeed, injectionIndex + 1000) % Math.min(8, interval);
-        
-        currentPos += interval + offset;
-        
-        if (currentPos < nonPriorityProfiles.length) {
-          injectionPositions.push(currentPos);
-          injectionIndex++;
-        }
-      }
-
-      const injectionSet = new Set(injectionPositions);
-
-      // Build final array with injections at calculated positions
-      const finalProfiles: typeof shuffled = [];
-      let priorityIdx = 0;
-      const injectedLikers: Array<{ id: string; positionInDeck: number; lastActiveDays: number | null }> = [];
-
-      for (let i = 0; i < nonPriorityProfiles.length; i++) {
-        // Check if we should inject at this position
-        if (injectionSet.has(i) && priorityIdx < limitedPriorityProfiles.length) {
-          const likerProfile = limitedPriorityProfiles[priorityIdx];
-          // Tagged client-side only, for swipe-outcome telemetry attribution.
-          const taggedLiker = { ...likerProfile, likedYouMechanism: 'A' as const };
-          finalProfiles.push(taggedLiker);
-          const lastActiveDays = likerProfile.last_login_at
-            ? Math.floor((Date.now() - new Date(likerProfile.last_login_at).getTime()) / (24 * 60 * 60 * 1000))
-            : null;
-          injectedLikers.push({ id: likerProfile.id, positionInDeck: finalProfiles.length - 1, lastActiveDays });
-          priorityIdx++;
-        }
-
-        finalProfiles.push(nonPriorityProfiles[i]);
-      }
-
-      shuffled = finalProfiles;
-
-      if (injectedLikers.length > 0) {
-        recordLikersShown(userId, injectedLikers.map((l) => l.id));
-        for (const liker of injectedLikers) {
-          trackLikedYouShown({
-            viewerId: userId,
-            likerId: liker.id,
-            mechanism: 'A',
-            likerLastActiveDays: liker.lastActiveDays,
-            positionInDeck: liker.positionInDeck,
-          });
-        }
-      }
-    }
+    // NOTE: "liked you" reveals used to also be injected here, baked directly
+    // into this per-day persisted deck order (capped at 15% of the feed, in
+    // fixed deck-position intervals). That ran independently of - and on top
+    // of - the live per-swipe reveal schedule in useLikeBackInjection.ts,
+    // making actual reveal frequency unpredictable and impossible to reason
+    // about as one coherent rate. Reveals are now handled by exactly one
+    // mechanism: the decaying swipe-based schedule in useLikeBackInjection.ts
+    // (2 reveals in the first 20 swipes, 1 in the next 20, 1 in the next 30,
+    // tapering further from there).
 
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
     // Load last profile ID and time from localStorage
@@ -2002,8 +1813,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     if (isSavedValid && savedId) {
       const foundIndex = shuffled.findIndex(p => p.id === savedId);
       if (foundIndex !== -1) {
-        // Resume from the NEXT profile after the last viewed one
-        startIndex = Math.min(foundIndex + 1, shuffled.length - 1);
+        // `savedId` is written by moveToNext() as the id of the card that becomes
+        // current right after a swipe completes - i.e. it's already "the next
+        // profile to show", not "the one just swiped". Resuming at foundIndex + 1
+        // silently skipped that exact card on every reload/relaunch, regardless of
+        // whether the user had actually swiped on it - each refresh moved the
+        // deck forward for free. Resume ON the saved profile, not past it.
+        startIndex = Math.min(foundIndex, shuffled.length - 1);
       }
     }
 
@@ -2660,38 +2476,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           }
 
           const runRecoveryQuery = async (archived: boolean): Promise<ProfileRow[]> => {
-            let query = supabase
-              .from('profiles')
-              .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
-              .in('gender', allowedGendersForRecovery)
-              .eq('account_status', 'active')
-              .eq('is_admin', false)
-              .eq('is_archived', archived)
-              .limit(200);
-
-            if (premiumActive && allowedCountryCodes.length > 0) {
-              query = query.in('country_code', allowedCountryCodes);
-            } else if (baseCountryCode) {
-              query = query.eq('country_code', baseCountryCode);
-            }
-
-            // Only use DB exclusion when the set is small enough for PostgREST URLs
-            if (excluded.size > 0 && excluded.size <= 90) {
-              query = query.not('id', 'in', formatUuidInFilter(Array.from(excluded)));
-            }
+            const recoveryCountryCodes = premiumActive && allowedCountryCodes.length > 0
+              ? allowedCountryCodes
+              : (baseCountryCode ? [baseCountryCode] : []);
+            if (recoveryCountryCodes.length === 0) return [];
 
             // Distance is a free-tier concept only - premium browses unlocked
             // countries with no radius, same as the main fetch's international path.
-            if (!premiumActive && currentUserData.latitude && currentUserData.longitude) {
-              const radiusInDegrees = maxDistance / 111.32;
-              query = query
-                .gte('latitude', currentUserData.latitude - radiusInDegrees)
-                .lte('latitude', currentUserData.latitude + radiusInDegrees)
-                .gte('longitude', currentUserData.longitude - radiusInDegrees)
-                .lte('longitude', currentUserData.longitude + radiusInDegrees);
-            }
+            const recoveryRadiusInDegrees = (!premiumActive && currentUserData.latitude && currentUserData.longitude)
+              ? maxDistance / 111.32
+              : null;
 
-            const { data: rows } = await query;
+            // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+            // RPC params travel in the POST body, so the full exclusion set is
+            // always usable here too (no more ~90-id URL-length cap).
+            const { data: rows } = await supabase.rpc('get_random_discover_profiles', {
+              p_country_codes: recoveryCountryCodes,
+              p_allowed_genders: allowedGendersForRecovery,
+              p_archived: archived,
+              p_excluded_ids: Array.from(excluded),
+              p_limit: 200,
+              p_lat: recoveryRadiusInDegrees != null ? currentUserData.latitude : null,
+              p_lon: recoveryRadiusInDegrees != null ? currentUserData.longitude : null,
+              p_radius_degrees: recoveryRadiusInDegrees,
+            });
             return (Array.isArray(rows) ? (rows as ProfileRow[]) : [])
               .filter((p) => {
                 // Final guard for large exclusion lists (liked/matched/passed/blocked).
@@ -3670,7 +3478,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               const { data: freshRows } = await Promise.race([
                 supabase
                   .from('profiles')
-                  .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
+                  .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
                   .in('id', fetchIds)
                   .in('country_code', rescueAllowedCountryCodes)
                   .eq('account_status', 'active')
@@ -4467,7 +4275,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // If not in current matches, try to fetch their profile data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, is_verified')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, is_verified')
           .eq('id', lastPassedUser.user_id)
           .eq('account_status', 'active')
           .single();

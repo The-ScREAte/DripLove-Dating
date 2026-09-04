@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeImageModeration } from '@/utils/invokeImageModeration';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil } from 'lucide-react';
 const PhotoCropModal = lazy(() => import('@/components/profile/PhotoCropModal'));
@@ -385,6 +386,17 @@ const ProfileCompletionPage = () => {
       return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
     };
 
+    // `images` (component state) is a snapshot from when this handler
+    // started - it never reflects the setImages() calls made later in this
+    // same loop, since those are just scheduled, not applied synchronously.
+    // Checking isDuplicate against `images` alone let two copies of the
+    // SAME file, picked in one file-dialog selection, both pass the check
+    // (neither was in the original `images` list yet) and both get queued -
+    // a real, duplicate DB row once submitted. This local set is mutated
+    // synchronously as each file in the batch is processed, so it catches
+    // in-batch duplicates that the stale state snapshot can't.
+    const seenHashesThisBatch = new Set(images.map((img) => img.hash).filter(Boolean));
+
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         toast({
@@ -410,10 +422,9 @@ const ProfileCompletionPage = () => {
       // Generate hash AFTER compression for accurate duplicate detection
       const fileHash = await getFileHash(compressedFile);
       
-      // Check against existing images (including their stored hashes)
-      const isDuplicate = images.some(img => img.hash === fileHash);
-
-      if (isDuplicate) {
+      // Check against existing images AND every file already queued earlier
+      // in this same batch (see seenHashesThisBatch above).
+      if (seenHashesThisBatch.has(fileHash)) {
         toast({
           title: t('profileCompletion.duplicateImage'),
           description: t('profileCompletion.imageAlreadyUploaded'),
@@ -421,6 +432,7 @@ const ProfileCompletionPage = () => {
         });
         continue;
       }
+      seenHashesThisBatch.add(fileHash);
 
       const preview = URL.createObjectURL(compressedFile);
       // Real moderation (AWS Rekognition nudity/celebrity/face-match checks)
@@ -818,6 +830,7 @@ const ProfileCompletionPage = () => {
       const uploadFailures: string[] = [];
       let successfulUploads = 0;
       let removedCount = 0;
+      let pendingCount = 0;
       let showedFaceTip = false;
 
       for (let index = 0; index < approvedImages.length; index++) {
@@ -868,27 +881,25 @@ const ProfileCompletionPage = () => {
           if (dbError) throw dbError;
           successfulUploads++;
 
-          try {
-            const imageBase64 = await fileToBase64(image.file);
-            const { data: modData, error: modError } = await supabase.functions.invoke('moderate-image', {
-              body: { imageId: insertedRow.id, imageBase64 },
+          // invokeImageModeration retries transient invoke failures before
+          // giving up, so a network blip during onboarding doesn't leave the
+          // photo stuck at its DB-default 'pending' state with nothing ever
+          // telling the user.
+          const imageBase64 = await fileToBase64(image.file);
+          const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
+          if (modDecision.status === 'rejected') {
+            // Only confirmed explicit content is ever removed - everything
+            // else went live already.
+            removedCount++;
+          } else if (modDecision.status === 'pending') {
+            pendingCount++;
+          } else if (index === 0 && modDecision.hasFace === false && !showedFaceTip) {
+            showedFaceTip = true;
+            toast({
+              title: 'Tip',
+              description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
+              variant: 'default',
             });
-            if (modError || !modData?.success) {
-              console.error('Moderation error:', modError || modData?.error);
-            } else if (modData.status === 'rejected') {
-              // Only confirmed explicit content is ever removed - everything
-              // else went live already.
-              removedCount++;
-            } else if (index === 0 && modData.hasFace === false && !showedFaceTip) {
-              showedFaceTip = true;
-              toast({
-                title: 'Tip',
-                description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
-                variant: 'default',
-              });
-            }
-          } catch (modErr) {
-            console.error('Moderation exception:', modErr);
           }
         } catch (uploadErr) {
           const errorMessage = uploadErr instanceof Error ? uploadErr.message : 'Unknown upload error';
@@ -914,6 +925,14 @@ const ProfileCompletionPage = () => {
           title: 'Photos removed',
           description: `${removedCount} of your photos ${removedCount === 1 ? 'was' : 'were'} removed for violating our content guidelines.`,
           variant: 'destructive'
+        });
+      }
+
+      if (pendingCount > 0) {
+        toast({
+          title: 'Photo(s) queued for review',
+          description: `${pendingCount} of your photos ${pendingCount === 1 ? 'is' : 'are'} still being reviewed and will go live automatically within a few minutes.`,
+          variant: 'default'
         });
       }
 

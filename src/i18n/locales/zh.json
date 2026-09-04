@@ -151,6 +151,7 @@
     "perfectFirstDate": "完美的第一次约会",
     "lastGoogled": "最后搜索",
     "interests": "兴趣",
+    "favorites": "Favorites",
     "selectInterests": "选择您的兴趣",
     "adinkra": "文化符号",
     "selectAdinkra": "选择您的文化符号",
@@ -326,6 +327,7 @@
       "spontaneousVsPlanner": "随性 vs 计划者：{{percentage}}%",
       "messyVsOrganized": "凌乱 vs 有条理：{{percentage}}%",
       "interests": "兴趣爱好",
+      "favorites": "Favorites",
       "language": "语言"
     }
   },
@@ -353,6 +355,7 @@
     "showLess": "显示更少",
     "about": "关于",
     "interests": "兴趣",
+    "favorites": "Favorites",
     "yearsOld": "岁",
     "pullToRefresh": "下拉刷新",
     "releaseToRefresh": "释放以刷新",

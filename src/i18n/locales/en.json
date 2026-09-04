@@ -194,6 +194,8 @@
     "lastGoogled": "Last Googled",
     "interests": "Interests",
     "selectInterests": "Select Interests",
+    "favorites": "Favorites",
+    "selectFavorites": "Select Favorites",
     "adinkra": "Cultural Signs",
     "selectAdinkra": "Select Cultural Signs",
     "photos": "Photos",
@@ -237,14 +239,15 @@
     "perfectFirstDatePlaceholder": "Your ideal first date...",
     "lastGoogledPlaceholder": "Last thing you Googled...",
     "chooseInterests": "Choose your interests",
+    "chooseFavorites": "Choose up to 3 favorites",
     "adinkraDescription": "Cultural Signs (up to 10)",
     "selected": "Selected",
     "availableSymbols": "Available Symbols",
     "noAdinkraSelected": "No cultural signs selected yet.",
-    "yourDripLoveSummary": "Your Summary",
-    "totalMatches": "All-time Matches",
+    "yourDripLoveSummary": "Drip Weekly",
+    "totalMatches": "Matches (7d)",
     "activeChats": "Active Chats (7d)",
-    "likesGiven": "Likes Sent",
+    "likesGiven": "Likes Sent (7d)",
     "moreItems": "more items",
     "updatesTitle": "Profile Updates",
     "loadingUpdates": "Loading updates...",
@@ -354,6 +357,7 @@
       "spontaneousVsPlanner": "Spontaneous vs Planner: {{percentage}}%",
       "messyVsOrganized": "Messy vs Organized: {{percentage}}%",
       "interests": "Interests",
+      "favorites": "Favorites",
       "language": "Language"
     }
   },
@@ -380,6 +384,7 @@
     "showLess": "Show Less",
     "about": "About",
     "interests": "Interests",
+    "favorites": "Favorites",
     "yearsOld": "years old",
     "pullToRefresh": "Pull to refresh",
     "releaseToRefresh": "Release to refresh",
@@ -716,7 +721,8 @@
       "workEducation": "Work & Education",
       "personality": "Personality",
       "funFacts": "Fun Facts",
-      "interests": "Interests"
+      "interests": "Interests",
+      "favorites": "Favorites"
     },
     "lookingFor": {
       "interestedIn": "Interested in:",

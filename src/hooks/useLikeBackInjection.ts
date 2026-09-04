@@ -2,22 +2,42 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch } from '@/types';
 import { normalizeCountryCode } from '@/utils/countryCode';
+import { readLikeBackCycle, writeLikeBackCycle, type LikeBackCycleState } from '@/utils/likeBackCycleStorage';
+import { advanceLikeBackCycle } from '@/utils/likeBackSchedule';
+import { parseFavorites } from '@/constants/favorites';
 
 /**
- * 30% Like-Back Injection Hook
- * 
+ * Like-Back Injection Hook
+ *
  * Implements Tinder-style "like-back injection" where profiles that liked the current user
  * are injected into the swipe queue at strategic positions.
- * 
- * Rules:
- * - 30% injection rate = ~1 injected profile every 3-4 cards
- * - Never inject as "next card" - use positions +2 to +4
- * - Cap: max 30% of cards per session (only after 10+ swipes to avoid early blocking)
- * - Cooldown: at least 3 swipes between injections
- * - Quality filter: only inject likers with 2+ photos
- * - Deduplicate: avoid same ID appearing twice
- * - Respect: passed today + blocked profiles excluded
- * - Priority: most recent likers first (for higher match probability)
+ *
+ * Reveal cycle:
+ * - Dormant until the user has ever received their first like, ever - before
+ *   that, nothing is injected, full stop.
+ * - Once started: burst1 (2 reveals randomly mixed across up to 20 swipes),
+ *   then burst2 (3 reveals randomly mixed across up to 20 more swipes), then
+ *   quiet - no reveals at all for a stretch of real days, not swipes.
+ * - Quiet length rotates 3 -> 5 -> 4 days, then repeats, so the whole cycle
+ *   (burst1 -> burst2 -> quiet) restarts from burst1 once the quiet gap ends.
+ * - Cycle state (phase, progress, quiet-until) is persisted per user, since a
+ *   multi-day quiet gap has to survive reloads/relaunches - see
+ *   likeBackCycleStorage.ts.
+ * - A reveal slot with no eligible quality candidate is simply skipped, never
+ *   forced or carried over to a later slot.
+ *
+ * Placement rules:
+ * - Never in the first 3 positions of the visible queue.
+ * - Never two reveals back-to-back (enforced as a minimum real-swipe gap
+ *   between reveal events).
+ * - Candidates must already pass the same Discover eligibility as everyone
+ *   else (gender/orientation/age/country/distance) - see useDiscoverLikeBack.ts.
+ *   Free users only ever get likers from their own country; premium users get
+ *   their home country plus whichever countries they've unlocked.
+ * - Quality filter: only inject likers with 2+ approved photos.
+ * - Deduplicate: never inject the same person twice.
+ * - Respect: passed-today + blocked profiles excluded.
+ * - Priority: most recent likers first (for higher match probability).
  */
 
 interface UseLikeBackInjectionOptions {
@@ -26,7 +46,6 @@ interface UseLikeBackInjectionOptions {
   passedTodayIds: Set<string>;
   inQueueIds: Set<string>;
   locallySwipedIds: Map<string, { action: 'like' | 'pass'; timestamp: number }>;
-  boostMode?: boolean; // Optional: 90% injection rate for turbo mode
   // Country/location filtering: premium = home + unlocked countries (no
   // distance cap), free = home country only (distance-capped).
   isPremium?: boolean;
@@ -49,6 +68,7 @@ interface LikerProfile {
   education_level: string | null;
   date_of_birth: string | null;
   interests: string[] | null;
+  favorites?: unknown;
   gender: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -70,14 +90,9 @@ interface LikerProfile {
 }
 
 // Configuration
-const NORMAL_INJECT_RATE = 0.30; // 30% normal
-const BOOST_INJECT_RATE = 0.90; // 90% boost mode
-const COOLDOWN_SWIPES = 3; // At least 3 swipes between injections
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
-const INJECTION_POSITION_MIN = 2; // Position +2
-const INJECTION_POSITION_MAX = 4; // Position +4
-const MAX_INJECTION_PERCENT = 0.30; // Cap at 30% of session
-const MIN_SWIPES_FOR_CAP = 10; // Only enforce cap after 10+ swipes
+const INJECTION_POSITION_MIN = 3; // never in the first 3 positions (0-indexed, so index 3 is the first allowed)
+const INJECTION_POSITION_MAX = 5;
 
 // Helper to calculate distance between two coordinates (Haversine formula)
 const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -98,7 +113,6 @@ export function useLikeBackInjection({
   passedTodayIds,
   inQueueIds,
   locallySwipedIds,
-  boostMode = false,
   isPremium = false,
   userCountryCode,
   unlockedCountries = [],
@@ -151,11 +165,29 @@ export function useLikeBackInjection({
     likerProfilesRef.current = likerProfiles;
   }, [likerProfiles]);
   
-  // Track injection state (single counter, no double counting)
-  const swipeCountRef = useRef(0);
-  const injectedCountRef = useRef(0);
-  const lastInjectionSwipeRef = useRef(0);
   const injectedIdsRef = useRef<Set<string>>(new Set());
+
+  // Persisted reveal-cycle state (see likeBackCycleStorage.ts) - loaded/reloaded
+  // whenever the effective user changes, since it must survive reloads.
+  const cycleRef = useRef<LikeBackCycleState | null>(null);
+  const cycleUserIdRef = useRef<string | undefined>(undefined);
+  const ensureCycleLoaded = useCallback(() => {
+    if (cycleRef.current === null || cycleUserIdRef.current !== userId) {
+      cycleRef.current = readLikeBackCycle(userId);
+      cycleUserIdRef.current = userId;
+    }
+    return cycleRef.current;
+  }, [userId]);
+  useEffect(() => {
+    cycleRef.current = readLikeBackCycle(userId);
+    cycleUserIdRef.current = userId;
+  }, [userId]);
+
+  // Whether this user has ever received a like, ever - gates the whole cycle
+  // on. Set true (permanently, for this ref's lifetime - persisted via the
+  // cycle state once the cycle actually starts) the moment we observe any
+  // `likes` row for them, from either the initial fetch or the realtime feed.
+  const everReceivedLikeRef = useRef(false);
 
   // Guard against overlapping/thrashing fetches (can exhaust browser resources)
   const fetchInFlightRef = useRef(false);
@@ -184,6 +216,13 @@ export function useLikeBackInjection({
       if (likesError) {
         console.error('[LikeBackInjection] Error fetching liked me users:', likesError);
         return;
+      }
+
+      // `likedUsers` is every like ever received (matched or not) - its mere
+      // presence is exactly "has this user ever received a like", independent
+      // of the further eligibility filtering below.
+      if ((likedUsers || []).length > 0) {
+        everReceivedLikeRef.current = true;
       }
 
       const likerIds = (likedUsers || []).map(l => l.liker_id).filter(Boolean);
@@ -250,7 +289,7 @@ export function useLikeBackInjection({
         .from('profiles')
         .select(`
           id, first_name, last_name, bio, city, country, country_code,
-          occupation, education_level, date_of_birth, interests, gender,
+          occupation, education_level, date_of_birth, interests, favorites, gender,
           latitude, longitude, fun_fact, perfect_first_date, last_googled,
           relationship_intent, smoking, drinking, exercise_level,
           sleeping_schedule, introvert_extrovert, spontaneous_planner,
@@ -331,6 +370,9 @@ export function useLikeBackInjection({
           const newLikerId = payload.new?.liker_id;
           if (!newLikerId) return;
 
+          // Any INSERT on `likes` targeting this user is, definitionally, a like received.
+          everReceivedLikeRef.current = true;
+
           const currentLikedMeIds = likedMeIdsRef.current;
 
           // Skip if already known, blocked, passed, or in queue
@@ -351,7 +393,7 @@ export function useLikeBackInjection({
               .from('profiles')
               .select(`
                 id, first_name, last_name, bio, city, country, country_code,
-                occupation, education_level, date_of_birth, interests, gender,
+                occupation, education_level, date_of_birth, interests, favorites, gender,
                 latitude, longitude, fun_fact, perfect_first_date, last_googled,
                 relationship_intent, smoking, drinking, exercise_level,
                 sleeping_schedule, introvert_extrovert, spontaneous_planner,
@@ -406,27 +448,6 @@ export function useLikeBackInjection({
     };
   }, [userId]);
 
-  // Get effective injection rate based on mode
-  const injectRate = boostMode ? BOOST_INJECT_RATE : NORMAL_INJECT_RATE;
-  const everyNSwipes = Math.round(1 / injectRate); // 3 for 30%, 1 for 90%
-
-  // Check if we should inject on this swipe
-  const shouldInjectNow = useCallback((): boolean => {
-    const swipes = swipeCountRef.current;
-    const injected = injectedCountRef.current;
-
-    // No candidates available
-    if (likedMeIds.length === 0) return false;
-
-    // Don't exceed 30% injection cap (only after MIN_SWIPES_FOR_CAP swipes to avoid early blocking)
-    if (swipes >= MIN_SWIPES_FOR_CAP && injected / swipes >= MAX_INJECTION_PERCENT) return false;
-
-    // Cooldown: at least COOLDOWN_SWIPES swipes since last injection
-    if (swipes - lastInjectionSwipeRef.current < COOLDOWN_SWIPES) return false;
-
-    // Main check: every Nth swipe based on inject rate
-    return swipes > 0 && swipes % everyNSwipes === 0;
-  }, [likedMeIds.length, everyNSwipes]);
 
   // Get injection candidate - country-restricted for everyone (premium =
   // home + unlocked countries, free = home country only), plus a distance
@@ -506,6 +527,7 @@ export function useLikeBackInjection({
       education_level: liker.education_level || '',
       date_of_birth: liker.date_of_birth || '',
       interests: liker.interests || [],
+      favorites: parseFavorites(liker.favorites),
       images: [], // Will be loaded by DiscoverPage
       is_verified: liker.is_verified || undefined,
       gender: liker.gender || '',
@@ -526,7 +548,7 @@ export function useLikeBackInjection({
     };
   }, []);
 
-  // Calculate injection position (+2 to +4, never next card)
+  // Calculate injection position - never in the first 3 positions of the queue
   const getInjectionPosition = useCallback((queueLength: number): number => {
     const minPos = INJECTION_POSITION_MIN;
     const maxPos = Math.min(INJECTION_POSITION_MAX, queueLength);
@@ -539,45 +561,64 @@ export function useLikeBackInjection({
     return minPos + offset;
   }, []);
 
-  // Main injection function - call this after each swipe
+  // Main injection function - call this after each real swipe. Advances the
+  // persisted cycle by one swipe regardless of candidate availability (the
+  // cycle's clock keeps ticking even through a dry spell - only the reveal
+  // itself gets skipped when there's no quality candidate), then persists
+  // the result so it survives a reload mid-burst or mid-quiet-gap.
   const onSwipe = useCallback(<T extends { id: string }>(
     queue: T[],
     addToQueue: (profile: PotentialMatch, position: number) => void
   ) => {
-    swipeCountRef.current += 1;
+    if (!userId) return;
+    const current = ensureCycleLoaded();
+    const { next, shouldInject } = advanceLikeBackCycle(current, everReceivedLikeRef.current);
+    cycleRef.current = next;
 
-    if (!shouldInjectNow()) return;
+    if (!shouldInject) {
+      writeLikeBackCycle(userId, next);
+      return;
+    }
 
     const candidate = getInjectionCandidate();
-    if (!candidate) return;
+    // No eligible candidate right now - this slot is simply skipped, not
+    // deferred to a later swipe, per "no bad cards are forced in".
+    if (!candidate) {
+      writeLikeBackCycle(userId, next);
+      return;
+    }
 
     const position = getInjectionPosition(queue.length);
     const match = likerToMatch(candidate);
 
-    // Mark as injected
     injectedIdsRef.current.add(candidate.id);
-    injectedCountRef.current += 1;
-    lastInjectionSwipeRef.current = swipeCountRef.current;
+    next.lastInjectionAtSwipeGlobal = next.swipesGlobal;
+    cycleRef.current = next;
+    writeLikeBackCycle(userId, next);
 
     // Remove from candidates
     setLikedMeIds(prev => prev.filter(id => id !== candidate.id));
 
     // Insert into queue
     addToQueue(match, position);
-  }, [shouldInjectNow, getInjectionCandidate, getInjectionPosition, likerToMatch]);
+  }, [userId, ensureCycleLoaded, getInjectionCandidate, getInjectionPosition, likerToMatch]);
 
   // Check if a profile ID is a "liked me" profile (for UI hints)
   const isLikedMeProfile = useCallback((profileId: string): boolean => {
     return likedMeIds.includes(profileId) || injectedIdsRef.current.has(profileId);
   }, [likedMeIds]);
 
-  // Reset injection tracking (e.g., on new session)
+  // Reset injection tracking. NOTE: this wipes the persisted cycle (including
+  // hasStarted and any in-progress quiet gap) - only meant for an explicit
+  // "start over" action (e.g. admin/testing), never called on a normal
+  // reload/new session, since the whole point of persisting the cycle is
+  // that reloads must NOT reset it.
   const resetInjectionTracking = useCallback(() => {
-    swipeCountRef.current = 0;
-    injectedCountRef.current = 0;
-    lastInjectionSwipeRef.current = 0;
+    const fresh = readLikeBackCycle(undefined); // defaults, not tied to any user
+    cycleRef.current = { ...fresh };
+    if (userId) writeLikeBackCycle(userId, cycleRef.current);
     injectedIdsRef.current.clear();
-  }, []);
+  }, [userId]);
 
   // Refresh candidates
   const refreshCandidates = useCallback(() => {

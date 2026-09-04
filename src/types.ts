@@ -1,5 +1,6 @@
 // UserProfile type for use in components
 import { Database } from '@/integrations/supabase/types';
+import type { FavoriteEntry } from '@/constants/favorites';
 
 export type UserProfile = Database['public']['Tables']['profiles']['Row'];
 
@@ -18,6 +19,7 @@ export interface PotentialMatch {
   education_level: string;
   date_of_birth: string;
   interests: string[];
+  favorites?: FavoriteEntry[];
   images: string[];
   is_verified?: boolean;
   gender: string;

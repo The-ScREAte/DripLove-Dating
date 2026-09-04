@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeImageModeration } from '@/utils/invokeImageModeration';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -790,30 +791,32 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           throw dbError;
         }
 
-        try {
-          const imageBase64 = await fileToBase64(image.file);
-          const { data: modData, error: modError } = await supabase.functions.invoke('moderate-image', {
-            body: { imageId: insertedRow.id, imageBase64 },
+        // invokeImageModeration retries transient invoke failures a few
+        // times before giving up, so a single network blip during signup
+        // doesn't leave the photo stuck at its DB-default 'pending' state
+        // forever with nothing telling the user.
+        const imageBase64 = await fileToBase64(image.file);
+        const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
+        if (modDecision.status === 'rejected') {
+          // Only confirmed explicit content is ever removed - everything
+          // else went live already.
+          toast({
+            title: 'Photo removed',
+            description: modDecision.message || 'One of your photos was removed for violating our content guidelines.',
+            variant: 'destructive',
           });
-          if (modError || !modData?.success) {
-            console.error('Moderation error:', modError || modData?.error);
-          } else if (modData.status === 'rejected') {
-            // Only confirmed explicit content is ever removed - everything
-            // else went live already.
-            toast({
-              title: 'Photo removed',
-              description: modData.message || 'One of your photos was removed for violating our content guidelines.',
-              variant: 'destructive',
-            });
-          } else if (imageOrder === 1 && modData.hasFace === false) {
-            toast({
-              title: 'Tip',
-              description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
-              variant: 'default',
-            });
-          }
-        } catch (modErr) {
-          console.error('Moderation exception:', modErr);
+        } else if (modDecision.status === 'pending') {
+          toast({
+            title: 'Photo queued for review',
+            description: modDecision.message,
+            variant: 'default',
+          });
+        } else if (imageOrder === 1 && modDecision.hasFace === false) {
+          toast({
+            title: 'Tip',
+            description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
+            variant: 'default',
+          });
         }
 
         imageOrder++;

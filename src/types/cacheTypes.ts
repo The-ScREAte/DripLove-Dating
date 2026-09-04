@@ -13,6 +13,10 @@ export type LikerProfile = {
   country?: string | null;
   occupation?: string | null;
   interests?: string[] | null;
+  // jsonb on the DB side (FavoriteEntry[] shape) - arrives untyped here since
+  // this covers loosely-typed `.select('*')` results; run it through
+  // parseFavorites() from '@/constants/favorites' before rendering.
+  favorites?: unknown;
   adinkra_symbols?: string[] | null;
   preferred_language?: string | null;
   education_level?: string | null;

@@ -15,6 +15,8 @@ import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from '../discover/MatchCardHelpers';
+import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
+import MusicLinkBadge from '../discover/MusicLinkBadge';
 import { SlideRenderer } from '../discover/SlideRenderer';
 import UserAdinkraDisplay from '../discover/UserAdinkraDisplay';
 import SwipeButtons from '../discover/SwipeButtons';
@@ -130,6 +132,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
 
   const slides = useMemo(() => buildSlides(profile, images), [profile, images]);
   const previewHighlights = useMemo(() => getPreviewHighlights(profile), [profile]);
+  const musicHighlight = useMemo(() => findFavoriteWithLink(profile.favorites), [profile]);
   const userBackgroundColor = useMemo(
     () => getUserColorHash(profile.id, BACKGROUND_COLORS),
     [profile.id]
@@ -350,7 +353,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 </div>
               )}
 
-              {!showMoreInfo && (previewHighlights.length > 0 || (profile.adinkra_symbols && profile.adinkra_symbols.length > 0)) && (
+              {!showMoreInfo && (previewHighlights.length > 0 || (profile.adinkra_symbols && profile.adinkra_symbols.length > 0) || musicHighlight) && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2">
                   {previewHighlights.map((highlight, index) => (
                     <span
@@ -364,6 +367,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                     <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
                       <UserAdinkraDisplay adinkraSymbols={[profile.adinkra_symbols[0]]} />
                     </span>
+                  )}
+                  {musicHighlight?.link && (
+                    <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
                   )}
                 </div>
               )}
@@ -428,24 +434,28 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               <div className="space-y-2">
                 {profile.smoking && profile.smoking !== 'not_specified' && (
                   <div className="flex items-center text-sm">
+                    <span className="mr-2 flex-shrink-0" aria-hidden="true">🚬</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.smoking')}:</span>
                     <span className="text-gray-200">{profile.smoking}</span>
                   </div>
                 )}
                 {profile.drinking && profile.drinking !== 'not_specified' && (
                   <div className="flex items-center text-sm">
+                    <span className="mr-2 flex-shrink-0" aria-hidden="true">🍸</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.drinking')}:</span>
                     <span className="text-gray-200">{profile.drinking}</span>
                   </div>
                 )}
                 {profile.exercise_level && profile.exercise_level !== 'not_specified' && (
                   <div className="flex items-center text-sm">
+                    <span className="mr-2 flex-shrink-0" aria-hidden="true">🏋️</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.exercise')}:</span>
                     <span className="text-gray-200">{profile.exercise_level}</span>
                   </div>
                 )}
                 {profile.sleeping_schedule && profile.sleeping_schedule !== 'not_specified' && (
                   <div className="flex items-center text-sm">
+                    <span className="mr-2 flex-shrink-0" aria-hidden="true">😴</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.sleep')}:</span>
                     <span className="text-gray-200">{profile.sleeping_schedule}</span>
                   </div>
@@ -481,6 +491,23 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 {profile.interests.map((interest, index) => (
                   <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
                     {interest}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profile.favorites && profile.favorites.length > 0 && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.favorites')}</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {profile.favorites.map((favorite, index) => (
+                  <span key={index} className="inline-flex items-center gap-1 h-6 leading-none px-2 py-0 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs">
+                    <span className="text-[11px] leading-none">{favoriteEmoji(favorite.category)}</span>
+                    <span className="leading-none">{formatFavoriteLabel(favorite)}</span>
+                    {favorite.link && (
+                      <MusicLinkBadge link={favorite.link} label={formatFavoriteLabel(favorite)} variant="inline" />
+                    )}
                   </span>
                 ))}
               </div>

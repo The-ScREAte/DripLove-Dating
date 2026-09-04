@@ -151,6 +151,7 @@
     "perfectFirstDate": "الموعد الأول المثالي",
     "lastGoogled": "آخر بحث",
     "interests": "الاهتمامات",
+    "favorites": "Favorites",
     "selectInterests": "اختر اهتماماتك",
     "adinkra": "العلامات الثقافية",
     "selectAdinkra": "اختر علاماتك الثقافية",
@@ -326,6 +327,7 @@
       "spontaneousVsPlanner": "عفوي vs مخطط: {{percentage}}%",
       "messyVsOrganized": "فوضوي vs منظم: {{percentage}}%",
       "interests": "الاهتمامات",
+      "favorites": "Favorites",
       "language": "اللغة"
     }
   },
@@ -353,6 +355,7 @@
     "showLess": "عرض أقل",
     "about": "نبذة",
     "interests": "الاهتمامات",
+    "favorites": "Favorites",
     "yearsOld": "سنة",
     "pullToRefresh": "اسحب للتحديث",
     "releaseToRefresh": "حرر للتحديث",

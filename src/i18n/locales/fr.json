@@ -158,6 +158,7 @@
     "perfectFirstDate": "Premier rendez-vous parfait",
     "lastGoogled": "Dernière recherche",
     "interests": "Intérêts",
+    "favorites": "Favorites",
     "selectInterests": "Sélectionnez vos intérêts",
     "adinkra": "Signes Culturels",
     "selectAdinkra": "Sélectionnez vos signes culturels",
@@ -330,6 +331,7 @@
       "spontaneousVsPlanner": "Spontané vs Planificateur : {{percentage}}%",
       "messyVsOrganized": "Désordonné vs Organisé : {{percentage}}%",
       "interests": "Centres d'intérêt",
+      "favorites": "Favorites",
       "language": "Langue"
     }
   },
@@ -357,6 +359,7 @@
     "showLess": "Afficher moins",
     "about": "À propos",
     "interests": "Intérêts",
+    "favorites": "Favorites",
     "yearsOld": "ans",
     "pullToRefresh": "Tirez pour actualiser",
     "releaseToRefresh": "Relâchez pour actualiser",

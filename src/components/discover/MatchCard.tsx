@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
+import MusicLinkBadge from './MusicLinkBadge';
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -141,6 +143,13 @@ const MatchCard: React.FC<MatchCardProps> = ({
     const mine = currentUserAdinkraSymbols || [];
     return theirs.find(symbol => mine.includes(symbol)) || theirs[0];
   }, [stableMatch, currentUserAdinkraSymbols]);
+
+  // A favorite carrying a share link (e.g. a music track/album) surfaces as
+  // its own circular badge in the compact preview row, mirroring signHighlight.
+  const musicHighlight = useMemo(
+    () => findFavoriteWithLink(stableMatch.favorites),
+    [stableMatch]
+  );
 
   // ⭐ REMOVED: Language fetching (now passed as prop from parent to eliminate DB calls)
   // ⭐ REMOVED: imageLoading state - blob URLs load instantly from memory, no loader needed
@@ -611,7 +620,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   </div>
                 )}
 
-                {!showMoreInfo && (previewHighlights.length > 0 || signHighlight) && (
+                {!showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
                   <div className="flex items-center gap-1.5 flex-wrap mt-2">
                     {previewHighlights.map((highlight, index) => (
                       <span
@@ -625,6 +634,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-6 h-6 shrink-0">
                         <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
                       </span>
+                    )}
+                    {musicHighlight?.link && (
+                      <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
                     )}
                   </div>
                 )}
@@ -845,24 +857,28 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 <div className="space-y-2">
                   {match.smoking && match.smoking !== 'not_specified' && (
                     <div className="flex items-center text-sm">
+                      <span className="mr-2 flex-shrink-0" aria-hidden="true">🚬</span>
                       <span className="font-semibold mr-2 text-white">{t('discover.matchCard.smoking')}:</span>
                       <span className="text-gray-200">{match.smoking}</span>
                     </div>
                   )}
                   {match.drinking && match.drinking !== 'not_specified' && (
                     <div className="flex items-center text-sm">
+                      <span className="mr-2 flex-shrink-0" aria-hidden="true">🍸</span>
                       <span className="font-semibold mr-2 text-white">{t('discover.matchCard.drinking')}:</span>
                       <span className="text-gray-200">{match.drinking}</span>
                     </div>
                   )}
                   {match.exercise_level && match.exercise_level !== 'not_specified' && (
                     <div className="flex items-center text-sm">
+                      <span className="mr-2 flex-shrink-0" aria-hidden="true">🏋️</span>
                       <span className="font-semibold mr-2 text-white">{t('discover.matchCard.exercise')}:</span>
                       <span className="text-gray-200">{match.exercise_level}</span>
                     </div>
                   )}
                   {match.sleeping_schedule && match.sleeping_schedule !== 'not_specified' && (
                     <div className="flex items-center text-sm">
+                      <span className="mr-2 flex-shrink-0" aria-hidden="true">😴</span>
                       <span className="font-semibold mr-2 text-white">{t('discover.matchCard.sleep')}:</span>
                       <span className="text-gray-200">{match.sleeping_schedule}</span>
                     </div>
@@ -958,6 +974,27 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm"
                     >
                       {interest}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Favorites */}
+            {match.favorites?.length > 0 && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.favorites')}</h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {match.favorites.map((favorite, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 h-6 leading-none px-2 py-0 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs"
+                    >
+                      <span className="text-[11px] leading-none">{favoriteEmoji(favorite.category)}</span>
+                      <span className="leading-none">{formatFavoriteLabel(favorite)}</span>
+                      {favorite.link && (
+                        <MusicLinkBadge link={favorite.link} label={formatFavoriteLabel(favorite)} variant="inline" />
+                      )}
                     </span>
                   ))}
                 </div>
