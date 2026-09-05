@@ -3,9 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad2, Eye } from 'lucide-react';
+import { Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad2, Eye } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,7 +28,6 @@ import AdvertisementSection from './profile/AdvertisementSection';
 import AccountActions from './profile/AccountActions';
 import ProfileSummaryCard from './ProfileSummaryCard';
 import ReportButton from './ReportButton';
-import LanguageSelector from './LanguageSelector';
 
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import PremiumUpgrade from './PremiumUpgrade';
@@ -37,7 +35,6 @@ import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
 import { occupationOptions, industryOptions, educationLevelOptions } from '@/constants/professionOptions';
 import { FavoriteEntry, parseFavorites } from '@/constants/favorites';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +47,12 @@ type UserImageRow = {
   is_approved: boolean | null
   moderation_status: string | null
 }
+
+// Default preference age range used whenever a profile is missing min_age/
+// max_age (a brand-new profile, or one from before these fields existed) -
+// was independently re-typed as "18"/"40" in five separate places.
+const DEFAULT_PREFERENCE_MIN_AGE = 18;
+const DEFAULT_PREFERENCE_MAX_AGE = 40;
 
 type DiscoverCacheWindow = Window & {
   discoverCache?: {
@@ -151,7 +154,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }, [verifySignal]);
 
   const { toast } = useToast();
-  const { subscription, loading: subscriptionLoading } = useSubscription(currentUser?.id);
+  // Premium status for this page's own UI comes from the `isPremium` prop
+  // (set by MainApp) - this call is kept purely for its side effect of
+  // refreshing the device's cached premium status (writeCachedPremiumStatus
+  // inside useSubscription) whenever Profile is visited, so the cache stays
+  // warm for other screens (e.g. Discover) even if the user never opens them
+  // this session.
+  useSubscription(currentUser?.id);
 
   const isOwnProfile = !!currentUser?.id && !!profile?.id && currentUser.id === profile.id;
   const [broadcastUnreadCount, setBroadcastUnreadCount] = useState(0);
@@ -222,15 +231,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       console.error('[ProfilePage] Failed to load broadcast messages:', err);
     } finally {
       setIsLoadingBroadcastMessages(false);
-    }
-  };
-
-  const markBroadcastMessagesRead = async () => {
-    if (!isOwnProfile) return;
-    try {
-      await supabase.rpc('mark_my_profile_broadcasts_read');
-    } catch (err) {
-      console.error('[ProfilePage] Failed to mark broadcasts read:', err);
     }
   };
 
@@ -340,8 +340,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     country_code: '',
     date_of_birth: '',
     max_distance: 250,
-    min_age: 18,
-    max_age: 40,
+    min_age: DEFAULT_PREFERENCE_MIN_AGE,
+    max_age: DEFAULT_PREFERENCE_MAX_AGE,
     gender: '',
     preference: '',
     relationship_intent: '',
@@ -434,8 +434,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           country_code: profile.country_code || '',
           date_of_birth: profile.date_of_birth || '',
           max_distance: profile.max_distance || profile.distance_preference || 250,
-          min_age: profile.min_age || 18,
-          max_age: profile.max_age || 40,
+          min_age: profile.min_age || DEFAULT_PREFERENCE_MIN_AGE,
+          max_age: profile.max_age || DEFAULT_PREFERENCE_MAX_AGE,
           gender: profile.gender || '',
           preference: profile.preference || '',
           relationship_intent: profile.relationship_intent || '',
@@ -477,8 +477,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           country_code: '',
           date_of_birth: '',
           max_distance: 250,
-          min_age: 18,
-          max_age: 40,
+          min_age: DEFAULT_PREFERENCE_MIN_AGE,
+          max_age: DEFAULT_PREFERENCE_MAX_AGE,
           gender: '',
           preference: '',
           relationship_intent: '',
@@ -617,8 +617,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
         email: currentUser.email,
         max_distance: editedProfile.max_distance || 250,
-        min_age: editedProfile.min_age || 18,
-        max_age: editedProfile.max_age || 40,
+        min_age: editedProfile.min_age || DEFAULT_PREFERENCE_MIN_AGE,
+        max_age: editedProfile.max_age || DEFAULT_PREFERENCE_MAX_AGE,
         gender: editedProfile.gender || 'not_specified',
         preference: editedProfile.preference || 'not_specified',
         relationship_intent: editedProfile.relationship_intent || 'open_to_anything',
@@ -675,24 +675,21 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         .single();
 
       const profileExists = !!existingProfile;
-      let result;
 
       const profilePayload = { id: currentUser.id, ...updateData } as unknown as Database['public']['Tables']['profiles']['Insert'];
 
       if (profileExists) {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('profiles')
           .upsert(profilePayload)
           .select();
         if (error) throw new Error('Update failed: ' + error.message);
-        result = data;
       } else {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('profiles')
           .insert(profilePayload)
           .select();
         if (error) throw new Error('Insert failed: ' + error.message);
-        result = data;
       }
 
   setIsEditing(false);
@@ -762,8 +759,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country_code: profile.country_code || '',
         date_of_birth: profile.date_of_birth || '',
         max_distance: profile.max_distance || profile.distance_preference || 250,
-        min_age: profile.min_age || 18,
-        max_age: profile.max_age || 40,
+        min_age: profile.min_age || DEFAULT_PREFERENCE_MIN_AGE,
+        max_age: profile.max_age || DEFAULT_PREFERENCE_MAX_AGE,
         gender: profile.gender || '',
         preference: profile.preference || '',
         relationship_intent: profile.relationship_intent || '',

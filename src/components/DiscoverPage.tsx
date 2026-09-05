@@ -79,6 +79,61 @@ import { CurrentUser, PotentialMatch } from '@/types';
 // for now to validate the flow end to end; raise to ~15 once that's done.
 const SWIPES_BEFORE_VERIFY_PROMPT = 1;
 
+// Single source of truth for the daily swipe caps - must match the
+// `update_user_usage` DB function's own `usage_limit` for 'swipe' (see
+// supabase/migrations). Previously "29"/"200" were hardcoded separately in
+// five different places in this file, which is exactly how they drift out
+// of sync with each other and with the server.
+const FREE_DAILY_SWIPE_LIMIT = 30;
+const PREMIUM_DAILY_SWIPE_LIMIT = 200;
+
+// Free users are capped at this distance (km) regardless of their own
+// max_distance/distance_preference setting - premium has no such cap. This
+// was independently redeclared as a local const under two different names
+// (FREE_USER_MAX_DISTANCE, FREE_USER_MAX_DISTANCE_CACHE) plus two more raw
+// "500" literals, in four separate places in this file - the same drift
+// risk that caused the swipe-limit bug. One constant now.
+const FREE_USER_MAX_DISTANCE_KM = 500;
+
+// Below this profile-completion percentage, swiping is blocked once the user
+// has already had a few free look-arounds. Was hardcoded as "70" and "5"
+// independently in both handleLike and handlePass.
+const PROFILE_COMPLETION_REQUIRED_PERCENT = 70;
+const PROFILE_COMPLETION_GRACE_SWIPES = 5;
+
+// Fallback age range used whenever a user hasn't set min_age/max_age -
+// was independently re-typed as "18"/"99" in three separate places.
+const DEFAULT_MIN_AGE = 18;
+const DEFAULT_MAX_AGE = 99;
+
+// Fallback distance (km) used whenever a user hasn't set max_distance or
+// distance_preference - was independently re-typed as a raw "50" in eight
+// separate places across this file.
+const DEFAULT_MAX_DISTANCE_KM = 50;
+
+// Resumes the deck at whatever card the user was actually looking at, not
+// index 0 - `driplove_last_profile_<userId>` is written by moveToNext() as
+// the id of the card that becomes current right after a swipe, so resuming
+// ON it (not past it) shows the same card the user hadn't swiped yet.
+// BUG this fixes: this used to only run inside the cold-fetch path
+// (fetchPotentialMatchesData) - the far more common "restore from the local
+// deck cache" path on every subsequent refresh that same day unconditionally
+// reset to index 0 instead, so a refresh/relaunch would jump back to
+// whatever card happened to be first in the cached array - looking like a
+// random different person every time, defeating the point of resuming at
+// all. Both paths now share this one calculation.
+const resolveResumeIndex = (profiles: { id: string }[], userId: string): number => {
+  const savedId = readPersistentItem(`driplove_last_profile_${userId}`);
+  const savedTime = parseInt(readPersistentItem(`driplove_last_profile_time_${userId}`) || '0');
+  const twentyFourHours = 24 * 60 * 60 * 1000;
+  const isSavedValid = Boolean(savedId) && Date.now() - savedTime < twentyFourHours;
+  if (!isSavedValid || !savedId) return 0;
+
+  const foundIndex = profiles.findIndex((p) => p.id === savedId);
+  if (foundIndex === -1) return 0;
+  return Math.min(foundIndex, profiles.length - 1);
+};
+
 // Paginated fetch for tables that can exceed Supabase's 1000-row default limit.
 // Returns all matching rows by fetching in pages of `pageSize`.
 const fetchAllRows = async <T,>(
@@ -517,8 +572,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // swipe cap. Previously this was an OR, so the page could enforce the cap the
   // instant *either* signal settled (often the DB swipe count, which loads
   // fast) even though the other was still mid-flight and would have said
-  // "premium" a moment later - a paying user could get capped at 29 during
-  // that window. Requiring BOTH closes that race.
+  // "premium" a moment later - a paying user could get capped at the free
+  // limit during that window. Requiring BOTH closes that race.
   const premiumResolved = isPremium !== undefined && !subscriptionLoading;
 
   // Last confirmed premium status for this device (see premiumStatusCache).
@@ -715,7 +770,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     if (todaySwipeCount === null) return;
     
     // Determine the correct swipe limit based on premium status
-    const swipeLimit = premiumActive ? 200 : 29;
+    const swipeLimit = premiumActive ? PREMIUM_DAILY_SWIPE_LIMIT : FREE_DAILY_SWIPE_LIMIT;
     
     // Always check and update the out of swipes state based on current premium status
     if (todaySwipeCount >= swipeLimit) {
@@ -736,6 +791,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       pendingSwipesRef.current = Math.max(0, pendingSwipesRef.current - delta);
       return next;
     });
+  }, [currentUser?.id]);
+
+  // Snaps the local swipe counter (and its cache) to the server's
+  // authoritative value whenever persistSwipeCount actually gets one back -
+  // corrects any drift from a failed/lagged persist or a no-op duplicate
+  // swipe, instead of letting bumpLocalSwipeCount's optimistic +1 stand
+  // uncorrected all session. A no-op when there's nothing to reconcile
+  // (serverUsage is null, e.g. a total network failure with no answer at
+  // all - deliberately left alone rather than guessed at).
+  const reconcileSwipeCountFromServer = useCallback((serverUsage: number | null) => {
+    if (serverUsage === null || !currentUser?.id) return;
+    setTodaySwipeCount(serverUsage);
+    writeCachedSwipeCount(currentUser.id, serverUsage);
   }, [currentUser?.id]);
 
   // Single source of truth for completion checks in Discover:
@@ -1057,10 +1125,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       .map(([id, _]) => id));
     const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
     
-    const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? 50;
+    const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
     const userMaxDistance = Number(userMaxDistanceRaw);
     // CRITICAL: Free users capped at 500km max, premium users can use their full setting
-    const safeUserMaxDistanceUncapped = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+    const safeUserMaxDistanceUncapped = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : DEFAULT_MAX_DISTANCE_KM;
 
     // CRITICAL: Use BOTH country_code AND country name as fallback for free user country filtering
     // If they disagree, trust the country name (what the user sees/sets) and fail-closed on missing.
@@ -1068,11 +1136,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     const premiumForFeed = premiumActive;
 
-    // For FREE users: enforce 500km max distance cap
-    const FREE_USER_MAX_DISTANCE = 500;
-    const safeUserMaxDistance = premiumForFeed 
-      ? safeUserMaxDistanceUncapped 
-      : Math.min(safeUserMaxDistanceUncapped, FREE_USER_MAX_DISTANCE);
+    // For FREE users: enforce the shared max distance cap
+    const safeUserMaxDistance = premiumForFeed
+      ? safeUserMaxDistanceUncapped
+      : Math.min(safeUserMaxDistanceUncapped, FREE_USER_MAX_DISTANCE_KM);
 
     const unlockedCountriesRaw = currentUserData?.unlocked_countries ?? currentUser.unlocked_countries;
     const unlockedCountries: string[] = premiumForFeed
@@ -1159,8 +1226,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
 
       // STEP 3: Apply age filtering to EACH group separately
-      const userMinAge = currentUserData?.min_age || 18;
-      const userMaxAge = currentUserData?.max_age || 99;
+      const userMinAge = currentUserData?.min_age || DEFAULT_MIN_AGE;
+      const userMaxAge = currentUserData?.max_age || DEFAULT_MAX_AGE;
       
       const filterAge = (profiles: ProfileRow[]) => profiles.filter((profile) => {
         // Premium: keep profiles even if DOB is missing; only enforce range when DOB is present.
@@ -1497,8 +1564,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // For FREE users: Apply age filtering, activity weighting, and stratification here
     // (Premium users already did this per-group before mixing)
     if (!premiumForFeed) {
-      const userMinAge = currentUserData?.min_age || 18;
-      const userMaxAge = currentUserData?.max_age || 99;
+      const userMinAge = currentUserData?.min_age || DEFAULT_MIN_AGE;
+      const userMaxAge = currentUserData?.max_age || DEFAULT_MAX_AGE;
       
       filteredProfiles = filteredProfiles.filter(profile => {
         if (!profile.date_of_birth) return false;
@@ -1816,26 +1883,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // tapering further from there).
 
     // ⭐ PROFILE POSITION PERSISTENCE: Resume from last viewed profile
-    // Load last profile ID and time from localStorage
-    const savedId = readPersistentItem(`driplove_last_profile_${userId}`);
-    const savedTime = parseInt(readPersistentItem(`driplove_last_profile_time_${userId}`) || '0');
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    const isSavedValid = savedId && Date.now() - savedTime < twentyFourHours;
-
-    // Find starting index based on saved profile - this ensures continuity after refresh
-    let startIndex = 0;
-    if (isSavedValid && savedId) {
-      const foundIndex = shuffled.findIndex(p => p.id === savedId);
-      if (foundIndex !== -1) {
-        // `savedId` is written by moveToNext() as the id of the card that becomes
-        // current right after a swipe completes - i.e. it's already "the next
-        // profile to show", not "the one just swiped". Resuming at foundIndex + 1
-        // silently skipped that exact card on every reload/relaunch, regardless of
-        // whether the user had actually swiped on it - each refresh moved the
-        // deck forward for free. Resume ON the saved profile, not past it.
-        startIndex = Math.min(foundIndex, shuffled.length - 1);
-      }
-    }
+    const startIndex = resolveResumeIndex(shuffled, userId);
 
     const imageMap: { [key: string]: string[] } = {};
     if (shuffled.length > 0) {
@@ -2059,12 +2107,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const safeIndex = Number.isFinite(index) ? Math.max(0, Math.min(index, matchesWithAds.length)) : 0;
         const initialDeck = safeIndex > 0 ? matchesWithAds.slice(safeIndex) : matchesWithAds;
 
+        // Captured from inside the setState updater below so the deck cache
+        // write further down persists what's ACTUALLY in React state (the
+        // resumed card preserved at the front by the merge branch), not
+        // `initialDeck` - this fetch's own raw/trimmed result. Writing
+        // `initialDeck` here used to be the deeper half of the resume bug:
+        // a background refresh's random sample often doesn't happen to
+        // include the profile the user was actually looking at, so its own
+        // resume-index calc lands on 0 for a totally different profile -
+        // caching THAT (while React's live state correctly still showed the
+        // real resumed card, since the merge preserves `prev`'s front)
+        // poisoned the very next reload, which reads the cache fresh with
+        // no live state to protect it.
+        let deckForCache: MatchOrAd[] = initialDeck;
         setPotentialMatches(prev => {
           // ⭐ CRITICAL: Always filter against locally swiped profiles to prevent repetition
           const swipedIds = locallySwipedProfileIds.current;
           const now = Date.now();
           const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-          
+
           const filterSwiped = (deck: MatchOrAd[]): MatchOrAd[] => {
             return deck.filter(item => {
               if (isAd(item)) return true;
@@ -2075,11 +2136,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               return (now - swipeData.timestamp) >= thirtyDaysMs;
             });
           };
-          
-          if (prev.length === 0) {
-            return filterSwiped(initialDeck);
-          }
-          return mergeDecksWithoutProfileDupes(prev, matchesWithAds, swipedIds);
+
+          const merged = prev.length === 0
+            ? filterSwiped(initialDeck)
+            : mergeDecksWithoutProfileDupes(prev, matchesWithAds, swipedIds);
+          deckForCache = merged;
+          return merged;
         });
         setUserImages(images);
         setUserDistances(distances);
@@ -2115,7 +2177,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         const cacheKeyForWrite = opts?.cacheKey;
         if (cacheKeyForWrite) {
-          writeDeckCache(cacheKeyForWrite, initialDeck);
+          writeDeckCache(cacheKeyForWrite, deckForCache);
         }
 
         // Mark as complete immediately
@@ -2444,10 +2506,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (!isCancelled && currentUserData) {
           const baseCountryCode = getTrustedBaseCountryCode(currentUserData.country_code, currentUserData.country);
-          const maxDistanceRaw = Number(currentUserData.max_distance ?? currentUserData.distance_preference ?? 50);
-          const maxDistance = Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? Math.min(maxDistanceRaw, 500) : 50;
-          const minAge = Number(currentUserData.min_age ?? 18);
-          const maxAge = Number(currentUserData.max_age ?? 99);
+          const maxDistanceRaw = Number(currentUserData.max_distance ?? currentUserData.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
+          const maxDistance = Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? Math.min(maxDistanceRaw, FREE_USER_MAX_DISTANCE_KM) : DEFAULT_MAX_DISTANCE_KM;
+          const minAge = Number(currentUserData.min_age ?? DEFAULT_MIN_AGE);
+          const maxAge = Number(currentUserData.max_age ?? DEFAULT_MAX_AGE);
           // BUG FIX: this whole recovery pass used to be written as if every
           // user were free - hardcoded to baseCountryCode only, active
           // profiles only, and a distance box centered on the viewer's own
@@ -2715,8 +2777,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       return; // Already initialized for this user today with these preferences
     }
 
-    // locallySwipedProfileIds.current.clear(); // REMOVED
-
     // ⭐ CRITICAL FIX: Reconcile local swipe cache against DB source-of-truth on page load.
     // This prevents stale/corrupt local swipe entries from permanently hiding valid profiles.
     // Keep only server-backed history + very recent optimistic local swipes.
@@ -2907,12 +2967,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         
         const keyForStorage = buildDeckCacheKey(cacheKey);
         
-        // For free users: calculate max distance (capped at 500km)
-        const FREE_USER_MAX_DISTANCE_CACHE = 500;
+        // For free users: calculate max distance (capped at the shared free-tier limit)
         const userMaxDistanceForCache = currentUser.max_distance || currentUser.distance_preference || 500;
-        const freeUserMaxDistance = premiumActive 
-          ? userMaxDistanceForCache 
-          : Math.min(userMaxDistanceForCache, FREE_USER_MAX_DISTANCE_CACHE);
+        const freeUserMaxDistance = premiumActive
+          ? userMaxDistanceForCache
+          : Math.min(userMaxDistanceForCache, FREE_USER_MAX_DISTANCE_KM);
         const userLat = currentUser.latitude;
         const userLon = currentUser.longitude;
         
@@ -2943,8 +3002,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         }
         
         if (filteredCachedDeck.length > 0) {
-          // ⭐ INSTANT LOAD: Use filtered cached deck for immediate display
-          setPotentialMatches(filteredCachedDeck);
+          // ⭐ INSTANT LOAD: Use filtered cached deck for immediate display.
+          // Codebase-wide invariant: currentIndex is always 0 - "resuming"
+          // means trimming the array so the resumed profile IS index 0, not
+          // pointing an index into an untrimmed array. Every background
+          // refresh after this (see fetchPotentialMatches below) unconditionally
+          // resets currentIndex to 0 once it merges in fresh data, so leaving
+          // this at a non-zero position (as a previous version of this fix
+          // did) meant that very next background refresh silently swapped
+          // the visible card out from under the user - "0" then pointed at
+          // a completely different profile in the newly-merged array.
+          const resumeIndex = resolveResumeIndex(filteredCachedDeck, currentUser.id);
+          const resumedDeck = resumeIndex > 0 ? filteredCachedDeck.slice(resumeIndex) : filteredCachedDeck;
+          setPotentialMatches(resumedDeck);
           setCurrentIndex(0);
           setImageIndex(0);
           setIsLoading(false);
@@ -3531,11 +3601,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
               const rescueUserLat = currentUser?.latitude;
               const rescueUserLon = currentUser?.longitude;
-              const rescueMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
+              const rescueMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
               const rescueMaxDistance = Number(rescueMaxDistanceRaw);
               const safeRescueMaxDistance = premiumActive
                 ? Infinity
-                : Math.min(Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : 50, 500);
+                : Math.min(Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : DEFAULT_MAX_DISTANCE_KM, FREE_USER_MAX_DISTANCE_KM);
 
               const freshProfiles = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
                 .filter((p) => {
@@ -3630,11 +3700,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
   }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
-  // Helper to persist swipe count to database using the proper RPC
-  const persistSwipeCount = async (userId: string) => {
+  // Helper to persist swipe count to database using the proper RPC.
+  // Returns the server's authoritative usage figures whenever we actually
+  // get an answer back, so callers can reconcile the optimistic local
+  // counter (bumpLocalSwipeCount) against ground truth instead of letting
+  // it silently drift ahead of what's really persisted - this was the root
+  // cause of users seeing "out of swipes" while their real usage was well
+  // under the limit: the local counter goes up on every swipe attempt
+  // unconditionally, but previously nothing ever corrected it back down
+  // (or synced it to the true count) when a persist failed, lagged, or hit
+  // a duplicate/no-op path - errors just got logged and swallowed.
+  const persistSwipeCount = async (
+    userId: string
+  ): Promise<{ ok: boolean; serverUsage: number | null; limitReached: boolean }> => {
+    const result = await persistSwipeCountInner(userId);
+    maybeShowVerifyPrompt(userId);
+    return result;
+  };
+
+  const persistSwipeCountInner = async (
+    userId: string
+  ): Promise<{ ok: boolean; serverUsage: number | null; limitReached: boolean }> => {
     try {
       // Use the update_user_usage RPC which correctly handles upsert + increment
-      const { error } = await (supabase as unknown as {
+      const { data, error } = await (supabase as unknown as {
         rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
       }).rpc('update_user_usage', {
         user_id_param: userId,
@@ -3646,7 +3735,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         console.error('Failed to persist swipe count via RPC:', error);
         // Fallback: Direct SQL upsert with proper increment
         const today = new Date().toISOString().split('T')[0];
-        
+
         // First check if record exists
         const { data: existing } = await supabase
           .from('user_usage')
@@ -3654,17 +3743,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           .eq('user_id', userId)
           .eq('date', today)
           .maybeSingle();
-        
+
         if (existing) {
           // Update existing record
-          await supabase
+          const newUsage = (existing.swipes_used || 0) + 1;
+          const { error: updateError } = await supabase
             .from('user_usage')
-            .update({ swipes_used: (existing.swipes_used || 0) + 1 })
+            .update({ swipes_used: newUsage })
             .eq('user_id', userId)
             .eq('date', today);
+          if (updateError) return { ok: false, serverUsage: null, limitReached: false };
+          return { ok: true, serverUsage: newUsage, limitReached: false };
         } else {
           // Insert new record
-          await supabase
+          const { error: insertError } = await supabase
             .from('user_usage')
             .insert({
               user_id: userId,
@@ -3672,13 +3764,33 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               swipes_used: 1,
               reverse_dislikes_used: 0,
             });
+          if (insertError) return { ok: false, serverUsage: null, limitReached: false };
+          return { ok: true, serverUsage: 1, limitReached: false };
         }
       }
+
+      // update_user_usage returns { success, current_usage, limit, message }.
+      // success:false means the SERVER's own authoritative count was already
+      // at/over the limit when this call landed - a real signal, not a
+      // failure, that the local count had drifted and must be corrected.
+      const parsed = data as { success?: boolean; current_usage?: number } | null;
+      const serverUsage = typeof parsed?.current_usage === 'number' ? parsed.current_usage : null;
+      return { ok: parsed?.success !== false, serverUsage, limitReached: parsed?.success === false };
     } catch (err) {
       console.error('Error persisting swipe count:', err);
+      return { ok: false, serverUsage: null, limitReached: false };
     }
+  };
 
-    maybeShowVerifyPrompt(userId);
+  // Single call site for "a like/pass RPC just succeeded, now record the
+  // swipe usage" - used by both handleLike and executePassLogic (each has a
+  // primary-RPC-succeeded path and a fallback-insert-succeeded path, four
+  // call sites total), so the persist + reconcile + limit-check sequence
+  // exists exactly once instead of copy-pasted at each site.
+  const persistSwipeAndReconcile = async (userId: string) => {
+    const persistResult = await persistSwipeCount(userId);
+    reconcileSwipeCountFromServer(persistResult.serverUsage);
+    if (persistResult.limitReached) setIsOutOfSwipes(true);
   };
 
   // Lifetime swipe count (distinct from the daily usage tracked above) -
@@ -3739,7 +3851,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       pending: pendingSwipesRef.current,
       todaySwipeCount,
       effectiveSwipeCount,
-      swipeLimit: premiumActive ? 200 : 29,
+      swipeLimit: premiumActive ? PREMIUM_DAILY_SWIPE_LIMIT : FREE_DAILY_SWIPE_LIMIT,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
@@ -3754,7 +3866,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
 
     // Check profile completion restriction (70% after 5 swipes)
-    if (effectiveProfileCompletion < 70 && effectiveSwipeCount >= 5) {
+    if (effectiveProfileCompletion < PROFILE_COMPLETION_REQUIRED_PERCENT && effectiveSwipeCount >= PROFILE_COMPLETION_GRACE_SWIPES) {
       swipeDebug('handleLike: blocked by profile completion', {
         parentProfileCompletion,
         computedProfileCompletion,
@@ -3786,8 +3898,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 29 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 29;
+    // Free users: FREE_DAILY_SWIPE_LIMIT swipes, Premium users: PREMIUM_DAILY_SWIPE_LIMIT swipes
+    const swipeLimit = premiumActive ? PREMIUM_DAILY_SWIPE_LIMIT : FREE_DAILY_SWIPE_LIMIT;
 
     // Block purely based on the authoritative swipe count.
     if (effectiveSwipeCount >= swipeLimit) {
@@ -3888,7 +4000,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               }
               
               swipeDebug('handleLike: Fallback like inserted successfully');
-              await persistSwipeCount(currentUser.id);
+              {
+                await persistSwipeAndReconcile(currentUser.id);
+              }
 
               // Notify other parts of the app (e.g., Profile stats) immediately
               if (typeof window !== 'undefined') {
@@ -3961,7 +4075,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         } else {
           // RPC succeeded — increment swipe count after successful DB write
           swipeDebug('handleLike: RPC succeeded');
-          await persistSwipeCount(currentUser.id);
+          {
+            await persistSwipeAndReconcile(currentUser.id);
+          }
 
           // Notify other parts of the app (e.g., Profile stats) immediately
           if (typeof window !== 'undefined') {
@@ -4069,14 +4185,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       pending: pendingSwipesRef.current,
       todaySwipeCount,
       effectiveSwipeCount,
-      swipeLimit: premiumActive ? 200 : 29,
+      swipeLimit: premiumActive ? PREMIUM_DAILY_SWIPE_LIMIT : FREE_DAILY_SWIPE_LIMIT,
       parentProfileCompletion,
       computedProfileCompletion,
       effectiveProfileCompletion,
     });
 
     // Check profile completion restriction (70% after 5 swipes)
-    if (effectiveProfileCompletion < 70 && effectiveSwipeCount >= 5) {
+    if (effectiveProfileCompletion < PROFILE_COMPLETION_REQUIRED_PERCENT && effectiveSwipeCount >= PROFILE_COMPLETION_GRACE_SWIPES) {
       swipeDebug('executePassLogic: blocked by profile completion', {
         parentProfileCompletion,
         computedProfileCompletion,
@@ -4108,8 +4224,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
 
     // Check daily limit - MUST be checked BEFORE swipe
-    // Free users: 29 swipes, Premium users: 200 swipes
-    const swipeLimit = premiumActive ? 200 : 29;
+    // Free users: FREE_DAILY_SWIPE_LIMIT swipes, Premium users: PREMIUM_DAILY_SWIPE_LIMIT swipes
+    const swipeLimit = premiumActive ? PREMIUM_DAILY_SWIPE_LIMIT : FREE_DAILY_SWIPE_LIMIT;
 
     // Block purely based on the authoritative swipe count.
     if (effectiveSwipeCount >= swipeLimit) {
@@ -4201,7 +4317,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 throw insertError;
               }
               
-              await persistSwipeCount(currentUser.id);
+              {
+                await persistSwipeAndReconcile(currentUser.id);
+              }
 
               // Notify other parts of the app (for debugging/telemetry)
               if (typeof window !== 'undefined') {
@@ -4218,7 +4336,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           }
         } else {
           // RPC succeeded — persist server usage
-          await persistSwipeCount(currentUser.id);
+          {
+            await persistSwipeAndReconcile(currentUser.id);
+          }
 
           // Notify other parts of the app (for debugging/telemetry)
           if (typeof window !== 'undefined') {
@@ -4342,9 +4462,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       try {
         const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
         const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
-        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
+        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
         const userMaxDistance = Number(userMaxDistanceRaw);
-        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : DEFAULT_MAX_DISTANCE_KM;
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, premiumActive, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
         const savedOrder = readPersistentItem(savedOrderKey);
@@ -4457,9 +4577,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       try {
         const baseCountryCode = normalizeCountryCode(String(currentUser?.country_code ?? ''));
         const unlockedCountries = normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode);
-        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? 50;
+        const userMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
         const userMaxDistance = Number(userMaxDistanceRaw);
-        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : 50;
+        const safeUserMaxDistance = Number.isFinite(userMaxDistance) && userMaxDistance > 0 ? userMaxDistance : DEFAULT_MAX_DISTANCE_KM;
         const feedSignature = buildFeedSignature(baseCountryCode, unlockedCountries, premiumActive, safeUserMaxDistance);
         const savedOrderKey = buildSavedOrderKey(currentUser?.id || '', feedSignature);
         
@@ -4480,10 +4600,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // Ignore localStorage errors
       }
       
-      // ⭐ REMOVED: Auto-reload logic moved to useEffect (single source of truth)
-      // The useEffect will detect when remainingReal <= 10 and trigger loadMoreMatches
-      // No need for duplicate reload logic here - keeps it simple and predictable
-      
+      // Auto-refill lives in the dedicated effect + the "running low" check
+      // further below in this same updater - not duplicated here.
+
       // ⭐ SMART IMAGE LOADING: Cancel previous profile images and preload next profiles with priority
       // Cancel ALL images from the swiped profile (no longer needed)
       if (!isAd(swipedItem)) {
@@ -4559,9 +4678,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     
     // ⭐ RULE 5: Hard-cut instant card removal - always stay at index 0
     setCurrentIndex(0);
-    
-    // ⭐ REMOVED: Old preload logic that used stale potentialMatches array
-    // Now handled inside setPotentialMatches callback with correct newMatches array (3A)
     
     // ⭐ 25% LIKE-BACK INJECTION: Inject profiles who liked the current user
     // This happens AFTER the current profile is removed, inserting at +2 to +4
@@ -4642,7 +4758,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // ever inlined in the main return before) would unmount right along with
   // it, well before its own 5s timer was up. It's plain JSX computed off
   // state, not a hook, so it's safe to build here ahead of the conditionals.
-  const swipeGuideOverlay = showSwipeGuide ? (
+  // Suppressed while the user is genuinely out of swipes - this overlay's
+  // z-[9999] otherwise visually covers the "out of swipes" modal for its
+  // first ~5s (pointerEvents:none means the modal is still clickable
+  // underneath, but the user can't read its message or see its buttons
+  // during that window, which reads as the message not showing at all).
+  const swipeGuideOverlay = showSwipeGuide && !isOutOfSwipes ? (
     // pointerEvents: 'none' throughout - this is a purely visual demo overlay,
     // not a modal to dismiss first, and never blocks the real card underneath.
     <div

@@ -34,8 +34,8 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   // size instead of estimating it. The extra gap is nudged up a touch from
   // before per feedback that it sat too close to the nav even on phones.
   const bottomOffset = (isAndroid || isIOS)
-    ? 'calc(var(--app-bottom-nav-height, 88px) + clamp(14px, 3vw, 22px))'
-    : 'calc(var(--app-bottom-nav-height, 64px) + clamp(10px, 2.4vw, 16px))';
+    ? 'calc(var(--app-bottom-nav-height, 88px) + clamp(22px, 4.2vw, 32px))'
+    : 'calc(var(--app-bottom-nav-height, 64px) + clamp(16px, 3.2vw, 24px))';
 
   return (
   <div

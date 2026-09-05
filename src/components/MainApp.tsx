@@ -1407,8 +1407,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   <Icon style={{ width: 'clamp(13px, 3.8vw, 16px)', height: 'clamp(13px, 3.8vw, 16px)' }} className="shrink-0" />
                   <span className="font-medium" style={{ fontSize: 'clamp(8px, 2.3vw, 9px)' }}>{label}</span>
                    {value === 'chat' && unreadCount > 0 && (
-                     <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white z-10 flex items-center justify-center">
-                       <span className="text-xs text-white font-bold">
+                     <div className="absolute top-0 right-0.5 h-4 w-4 rounded-full bg-red-500 border border-white z-10 flex items-center justify-center">
+                       <span className="text-[9px] text-white font-bold leading-none">
                          {unreadCount > 9 ? '9+' : unreadCount}
                        </span>
                      </div>

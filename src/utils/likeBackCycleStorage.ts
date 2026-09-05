@@ -1,51 +1,48 @@
 /**
  * Persisted state for the "people who liked you" Discover injection cycle.
  *
- * Why persisted (not just an in-memory ref): the cycle's quiet gaps are
- * measured in real days, not swipes, so state has to survive reloads,
- * app restarts, and multi-day absences - an in-memory-only tracker would
- * restart the whole cycle every time the app is closed and reopened.
+ * Why persisted (not just an in-memory ref): the schedule is keyed by real
+ * calendar days since the user's first-ever like, so state has to survive
+ * reloads, app restarts, and multi-day absences - an in-memory-only tracker
+ * would restart the cycle every time the app is closed and reopened.
  *
- * One cycle = burst1 (2 reveals across up to 20 swipes) -> burst2 (3 reveals
- * across up to 20 swipes) -> quiet (a rotating 3/5/4-day gap) -> repeat from
- * burst1. The cycle only starts at all once the user has ever received their
- * first like; before that it stays permanently dormant.
+ * The cycle only starts at all once the user has ever received their first
+ * like; before that it stays permanently dormant. Once started, each
+ * calendar day gets a reveal quota from a repeating 9-day table (see
+ * DAY_QUOTA_CYCLE in likeBackSchedule.ts) - day 1 of the cycle gets that
+ * table's first entry, day 10 wraps back to the first entry again, and so
+ * on. A day's quota (if any) is delivered within that day's first 30
+ * swipes, never two reveals back-to-back.
  */
-
-export type LikeBackPhase = 'burst1' | 'burst2' | 'quiet';
 
 export interface LikeBackCycleState {
   /** Becomes true, permanently, the first time we detect the user has ever received a like. */
   hasStarted: boolean;
-  phase: LikeBackPhase;
-  /** How many real swipes have landed since entering the current phase. */
-  swipesInPhase: number;
-  /** Swipe-in-phase numbers (1-based) chosen at random for a reveal this phase. */
-  plannedOffsets: number[];
-  /** Epoch ms the current quiet phase ends; only meaningful while phase === 'quiet'. */
-  quietUntil: number | null;
-  /** Index into the [3, 5, 4] day rotation for the *next* quiet phase. */
-  gapRotationIndex: number;
-  /** Cumulative real-swipe counter, for the cross-phase "never back to back" gap check. */
+  /** Date string (YYYY-MM-DD, UTC) of the day the cycle started - day 1 of the schedule. */
+  cycleStartDateStr: string | null;
+  /** Date string (YYYY-MM-DD, UTC) this state was last advanced for - detects day rollover. */
+  currentDayStr: string | null;
+  /** How many real swipes have landed since the start of currentDayStr. */
+  swipesToday: number;
+  /** Swipe-of-the-day numbers (1-based, within the first 30) chosen for today's quota. */
+  plannedOffsetsToday: number[];
+  /** Cumulative real-swipe counter, for the cross-day "never back to back" gap check. */
   swipesGlobal: number;
   /** swipesGlobal value at the last actual reveal, for the same back-to-back check. */
   lastInjectionAtSwipeGlobal: number;
 }
 
-export const GAP_ROTATION_DAYS: ReadonlyArray<number> = [3, 5, 4];
-
 const defaultState: LikeBackCycleState = {
   hasStarted: false,
-  phase: 'burst1',
-  swipesInPhase: 0,
-  plannedOffsets: [],
-  quietUntil: null,
-  gapRotationIndex: 0,
+  cycleStartDateStr: null,
+  currentDayStr: null,
+  swipesToday: 0,
+  plannedOffsetsToday: [],
   swipesGlobal: 0,
   // Sentinel meaning "no injection has ever happened yet" - NOT swipe 0. Using
   // 0 here made the "never back to back" gap check misread cycle start as a
   // recent injection, silently dropping any reveal planned within the first
-  // couple of swipes of the very first burst.
+  // couple of swipes of day 1.
   lastInjectionAtSwipeGlobal: -1000,
 };
 

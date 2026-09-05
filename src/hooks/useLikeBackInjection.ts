@@ -15,13 +15,14 @@ import { parseFavorites } from '@/constants/favorites';
  * Reveal cycle:
  * - Dormant until the user has ever received their first like, ever - before
  *   that, nothing is injected, full stop.
- * - Once started: burst1 (2 reveals randomly mixed across up to 20 swipes),
- *   then burst2 (3 reveals randomly mixed across up to 20 more swipes), then
- *   quiet - no reveals at all for a stretch of real days, not swipes.
- * - Quiet length rotates 3 -> 5 -> 4 days, then repeats, so the whole cycle
- *   (burst1 -> burst2 -> quiet) restarts from burst1 once the quiet gap ends.
- * - Cycle state (phase, progress, quiet-until) is persisted per user, since a
- *   multi-day quiet gap has to survive reloads/relaunches - see
+ * - Once started, each calendar day gets a reveal quota from a repeating
+ *   9-day schedule (2, 1, 1, 0, 1, 0, 0, 1, 2 - see DAY_QUOTA_CYCLE in
+ *   likeBackSchedule.ts), day 10 wrapping back to day 1's quota, and so on.
+ *   A day's quota (if any) is randomly mixed across that day's first 30
+ *   swipes; a 0-quota day gets nothing at all.
+ * - Cycle state (which calendar day, today's progress/planned offsets) is
+ *   persisted per user, since the schedule is keyed by real days, not just
+ *   swipes, and has to survive reloads/relaunches - see
  *   likeBackCycleStorage.ts.
  * - A reveal slot with no eligible quality candidate is simply skipped, never
  *   forced or carried over to a later slot.

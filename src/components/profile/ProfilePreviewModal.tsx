@@ -378,7 +378,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             {/* Expandable info button - same style/behavior as Discover's MatchCard toggle. */}
             <button
               onClick={() => setShowMoreInfo(prev => !prev)}
-              className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+              className="text-white rounded-full p-[clamp(0.2rem,1vw,0.3rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
               style={{
                 background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
                 boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',

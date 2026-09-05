@@ -138,7 +138,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const [isBlocking, setIsBlocking] = useState(false);
   const [blockReason, setBlockReason] = useState('');
   const [isBlockSuccess, setIsBlockSuccess] = useState(false);
-  const [imageIndex, setImageIndex] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   // Swipe-to-pass/like-back on the photo card, same gesture as Discover's swipe
@@ -785,7 +784,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   }, [currentUser?.id, fetchLikersInBackground]);
 
   useEffect(() => {
-    setImageIndex(0);
     setShowMoreInfo(false);
     setCurrentSlide(0);
     setSwipeDragX(0);
@@ -846,19 +844,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       setCurrentSlide(Math.max(0, slides.length - 1));
     }
   }, [slides.length, currentSlide]);
-
-  // ⭐ FIX #6: Memoize getRemainingDays (prevents recalc on every render)
-  const getRemainingDays = useMemo(() => {
-    if (!lockoutEndDate) return 0;
-    const now = new Date();
-    const diff = lockoutEndDate.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  }, [lockoutEndDate]);
-
-  const isInLockout = useMemo(() => 
-    !isPremium && lockoutEndDate && new Date() < lockoutEndDate,
-    [isPremium, lockoutEndDate]
-  );
 
   const setLockoutPeriod = useCallback(async () => {
     if (isPremium || !currentUser?.id) return;
@@ -951,7 +936,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       const { data, error } = await supabase.rpc('like_and_usage_batched', {
         liker_id_param: currentUser.id,
         liked_id_param: profileId,
-        premium_param: isPremium || false
+        premium_param: !!isPremium
       });
 
       if (error) throw error;
@@ -1450,7 +1435,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowMoreInfo(!showMoreInfo); }}
                   aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
-                  className="text-white rounded-full p-[clamp(0.4rem,2vw,0.55rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+                  className="text-white rounded-full p-[clamp(0.2rem,1vw,0.3rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
                   style={{
                     background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
                     boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
@@ -1793,7 +1778,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, platform, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
+  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showMatchAnimation && matchedProfile) {

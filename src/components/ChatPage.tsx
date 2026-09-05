@@ -730,7 +730,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
     first_name?: string;
     last_name?: string;
     is_admin?: boolean;
-    is_archived?: boolean;
   };
 
   type MatchRowChat = {
@@ -757,8 +756,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       .map((row) => {
         const partner = row.user1_id === currentUser.id ? row.user2 : row.user1;
 
-        if (partner?.is_archived === true) return null;
-
+        // Deliberately does NOT filter on is_archived - that flag just marks
+        // a lower-priority/backfill pool Discover tops decks up with when a
+        // country's active supply is thin (see LikedMePage's identical note
+        // and DiscoverPage's active-then-archived top-up query). It does not
+        // mean removed, deleted, or unmatchable. A real mutual match with an
+        // archived profile is still a real match - hiding it here silently
+        // dropped matches from Chat the moment either party happened to be
+        // archived, even though the `matches` row (and the match animation
+        // the user already saw) was entirely legitimate.
         const partnerId = partner?.id;
         const firstName = partner?.first_name || '';
         const lastName = partner?.last_name || '';
@@ -854,8 +860,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .from('matches')
         .select(`
           id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, is_archived),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, is_archived),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
@@ -936,8 +942,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
         .from('matches')
         .select(`
           id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, is_archived),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, is_archived),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
