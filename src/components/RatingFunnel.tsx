@@ -1,10 +1,10 @@
 /**
- * Two-step rating funnel
+ * Rating funnel
  * Shown once, ever, 3s after the user closes their first-ever match screen.
  *
- * Step 1 (prompt): "Enjoying DripLove?" -> Not Really / Yes!
- * Step 2 (grow):   "Help Us Grow the Pool" -> Rate DripLove (native review + 24h 1.5x visibility boost)
- * Step 3 (feedback): internal feedback card shown when the user picks "Not Really"
+ * Step 1 (prompt): "Enjoying DripLove?" -> Not Really / Yes! (Yes! opens the
+ *   native review prompt directly and grants the 24h 1.5x visibility boost)
+ * Step 2 (feedback): internal feedback card shown when the user picks "Not Really"
  */
 
 import React, { useState } from 'react';
@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Sparkles, MessageSquareHeart } from 'lucide-react';
 import { openRatingInterface, activateVisibilityBoost } from '@/utils/ratingPlatform';
 
-type FunnelStep = 'prompt' | 'grow' | 'feedback';
+type FunnelStep = 'prompt' | 'feedback';
 
 interface RatingFunnelProps {
   open: boolean;
@@ -42,9 +42,8 @@ const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
   };
 
   const handleNotReally = () => setStep('feedback');
-  const handleYes = () => setStep('grow');
 
-  const handleRateDripLove = async () => {
+  const handleYes = async () => {
     try {
       await openRatingInterface(5);
     } catch (error) {
@@ -94,7 +93,8 @@ const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
                 Enjoying DripLove?
               </DialogTitle>
               <DialogDescription className="text-center text-gray-300 leading-relaxed">
-                We'd love to hear your thoughts.
+                In return for your support of the DripLove community, we'll optimize
+                your profile visibility for the next 24 hours.
               </DialogDescription>
             </DialogHeader>
             <div className="pt-5 flex gap-3">
@@ -110,32 +110,6 @@ const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
                 className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold hover:opacity-90"
               >
                 Yes!
-              </Button>
-            </div>
-          </>
-        )}
-
-        {step === 'grow' && (
-          <>
-            <DialogHeader className="space-y-3 pt-1">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/10 ring-1 ring-pink-500/30">
-                <Sparkles className="h-6 w-6 text-pink-400" />
-              </div>
-              <DialogTitle className="text-lg font-semibold text-center text-white">
-                Help Us Grow the Pool
-              </DialogTitle>
-              <DialogDescription className="text-center text-gray-300 leading-relaxed">
-                Glad you're liking it! Rating us helps DripLove find more high-quality singles
-                in your area. As a thank you for supporting the community, we'll optimize your
-                profile visibility for the next 24 hours.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="pt-5">
-              <Button
-                onClick={handleRateDripLove}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-5 hover:opacity-90"
-              >
-                Rate DripLove
               </Button>
             </div>
           </>
