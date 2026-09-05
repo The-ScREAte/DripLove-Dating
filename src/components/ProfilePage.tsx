@@ -1117,9 +1117,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           // on devices with a bigger inset (Dynamic Island, etc). The md: bump lives in
           // the .top-pad-clear-headers class (index.css) to match the toolbar's own
           // md: top offset above, so content never sits under the toolbar on tablets.
-          paddingBottom: Capacitor.getPlatform() === 'web'
-            ? '30px'
-            : 'clamp(100px, calc(env(safe-area-inset-bottom, 0px) + 90px), 150px)'
+          //
+          // Bottom padding is a flat 10px on every platform - MainApp's bottom nav
+          // is already a real flex sibling of this scrollable content box (not an
+          // overlay), so the box structurally can't extend past the nav's top edge
+          // in the first place. The old platform branch (a much larger clamp() on
+          // native vs 30px on web) was clearing space that was already reserved by
+          // that layout, and relied on Capacitor.getPlatform() - which only reports
+          // 'ios'/'android' inside the actual native app shell, not a mobile browser
+          // on those devices, so testing via Safari/Chrome silently got the "web"
+          // value regardless of the real platform.
+          paddingBottom: '10px',
         }}
       >
         <div className="w-full max-w-full overflow-hidden">

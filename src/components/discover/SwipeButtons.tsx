@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 
 interface SwipeButtonsProps {
   onReverse: () => void;
@@ -18,24 +17,19 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
 }) => {
   const showCount = !isPremium && reversesLeft !== undefined && reversesLeft > 0;
 
-  // Detect platform
-  const platform = Capacitor.getPlatform();
-  const isIOS = platform === 'ios';
-  const isAndroid = platform === 'android';
-
-  // Adjust bottom position based on platform — lifted to clear the floating pill nav.
-  //
-  // Previously a vw-based clamp() guess at the nav's height - that caps out
-  // (stops scaling) past ~467px viewport width, while the real nav bar keeps
-  // growing on wider/tablet viewports, so the button ended up sitting under
-  // the nav on medium screens. MainApp measures the real nav height via
-  // ResizeObserver and publishes it as --app-bottom-nav-height (see
-  // MainApp.tsx), so this now always clears the actual nav at any screen
-  // size instead of estimating it. The extra gap is nudged up a touch from
-  // before per feedback that it sat too close to the nav even on phones.
-  const bottomOffset = (isAndroid || isIOS)
-    ? 'calc(var(--app-bottom-nav-height, 88px) + clamp(22px, 4.2vw, 32px))'
-    : 'calc(var(--app-bottom-nav-height, 64px) + clamp(16px, 3.2vw, 24px))';
+  // Lifted to clear the floating pill nav. One shared formula for every
+  // platform now (native app on iOS/Android, and a plain mobile browser,
+  // which Capacitor itself reports as 'web' - a previous per-platform
+  // branch here relied on Capacitor.getPlatform(), which only ever returns
+  // 'ios'/'android' inside the actual native app shell, not a browser
+  // running on an iOS/Android device. That meant anyone testing via mobile
+  // Safari/Chrome silently got the OTHER branch's (smaller) offset, with no
+  // visible relation to which one "should" apply - splitting a purely
+  // visual position into platform branches was never buying anything here.
+  // MainApp measures the real nav height via ResizeObserver and publishes
+  // it as --app-bottom-nav-height (see MainApp.tsx), so this always clears
+  // the actual nav at any screen size instead of estimating it.
+  const bottomOffset = 'calc(var(--app-bottom-nav-height, 88px) + clamp(28px, 5vw, 38px))';
 
   return (
   <div

@@ -836,7 +836,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Roboto, "Segoe UI", sans-serif'
         }}
       >
-        <div className="px-4 pt-1 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 12px) + 80px)' }}>
+        <div className="px-4 pt-1 space-y-3 text-[clamp(13px,3.6vw,16px)]" style={{ paddingBottom: '10px' }}>
             {/* About (Bio) */}
             {match.bio && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
