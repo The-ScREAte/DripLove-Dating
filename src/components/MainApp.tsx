@@ -150,7 +150,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         if (entry.target === header) {
           root.style.setProperty('--app-header-height', `${height}px`);
         } else if (entry.target === bottomNav) {
-          root.style.setProperty('--app-bottom-nav-height', `${height}px`);
+          // borderBoxSize excludes margin, but the nav's marginBottom (safe-area
+          // inset + gap) is real visual space below it that callers reserving
+          // "the bottom nav's height" need included too - otherwise this var
+          // undercounts by exactly that margin, which is 0 on web/Android but
+          // ~34px on iOS devices with a home indicator, causing anything
+          // positioned via this var to overlap the nav only on those devices.
+          const marginBottom = parseFloat(getComputedStyle(entry.target).marginBottom) || 0;
+          root.style.setProperty('--app-bottom-nav-height', `${height + marginBottom}px`);
         }
       }
     });

@@ -33,7 +33,7 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
 
   return (
   <div
-    className="fixed right-[clamp(16px,4vw,24px)] z-30 sm:absolute sm:right-[clamp(16px,4vw,24px)]"
+    className="fixed right-[clamp(16px,4vw,24px)] z-[100000] sm:absolute sm:right-[clamp(16px,4vw,24px)]"
     style={{ bottom: bottomOffset }}
   >
       <div className="relative">
