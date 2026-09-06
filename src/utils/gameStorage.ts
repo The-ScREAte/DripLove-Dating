@@ -39,6 +39,21 @@ const safeGetLocalStorage = (): Storage | null => {
   }
 };
 
+// setItem can throw synchronously (QuotaExceededError, private-browsing
+// storage caps on some mobile browsers) even when reads work fine. All the
+// call sites below sit inside a game's core loop, and this whole feature
+// renders under one app-wide ErrorBoundary - an uncaught throw here doesn't
+// just skip saving a score, it crashes the entire app to the "Something went
+// wrong" screen mid-play. A failed save is fine to silently drop; a crashed
+// app is not.
+const safeSetItem = (storage: Storage, key: string, value: string): void => {
+  try {
+    storage.setItem(key, value);
+  } catch {
+    // best-effort persistence only - never let a storage failure take down the app
+  }
+};
+
 type ResultsStore = Partial<Record<GameType, LocalGameResult[]>>;
 type ProgressStore = Partial<Record<GameType, LocalGameProgress>>;
 type LevelBestStore = Partial<Record<GameType, Record<number, LocalGameResult>>>;
@@ -75,7 +90,7 @@ export const addResult = (result: LocalGameResult): LocalGameResult[] => {
     .slice(0, 3);
 
   store[result.gameType] = merged;
-  storage.setItem(RESULTS_KEY, JSON.stringify(store));
+  safeSetItem(storage, RESULTS_KEY, JSON.stringify(store));
   return merged;
 };
 
@@ -100,7 +115,7 @@ export const updateBestForLevel = (result: LocalGameResult): Record<number, Loca
   if (isBetterResult(result, current)) {
     perGame[result.level] = result;
     store[result.gameType] = perGame;
-    storage.setItem(LEVEL_BEST_KEY, JSON.stringify(store));
+    safeSetItem(storage, LEVEL_BEST_KEY, JSON.stringify(store));
   }
 
   return store[result.gameType] ?? perGame;
@@ -121,7 +136,7 @@ export const clearLevelBests = (gameType: GameType) => {
 
   const store = safeParse<LevelBestStore>(storage.getItem(LEVEL_BEST_KEY)) ?? {};
   delete store[gameType];
-  storage.setItem(LEVEL_BEST_KEY, JSON.stringify(store));
+  safeSetItem(storage, LEVEL_BEST_KEY, JSON.stringify(store));
 };
 
 export const clearResults = (gameType: GameType) => {
@@ -130,7 +145,7 @@ export const clearResults = (gameType: GameType) => {
 
   const store = safeParse<ResultsStore>(storage.getItem(RESULTS_KEY)) ?? {};
   delete store[gameType];
-  storage.setItem(RESULTS_KEY, JSON.stringify(store));
+  safeSetItem(storage, RESULTS_KEY, JSON.stringify(store));
 };
 
 export const saveProgress = (gameType: GameType, level: number, state: unknown) => {
@@ -144,7 +159,7 @@ export const saveProgress = (gameType: GameType, level: number, state: unknown) 
     state,
     savedAt: new Date().toISOString(),
   };
-  storage.setItem(PROGRESS_KEY, JSON.stringify(store));
+  safeSetItem(storage, PROGRESS_KEY, JSON.stringify(store));
 };
 
 export const loadProgress = (gameType: GameType): { level: number; state: unknown } | null => {
@@ -163,5 +178,5 @@ export const clearProgress = (gameType: GameType) => {
 
   const store = safeParse<ProgressStore>(storage.getItem(PROGRESS_KEY)) ?? {};
   delete store[gameType];
-  storage.setItem(PROGRESS_KEY, JSON.stringify(store));
+  safeSetItem(storage, PROGRESS_KEY, JSON.stringify(store));
 };

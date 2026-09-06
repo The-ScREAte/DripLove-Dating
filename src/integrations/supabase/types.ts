@@ -1403,6 +1403,7 @@ export type Database = {
         Row: {
           code: string
           commission_duration: number | null
+          commission_enabled: boolean
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -1412,6 +1413,10 @@ export type Database = {
           owner_name: string
           password_hash: string | null
           percentage_cut: number
+          show_demographics_enabled: boolean
+          show_leads_enabled: boolean
+          show_subscribers_enabled: boolean
+          terms_accepted_at: string | null
           status: string | null
           total_commission_earned: number | null
           total_paid_subscribers: number | null
@@ -1421,6 +1426,7 @@ export type Database = {
         Insert: {
           code: string
           commission_duration?: number | null
+          commission_enabled?: boolean
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -1430,6 +1436,10 @@ export type Database = {
           owner_name: string
           password_hash?: string | null
           percentage_cut?: number
+          show_demographics_enabled?: boolean
+          show_leads_enabled?: boolean
+          show_subscribers_enabled?: boolean
+          terms_accepted_at?: string | null
           status?: string | null
           total_commission_earned?: number | null
           total_paid_subscribers?: number | null
@@ -1439,6 +1449,7 @@ export type Database = {
         Update: {
           code?: string
           commission_duration?: number | null
+          commission_enabled?: boolean
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -1448,6 +1459,10 @@ export type Database = {
           owner_name?: string
           password_hash?: string | null
           percentage_cut?: number
+          show_demographics_enabled?: boolean
+          show_leads_enabled?: boolean
+          show_subscribers_enabled?: boolean
+          terms_accepted_at?: string | null
           status?: string | null
           total_commission_earned?: number | null
           total_paid_subscribers?: number | null

@@ -5,28 +5,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Gift, 
-  LogIn, 
-  LogOut, 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  Percent,
+  Gift,
+  LogIn,
+  LogOut,
+  Users,
   Clock,
-  CheckCircle,
   Crown,
-  Wallet,
   Eye,
-  EyeOff
+  EyeOff,
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 
-interface ReferredUser {
-  first_name: string;
-  last_initial: string | null;
-  signup_date: string;
-  is_subscribed: boolean;
+interface DemographicBucket {
+  label: string;
+  count: number;
 }
 
 interface InfluencerSession {
@@ -36,6 +33,11 @@ interface InfluencerSession {
   email?: string;
   percentage_cut: number;
   commission_duration: number;
+  commission_enabled: boolean;
+  show_leads_enabled: boolean;
+  show_subscribers_enabled: boolean;
+  show_demographics_enabled: boolean;
+  terms_accepted_at: string | null;
   status: string;
   total_signups: number;
   total_subscribers: number;
@@ -49,6 +51,38 @@ interface InfluencerSession {
   exchange_rate: number;
   has_pending_payout: boolean;
 }
+
+// Single-hue horizontal bar breakdown (magnitude comparison across a small
+// set of categories) - bar length is the value, count is direct-labeled, no
+// legend needed since each row's own label already names its category.
+const DemographicBarGroup = ({ title, buckets }: { title: string; buckets: DemographicBucket[] | null }) => {
+  if (!buckets || buckets.length === 0) return null;
+  const total = buckets.reduce((sum, b) => sum + b.count, 0);
+  if (total === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{title}</p>
+      <div className="space-y-2">
+        {buckets.map((b) => {
+          const pct = total > 0 ? (b.count / total) * 100 : 0;
+          return (
+            <div key={b.label} className="flex items-center gap-2 text-sm">
+              <span className="w-16 shrink-0 text-gray-600">{b.label}</span>
+              <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-pink-500"
+                  style={{ width: `${Math.max(pct, b.count > 0 ? 4 : 0)}%` }}
+                />
+              </div>
+              <span className="w-8 shrink-0 text-right font-medium text-gray-900">{b.count}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const InfluencerPortal = () => {
   const { toast } = useToast();
@@ -66,11 +100,28 @@ const InfluencerPortal = () => {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [requestingPayout, setRequestingPayout] = useState(false);
 
-  // Referred users (who signed up with this code, and whether they've
-  // subscribed yet) - fetched separately since it's not part of the
-  // aggregate stats returned by influencer_login.
-  const [referredUsers, setReferredUsers] = useState<ReferredUser[] | null>(null);
-  const [loadingReferredUsers, setLoadingReferredUsers] = useState(false);
+  // Terms & Conditions - forced open (non-dismissible) on first login until
+  // agreed; reopenable any time afterward via the header button.
+  const [showTerms, setShowTerms] = useState(false);
+  const [termsChecked, setTermsChecked] = useState(false);
+  const [acceptingTerms, setAcceptingTerms] = useState(false);
+  const termsRequired = !!session && !session.terms_accepted_at;
+
+  useEffect(() => {
+    if (termsRequired) {
+      setShowTerms(true);
+      setTermsChecked(false);
+    }
+  }, [termsRequired]);
+
+  // Gender/age breakdown of everyone who used this code (the leads) - fetched
+  // separately since it's not part of the aggregate stats returned by
+  // influencer_login. Aggregate only, no individual names - more useful to a
+  // promoter than a raw name list (which just duplicated the leads count) and
+  // more private for the people who signed up.
+  const [genderBreakdown, setGenderBreakdown] = useState<DemographicBucket[] | null>(null);
+  const [ageBreakdown, setAgeBreakdown] = useState<DemographicBucket[] | null>(null);
+  const [loadingDemographics, setLoadingDemographics] = useState(false);
 
   // Check for existing session on mount (display-only, no auto-refresh with credentials)
   useEffect(() => {
@@ -88,6 +139,11 @@ const InfluencerPortal = () => {
             email: parsed.email,
             percentage_cut: parsed.percentage_cut || 0,
             commission_duration: parsed.commission_duration || 0,
+            commission_enabled: parsed.commission_enabled ?? true,
+            show_leads_enabled: parsed.show_leads_enabled ?? true,
+            show_subscribers_enabled: parsed.show_subscribers_enabled ?? true,
+            show_demographics_enabled: parsed.show_demographics_enabled ?? true,
+            terms_accepted_at: parsed.terms_accepted_at ?? null,
             status: parsed.status || 'active',
             total_signups: parsed.total_signups || 0,
             total_subscribers: parsed.total_subscribers || 0,
@@ -125,6 +181,11 @@ const InfluencerPortal = () => {
       email: result.email,
       percentage_cut: result.percentage_cut,
       commission_duration: result.commission_duration,
+      commission_enabled: result.commission_enabled ?? true,
+      show_leads_enabled: result.show_leads_enabled ?? true,
+      show_subscribers_enabled: result.show_subscribers_enabled ?? true,
+      show_demographics_enabled: result.show_demographics_enabled ?? true,
+      terms_accepted_at: result.terms_accepted_at ?? null,
       status: result.status,
       total_signups: result.total_signups,
       total_subscribers: result.total_subscribers,
@@ -146,24 +207,25 @@ const InfluencerPortal = () => {
     return sessionData;
   };
 
-  const fetchReferredUsers = async (code: string, passwordToUse: string) => {
-    setLoadingReferredUsers(true);
+  const fetchLeadDemographics = async (code: string, passwordToUse: string) => {
+    setLoadingDemographics(true);
     try {
-      const { data, error } = await supabase.rpc('get_influencer_referred_users', {
+      const { data, error } = await supabase.rpc('get_influencer_lead_demographics', {
         p_code: code,
         p_password: passwordToUse,
       });
 
       if (error) throw error;
 
-      const result = data as unknown as { success: boolean; referred_users?: ReferredUser[]; error?: string };
+      const result = data as unknown as { success: boolean; gender?: DemographicBucket[]; age_groups?: DemographicBucket[]; error?: string };
       if (result.success) {
-        setReferredUsers(result.referred_users || []);
+        setGenderBreakdown(result.gender || []);
+        setAgeBreakdown(result.age_groups || []);
       }
     } catch (err) {
-      console.error('Error fetching referred users:', err);
+      console.error('Error fetching lead demographics:', err);
     } finally {
-      setLoadingReferredUsers(false);
+      setLoadingDemographics(false);
     }
   };
 
@@ -193,7 +255,9 @@ const InfluencerPortal = () => {
       if (result.success) {
         updateSessionFromResult(result);
         setSessionPassword(password);
-        fetchReferredUsers(promoCode.trim(), password);
+        if (result.show_demographics_enabled ?? true) {
+          fetchLeadDemographics(promoCode.trim(), password);
+        }
 
         toast({ title: 'Welcome!', description: `Logged in as ${result.owner_name}` });
       } else {
@@ -220,7 +284,8 @@ const InfluencerPortal = () => {
     setPromoCode('');
     setPassword('');
     setSessionPassword('');
-    setReferredUsers(null);
+    setGenderBreakdown(null);
+    setAgeBreakdown(null);
     localStorage.removeItem('influencer_session');
     toast({ title: 'Logged out', description: 'You have been logged out successfully.' });
   };
@@ -251,7 +316,9 @@ const InfluencerPortal = () => {
       const result = data as any;
       if (result.success) {
         updateSessionFromResult(result);
-        fetchReferredUsers(session.code, passwordToUse);
+        if (result.show_demographics_enabled ?? true) {
+          fetchLeadDemographics(session.code, passwordToUse);
+        }
         toast({ title: 'Stats refreshed', description: 'Latest totals loaded.' });
       } else {
         // Auto-logout on refresh failure
@@ -355,6 +422,42 @@ const InfluencerPortal = () => {
     }
   };
 
+  const handleAcceptTerms = async () => {
+    if (!session || !termsChecked) return;
+    const passwordToUse = sessionPassword || password;
+    if (!passwordToUse) {
+      toast({ title: 'Session expired', description: 'Please log in again.', variant: 'destructive' });
+      handleLogout();
+      return;
+    }
+
+    setAcceptingTerms(true);
+    try {
+      const { data, error } = await supabase.rpc('accept_influencer_terms', {
+        p_code: session.code,
+        p_password: passwordToUse,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success: boolean; terms_accepted_at?: string; error?: string };
+      if (!result.success) throw new Error(result.error || 'Failed to record acceptance');
+
+      setSession(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev, terms_accepted_at: result.terms_accepted_at ?? new Date().toISOString() };
+        localStorage.setItem('influencer_session', JSON.stringify(updated));
+        return updated;
+      });
+      setShowTerms(false);
+    } catch (err) {
+      console.error('Error accepting terms:', err);
+      toast({ title: 'Error', description: 'Failed to record your acceptance. Please try again.', variant: 'destructive' });
+    } finally {
+      setAcceptingTerms(false);
+    }
+  };
+
   // Login Page
   if (!session) {
     return (
@@ -364,7 +467,7 @@ const InfluencerPortal = () => {
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
               <Gift className="w-8 h-8 text-white" />
             </div>
-            <CardTitle className="text-2xl">Influencer Portal</CardTitle>
+            <CardTitle className="text-2xl">Promoter Portal</CardTitle>
             <p className="text-gray-500 text-sm mt-2">
               Login with your promo code to view your stats and commissions
             </p>
@@ -425,240 +528,265 @@ const InfluencerPortal = () => {
     );
   }
 
+  const showPerformance = session.show_leads_enabled || session.show_subscribers_enabled;
+  const nothingToShow = !session.commission_enabled && !showPerformance && !session.show_demographics_enabled;
+
   // Dashboard
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50 p-4">
-      <div className="max-w-md mx-auto space-y-4 pb-20">
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-md mx-auto space-y-4 pb-12">
         {/* Header */}
-        <Card>
+        <Card className="border-t-4 border-t-pink-500 overflow-hidden">
           <CardContent className="py-4">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-gray-500">Welcome back,</p>
-                <h1 className="text-xl font-bold">{session.owner_name}</h1>
+                <h1 className="text-xl font-bold text-gray-900">{session.owner_name}</h1>
                 {session.email && (
                   <p className="text-xs text-gray-500">{session.email}</p>
                 )}
-                <Badge className="mt-1 bg-pink-100 text-pink-800">
-                  Code: {session.code}
-                </Badge>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              >
+                <LogOut className="w-4 h-4 mr-1.5" /> Log Out
+              </Button>
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t">
+              <Badge className="font-mono text-xs bg-pink-50 text-pink-700 border border-pink-200 hover:bg-pink-50">{session.code}</Badge>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTerms(true)}
+                  className="h-8 text-xs border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <FileText className="w-3.5 h-3.5 mr-1.5" />
+                  Terms
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={refreshStats}
                   disabled={refreshing}
+                  className="h-8 text-xs border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 >
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
-                  <LogOut className="w-4 h-4" />
+                  <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing…' : 'Refresh'}
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Commission Info */}
-        <Card className="border-pink-200 bg-gradient-to-r from-pink-50 to-purple-50">
-          <CardContent className="py-4">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Percent className="w-5 h-5 text-pink-500" />
-                <span className="font-medium">Commission Rate</span>
-              </div>
-              <span className="text-xl font-bold text-pink-600">{session.percentage_cut}%</span>
-            </div>
-            <div className="flex justify-between items-center mt-2">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-purple-500" />
-                <span className="font-medium">Duration</span>
-              </div>
-              <span className="text-lg font-semibold text-purple-600">{session.commission_duration}x per user</span>
-            </div>
-            <div className="mt-3 p-2 bg-white/60 rounded-lg border border-pink-200">
-              <p className="text-xs text-pink-700">
-                💰 You earn <span className="font-bold">{session.percentage_cut}%</span> of each payment for up to <span className="font-bold">{session.commission_duration}</span> months per user
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Performance - leads/subscribers, whichever the admin has shared */}
+        {showPerformance && (
           <Card>
-            <CardContent className="py-4 text-center">
-              <Users className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-blue-600">{session.total_signups}</p>
-              <p className="text-xs text-gray-500">Total Signups</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="py-4 text-center">
-              <Crown className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-yellow-600">{session.total_subscribers}</p>
-              <p className="text-xs text-gray-500">Premium Users</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Referred Users */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-500" />
-              People Who Used Your Code
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingReferredUsers ? (
-              <div className="flex justify-center py-4">
-                <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : !referredUsers || referredUsers.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-2">
-                No signups yet. Share your code to get started!
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {referredUsers.map((u, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg text-sm">
-                    <div>
-                      <p className="font-medium">
-                        {u.first_name}{u.last_initial ? ` ${u.last_initial}.` : ''}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Signed up {new Date(u.signup_date).toLocaleDateString()}
-                      </p>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700">Your Performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`grid gap-3 ${session.show_leads_enabled && session.show_subscribers_enabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {session.show_leads_enabled && (
+                  <div className="rounded-lg bg-blue-50 border border-blue-100 py-3 text-center">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-1.5">
+                      <Users className="w-4 h-4 text-blue-600" />
                     </div>
-                    {u.is_subscribed ? (
-                      <Badge className="bg-green-100 text-green-800">
-                        <Crown className="w-3 h-3 mr-1" /> Subscribed
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-gray-500">
-                        Not yet
-                      </Badge>
-                    )}
+                    <p className="text-2xl font-bold text-gray-900">{session.total_signups}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Leads</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Earnings */}
-        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-green-500" />
-              Total Earnings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-3">
-              <p className="text-3xl font-bold text-green-600">
-                ${session.total_commission_usd.toFixed(2)}
-              </p>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Earned from {session.total_subscribers} premium subscribers
-            </p>
-            
-            {/* Financial Breakdown */}
-            <div className="mt-3 space-y-2">
-              <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-green-200">
-                <span className="text-gray-600">💰 Total Earned (USD):</span>
-                <span className="font-bold text-green-700">${session.total_commission_usd.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-blue-200">
-                <span className="text-gray-600">✅ Paid Out (USD):</span>
-                <span className="font-semibold text-blue-700">${session.total_paid_usd.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm p-2 bg-white/60 rounded border border-orange-200">
-                <span className="text-gray-600">💵 Available (USD):</span>
-                <span className="font-bold text-orange-700">${session.outstanding_usd.toFixed(2)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payout Request */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-purple-500" />
-              Request Payout
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {session.has_pending_payout ? (
-              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <Clock className="w-5 h-5 text-yellow-600" />
-                <div>
-                  <p className="font-medium text-yellow-800">Payout Pending</p>
-                  <p className="text-xs text-yellow-600">Your request is being processed</p>
-                </div>
-              </div>
-            ) : session.outstanding_usd > 0 ? (
-              <>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(e.target.value)}
-                    placeholder="Amount to withdraw (USD)"
-                    min="1"
-                    max={session.outstanding_usd}
-                    step="0.01"
-                  />
-                  <Button
-                    onClick={handleRequestPayout}
-                    disabled={requestingPayout || !payoutAmount}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    {requestingPayout ? 'Submitting...' : 'Request'}
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  Available to withdraw: ${session.outstanding_usd.toFixed(2)}
-                </p>
-                {session.total_paid_usd > 0 && (
-                  <p className="text-xs text-blue-600">
-                    ✓ Already paid out: ${session.total_paid_usd.toFixed(2)}
-                  </p>
                 )}
+                {session.show_subscribers_enabled && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-100 py-3 text-center">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-1.5">
+                      <Crown className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">{session.total_subscribers}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Subscribers</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Lead Demographics - who's using the code, by gender and age group.
+            Aggregate only (no names) - covers every lead (all referrals),
+            not just subscribers. Gated on its own admin toggle, independent
+            of the plain leads count above. */}
+        {session.show_demographics_enabled && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700">Lead Demographics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingDemographics ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : session.total_signups === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-2">
+                  No signups yet. Share your code to get started.
+                </p>
+              ) : (
+                <div className="space-y-5">
+                  <DemographicBarGroup title="Gender" buckets={genderBreakdown} />
+                  <DemographicBarGroup title="Age" buckets={ageBreakdown} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Earnings + Payout - only for promoters with commission activated */}
+        {session.commission_enabled && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700 flex items-center justify-between">
+                <span>Earnings</span>
+                <span className="text-xs font-normal text-gray-500">
+                  {session.percentage_cut}% for {session.commission_duration} month{session.commission_duration === 1 ? '' : 's'} per user
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm py-1.5 border-b">
+                  <span className="text-gray-500">Total earned</span>
+                  <span className="font-semibold text-gray-900">${session.total_commission_usd.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm py-1.5 border-b">
+                  <span className="text-gray-500">Paid out</span>
+                  <span className="font-medium text-gray-700">${session.total_paid_usd.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm py-1.5">
+                  <span className="text-gray-500">Available</span>
+                  <span className="font-bold text-green-600">${session.outstanding_usd.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t">
+                {session.has_pending_payout ? (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                    <p className="text-sm text-amber-800">Payout request pending review</p>
+                  </div>
+                ) : session.outstanding_usd > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        value={payoutAmount}
+                        onChange={(e) => setPayoutAmount(e.target.value)}
+                        placeholder="Amount (USD)"
+                        min="1"
+                        max={session.outstanding_usd}
+                        step="0.01"
+                      />
+                      <Button
+                        onClick={handleRequestPayout}
+                        disabled={requestingPayout || !payoutAmount}
+                        className="bg-pink-600 hover:bg-pink-700 shrink-0"
+                      >
+                        {requestingPayout ? 'Submitting…' : 'Request Payout'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">Up to ${session.outstanding_usd.toFixed(2)} available</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center">No earnings available for payout yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {nothingToShow && (
+          <Card>
+            <CardContent className="py-6 text-center text-sm text-gray-500">
+              Your code is active and your referrals are being tracked. Reach out to the DripLove team for more details.
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Terms & Conditions - forced open (no escape/outside-click dismiss)
+          on first login until agreed; a normal, freely-dismissible dialog on
+          every later open via the header button. */}
+      <Dialog open={showTerms} onOpenChange={(open) => { if (termsRequired && !open) return; setShowTerms(open); }}>
+        <DialogContent
+          className="max-h-[80dvh] flex flex-col"
+          onEscapeKeyDown={(e) => { if (termsRequired) e.preventDefault(); }}
+          onPointerDownOutside={(e) => { if (termsRequired) e.preventDefault(); }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-pink-600">
+              <FileText className="w-5 h-5 text-pink-500 shrink-0" />
+              <span>DripLove — Content Recording &amp; Publishing</span>
+            </DialogTitle>
+            <p className="text-sm text-gray-500">Terms &amp; Conditions for Promoters</p>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 text-sm text-gray-700 space-y-4">
+            <p>
+              Every promoter has their own style, and DripLove doesn't dictate how you create — your setup,
+              environment, tone, and format are entirely up to you. If DripLove does give you specific instructions
+              or talking points for a piece of content, you're expected to follow them; outside of that, create
+              however works best for you.
+            </p>
+
+            <p>
+              The one thing we ask is that you don't put yourself or DripLove at legal or reputational risk.
+              Concretely, that means: don't make false, exaggerated, or misleading claims about the app; disclose
+              sponsored or paid content the way the law requires (e.g. <strong>#ad</strong> or a verbal
+              disclosure); don't feature or expose other people's personal information without their consent; and
+              don't post anything that misrepresents DripLove or breaks the rules of the platform you're posting
+              on.
+            </p>
+
+            <p>
+              <strong>Content that creates legal exposure or seriously misrepresents DripLove may be taken down,
+              and serious or repeated violations can result in removal from the program and forfeiture of pending
+              compensation.</strong> Outside of that, we trust you to represent yourself and DripLove well.
+            </p>
+
+            <p className="text-xs text-gray-500 pt-2 border-t">
+              These Terms &amp; Conditions are incorporated by reference into your Promoter Agreement with Screate
+              LLC.
+            </p>
+          </div>
+          <div className="pt-3 border-t space-y-3">
+            {termsRequired ? (
+              <>
+                <label className="flex items-start gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={termsChecked} onCheckedChange={(checked) => setTermsChecked(checked === true)} className="mt-0.5" />
+                  <span className="text-gray-700">I have read and agree to the Terms &amp; Conditions above.</span>
+                </label>
+                <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
+                  <Button
+                    onClick={handleAcceptTerms}
+                    disabled={!termsChecked || acceptingTerms}
+                    className="w-full bg-pink-600 hover:bg-pink-700"
+                  >
+                    {acceptingTerms ? 'Saving…' : 'Agree & Continue'}
+                  </Button>
+                </DialogFooter>
               </>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-2">
-                No earnings available for payout yet
-              </p>
+              <>
+                <p className="text-xs text-gray-500">
+                  You agreed to these terms on {session.terms_accepted_at ? new Date(session.terms_accepted_at).toLocaleDateString() : '—'}.
+                </p>
+                <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
+                  <Button variant="outline" onClick={() => setShowTerms(false)}>Close</Button>
+                </DialogFooter>
+              </>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Tips */}
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-          <CardContent className="py-4">
-            <h3 className="font-semibold text-blue-800 mb-2">💡 Tips to Earn More</h3>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Share your code <span className="font-bold">{session.code}</span> on social media</li>
-              <li>• Encourage users to go premium for better matches</li>
-              <li>• Create content about your positive experience</li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* Re-login Button - since we no longer cache passwords */}
-        <Button 
-          variant="outline" 
-          className="w-full"
-          onClick={handleLogout}
-        >
-          Re-login to Refresh Stats
-        </Button>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

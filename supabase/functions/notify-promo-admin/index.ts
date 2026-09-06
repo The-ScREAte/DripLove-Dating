@@ -28,10 +28,10 @@ const buildEmail = (
   html: `
     <h2>Promo code redeemed at signup</h2>
     <p><strong>Promo code:</strong> ${escapeHtml(promoCode)}</p>
-    <p><strong>Influencer:</strong> ${escapeHtml(ownerName)}</p>
+    <p><strong>Promoter:</strong> ${escapeHtml(ownerName)}</p>
     <p><strong>New user:</strong> ${escapeHtml(newUserName)}</p>
     <p><strong>New user email:</strong> ${escapeHtml(newUserEmail)}</p>
-    <p>Review this influencer's stats in Admin &gt; Influencers.</p>
+    <p>Review this promoter's stats in Admin &gt; Promoters.</p>
   `,
 });
 

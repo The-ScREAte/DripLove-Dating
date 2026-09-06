@@ -585,6 +585,16 @@ type Result = 'swish' | 'airball' | 'brick' | null;
 
 const GAME_TYPE: GameType = 'shoot-your-shot';
 
+// Picks `count` random, non-repeating items from `pool` (Fisher-Yates).
+const pickRandom = <T,>(pool: T[], count: number): T[] => {
+  const copy = [...pool];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, Math.min(count, copy.length));
+};
+
 const levelConfig: Record<number, { name: string; difficulty: string; timeLimit: number; challenges: number; }> = {
   1: { name: 'Warm Up', difficulty: 'Easy', timeLimit: 60, challenges: 3 },
   2: { name: 'Quick Hands', difficulty: 'Medium', timeLimit: 45, challenges: 4 },
@@ -609,6 +619,10 @@ const ShootYourShot = () => {
   const [result, setResult] = useState<Result>(null);
   const [gameStarted, setGameStarted] = useState(false);
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
+  const [savingResult, setSavingResult] = useState(false);
+  // Bumped on every startLevel() call so replaying the SAME level re-shuffles
+  // instead of reusing the memoized pick from the last play.
+  const [levelStartNonce, setLevelStartNonce] = useState(0);
 
   const [levelComplete, setLevelComplete] = useState<null | {
     level: number;
@@ -624,8 +638,13 @@ const ShootYourShot = () => {
   const levelChallenges = useMemo(() => {
     if (!selectedLevel) return [] as Challenge[];
     const count = levelConfig[selectedLevel]?.challenges ?? challenges.length;
-    return challenges.slice(0, Math.min(count, challenges.length));
-  }, [selectedLevel]);
+    // Random sample of the FULL 70-challenge pool, not just the first N -
+    // previously this always sliced the same fixed prefix, so ~65 of the 70
+    // authored challenges could never appear at any level, and every replay
+    // of a given level showed the exact same challenges in the same order.
+    return pickRandom(challenges, count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLevel, levelStartNonce]);
 
   const challenge = levelChallenges[currentChallenge];
 
@@ -699,16 +718,17 @@ const ShootYourShot = () => {
   };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft(time => time - 1);
-      }, 1000);
-    }
-    
+    if (!isActive) return;
+    // Depends on [isActive] only (not timeLeft) - setTimeLeft's functional
+    // form reads the current value on each tick, so this creates ONE interval
+    // for the whole countdown instead of tearing down and recreating a new
+    // setInterval every single second (which timeLeft-as-a-dependency was
+    // doing on the most time-pressured game in the app).
+    const interval = setInterval(() => {
+      setTimeLeft(time => Math.max(0, time - 1));
+    }, 1000);
     return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isActive]);
 
   // Separate effect for handling time expiry
   useEffect(() => {
@@ -725,7 +745,11 @@ const ShootYourShot = () => {
   };
 
   const handleNext = async () => {
-    if (!selectedLevel) return;
+    // The screen doesn't change until setLevelComplete at the very end of the
+    // last-challenge branch below, so without this guard the "See Results"
+    // button stays visible and clickable for the whole awaited DB write -
+    // a rapid double-tap there re-enters this function and double-submits.
+    if (!selectedLevel || savingResult) return;
 
     if (currentChallenge < levelChallenges.length - 1) {
       setCurrentChallenge(currentChallenge + 1);
@@ -756,7 +780,12 @@ const ShootYourShot = () => {
         timeTakenSeconds,
         playedAt,
       });
-      await saveFinalGameResultToDb({ gameType: GAME_TYPE, level: selectedLevel, percentage, playedAt });
+      setSavingResult(true);
+      try {
+        await saveFinalGameResultToDb({ gameType: GAME_TYPE, level: selectedLevel, percentage, playedAt });
+      } finally {
+        setSavingResult(false);
+      }
 
       setBest3(getBestResults(GAME_TYPE));
 
@@ -784,6 +813,7 @@ const ShootYourShot = () => {
 
   const startLevel = (level: number) => {
     setSelectedLevel(level);
+    setLevelStartNonce(n => n + 1);
     setCurrentChallenge(0);
     setMessage('');
     setTimeLeft(levelConfig[level]?.timeLimit ?? 60);
@@ -883,10 +913,10 @@ const ShootYourShot = () => {
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10 hover:text-white">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
@@ -963,10 +993,10 @@ const ShootYourShot = () => {
         <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -1010,14 +1040,14 @@ const ShootYourShot = () => {
                 )}
               </div>
 
-              <div className="mt-6 space-y-2">
+              <div className="mt-6 flex gap-2">
                 <Button
                   onClick={() => startLevel(levelComplete.level)}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-bold"
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-bold"
                 >
                   Replay Level {levelComplete.level}
                 </Button>
-                <Button onClick={backToLevelSelect} variant="outline" className="w-full border-pink-500/40 text-white hover:bg-white/10">
+                <Button onClick={backToLevelSelect} variant="outline" className="flex-1 bg-black/60 border-pink-500/40 text-white hover:bg-white/10 hover:text-white">
                   Choose Another Level
                 </Button>
               </div>
@@ -1050,10 +1080,10 @@ const ShootYourShot = () => {
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -1178,13 +1208,14 @@ const ShootYourShot = () => {
 
               <Button
                 onClick={handleNext}
+                disabled={savingResult}
                 className={`w-full font-bold ${
                   resultInfo?.color === 'green' ? 'bg-green-600 hover:bg-green-700' :
                   resultInfo?.color === 'orange' ? 'bg-orange-600 hover:bg-orange-700' :
                   'bg-red-600 hover:bg-red-700'
                 }`}
               >
-                {currentChallenge < levelChallenges.length - 1 ? 'Next Challenge' : 'See Results'}
+                {savingResult ? 'Saving…' : currentChallenge < levelChallenges.length - 1 ? 'Next Challenge' : 'See Results'}
               </Button>
             </CardContent>
           </Card>

@@ -37,6 +37,10 @@ interface PromoCode {
   owner_name: string;
   percentage_cut: number;
   commission_duration: number;
+  commission_enabled: boolean;
+  show_leads_enabled: boolean;
+  show_subscribers_enabled: boolean;
+  show_demographics_enabled: boolean;
   status: string;
   is_active: boolean;
   total_signups: number;
@@ -104,7 +108,11 @@ const InfluencerManagement = () => {
     email: '',
     password: '',
     percentageCut: '20',
-    commissionDuration: '1'
+    commissionDuration: '1',
+    commissionEnabled: true,
+    showLeadsEnabled: true,
+    showSubscribersEnabled: true,
+    showDemographicsEnabled: true
   });
 
   const fetchPromoCodes = useCallback(async () => {
@@ -114,7 +122,7 @@ const InfluencerManagement = () => {
       // needed here anyway.
       const { data, error } = await supabase
         .from('promo_codes')
-        .select('id, code, owner_name, email, percentage_cut, commission_duration, status, is_active, total_signups, total_paid_subscribers, total_commission_earned, created_at, deleted_at')
+        .select('id, code, owner_name, email, percentage_cut, commission_duration, commission_enabled, show_leads_enabled, show_subscribers_enabled, show_demographics_enabled, status, is_active, total_signups, total_paid_subscribers, total_commission_earned, created_at, deleted_at')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -231,6 +239,10 @@ const InfluencerManagement = () => {
           password_hash: token, // Token will be replaced when user sets password
           percentage_cut: parseFloat(formData.percentageCut),
           commission_duration: parseInt(formData.commissionDuration),
+          commission_enabled: formData.commissionEnabled,
+          show_leads_enabled: formData.showLeadsEnabled,
+          show_subscribers_enabled: formData.showSubscribersEnabled,
+          show_demographics_enabled: formData.showDemographicsEnabled,
           status: 'pending_password',
           is_active: true
         })
@@ -244,12 +256,58 @@ const InfluencerManagement = () => {
       const setupLink = `${appUrl}/influencer/set-password?id=${newPromoCode.id}&token=${encodeURIComponent(token)}`;
       setPasswordSetupLink(setupLink);
 
-      toast({ title: 'Success', description: 'Influencer created! Share the password setup link with them.' });
-      setFormData({ code: '', ownerName: '', email: '', password: '', percentageCut: '20', commissionDuration: '1' });
+      // Best-effort - the admin can also always pull up (and re-send) this
+      // link later via the "Setup Link" button while the promoter is still
+      // pending_password, so a failure here isn't fatal to the creation flow.
+      supabase.functions.invoke('notify-promoter-created', {
+        body: { promoCodeId: newPromoCode.id, appUrl },
+      }).then(({ error: emailError }) => {
+        if (emailError) console.error('Failed to email promoter setup link:', emailError);
+      });
+
+      toast({ title: 'Success', description: 'Promoter created! Setup link emailed to them (and shown below to share yourself).' });
+      setFormData({ code: '', ownerName: '', email: '', password: '', percentageCut: '20', commissionDuration: '1', commissionEnabled: true, showLeadsEnabled: true, showSubscribersEnabled: true, showDemographicsEnabled: true });
       fetchPromoCodes();
     } catch (error) {
       console.error('Error creating promo code:', error);
       toast({ title: 'Error', description: 'Failed to create promo code', variant: 'destructive' });
+    }
+  };
+
+  const [fetchingSetupLinkFor, setFetchingSetupLinkFor] = useState<string | null>(null);
+
+  const handleGetSetupLink = async (promoCode: PromoCode) => {
+    setFetchingSetupLinkFor(promoCode.id);
+    try {
+      const { data, error } = await supabase.rpc('admin_get_promo_setup_link', {
+        p_promo_code_id: promoCode.id,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success: boolean; token?: string; error?: string };
+      if (!result.success || !result.token) {
+        throw new Error(result.error || 'Failed to generate setup link');
+      }
+
+      const appUrl = window.location.origin;
+      setPasswordSetupLink(`${appUrl}/influencer/set-password?id=${promoCode.id}&token=${encodeURIComponent(result.token)}`);
+
+      // Best-effort resend - the new token above was already regenerated
+      // regardless of whether the email succeeds.
+      supabase.functions.invoke('notify-promoter-created', {
+        body: { promoCodeId: promoCode.id, appUrl },
+      }).then(({ error: emailError }) => {
+        if (emailError) console.error('Failed to email promoter setup link:', emailError);
+      });
+
+      toast({ title: 'Setup link ready', description: 'A fresh link was generated and emailed to the promoter.' });
+      fetchPromoCodes();
+    } catch (error) {
+      console.error('Error fetching setup link:', error);
+      toast({ title: 'Error', description: 'Failed to generate setup link', variant: 'destructive' });
+    } finally {
+      setFetchingSetupLinkFor(null);
     }
   };
 
@@ -279,7 +337,11 @@ const InfluencerManagement = () => {
         owner_name: formData.ownerName.trim(),
         email: formData.email.trim() || null,
         percentage_cut: parseFloat(formData.percentageCut),
-        commission_duration: parseInt(formData.commissionDuration)
+        commission_duration: parseInt(formData.commissionDuration),
+        commission_enabled: formData.commissionEnabled,
+        show_leads_enabled: formData.showLeadsEnabled,
+        show_subscribers_enabled: formData.showSubscribersEnabled,
+        show_demographics_enabled: formData.showDemographicsEnabled
       };
 
       const { error } = await supabase
@@ -438,7 +500,11 @@ const InfluencerManagement = () => {
       email: (promoCode as any).email || '',
       password: '',
       percentageCut: promoCode.percentage_cut.toString(),
-      commissionDuration: promoCode.commission_duration.toString()
+      commissionDuration: promoCode.commission_duration.toString(),
+      commissionEnabled: promoCode.commission_enabled,
+      showLeadsEnabled: promoCode.show_leads_enabled,
+      showSubscribersEnabled: promoCode.show_subscribers_enabled,
+      showDemographicsEnabled: promoCode.show_demographics_enabled
     });
     setShowEditModal(true);
   };
@@ -470,7 +536,7 @@ const InfluencerManagement = () => {
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Gift className="w-5 h-5 text-pink-500" />
-          Influencer Management
+          Promoter Management
         </h2>
         <Button onClick={() => setShowCreateModal(true)} size="sm" className="bg-pink-500 hover:bg-pink-600">
           <Plus className="w-4 h-4 mr-1" /> New Promo Code
@@ -565,16 +631,32 @@ const InfluencerManagement = () => {
                     <p className="font-bold text-lg">{promo.code}</p>
                     <p className="text-sm text-gray-600">{promo.owner_name}</p>
                   </div>
-                  {getStatusBadge(promo.status)}
+                  <div className="flex flex-col items-end gap-1">
+                    {getStatusBadge(promo.status)}
+                    <div className="flex gap-1">
+                      {!promo.commission_enabled && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-gray-300 text-gray-500">No commission</Badge>
+                      )}
+                      {!promo.show_leads_enabled && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-gray-300 text-gray-500">Leads hidden</Badge>
+                      )}
+                      {!promo.show_subscribers_enabled && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-gray-300 text-gray-500">Subscribers hidden</Badge>
+                      )}
+                      {!promo.show_demographics_enabled && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-gray-300 text-gray-500">Demographics hidden</Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                
+
                 <div className="grid grid-cols-4 gap-2 text-xs">
                   <div className="text-center p-2 bg-gray-50 rounded">
-                    <p className="font-semibold">{promo.percentage_cut}%</p>
+                    <p className="font-semibold">{promo.commission_enabled ? `${promo.percentage_cut}%` : '—'}</p>
                     <p className="text-gray-500">Commission</p>
                   </div>
                   <div className="text-center p-2 bg-gray-50 rounded">
-                    <p className="font-semibold">{promo.commission_duration}x</p>
+                    <p className="font-semibold">{promo.commission_enabled ? `${promo.commission_duration}x` : '—'}</p>
                     <p className="text-gray-500">Duration</p>
                   </div>
                   <div className="text-center p-2 bg-blue-50 rounded">
@@ -588,10 +670,12 @@ const InfluencerManagement = () => {
                 </div>
 
                 <div className="text-xs space-y-1">
-                  <div>
-                    Total Earned: <span className="font-semibold text-green-600">GHS {(promo.total_commission_earned || 0).toFixed(2)}</span>
-                  </div>
-                  {payoutStats[promo.id] && (
+                  {promo.commission_enabled && (
+                    <div>
+                      Total Earned: <span className="font-semibold text-green-600">GHS {(promo.total_commission_earned || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {promo.commission_enabled && payoutStats[promo.id] && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Paid Out:</span>
@@ -611,31 +695,48 @@ const InfluencerManagement = () => {
                   )}
                 </div>
 
-                <div className="flex gap-1 pt-2 border-t">
-                  <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => handleViewDetails(promo)}>
-                    <Eye className="w-3 h-3 mr-1" /> View
+                <div className="flex flex-wrap gap-1 pt-2 border-t">
+                  <Button size="icon" variant="outline" className="h-7 w-7" title="View details" aria-label="View details" onClick={() => handleViewDetails(promo)}>
+                    <Eye className="w-3.5 h-3.5" />
                   </Button>
-                  <Button size="sm" variant="outline" className="flex-1 text-xs h-7" onClick={() => openEditModal(promo)}>
-                    <Edit2 className="w-3 h-3 mr-1" /> Edit
+                  <Button size="icon" variant="outline" className="h-7 w-7" title="Edit" aria-label="Edit" onClick={() => openEditModal(promo)}>
+                    <Edit2 className="w-3.5 h-3.5" />
                   </Button>
+                  {promo.status === 'pending_password' && (
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-7 w-7 text-pink-600 border-pink-200"
+                      title="Get setup link"
+                      aria-label="Get setup link"
+                      onClick={() => handleGetSetupLink(promo)}
+                      disabled={fetchingSetupLinkFor === promo.id}
+                    >
+                      {fetchingSetupLinkFor === promo.id ? (
+                        <div className="w-3.5 h-3.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Link className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  )}
                   {promo.status === 'active' ? (
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleStatusChange(promo, 'inactive')}>
-                      <XCircle className="w-3 h-3" />
+                    <Button size="icon" variant="outline" className="h-7 w-7" title="Deactivate" aria-label="Deactivate" onClick={() => handleStatusChange(promo, 'inactive')}>
+                      <XCircle className="w-3.5 h-3.5" />
                     </Button>
                   ) : promo.status === 'inactive' ? (
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleStatusChange(promo, 'active')}>
-                      <CheckCircle className="w-3 h-3" />
+                    <Button size="icon" variant="outline" className="h-7 w-7" title="Activate" aria-label="Activate" onClick={() => handleStatusChange(promo, 'active')}>
+                      <CheckCircle className="w-3.5 h-3.5" />
                     </Button>
                   ) : promo.status === 'blocked' ? (
-                    <Button size="sm" variant="outline" className="text-xs h-7 text-green-600" onClick={() => handleStatusChange(promo, 'active')}>
-                      <CheckCircle className="w-3 h-3" />
+                    <Button size="icon" variant="outline" className="h-7 w-7 text-green-600" title="Unblock" aria-label="Unblock" onClick={() => handleStatusChange(promo, 'active')}>
+                      <CheckCircle className="w-3.5 h-3.5" />
                     </Button>
                   ) : null}
-                  <Button size="sm" variant="outline" className="text-xs h-7 text-orange-600" onClick={() => handleStatusChange(promo, 'blocked')}>
-                    <Ban className="w-3 h-3" />
+                  <Button size="icon" variant="outline" className="h-7 w-7 text-orange-600" title="Block" aria-label="Block" onClick={() => handleStatusChange(promo, 'blocked')}>
+                    <Ban className="w-3.5 h-3.5" />
                   </Button>
-                  <Button size="sm" variant="outline" className="text-xs h-7 text-red-600" onClick={() => handleDelete(promo)}>
-                    <Trash2 className="w-3 h-3" />
+                  <Button size="icon" variant="outline" className="h-7 w-7 text-red-600" title="Delete" aria-label="Delete" onClick={() => handleDelete(promo)}>
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               </div>
@@ -653,61 +754,120 @@ const InfluencerManagement = () => {
           <div className="space-y-4">
             <div>
               <Label>Promo Code *</Label>
-              <Input 
-                value={formData.code} 
+              <Input
+                value={formData.code}
                 onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                placeholder="e.g., INFLUENCER20"
+                placeholder="e.g., PROMO20"
               />
             </div>
             <div>
-              <Label>Influencer Name *</Label>
-              <Input 
-                value={formData.ownerName} 
+              <Label>Promoter Name *</Label>
+              <Input
+                value={formData.ownerName}
                 onChange={(e) => setFormData(prev => ({ ...prev, ownerName: e.target.value }))}
                 placeholder="Full name"
               />
             </div>
             <div>
               <Label>Email *</Label>
-              <Input 
+              <Input
                 type="email"
-                value={formData.email} 
+                value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="influencer@email.com"
+                placeholder="promoter@email.com"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Commission % *</Label>
-                <Input 
-                  type="number"
-                  value={formData.percentageCut} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, percentageCut: e.target.value }))}
-                  min="1"
-                  max="100"
-                />
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Activate Promo Percentage</p>
+                <p className="text-xs text-gray-500">
+                  On: this promoter earns commission and sees earnings/payout in their portal.
+                  Off: their code is still tracked for leads &amp; subscribers only.
+                </p>
               </div>
-              <div>
-                <Label>Commission Duration *</Label>
-                <Select 
-                  value={formData.commissionDuration} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, commissionDuration: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1x (One-time)</SelectItem>
-                    <SelectItem value="2">2x (Two payments)</SelectItem>
-                    <SelectItem value="3">3x (Three payments)</SelectItem>
-                    <SelectItem value="6">6x (Six payments)</SelectItem>
-                    <SelectItem value="12">12x (Twelve payments)</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Switch
+                checked={formData.commissionEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, commissionEnabled: checked }))}
+              />
+            </div>
+
+            {formData.commissionEnabled && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Commission % *</Label>
+                  <Input
+                    type="number"
+                    value={formData.percentageCut}
+                    onChange={(e) => setFormData(prev => ({ ...prev, percentageCut: e.target.value }))}
+                    min="1"
+                    max="100"
+                  />
+                </div>
+                <div>
+                  <Label>Months Available *</Label>
+                  <Select
+                    value={formData.commissionDuration}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, commissionDuration: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 month (one-time)</SelectItem>
+                      <SelectItem value="2">2 months</SelectItem>
+                      <SelectItem value="3">3 months</SelectItem>
+                      <SelectItem value="6">6 months</SelectItem>
+                      <SelectItem value="12">12 months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            )}
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Show Leads to Promoter</p>
+                <p className="text-xs text-gray-500">
+                  On: they can see their signup count and the list of people who used their code.
+                  Off: hidden from their portal (you still see it here as admin).
+                </p>
+              </div>
+              <Switch
+                checked={formData.showLeadsEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showLeadsEnabled: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Show Subscribers to Promoter</p>
+                <p className="text-xs text-gray-500">
+                  On: they can see how many of their referrals went premium.
+                  Off: hidden from their portal (you still see it here as admin).
+                </p>
+              </div>
+              <Switch
+                checked={formData.showSubscribersEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showSubscribersEnabled: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Show Lead Demographics</p>
+                <p className="text-xs text-gray-500">
+                  On: they can see a gender/age breakdown of their leads.
+                  Off: hidden from their portal (you still see it here as admin).
+                </p>
+              </div>
+              <Switch
+                checked={formData.showDemographicsEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showDemographicsEnabled: checked }))}
+              />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
             <Button size="sm" variant="outline" onClick={() => setShowCreateModal(false)}>Cancel</Button>
             <Button size="sm" onClick={handleCreatePromoCode} className="bg-pink-500 hover:bg-pink-600">Create</Button>
           </DialogFooter>
@@ -722,62 +882,121 @@ const InfluencerManagement = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Influencer Name *</Label>
-              <Input 
-                value={formData.ownerName} 
+              <Label>Promoter Name *</Label>
+              <Input
+                value={formData.ownerName}
                 onChange={(e) => setFormData(prev => ({ ...prev, ownerName: e.target.value }))}
               />
             </div>
             <div>
               <Label>Email (Optional)</Label>
-              <Input 
+              <Input
                 type="email"
-                value={formData.email} 
+                value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="influencer@email.com"
+                placeholder="promoter@email.com"
               />
             </div>
             <div>
               <Label>New Password (leave empty to keep current)</Label>
-              <Input 
+              <Input
                 type="password"
-                value={formData.password} 
+                value={formData.password}
                 onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                 placeholder="Enter new password"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Commission %</Label>
-                <Input 
-                  type="number"
-                  value={formData.percentageCut} 
-                  onChange={(e) => setFormData(prev => ({ ...prev, percentageCut: e.target.value }))}
-                  min="1"
-                  max="100"
-                />
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Activate Promo Percentage</p>
+                <p className="text-xs text-gray-500">
+                  On: this promoter earns commission and sees earnings/payout in their portal.
+                  Off: their code is still tracked for leads &amp; subscribers only.
+                </p>
               </div>
-              <div>
-                <Label>Commission Duration</Label>
-                <Select 
-                  value={formData.commissionDuration} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, commissionDuration: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1x (One-time)</SelectItem>
-                    <SelectItem value="2">2x (Two payments)</SelectItem>
-                    <SelectItem value="3">3x (Three payments)</SelectItem>
-                    <SelectItem value="6">6x (Six payments)</SelectItem>
-                    <SelectItem value="12">12x (Twelve payments)</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Switch
+                checked={formData.commissionEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, commissionEnabled: checked }))}
+              />
+            </div>
+
+            {formData.commissionEnabled && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Commission %</Label>
+                  <Input
+                    type="number"
+                    value={formData.percentageCut}
+                    onChange={(e) => setFormData(prev => ({ ...prev, percentageCut: e.target.value }))}
+                    min="1"
+                    max="100"
+                  />
+                </div>
+                <div>
+                  <Label>Months Available</Label>
+                  <Select
+                    value={formData.commissionDuration}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, commissionDuration: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 month (one-time)</SelectItem>
+                      <SelectItem value="2">2 months</SelectItem>
+                      <SelectItem value="3">3 months</SelectItem>
+                      <SelectItem value="6">6 months</SelectItem>
+                      <SelectItem value="12">12 months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            )}
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Show Leads to Promoter</p>
+                <p className="text-xs text-gray-500">
+                  On: they can see their signup count and the list of people who used their code.
+                  Off: hidden from their portal (you still see it here as admin).
+                </p>
+              </div>
+              <Switch
+                checked={formData.showLeadsEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showLeadsEnabled: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Show Subscribers to Promoter</p>
+                <p className="text-xs text-gray-500">
+                  On: they can see how many of their referrals went premium.
+                  Off: hidden from their portal (you still see it here as admin).
+                </p>
+              </div>
+              <Switch
+                checked={formData.showSubscribersEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showSubscribersEnabled: checked }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Show Lead Demographics</p>
+                <p className="text-xs text-gray-500">
+                  On: they can see a gender/age breakdown of their leads.
+                  Off: hidden from their portal (you still see it here as admin).
+                </p>
+              </div>
+              <Switch
+                checked={formData.showDemographicsEnabled}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showDemographicsEnabled: checked }))}
+              />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
             <Button size="sm" variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
             <Button size="sm" onClick={handleUpdatePromoCode} className="bg-pink-500 hover:bg-pink-600">Save Changes</Button>
           </DialogFooter>

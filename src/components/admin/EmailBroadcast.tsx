@@ -47,7 +47,22 @@ const getCountryName = (code: string): string => {
   return countryNames[code] || code || 'Unknown';
 };
 
-export default function EmailBroadcast() {
+interface CloneSeed {
+  subject: string;
+  body: string;
+  recipientFilter: RecipientFilter;
+  targetCountries: string[];
+  // Bumped by the caller on every "Clone" click so this effect re-applies
+  // even when cloning the exact same campaign twice in a row (a seed object
+  // with identical field values wouldn't otherwise look "new" as a dependency).
+  seedKey: number;
+}
+
+interface EmailBroadcastProps {
+  cloneSeed?: CloneSeed | null;
+}
+
+export default function EmailBroadcast({ cloneSeed }: EmailBroadcastProps = {}) {
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set());
   const [users, setUsers] = useState<User[]>([]);
@@ -70,6 +85,20 @@ export default function EmailBroadcast() {
   useEffect(() => {
     loadCountries();
   }, []);
+
+  // Clone: pre-fill subject/body/filter/countries from a past campaign. The
+  // admin still re-picks (or Select All's) individual recipients themselves -
+  // email_send_queue only stores raw email addresses, not user ids, so there's
+  // no reliable way to reselect the exact original recipient set by id the way
+  // the push "Clone" does.
+  useEffect(() => {
+    if (!cloneSeed) return;
+    setEmailSubject(cloneSeed.subject);
+    setEmailBody(cloneSeed.body);
+    setRecipientFilter(cloneSeed.recipientFilter);
+    setSelectedCountries(new Set(cloneSeed.targetCountries));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloneSeed?.seedKey]);
 
   useEffect(() => {
     if (selectedCountries.size > 0) {

@@ -79,6 +79,7 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
       <Label htmlFor="promoCode" className="text-sm font-medium flex items-center gap-2">
         <Gift className="w-4 h-4 text-pink-500" />
         Promo Code
+        <span className="text-xs font-normal text-gray-400">(optional)</span>
       </Label>
       <div className="flex gap-2">
         <div className="relative flex-1">

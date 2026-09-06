@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil } from 'lucide-react';
+import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
 const PhotoCropModal = lazy(() => import('@/components/profile/PhotoCropModal'));
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -493,8 +493,8 @@ const ProfileCompletionPage = () => {
         );
       case 'pending':
         return (
-          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-            {t('profileCompletion.pending')}
+          <div className="absolute top-2 left-2 bg-orange-500 text-white p-1 rounded-full" title={t('profileCompletion.pending')}>
+            <Clock className="w-4 h-4" />
           </div>
         );
       case 'rejected':
@@ -601,7 +601,6 @@ const ProfileCompletionPage = () => {
     if (!formData.occupation) validationErrors.occupation = t('profileCompletion.errors.occupationRequired');
     if (!formData.industry) validationErrors.industry = t('profileCompletion.errors.industryRequired');
     if (!formData.educationLevel) validationErrors.educationLevel = t('profileCompletion.errors.educationRequired');
-    if (!formData.adinkraSymbols || formData.adinkraSymbols.length === 0) validationErrors.adinkraSymbols = 'Please select at least 1 cultural sign';
 
     // Face verification is required (unless user already has one in DB)
     const { data: existingProfile } = await supabase
@@ -1259,11 +1258,6 @@ const ProfileCompletionPage = () => {
                         <p className="text-[11px] text-gray-500">JPG/PNG up to 10MB</p>
                       </Label>
                     </div>
-                    <p className="text-[11px] text-gray-500 text-center flex items-center justify-center gap-1">
-                      <Shield className="w-3 h-3" />
-                      Photos go live right away; explicit content is auto-removed.
-                    </p>
-
                     {images.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {images.map((image, index) => (

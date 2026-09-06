@@ -721,6 +721,16 @@ const scenarios: Scenario[] = [
 
 const GAME_TYPE: GameType = 'red-flag-green-flag';
 
+// Picks `count` random, non-repeating items from `pool` (Fisher-Yates).
+const pickRandom = <T,>(pool: T[], count: number): T[] => {
+  const copy = [...pool];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, Math.min(count, copy.length));
+};
+
 const levelConfig: Record<number, { name: string; difficulty: string; scenarios: number; }> = {
   1: { name: 'Basics', difficulty: 'Easy', scenarios: 5 },
   2: { name: 'Instincts', difficulty: 'Medium', scenarios: 7 },
@@ -733,7 +743,7 @@ const RedFlagGreenFlag = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   useAllowScreenshots();
-  const best3 = useMemo(() => getBestResults(GAME_TYPE), []);
+  const [best3, setBest3] = useState(() => getBestResults(GAME_TYPE));
 
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -742,17 +752,29 @@ const RedFlagGreenFlag = () => {
   const [score, setScore] = useState({ correct: 0, wrong: 0 });
   const [gameComplete, setGameComplete] = useState(false);
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
+  // Bumped on every startLevel() call so replaying the SAME level re-shuffles
+  // instead of reusing the memoized pick from the last play (useMemo alone
+  // won't recompute when selectedLevel is set to the same value it already
+  // had).
+  const [levelStartNonce, setLevelStartNonce] = useState(0);
 
   const levelScenarios = useMemo(() => {
     if (!selectedLevel) return [] as Scenario[];
     const count = levelConfig[selectedLevel]?.scenarios ?? scenarios.length;
-    return scenarios.slice(0, Math.min(count, scenarios.length));
-  }, [selectedLevel]);
+    // Random sample of the FULL 100+ scenario pool, not just the first N -
+    // previously this always sliced the same fixed prefix, so ~85% of the
+    // authored scenarios could never appear in any level, and every replay
+    // of a given level showed the exact same questions in the exact same
+    // order.
+    return pickRandom(scenarios, count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLevel, levelStartNonce]);
 
   const currentScenario = levelScenarios[currentIndex];
 
   const startLevel = (level: number) => {
     setSelectedLevel(level);
+    setLevelStartNonce(n => n + 1);
     setCurrentIndex(0);
     setSelectedAnswer(null);
     setShowExplanation(false);
@@ -788,7 +810,7 @@ const RedFlagGreenFlag = () => {
         const percentage = (score.correct / total) * 100;
         const timeTakenSeconds = startedAtMs ? Math.max(1, Math.floor((Date.now() - startedAtMs) / 1000)) : undefined;
 
-        addResult({
+        const merged = addResult({
           gameType: GAME_TYPE,
           level: selectedLevel,
           percentage,
@@ -797,6 +819,7 @@ const RedFlagGreenFlag = () => {
           timeTakenSeconds,
           playedAt,
         });
+        setBest3(merged);
 
         void saveFinalGameResultToDb({ gameType: GAME_TYPE, level: selectedLevel, percentage, playedAt });
 
@@ -841,10 +864,10 @@ const RedFlagGreenFlag = () => {
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10 hover:text-white">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
@@ -921,10 +944,10 @@ const RedFlagGreenFlag = () => {
         <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -954,17 +977,17 @@ const RedFlagGreenFlag = () => {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="flex gap-3">
                 <Button
                   onClick={handleRestart}
-                  className="w-full bg-gradient-to-r from-red-500 to-green-500 hover:opacity-90 text-white font-semibold"
+                  className="flex-1 bg-gradient-to-r from-red-500 to-green-500 hover:opacity-90 text-white font-semibold"
                 >
                   Play Again
                 </Button>
                 <Button
                   onClick={() => navigate('/games')}
                   variant="outline"
-                  className="w-full border-pink-500/40 text-white hover:bg-white/10"
+                  className="flex-1 bg-black/60 border-pink-500/40 text-white hover:bg-white/10 hover:text-white"
                 >
                   Back to Games
                 </Button>
@@ -986,10 +1009,10 @@ const RedFlagGreenFlag = () => {
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>

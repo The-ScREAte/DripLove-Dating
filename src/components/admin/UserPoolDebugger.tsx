@@ -861,7 +861,7 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
                       {systemStats.pendingPayouts} Pending Payout(s)
                     </p>
                     <p className="text-orange-700 mt-1">
-                      Review payouts in the Influencer Management section.
+                      Review payouts in the Promoter Management section.
                     </p>
                   </div>
                 )}

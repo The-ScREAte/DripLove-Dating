@@ -1586,7 +1586,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   </TabsTrigger>
                   <TabsTrigger value="influencers" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Crown className="w-4 h-4" />
-                    <span>Influencers</span>
+                    <span>Promoters</span>
                   </TabsTrigger>
                   <TabsTrigger value="settings" className="w-full text-xs flex flex-col gap-1 py-2">
                     <Settings className="w-4 h-4" />
@@ -2129,7 +2129,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
               <RedirectLinkCreator />
             </TabsContent>
 
-            {/* Influencers Tab */}
+            {/* Promoters Tab */}
             <TabsContent value="influencers" className="space-y-4">
               <InfluencerManagement />
             </TabsContent>

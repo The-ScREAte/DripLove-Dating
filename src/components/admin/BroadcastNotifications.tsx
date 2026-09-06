@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, RotateCw, Eye, History, Copy, Mail, Calendar, Bell, Download, ShieldOff } from 'lucide-react';
+import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, Ban, RotateCw, Eye, History, Copy, Mail, Calendar, Bell, Download, ShieldOff } from 'lucide-react';
 import EmailExport from './EmailExport';
 import EmailBroadcast from './EmailBroadcast';
 import ScheduledBroadcasts from './ScheduledBroadcasts';
@@ -163,6 +163,15 @@ export default function BroadcastNotifications() {
   const [showCampaignDetails, setShowCampaignDetails] = useState(false);
   const [selectedEmailCampaign, setSelectedEmailCampaign] = useState<EmailCampaign | null>(null);
   const [showEmailDetails, setShowEmailDetails] = useState(false);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [emailCloneSeed, setEmailCloneSeed] = useState<{
+    subject: string;
+    body: string;
+    recipientFilter: 'all' | 'premium' | 'free';
+    targetCountries: string[];
+    seedKey: number;
+  } | null>(null);
 
   const lastHistorySignatureRef = useRef<string>('');
   const historyPollIntervalRef = useRef<number | null>(null);
@@ -569,10 +578,16 @@ export default function BroadcastNotifications() {
     }
   };
 
-  const deleteCampaign = async (campaignId: string) => {
-    if (!confirm('Delete this campaign? This will also delete all recipient records.')) {
-      return;
-    }
+  const deleteCampaign = async (campaignId: string, isLive: boolean) => {
+    // broadcast_recipients.campaign_id is ON DELETE CASCADE, so this also
+    // removes every pending/processing recipient row - the queue processor
+    // (process-broadcast-queue) only ever selects work from that table, so
+    // deleting a live campaign genuinely stops it from sending to anyone it
+    // hasn't already reached, not just removing the history entry.
+    const confirmText = isLive
+      ? 'Cancel this broadcast? It will stop sending to anyone it hasn\'t already reached, and its history will be removed.'
+      : 'Delete this campaign? This will also delete all recipient records.';
+    if (!confirm(confirmText)) return;
 
     try {
       const { error } = await supabase
@@ -582,7 +597,7 @@ export default function BroadcastNotifications() {
 
       if (error) throw error;
 
-      toast({ title: 'Deleted', description: 'Campaign removed from history.' });
+      toast({ title: isLive ? 'Cancelled' : 'Deleted', description: isLive ? 'Broadcast stopped and removed from history.' : 'Campaign removed from history.' });
       loadHistory();
     } catch (error) {
       console.error('Error deleting campaign:', error);
@@ -594,16 +609,83 @@ export default function BroadcastNotifications() {
     }
   };
 
-  const deleteEmailCampaign = async (id: string) => {
-    if (!confirm('Delete this email campaign? This only removes the history entry.')) return;
+  const deleteEmailCampaign = async (id: string, isLive: boolean) => {
+    // email_send_queue.broadcast_id is ON DELETE CASCADE - deleting the
+    // history row also removes every pending queue row, so a 'partial'
+    // campaign's remaining sends are genuinely stopped, not just hidden.
+    // process-email-queue only ever reads from email_send_queue, never
+    // email_broadcast_history.status, so nothing short of removing (or
+    // clearing) those queue rows would actually halt it.
+    const confirmText = isLive
+      ? 'Cancel this broadcast? It will stop sending to anyone it hasn\'t already reached, and its history will be removed.'
+      : 'Delete this email campaign? This also removes its history entry.';
+    if (!confirm(confirmText)) return;
     try {
       const { error } = await supabase.from('email_broadcast_history').delete().eq('id', id);
       if (error) throw error;
-      toast({ title: 'Deleted', description: 'Email campaign removed from history.' });
+      toast({ title: isLive ? 'Cancelled' : 'Deleted', description: isLive ? 'Broadcast stopped and removed from history.' : 'Email campaign removed from history.' });
       loadHistory();
     } catch (error) {
       console.error('Error deleting email campaign:', error);
       toast({ title: 'Error', description: 'Failed to delete campaign', variant: 'destructive' });
+    }
+  };
+
+  const historyItemKey = (item: HistoryItem) => `${item.type}:${item.id}`;
+
+  const toggleHistorySelection = (item: HistoryItem) => {
+    const key = historyItemKey(item);
+    setSelectedHistoryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllHistory = () => {
+    if (selectedHistoryIds.size === historyItems.length) {
+      setSelectedHistoryIds(new Set());
+    } else {
+      setSelectedHistoryIds(new Set(historyItems.map(historyItemKey)));
+    }
+  };
+
+  const bulkDeleteHistory = async () => {
+    const selected = historyItems.filter(item => selectedHistoryIds.has(historyItemKey(item)));
+    if (selected.length === 0) return;
+
+    const liveCount = selected.filter(item =>
+      item.status === 'queued' || item.status === 'processing' || item.status === 'partial'
+    ).length;
+    const confirmText = liveCount > 0
+      ? `Delete ${selected.length} item(s)? ${liveCount} of them ${liveCount === 1 ? 'is' : 'are'} still sending and will be stopped from reaching anyone it hasn't already reached.`
+      : `Delete ${selected.length} item(s) from history?`;
+    if (!confirm(confirmText)) return;
+
+    setBulkDeleting(true);
+    try {
+      const pushIds = selected.filter(i => i.type === 'push').map(i => i.id);
+      const emailIds = selected.filter(i => i.type === 'email').map(i => i.id);
+
+      if (pushIds.length > 0) {
+        // broadcast_recipients.campaign_id is ON DELETE CASCADE
+        const { error } = await supabase.from('broadcast_campaigns').delete().in('id', pushIds);
+        if (error) throw error;
+      }
+      if (emailIds.length > 0) {
+        // email_send_queue.broadcast_id is ON DELETE CASCADE
+        const { error } = await supabase.from('email_broadcast_history').delete().in('id', emailIds);
+        if (error) throw error;
+      }
+
+      toast({ title: 'Deleted', description: `${selected.length} item(s) removed from history.` });
+      setSelectedHistoryIds(new Set());
+      loadHistory();
+    } catch (error) {
+      console.error('Error bulk deleting history:', error);
+      toast({ title: 'Error', description: 'Failed to delete selected items', variant: 'destructive' });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -684,6 +766,24 @@ export default function BroadcastNotifications() {
     setActiveTab('push');
   };
 
+  const cloneEmailCampaign = (campaign: EmailCampaign) => {
+    const filter = campaign.recipient_filter === 'premium' || campaign.recipient_filter === 'free'
+      ? campaign.recipient_filter
+      : 'all';
+    setEmailCloneSeed({
+      subject: campaign.subject,
+      body: campaign.message,
+      recipientFilter: filter,
+      targetCountries: campaign.target_countries ?? [],
+      seedKey: Date.now(),
+    });
+    setActiveTab('email');
+    toast({
+      title: 'Campaign Loaded',
+      description: 'Subject, message, and targeting copied. Pick recipients and click Send when ready.',
+    });
+  };
+
   const filteredUsers = users.filter(u => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
@@ -704,24 +804,24 @@ export default function BroadcastNotifications() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="email" className="text-xs">
+        <TabsList className="flex w-full overflow-x-auto justify-start gap-1">
+          <TabsTrigger value="email" className="text-xs shrink-0">
             <Mail className="w-3.5 h-3.5 mr-1.5" />
             Email
           </TabsTrigger>
-          <TabsTrigger value="push" className="text-xs">
+          <TabsTrigger value="push" className="text-xs shrink-0">
             <Bell className="w-3.5 h-3.5 mr-1.5" />
-            Push Not.
+            Push
           </TabsTrigger>
-          <TabsTrigger value="schedule" className="text-xs">
+          <TabsTrigger value="schedule" className="text-xs shrink-0">
             <Calendar className="w-3.5 h-3.5 mr-1.5" />
-            Schedule Msg
+            Schedule
           </TabsTrigger>
-          <TabsTrigger value="history" className="text-xs">
+          <TabsTrigger value="history" className="text-xs shrink-0">
             <History className="w-3.5 h-3.5 mr-1.5" />
             History
           </TabsTrigger>
-          <TabsTrigger value="suppressed" className="text-xs">
+          <TabsTrigger value="suppressed" className="text-xs shrink-0">
             <ShieldOff className="w-3.5 h-3.5 mr-1.5" />
             Excluded
           </TabsTrigger>
@@ -729,7 +829,7 @@ export default function BroadcastNotifications() {
 
         {/* EMAIL TAB */}
         <TabsContent value="email" className="space-y-3 mt-3">
-          <EmailBroadcast />
+          <EmailBroadcast cloneSeed={emailCloneSeed} />
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" onClick={() => setShowExport(true)} className="h-7 text-xs text-gray-500">
               <Download className="w-3 h-3 mr-1.5" />
@@ -985,21 +1085,44 @@ export default function BroadcastNotifications() {
         <TabsContent value="history" className="mt-3">
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-1.5">
                 <CardTitle className="text-xs flex items-center gap-1.5">
                   <History className="w-3.5 h-3.5" />
                   {historyItems.length} sent
                 </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadHistory({ silent: false })}
-                  disabled={isLoadingHistory}
-                  className="h-6 text-[11px] px-2"
-                >
-                  <RotateCw className={`w-3 h-3 mr-1 ${isLoadingHistory ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {historyItems.length > 0 && (
+                    <label className="flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer">
+                      <Checkbox
+                        checked={selectedHistoryIds.size > 0 && selectedHistoryIds.size === historyItems.length}
+                        onCheckedChange={toggleSelectAllHistory}
+                      />
+                      Select all
+                    </label>
+                  )}
+                  {selectedHistoryIds.size > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={bulkDeleteHistory}
+                      disabled={bulkDeleting}
+                      className="h-6 text-[11px] px-2 text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className={`w-3 h-3 mr-1 ${bulkDeleting ? 'animate-pulse' : ''}`} />
+                      Delete Selected ({selectedHistoryIds.size})
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadHistory({ silent: false })}
+                    disabled={isLoadingHistory}
+                    className="h-6 text-[11px] px-2"
+                  >
+                    <RotateCw className={`w-3 h-3 mr-1 ${isLoadingHistory ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1013,7 +1136,7 @@ export default function BroadcastNotifications() {
                   <p className="text-gray-500 text-xs">Nothing sent yet</p>
                 </div>
               ) : (
-                <ScrollArea className="h-[480px]">
+                <div className="h-[480px] overflow-auto">
                   <div className="space-y-1.5 pr-3">
                     {historyItems.map((item) => {
                       const isActive = item.status === 'queued' || item.status === 'processing';
@@ -1032,6 +1155,11 @@ export default function BroadcastNotifications() {
                           <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
+                                <Checkbox
+                                  checked={selectedHistoryIds.has(historyItemKey(item))}
+                                  onCheckedChange={() => toggleHistorySelection(item)}
+                                  className="shrink-0"
+                                />
                                 <Badge
                                   variant="outline"
                                   className={`text-[9px] h-4 px-1.5 shrink-0 ${
@@ -1093,7 +1221,7 @@ export default function BroadcastNotifications() {
                             <CountriesBadge countries={item.targetCountries} />
                           </div>
 
-                          <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-gray-100">
+                          <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-gray-100 flex-wrap">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1104,6 +1232,29 @@ export default function BroadcastNotifications() {
                             >
                               <Eye className="w-2.5 h-2.5 mr-1" />
                               View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                item.type === 'push'
+                                  ? deleteCampaign(item.push!.id, isActive)
+                                  : deleteEmailCampaign(item.email!.id, isActive || isPartial)
+                              }
+                              className="h-6 text-[10px] px-2 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              title={isActive || isPartial ? 'Cancel this broadcast' : 'Delete from history'}
+                            >
+                              {isActive || isPartial ? (
+                                <>
+                                  <Ban className="w-2.5 h-2.5 mr-1" />
+                                  Cancel
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="w-2.5 h-2.5 mr-1" />
+                                  Delete
+                                </>
+                              )}
                             </Button>
                             {item.type === 'push' && item.failed > 0 && (
                               <Button
@@ -1116,32 +1267,21 @@ export default function BroadcastNotifications() {
                                 Retry
                               </Button>
                             )}
-                            {item.type === 'push' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => repeatCampaign(item.push!, true)}
-                                className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50"
-                              >
-                                <Copy className="w-2.5 h-2.5 mr-1" />
-                                Clone
-                              </Button>
-                            )}
-                            <div className="flex-1" />
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => (item.type === 'push' ? deleteCampaign(item.push!.id) : deleteEmailCampaign(item.email!.id))}
-                              className="h-6 text-[10px] px-2 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => (item.type === 'push' ? repeatCampaign(item.push!, true) : cloneEmailCampaign(item.email!))}
+                              className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50"
                             >
-                              <Trash2 className="w-2.5 h-2.5" />
+                              <Copy className="w-2.5 h-2.5 mr-1" />
+                              Clone
                             </Button>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                </ScrollArea>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1155,7 +1295,7 @@ export default function BroadcastNotifications() {
 
       {/* Push Campaign Details Dialog */}
       <Dialog open={showCampaignDetails} onOpenChange={setShowCampaignDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedCampaign?.title}</DialogTitle>
             <DialogDescription>
@@ -1229,7 +1369,7 @@ export default function BroadcastNotifications() {
 
       {/* Email Campaign Details Dialog */}
       <Dialog open={showEmailDetails} onOpenChange={setShowEmailDetails}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedEmailCampaign?.subject}</DialogTitle>
             <DialogDescription>

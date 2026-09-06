@@ -96,7 +96,14 @@ const InfluencerSetPassword = () => {
 
       setSuccess(true);
       toast({ title: 'Success', description: 'Your password has been set successfully!' });
-      
+
+      // Best-effort confirmation email - doesn't block the success screen/redirect.
+      supabase.functions.invoke('notify-promoter-password-set', {
+        body: { promoCodeId, appUrl: window.location.origin },
+      }).then(({ error: emailError }) => {
+        if (emailError) console.error('Failed to send password-set confirmation email:', emailError);
+      });
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
         navigate('/influencer');
@@ -134,7 +141,7 @@ const InfluencerSetPassword = () => {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Password Set Successfully!</h2>
             <p className="text-gray-600 mb-4">
-              You can now login to your influencer portal using your promo code and password.
+              You can now login to your promoter portal using your promo code and password.
             </p>
             <p className="text-sm text-gray-500">Redirecting to login...</p>
           </CardContent>
@@ -161,7 +168,7 @@ const InfluencerSetPassword = () => {
           <CardTitle className="text-2xl">Set Your Password</CardTitle>
           <CardDescription>
             Welcome, <span className="font-semibold">{promoCodeInfo.ownerName}</span>!<br />
-            Create a secure password for your influencer account.
+            Create a secure password for your promoter account.
           </CardDescription>
         </CardHeader>
         <CardContent>

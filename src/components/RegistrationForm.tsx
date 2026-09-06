@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil } from 'lucide-react';
+import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
 const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
@@ -378,8 +378,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         );
       case 'pending':
         return (
-          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-            Review
+          <div className="absolute top-2 left-2 bg-orange-500 text-white p-1 rounded-full">
+            <Clock className="w-4 h-4" />
           </div>
         );
       case 'rejected':
@@ -1048,11 +1048,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                     <p className="text-[11px] text-gray-500">JPG/PNG up to 10MB</p>
                   </Label>
                 </div>
-                <p className="text-[11px] text-gray-500 flex items-center justify-center gap-1">
-                  <Shield className="w-3 h-3" />
-                  Photos go live right away; explicit content is auto-removed.
-                </p>
-                
                 {images.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {images.map((image, index) => (

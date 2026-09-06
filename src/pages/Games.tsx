@@ -62,7 +62,7 @@ const Games = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="hover:bg-white/10 text-white"
+                className="hover:bg-white/10 hover:text-white text-white"
                 title="Home"
               >
                 <Home className="w-5 h-5" />
