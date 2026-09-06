@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Gift, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 interface PromoCodeInputProps {
   value: string;
@@ -14,7 +13,6 @@ interface PromoCodeInputProps {
 }
 
 const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInputProps) => {
-  const { toast } = useToast();
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     valid: boolean;
@@ -46,10 +44,6 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
           ownerName: result.owner_name
         });
         onChange(value.toUpperCase(), result.promo_code_id);
-        toast({
-          title: 'Promo code valid!',
-          description: `Referred by ${result.owner_name}`,
-        });
       } else {
         setValidationResult({
           valid: false,
@@ -79,7 +73,7 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
       <Label htmlFor="promoCode" className="text-sm font-medium flex items-center gap-2">
         <Gift className="w-4 h-4 text-pink-500" />
         Promo Code
-        <span className="text-xs font-normal text-gray-400">(optional)</span>
+        <span className="text-xs font-normal text-black">(optional)</span>
       </Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -136,12 +130,8 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
           </Button>
         )}
       </div>
-      {validationResult && (
-        <p className={`text-xs ${validationResult.valid ? 'text-green-600' : 'text-red-600'}`}>
-          {validationResult.valid 
-            ? `✓ Referred by ${validationResult.ownerName}` 
-            : validationResult.error}
-        </p>
+      {validationResult && !validationResult.valid && (
+        <p className="text-xs text-red-600">{validationResult.error}</p>
       )}
     </div>
   );

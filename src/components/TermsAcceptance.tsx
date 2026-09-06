@@ -331,7 +331,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
   return (
     <div
-      className="terms-container fixed inset-0 z-[10000] bg-gradient-to-br from-rose-50 via-white to-fuchsia-50 overflow-y-auto overscroll-y-contain pointer-events-auto"
+      className="terms-container fixed inset-0 z-[10000] bg-gradient-to-br from-pink-300 via-pink-200 to-fuchsia-300 overflow-y-auto overscroll-y-contain pointer-events-auto"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',

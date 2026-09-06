@@ -1548,18 +1548,21 @@ export type Database = {
           id: string
           promo_code_id: string
           user_id: string | null
+          user_deleted_at: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           promo_code_id: string
           user_id?: string | null
+          user_deleted_at?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           promo_code_id?: string
           user_id?: string | null
+          user_deleted_at?: string | null
         }
         Relationships: [
           {

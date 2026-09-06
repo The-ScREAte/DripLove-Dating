@@ -32,10 +32,16 @@ interface RegistrationFormProps {
 }
 
 interface ImageUpload {
-  file: File;
+  file: File | null;
   preview: string;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
+  // Set once this photo has already been uploaded + moderated (checked live,
+  // right after picking) - final submit uses these to skip re-uploading and
+  // re-running moderation, and just fixes up image_order.
+  imageId?: string;
+  filePath?: string;
+  moderationMessage?: string;
 }
 
 interface DuplicateFaceDetails {
@@ -72,6 +78,12 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Set once the account is actually created (at the step 2 -> 3 transition,
+  // not at final submit anymore) - lets step 3's photo picker upload +
+  // moderate each photo live, the same way profile completion does, since
+  // that requires a real signed-in user to own the photo row.
+  const [accountUserId, setAccountUserId] = useState<string | null>(null);
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [faceVerified, setFaceVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -90,6 +102,46 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     if (savedFace) {
       setFaceVerified(true);
     }
+  }, []);
+
+  // Resume mid-registration after a reload: the account is now created at
+  // the step 2 -> 3 transition (not at final submit), and supabase-js
+  // persists that session in its own localStorage automatically - so if one
+  // exists here, this browser already has an account from an unfinished
+  // registration. Jump straight back to the photo step rather than
+  // re-showing step 1 (which would try to sign up the same email again).
+  React.useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user?.id) return;
+      setAccountUserId(session.user.id);
+      setCurrentStep(3);
+
+      const { data: existingRows } = await supabase
+        .from('user_images')
+        .select('id, image_url, image_order, is_approved, moderation_status')
+        .eq('user_id', session.user.id)
+        .order('image_order', { ascending: true });
+
+      if (existingRows && existingRows.length > 0) {
+        const extractStoragePath = (url: string): string | undefined => {
+          try {
+            const marker = '/storage/v1/object/public/user-photos/';
+            const idx = new URL(url).pathname.indexOf(marker);
+            return idx === -1 ? undefined : decodeURIComponent(new URL(url).pathname.slice(idx + marker.length));
+          } catch {
+            return undefined;
+          }
+        };
+
+        setImages(existingRows.map((row): ImageUpload => ({
+          file: null,
+          preview: row.image_url,
+          status: row.moderation_status === 'rejected' ? 'rejected' : (row.is_approved ? 'approved' : 'pending'),
+          imageId: row.id,
+          filePath: extractStoragePath(row.image_url),
+        })));
+      }
+    });
   }, []);
 
   // Handle face verification - validates and stores locally until form submission
@@ -152,33 +204,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
-  // Restore images from localStorage on mount
-  React.useEffect(() => {
-    const saved = localStorage.getItem('registration_images');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Only restore preview/status/hash, not File
-        setImages(parsed.map((img: any) => ({
-          file: null, // File cannot be restored
-          preview: img.preview,
-          status: img.status,
-          hash: img.hash // Restore hash for duplicate detection
-        })));
-      } catch {}
-    }
-  }, []);
-
-  // Save images to localStorage whenever they change
-  React.useEffect(() => {
-    // Only save serializable data including hash
-    const serializable = images.map(img => ({
-      preview: img.preview,
-      status: img.status,
-      hash: img.hash // Save hash for duplicate detection
-    }));
-    localStorage.setItem('registration_images', JSON.stringify(serializable));
-  }, [images]);
+  // Photos are now uploaded live during step 3 (see uploadAndModerateImage),
+  // so by the time any exist they're already real user_images rows, not
+  // just local state - restoring them from localStorage's blob preview URLs
+  // never actually worked across a reload anyway (those URLs die with the
+  // page that created them). The session-resume effect above rebuilds
+  // `images` straight from the database instead, which is what actually
+  // survives a reload.
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -259,6 +291,73 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }));
   };
 
+  // Checks a photo for real (AWS Rekognition) right away, the moment it's
+  // picked, instead of deferring to final submit - so the user finds out
+  // immediately if a photo needs replacing. Requires an actual DB row to
+  // attach the result to, which requires the account to already exist -
+  // accountUserId is only set once the step 2 -> 3 transition has created
+  // it. Shared by both the initial picker and re-cropping an existing photo.
+  const uploadAndModerateImage = (file: File, preview: string, order: number) => {
+    if (!accountUserId) {
+      setImages(prev => prev.map(img => img.preview === preview ? { ...img, status: 'pending' } : img));
+      return;
+    }
+
+    (async () => {
+      try {
+        const mimeToExt: Record<string, string> = {
+          'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'
+        };
+        const fileExt = mimeToExt[file.type] || 'jpg';
+        const uniqueSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        const filePath = `${accountUserId}/${uniqueSuffix}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('user-photos')
+          .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
+
+        const { data: insertedRow, error: dbError } = await supabase
+          .from('user_images')
+          .insert({ user_id: accountUserId, image_url: publicUrl, image_order: order })
+          .select('id')
+          .single();
+        if (dbError) throw dbError;
+
+        const imageBase64 = await fileToBase64(file);
+        const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
+
+        setImages(prev => prev.map(img => img.preview === preview
+          ? {
+              ...img,
+              status: modDecision.status === 'rejected' ? 'rejected' : 'approved',
+              imageId: insertedRow.id,
+              filePath,
+              moderationMessage: modDecision.message,
+            }
+          : img
+        ));
+
+        if (modDecision.status === 'rejected') {
+          toast({
+            title: 'Photo needs replacing',
+            description: modDecision.message || 'This photo violates our content guidelines - please choose another.',
+            variant: 'destructive',
+          });
+        }
+      } catch (err) {
+        console.error('Live moderation failed for a photo:', err);
+        // Fall back to the old deferred behavior - final submit will upload
+        // + moderate this one for real since it has no imageId.
+        setImages(prev => prev.map(img => img.preview === preview ? { ...img, status: 'pending' } : img));
+      }
+    })();
+  };
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
@@ -282,6 +381,17 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
     };
 
+    // Both of these are mutated synchronously as the loop processes each
+    // file, since `images` (component state) is a snapshot from when this
+    // handler started - it never reflects the setImages() calls made later
+    // in this same loop (those are only scheduled, not applied
+    // synchronously). Without a local running count, every file picked in
+    // ONE file-dialog selection got the exact same `images.length + 1`
+    // order, and the second photo's insert failed a unique(user_id,
+    // image_order) constraint outright.
+    const seenHashesThisBatch = new Set(images.map((img) => img.hash).filter(Boolean));
+    let orderCounter = images.length;
+
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         toast({
@@ -303,14 +413,11 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       // Compress (typically to JPEG) to keep uploads small and consistent
       const compressedFile = await compressImage(file);
-      
+
       // Generate hash AFTER compression for accurate duplicate detection
       const fileHash = await getFileHash(compressedFile);
-      
-      // Check against existing images (including their stored hashes)
-      const isDuplicate = images.some(img => img.hash === fileHash);
 
-      if (isDuplicate) {
+      if (seenHashesThisBatch.has(fileHash)) {
         toast({
           title: "Duplicate image",
           description: "This image has already been uploaded.",
@@ -318,45 +425,73 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         });
         continue;
       }
+      seenHashesThisBatch.add(fileHash);
 
       const preview = URL.createObjectURL(compressedFile);
       const newImage: ImageUpload = {
         file: compressedFile,
         preview,
-        // Real moderation (AWS Rekognition nudity/celebrity/face-match
-        // checks) can only run once this photo is actually uploaded and has
-        // a database row, which doesn't happen until final submit below -
-        // there's no account yet to check a verified face against while
-        // still picking photos. So every photo is just marked pending here;
-        // the toast at final submit reports the real per-photo outcome.
-        status: 'pending',
-        hash: fileHash // Store hash for future comparisons
+        status: 'moderating',
+        hash: fileHash
       };
 
       setImages(prev => [...prev, newImage]);
+      orderCounter++;
+      uploadAndModerateImage(compressedFile, preview, orderCounter);
     }
 
     event.target.value = '';
   };
 
   const removeImage = (preview: string) => {
+    const removed = images.find(img => img.preview === preview);
     setImages(prev => {
       const updated = prev.filter(img => img.preview !== preview);
       URL.revokeObjectURL(preview);
       return updated;
     });
+
+    if (removed?.imageId) {
+      supabase.from('user_images').delete().eq('id', removed.imageId)
+        .then(({ error }) => { if (error) console.error('Failed to remove photo row:', error); });
+    }
+    if (removed?.filePath) {
+      supabase.storage.from('user-photos').remove([removed.filePath])
+        .then(({ error }) => { if (error) console.error('Failed to remove photo file:', error); });
+    }
   };
 
   const [croppingImage, setCroppingImage] = useState<{ preview: string } | null>(null);
 
   const handleCroppedImage = ({ blob, previewUrl, originalUrl }: { blob: Blob; previewUrl: string; originalUrl: string }) => {
+    const original = images.find(img => img.preview === originalUrl);
+    const croppedFile = new File([blob], original?.file?.name || 'cropped.jpg', { type: 'image/jpeg' });
+    const order = images.findIndex(img => img.preview === originalUrl) + 1;
+
     setImages(prev => prev.map(img => {
       if (img.preview !== originalUrl) return img;
       URL.revokeObjectURL(img.preview);
-      const croppedFile = new File([blob], img.file.name, { type: 'image/jpeg' });
-      return { ...img, file: croppedFile, preview: previewUrl };
+      return {
+        ...img,
+        file: croppedFile,
+        preview: previewUrl,
+        status: 'moderating',
+        imageId: undefined,
+        filePath: undefined,
+        moderationMessage: undefined,
+      };
     }));
     setCroppingImage(null);
+
+    if (original?.imageId) {
+      supabase.from('user_images').delete().eq('id', original.imageId)
+        .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo row:', error); });
+    }
+    if (original?.filePath) {
+      supabase.storage.from('user-photos').remove([original.filePath])
+        .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo file:', error); });
+    }
+    uploadAndModerateImage(croppedFile, previewUrl, order > 0 ? order : images.length + 1);
   };
 
   const renderImageStatus = (image: ImageUpload) => {
@@ -462,15 +597,15 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevent double submission
-    if (isSubmitting) return;
-    
+    if (isSubmitting || creatingAccount) return;
+
     if (currentStep === 1) {
       handleContinue();
       return;
     }
-    
+
     if (currentStep === 2) {
       // Validate second step
       const validationErrors = validateRegistrationForm(formData);
@@ -478,13 +613,218 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         setErrors(validationErrors);
         return;
       }
+
+      // The account is created HERE now (not at final submit) - step 3's
+      // photo picker needs a real signed-in user to check each photo live
+      // as it's picked, the same way profile completion already does.
+      setCreatingAccount(true);
+
+      let userId: string | null = null;
+      try {
+        // Check if user profile already exists (this is the only check that matters)
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', formData.email)
+          .single();
+
+        if (existingProfile) {
+          toast({
+            title: "Account exists",
+            description: "An account with this email already exists. Please sign in instead.",
+            variant: "destructive"
+          });
+          setCreatingAccount(false);
+          return;
+        }
+
+        // Create new user account directly (no existing user checks in auth.users)
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              date_of_birth: formData.dateOfBirth,
+              country: formData.country,
+              city: formData.city,
+              zip_code: formData.zipCode,
+              gender: formData.gender,
+              preference: formData.preference,
+              relationship_intent: formData.relationshipIntent,
+              occupation: formData.occupation || '',
+              industry: formData.industry || '',
+              education_level: formData.educationLevel || '',
+              bio: formData.bio || ''
+            }
+          }
+        });
+
+        if (signUpError) {
+          toast({
+            title: "Registration failed",
+            description: signUpError.message,
+            variant: "destructive"
+          });
+          setCreatingAccount(false);
+          return;
+        }
+
+        userId = signUpData?.user?.id ?? null;
+        if (!userId) {
+          toast({ title: 'Registration failed', description: 'Could not create your account. Please try again.', variant: 'destructive' });
+          setCreatingAccount(false);
+          return;
+        }
+      } catch (err: any) {
+        setCreatingAccount(false);
+        toast({
+          title: 'Account Creation Error',
+          description: err?.message || 'Failed to create account. Please try a different email or sign in if you already have an account.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Save profile data (handle case where profile might already exist from DB trigger)
+      // Add a small delay to allow any database triggers to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      try {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('id', userId)
+          .single();
+
+        const profileData = {
+          id: userId,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          date_of_birth: formData.dateOfBirth,
+          country: formData.country,
+          city: formData.city,
+          zip_code: formData.zipCode,
+          gender: formData.gender,
+          preference: formData.preference,
+          relationship_intent: formData.relationshipIntent,
+          occupation: formData.occupation,
+          industry: formData.industry,
+          education_level: formData.educationLevel,
+          bio: formData.bio || '',
+          interests: formData.interests || [],
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          is_custom_city: formData.isCustomCity || false,
+          max_distance: formData.maxDistance || 250,
+          country_code: formData.countryCode || '',
+          adinkra_symbols: formData.adinkraSymbols || []
+        };
+
+        if (existingProfile) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update(profileData)
+            .eq('id', userId);
+          if (profileError) throw profileError;
+        } else {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert(profileData);
+          if (profileError) {
+            if (profileError.code === '23505' || profileError.message.includes('duplicate') || profileError.message.includes('already exists')) {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update(profileData)
+                .eq('id', userId);
+              if (updateError) throw updateError;
+            } else {
+              throw profileError;
+            }
+          }
+        }
+
+        // Save referral if promo code was used. Supabase queries resolve to
+        // { error } rather than throwing, so the error must be read explicitly
+        // here - a try/catch around the insert alone silently swallowed every
+        // DB-level failure (RLS denial, duplicate referral, etc.) with nothing
+        // ever logged.
+        if (formData.promoCodeId) {
+          try {
+            const { error: refError } = await supabase
+              .from('referrals')
+              .insert({ user_id: userId, promo_code_id: formData.promoCodeId });
+            if (refError) {
+              console.error('Error saving referral:', refError);
+            } else {
+              supabase.auth.getSession().then(({ data: { session } }) => {
+                if (!session?.access_token) return;
+                supabase.functions.invoke('notify-promo-admin', {
+                  body: {
+                    promoCodeId: formData.promoCodeId,
+                    newUserName: `${formData.firstName} ${formData.lastName}`.trim(),
+                    newUserEmail: formData.email,
+                  },
+                  headers: { Authorization: `Bearer ${session.access_token}` },
+                }).catch((notifyErr) => console.error('Error notifying admin of promo code use:', notifyErr));
+              });
+            }
+          } catch (refErr) {
+            console.error('Error saving referral:', refErr);
+          }
+        }
+      } catch (err: any) {
+        setCreatingAccount(false);
+        toast({
+          title: 'Profile Save Error',
+          description: err?.message || 'Failed to save profile.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Index face in AWS Rekognition with user's name (now, after the
+      // account exists, but BEFORE moderating photos in step 3) -
+      // moderate-image's face match for each photo searches this
+      // Rekognition collection, so the user's own face has to be indexed
+      // first or every photo would come back as a false "doesn't match
+      // verified identity" (non-blocking either way, but worth getting right).
+      const pendingFace = localStorage.getItem('pending_face_verification');
+      if (pendingFace && userId) {
+        try {
+          const userName = `${formData.firstName} ${formData.lastName}`;
+          const { error: faceError } = await supabase.functions.invoke("face-verify", {
+            body: { action: "index_face", front: pendingFace, userId, userName },
+          });
+          if (faceError) console.error('Face indexing error:', faceError);
+          localStorage.removeItem('pending_face_verification');
+        } catch (faceErr) {
+          console.error('Face indexing exception:', faceErr);
+        }
+      }
+
+      setAccountUserId(userId);
+      setCreatingAccount(false);
       setCurrentStep(3);
       return;
     }
 
-    // Final step - validate images
+    // Step 3 (final) - the account already exists; photos are checked live
+    // as they're picked (uploadAndModerateImage). This just needs everything
+    // to have settled into a real verdict before letting the user finish.
+    if (images.some(img => img.status === 'moderating')) {
+      toast({
+        title: 'Still checking your photos',
+        description: 'Give it just a moment - photos are quick to check.',
+        variant: 'default',
+      });
+      return;
+    }
+
     const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
-    
+
     if (approvedImages.length < 2) {
       toast({
         title: t('registration.errors.photosRequired'),
@@ -504,319 +844,70 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
-    // Check if we have valid files for approved images
-    const imagesWithFiles = approvedImages.filter(img => img.file !== null);
-    if (imagesWithFiles.length < 2) {
+    // Ready = already uploaded live (imageId) or has a file to fall back to
+    // uploading now (live-check failed earlier, e.g. a network blip).
+    const readyImages = approvedImages.filter(img => img.imageId || img.file);
+    if (readyImages.length < 2) {
       toast({
         title: t('registration.errors.photosNeedReupload'),
         description: t('registration.reuploadTwoPhotos'),
         variant: "destructive"
       });
-      // Clear images that don't have files and ask user to re-upload
-      setImages(prev => prev.filter(img => img.file !== null));
+      setImages(prev => prev.filter(img => img.imageId || img.file));
       return;
     }
 
-    // Set loading state
+    if (!accountUserId) {
+      toast({ title: 'Something went wrong', description: 'Please restart registration.', variant: 'destructive' });
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    // Clear sessionStorage after successful registration
-    sessionStorage.removeItem('registration_images');
-    // Submit with images
-    // 1. Create user account
-    let userId = null;
-    let userEmail = formData.email;
-    let userCreated = false;
-    
-    try {
-      // Check if user profile already exists (this is the only check that matters)
-      const { data: existingProfile, error: profileCheckError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', formData.email)
-        .single();
-      
-      if (existingProfile) {
-        toast({
-          title: "Account exists",
-          description: "An account with this email already exists. Please sign in instead.",
-          variant: "destructive"
-        });
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Create new user account directly (no existing user checks in auth.users)
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            date_of_birth: formData.dateOfBirth,
-            country: formData.country,
-            city: formData.city,
-            zip_code: formData.zipCode,
-            gender: formData.gender,
-            preference: formData.preference,
-            relationship_intent: formData.relationshipIntent,
-            occupation: formData.occupation || '',
-            industry: formData.industry || '',
-            education_level: formData.educationLevel || '',
-            bio: formData.bio || ''
-          }
-        }
-      });
-      
-      if (signUpError) {
-        toast({
-          title: "Registration failed",
-          description: signUpError.message,
-          variant: "destructive"
-        });
-        setIsSubmitting(false);
-        return;
-      }
-      
-      userId = signUpData?.user?.id;
-      userCreated = !!userId;
-    } catch (err) {
-      setIsSubmitting(false);
-      toast({
-        title: 'Account Creation Error',
-        description: err.message || 'Failed to create account. Please try a different email or sign in if you already have an account.',
-        variant: 'destructive',
-      });
-      return;
-    }
 
-    // 2. Save profile data (handle case where profile might already exist from DB trigger)
-    // Add a small delay to allow any database triggers to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    try {
-      // First check if profile already exists
-      const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('id', userId)
-        .single();
-
-      const profileData = {
-        id: userId,
-        email: userEmail,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        date_of_birth: formData.dateOfBirth,
-        country: formData.country,
-        city: formData.city,
-        zip_code: formData.zipCode,
-        gender: formData.gender,
-        preference: formData.preference,
-        relationship_intent: formData.relationshipIntent,
-        occupation: formData.occupation,
-        industry: formData.industry,
-        education_level: formData.educationLevel,
-        bio: formData.bio || '',
-        interests: formData.interests || [],
-        latitude: formData.latitude,
-        longitude: formData.longitude,
-        is_custom_city: formData.isCustomCity || false,
-        max_distance: formData.maxDistance || 250,
-        country_code: formData.countryCode || '',
-        adinkra_symbols: formData.adinkraSymbols || []
-      };
-
-      if (existingProfile) {
-        // Profile exists, update it
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update(profileData)
-          .eq('id', userId);
-        if (profileError) {
-          throw profileError;
-        }
-      } else {
-        // Profile doesn't exist, create it
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert(profileData);
-        if (profileError) {
-          // If insert fails due to conflict, try update instead
-          if (profileError.code === '23505' || profileError.message.includes('duplicate') || profileError.message.includes('already exists')) {
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update(profileData)
-              .eq('id', userId);
-            if (updateError) {
-              throw updateError;
-            }
-          } else {
-            throw profileError;
-          }
-        }
-      }
-
-      // Save referral if promo code was used. Supabase queries resolve to
-      // { error } rather than throwing, so the error must be read explicitly
-      // here - a try/catch around the insert alone silently swallowed every
-      // DB-level failure (RLS denial, duplicate referral, etc.) with nothing
-      // ever logged.
-      if (formData.promoCodeId) {
-        try {
-          const { error: refError } = await supabase
-            .from('referrals')
-            .insert({
-              user_id: userId,
-              promo_code_id: formData.promoCodeId
-            });
-          if (refError) {
-            console.error('Error saving referral:', refError);
-          } else {
-            // Best-effort - the referral row is what actually matters, so a
-            // failed notification email never blocks registration.
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              if (!session?.access_token) return;
-              supabase.functions.invoke('notify-promo-admin', {
-                body: {
-                  promoCodeId: formData.promoCodeId,
-                  newUserName: `${formData.firstName} ${formData.lastName}`.trim(),
-                  newUserEmail: formData.email,
-                },
-                headers: { Authorization: `Bearer ${session.access_token}` },
-              }).catch((notifyErr) => console.error('Error notifying admin of promo code use:', notifyErr));
-            });
-          }
-        } catch (refErr) {
-          console.error('Error saving referral:', refErr);
-        }
-        // Don't block registration if referral save fails
-      }
-      
-    } catch (err) {
-      setIsSubmitting(false); // Reset loading state
-      toast({
-        title: 'Profile Save Error',
-        description: err.message || 'Failed to save profile.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // 3. Index face in AWS Rekognition with user's name (now, after user is
-    // created, but BEFORE uploading photos below) - moderate-image's face
-    // match for each photo searches this Rekognition collection, so the
-    // user's own face has to be indexed first or every photo would come
-    // back as a false "doesn't match verified identity".
-    const pendingFace = localStorage.getItem('pending_face_verification');
-    if (pendingFace && userId) {
-      try {
-        const userName = `${formData.firstName} ${formData.lastName}`;
-        const { error: faceError } = await supabase.functions.invoke("face-verify", {
-          body: {
-            action: "index_face",
-            front: pendingFace,
-            userId: userId,
-            userName: userName, // Include user's name for admin identification
-          },
-        });
-
-        if (faceError) {
-          console.error('Face indexing error:', faceError);
-        }
-        // The face-verify edge function persists profiles.face_descriptor itself
-        // (server-side, service role, after confirming caller identity) - the
-        // client no longer writes verification status directly.
-
-        // Clear localStorage after successful indexing
-        localStorage.removeItem('pending_face_verification');
-      } catch (faceErr) {
-        console.error('Face indexing exception:', faceErr);
-      }
-    }
-
-    // 4. Upload approved images to storage and save to DB (after user is
-    // created). is_approved/moderation_status are never set by the client -
-    // DB grants enforce that - each row starts pending and moderate-image
-    // (AWS Rekognition: nudity/explicit-content labels, celebrity
-    // recognition, face match against the collection above) makes the real
-    // call right after its row exists.
     let imageOrder = 1;
-    for (const image of imagesWithFiles) {
+    for (const image of readyImages) {
       try {
-        if (!image.file) {
-          continue;
-        }
+        if (image.imageId) {
+          // Already uploaded + moderated live while picking - just fix up
+          // its image_order.
+          const { error } = await supabase
+            .from('user_images')
+            .update({ image_order: imageOrder })
+            .eq('id', image.imageId);
+          if (error) throw error;
+        } else if (image.file) {
+          // Fallback path - live check failed earlier for this one, so
+          // upload + moderate it for real now.
+          const mimeToExt: Record<string, string> = {
+            'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'
+          };
+          const fileExt = mimeToExt[image.file.type] || 'jpg';
+          const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+          const filePath = `${accountUserId}/${fileName}`;
 
-        // Upload to storage (extension must match MIME type after compression)
-        const mimeToExt: Record<string, string> = {
-          'image/jpeg': 'jpg',
-          'image/png': 'png',
-          'image/webp': 'webp',
-          'image/gif': 'gif'
-        };
-        const fileExt = mimeToExt[image.file.type] || 'jpg';
-        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-        const filePath = `${userId}/${fileName}`;
+          const { error: uploadError } = await supabase.storage
+            .from('user-photos')
+            .upload(filePath, image.file, { contentType: image.file.type, cacheControl: '3600' });
+          if (uploadError) throw uploadError;
 
-        const { error: uploadError } = await supabase.storage
-          .from('user-photos')
-          .upload(filePath, image.file, {
-            contentType: image.file.type,
-            cacheControl: '3600'
-          });
+          const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
 
-        if (uploadError) {
-          throw uploadError;
-        }
+          const { data: insertedRow, error: dbError } = await supabase
+            .from('user_images')
+            .insert({ user_id: accountUserId, image_url: publicUrl, image_order: imageOrder })
+            .select('id')
+            .single();
+          if (dbError) throw dbError;
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('user-photos')
-          .getPublicUrl(filePath);
-
-        // Save to database with proper image order (1-based index, max 7)
-        const { data: insertedRow, error: dbError } = await supabase
-          .from('user_images')
-          .insert({
-            user_id: userId,
-            image_url: publicUrl,
-            image_order: imageOrder,
-          })
-          .select('id')
-          .single();
-
-        if (dbError) {
-          throw dbError;
-        }
-
-        // invokeImageModeration retries transient invoke failures a few
-        // times before giving up, so a single network blip during signup
-        // doesn't leave the photo stuck at its DB-default 'pending' state
-        // forever with nothing telling the user.
-        const imageBase64 = await fileToBase64(image.file);
-        const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
-        if (modDecision.status === 'rejected') {
-          // Only confirmed explicit content is ever removed - everything
-          // else went live already.
-          toast({
-            title: 'Photo removed',
-            description: modDecision.message || 'One of your photos was removed for violating our content guidelines.',
-            variant: 'destructive',
-          });
-        } else if (modDecision.status === 'pending') {
-          toast({
-            title: 'Photo queued for review',
-            description: modDecision.message,
-            variant: 'default',
-          });
-        } else if (imageOrder === 1 && modDecision.hasFace === false) {
-          toast({
-            title: 'Tip',
-            description: 'Photos with your face tend to get more matches - consider making your first photo a clear face photo.',
-            variant: 'default',
-          });
+          const imageBase64 = await fileToBase64(image.file);
+          const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
+          if (modDecision.status === 'rejected') {
+            toast({
+              title: 'Photo removed',
+              description: modDecision.message || 'One of your photos was removed for violating our content guidelines.',
+              variant: 'destructive',
+            });
+          }
         }
 
         imageOrder++;
@@ -826,29 +917,16 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           description: `Image ${imageOrder} failed to upload. You can add it later from your profile.`,
           variant: 'destructive',
         });
-        // Continue with other images instead of failing completely
       }
     }
 
-    setIsSubmitting(false); // Reset loading state
-    
-    // Clear localStorage after successful registration
-    localStorage.removeItem('registration_images');
+    setIsSubmitting(false);
     localStorage.removeItem('pending_face_verification');
-    
-    // Fetch the new user from supabase and pass to onSubmit so app state updates
+
+    // Fetch the user from supabase and pass to onSubmit so app state updates
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error('Error fetching user after registration:', userError);
-      }
-      
-      if (user) {
-        // Pass user directly to onSubmit - NO reload needed
-        onSubmit({ ...formData, images: approvedImages, user });
-      } else {
-        onSubmit({ ...formData, images: approvedImages });
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      onSubmit({ ...formData, images: approvedImages, ...(user ? { user } : {}) });
     } catch (error) {
       onSubmit({ ...formData, images: approvedImages });
     }
@@ -1126,18 +1204,22 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 {t('registration.back')}
               </Button>
             )}
-            <Button 
-              type="submit" 
-              disabled={isSubmitting}
+            <Button
+              type="submit"
+              disabled={isSubmitting || creatingAccount || (currentStep === 3 && images.some(img => img.status === 'moderating'))}
               className="h-9 px-4 sm:w-auto bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting 
+              {creatingAccount
                 ? t('registration.creatingAccount')
-                : currentStep === 1 
-                  ? t('registration.continue')
-                  : currentStep === 2 
-                    ? t('registration.addPhoto')
-                    : t('registration.createAccount')
+                : isSubmitting
+                  ? t('registration.creatingAccount')
+                  : currentStep === 3 && images.some(img => img.status === 'moderating')
+                    ? 'Checking photos…'
+                    : currentStep === 1
+                      ? t('registration.continue')
+                      : currentStep === 2
+                        ? t('registration.addPhoto')
+                        : t('registration.createAccount')
               }
             </Button>
           </div>

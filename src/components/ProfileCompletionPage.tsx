@@ -33,6 +33,12 @@ interface ImageUpload {
   preview: string;
   status: 'uploading' | 'moderating' | 'approved' | 'pending' | 'rejected';
   hash?: string; // Store hash for duplicate detection
+  // Set once this photo has already been uploaded + moderated (checked live,
+  // right after picking) - final submit uses these to skip re-uploading and
+  // re-running moderation, and just fixes up image_order.
+  imageId?: string;
+  filePath?: string;
+  moderationMessage?: string;
 }
 
 type StoredImageUpload = {
@@ -364,6 +370,76 @@ const ProfileCompletionPage = () => {
     }
   };
 
+  // Checks a photo for real (AWS Rekognition) right away, the moment it's
+  // picked, instead of deferring to final submit - so the user finds out
+  // immediately if a photo needs replacing. Requires an actual DB row to
+  // attach the result to, so this uploads to storage + inserts the row
+  // right away too; final submit only fixes up image_order for rows that
+  // already exist this way, it doesn't redo any of this. Shared by both the
+  // initial picker and re-cropping an existing photo.
+  const uploadAndModerateImage = (file: File, preview: string, order: number) => {
+    if (!user?.id) {
+      // No session yet (shouldn't normally happen on this page) - fall back
+      // to the old deferred-to-final-submit behavior.
+      setImages(prev => prev.map(img => img.preview === preview ? { ...img, status: 'pending' } : img));
+      return;
+    }
+
+    (async () => {
+      try {
+        const mimeToExt: Record<string, string> = {
+          'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif'
+        };
+        const fileExt = mimeToExt[file.type] || 'jpg';
+        const uniqueSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        const filePath = `${user.id}/${uniqueSuffix}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('user-photos')
+          .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
+
+        const { data: insertedRow, error: dbError } = await supabase
+          .from('user_images')
+          .insert({ user_id: user.id, image_url: publicUrl, image_order: order })
+          .select('id')
+          .single();
+        if (dbError) throw dbError;
+
+        const imageBase64 = await fileToBase64(file);
+        const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
+
+        setImages(prev => prev.map(img => img.preview === preview
+          ? {
+              ...img,
+              status: modDecision.status === 'rejected' ? 'rejected' : 'approved',
+              imageId: insertedRow.id,
+              filePath,
+              moderationMessage: modDecision.message,
+            }
+          : img
+        ));
+
+        if (modDecision.status === 'rejected') {
+          toast({
+            title: 'Photo needs replacing',
+            description: modDecision.message || 'This photo violates our content guidelines - please choose another.',
+            variant: 'destructive',
+          });
+        }
+      } catch (err) {
+        console.error('Live moderation failed for a photo:', err);
+        // Fall back to the old deferred behavior - final submit will upload
+        // + moderate this one for real since it has no imageId.
+        setImages(prev => prev.map(img => img.preview === preview ? { ...img, status: 'pending' } : img));
+      }
+    })();
+  };
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
@@ -396,6 +472,12 @@ const ProfileCompletionPage = () => {
     // synchronously as each file in the batch is processed, so it catches
     // in-batch duplicates that the stale state snapshot can't.
     const seenHashesThisBatch = new Set(images.map((img) => img.hash).filter(Boolean));
+    // Same staleness problem as seenHashesThisBatch above: `images.length`
+    // never changes across this loop's iterations since setImages() calls
+    // are only scheduled, not applied synchronously - every file in one
+    // file-dialog selection got the exact same order, and the second
+    // photo's insert failed a unique(user_id, image_order) constraint.
+    let orderCounter = images.length;
 
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
@@ -435,43 +517,76 @@ const ProfileCompletionPage = () => {
       seenHashesThisBatch.add(fileHash);
 
       const preview = URL.createObjectURL(compressedFile);
-      // Real moderation (AWS Rekognition nudity/celebrity/face-match checks)
-      // can only run once this photo is uploaded and has a database row,
-      // which happens at final submit below - there's no row yet to check a
-      // verified face against while still picking photos. Every photo is
-      // just marked pending here; the toast at final submit reports the
-      // real per-photo outcome.
       const newImage: ImageUpload = {
         file: compressedFile,
         preview,
-        status: 'pending',
-        hash: fileHash // Store hash for future comparisons
+        status: 'moderating',
+        hash: fileHash
       };
-
       setImages(prev => [...prev, newImage]);
+      orderCounter++;
+      uploadAndModerateImage(compressedFile, preview, orderCounter);
     }
 
     event.target.value = '';
   };
 
   const removeImage = (preview: string) => {
+    const removed = images.find(img => img.preview === preview);
     setImages(prev => {
       const updated = prev.filter(img => img.preview !== preview);
       URL.revokeObjectURL(preview);
       return updated;
     });
+
+    // This photo was already live-checked (uploaded + a real user_images row
+    // exists) - clean both up now instead of leaving an orphaned row/file
+    // behind (which, for an already-approved photo, would otherwise sit in
+    // the DB forever even though the user just removed it from the picker).
+    if (removed?.imageId) {
+      supabase.from('user_images').delete().eq('id', removed.imageId)
+        .then(({ error }) => { if (error) console.error('Failed to remove photo row:', error); });
+    }
+    if (removed?.filePath) {
+      supabase.storage.from('user-photos').remove([removed.filePath])
+        .then(({ error }) => { if (error) console.error('Failed to remove photo file:', error); });
+    }
   };
 
   const [croppingImage, setCroppingImage] = useState<{ preview: string } | null>(null);
 
   const handleCroppedImage = ({ blob, previewUrl, originalUrl }: { blob: Blob; previewUrl: string; originalUrl: string }) => {
+    const original = images.find(img => img.preview === originalUrl);
+    const croppedFile = new File([blob], original?.file?.name || 'cropped.jpg', { type: 'image/jpeg' });
+    const order = images.findIndex(img => img.preview === originalUrl) + 1;
+
     setImages(prev => prev.map(img => {
       if (img.preview !== originalUrl) return img;
       URL.revokeObjectURL(img.preview);
-      const croppedFile = new File([blob], img.file?.name || 'cropped.jpg', { type: 'image/jpeg' });
-      return { ...img, file: croppedFile, preview: previewUrl };
+      return {
+        ...img,
+        file: croppedFile,
+        preview: previewUrl,
+        status: 'moderating',
+        imageId: undefined,
+        filePath: undefined,
+        moderationMessage: undefined,
+      };
     }));
     setCroppingImage(null);
+
+    // The crop changed the actual pixels, so the old row/file (if this photo
+    // had already been live-checked) points at stale content - clean it up
+    // and re-check the cropped version as if it were freshly picked.
+    if (original?.imageId) {
+      supabase.from('user_images').delete().eq('id', original.imageId)
+        .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo row:', error); });
+    }
+    if (original?.filePath) {
+      supabase.storage.from('user-photos').remove([original.filePath])
+        .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo file:', error); });
+    }
+    uploadAndModerateImage(croppedFile, previewUrl, order > 0 ? order : images.length + 1);
   };
 
   const renderImageStatus = (image: ImageUpload) => {
@@ -580,10 +695,29 @@ const ProfileCompletionPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevent double submission
     if (isSubmitting) return;
-    
+
+    // Dismiss the keyboard BEFORE swapping to the loading/terms screens
+    // below, not at the same time as it - on iOS's WKWebView, a big DOM
+    // swap landing in the same tick as the keyboard-dismiss viewport resize
+    // makes it snapshot-and-blur the outgoing view as a transition, which
+    // reads as "the hopping logo has a blur over it" with no CSS involved.
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    // A photo that's still mid-check (live moderation just kicked off) isn't
+    // 'approved' or 'pending' yet, so it'd be silently excluded from
+    // approvedImages below rather than actually submitted.
+    if (images.some(img => img.status === 'moderating')) {
+      toast({
+        title: 'Still checking your photos',
+        description: 'Give it just a moment - photos are quick to check.',
+        variant: 'default',
+      });
+      return;
+    }
+
     setLoading(true);
     setIsSubmitting(true);
 
@@ -758,28 +892,35 @@ const ProfileCompletionPage = () => {
         }
       };
 
-      // Replace existing image records to avoid unique(user_id, image_order) conflicts on retries.
+      // Replace existing image records to avoid unique(user_id, image_order) conflicts on retries -
+      // EXCEPT rows this same picking session already live-uploaded and
+      // moderated (uploadAndModerateImage above), which are real, current,
+      // already-checked photos, not stale leftovers from a prior attempt.
+      const liveImageIds = new Set(images.map(img => img.imageId).filter((id): id is string => Boolean(id)));
+
       const { data: existingUserImages, error: existingUserImagesError } = await supabase
         .from('user_images')
-        .select('image_url')
+        .select('id, image_url')
         .eq('user_id', user.id);
 
       if (existingUserImagesError) {
         throw existingUserImagesError;
       }
 
-      if ((existingUserImages?.length || 0) > 0) {
+      const staleUserImages = (existingUserImages || []).filter((img) => !liveImageIds.has(img.id));
+
+      if (staleUserImages.length > 0) {
         const { error: deleteExistingImagesError } = await supabase
           .from('user_images')
           .delete()
-          .eq('user_id', user.id);
+          .in('id', staleUserImages.map((img) => img.id));
 
         if (deleteExistingImagesError) {
           throw deleteExistingImagesError;
         }
 
         // Best-effort storage cleanup for replaced photos.
-        const oldStoragePaths = (existingUserImages || [])
+        const oldStoragePaths = staleUserImages
           .map((img) => extractStoragePathFromPublicUrl(img.image_url))
           .filter((path): path is string => Boolean(path));
 
@@ -836,6 +977,21 @@ const ProfileCompletionPage = () => {
         const image = approvedImages[index];
         try {
           if (!image.file) continue;
+
+          // Already uploaded + moderated live while picking - just fix up
+          // its image_order (which may have shifted from reordering/removing
+          // other photos since) rather than uploading and re-checking it.
+          if (image.imageId) {
+            const { error: orderError } = await supabase
+              .from('user_images')
+              .update({ image_order: index + 1 })
+              .eq('id', image.imageId);
+            if (orderError) throw orderError;
+            successfulUploads++;
+            if (image.status === 'rejected') removedCount++;
+            continue;
+          }
+
           const mimeToExt: Record<string, string> = {
             'image/jpeg': 'jpg',
             'image/png': 'png',
@@ -1323,7 +1479,7 @@ const ProfileCompletionPage = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                         type="submit"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || images.some(img => img.status === 'moderating')}
                         className="w-full h-8 text-xs px-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
@@ -1331,6 +1487,8 @@ const ProfileCompletionPage = () => {
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             <span>{t('profileCompletion.completingProfile')}</span>
                           </div>
+                        ) : images.some(img => img.status === 'moderating') ? (
+                          'Checking photos…'
                         ) : t('profileCompletion.completeProfile')}
                       </Button>
                       

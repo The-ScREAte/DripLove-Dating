@@ -428,13 +428,15 @@ const InfluencerManagement = () => {
             id,
             user_id,
             created_at,
+            user_deleted_at,
             profiles (
               first_name,
               last_name,
               email
             )
           `)
-          .eq('promo_code_id', promoCode.id),
+          .eq('promo_code_id', promoCode.id)
+          .order('created_at', { ascending: false }),
         supabase
           .from('influencer_commissions')
           .select('*')
@@ -1024,6 +1026,12 @@ const InfluencerManagement = () => {
                   <p className="text-2xl font-bold text-purple-600">{selectedPromoCode.total_paid_subscribers}</p>
                   <p className="text-xs text-gray-500">Premium Users</p>
                 </div>
+                <div className="p-3 bg-gray-50 rounded-lg text-center col-span-2">
+                  <p className="text-2xl font-bold text-gray-600">
+                    {detailStats.referrals.filter((r: any) => r.user_deleted_at).length}
+                  </p>
+                  <p className="text-xs text-gray-500">Deleted Leads (still counted in Total Signups)</p>
+                </div>
               </div>
 
               {/* Financial Summary */}
@@ -1136,9 +1144,18 @@ const InfluencerManagement = () => {
                 ) : (
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {detailStats.referrals.slice(0, 10).map((ref: any) => (
-                      <div key={ref.id} className="flex justify-between text-xs border-b py-1">
-                        <span>{ref.profiles?.first_name} {ref.profiles?.last_name}</span>
-                        <span className="text-gray-500">{new Date(ref.created_at).toLocaleDateString()}</span>
+                      <div key={ref.id} className="flex justify-between items-center text-xs border-b py-1.5 gap-2">
+                        {ref.user_deleted_at ? (
+                          <span className="flex items-center gap-1.5 text-gray-500">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-gray-300">Account deleted</Badge>
+                            <span className="text-gray-400">
+                              on {new Date(ref.user_deleted_at).toLocaleDateString()}
+                            </span>
+                          </span>
+                        ) : (
+                          <span>{ref.profiles?.first_name} {ref.profiles?.last_name}</span>
+                        )}
+                        <span className="text-gray-500 shrink-0">Signed up {new Date(ref.created_at).toLocaleDateString()}</span>
                       </div>
                     ))}
                   </div>
