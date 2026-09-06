@@ -42,6 +42,219 @@ function wasPaymentRecentlyCompleted(): boolean {
   return false;
 }
 
+// Pull the raw platform receipt (Apple base64 receipt, or Google purchase
+// token) directly off a Transaction's parent Receipt. We deliberately never
+// call transaction.verify()/store.when().verified() -- that chain only talks
+// to a `store.validator`, which we never configure (validation happens in our
+// own Supabase edge functions instead). Without a validator configured, the
+// plugin's internal ValidatorController treats every receipt as verified
+// without ever fetching real data ("for backward compatibility"), so
+// anything read off that fake VerifiedReceipt is empty. Reading straight off
+// the real Transaction/Receipt objects here is the only way to get the raw
+// data.
+function extractReceiptData(t: any): { receiptData: string | undefined; purchaseToken: string | undefined } {
+  if (isAndroid()) {
+    const purchaseToken = t?.parentReceipt?.purchaseToken || t?.nativePurchase?.purchaseToken;
+    return { receiptData: purchaseToken, purchaseToken };
+  }
+  const receiptData = t?.parentReceipt?.nativeData?.appStoreReceipt;
+  return { receiptData, purchaseToken: undefined };
+}
+
+// Find the real Transaction for an owned product among the store's locally
+// held receipts. Product has no `.transaction`/`.latestTransaction` field --
+// the transaction lives on the Receipt that contains it.
+function findTransactionForProduct(store: any, productId: string): any {
+  try {
+    const receipts = store?.localReceipts || [];
+    for (const receipt of receipts) {
+      const tx = (receipt.transactions || []).find((t: any) =>
+        (t.products || []).some((p: any) => p.id === productId)
+      );
+      if (tx) return tx;
+    }
+  } catch (e) {
+    console.warn('[IAP] Error finding transaction for product:', productId, e);
+  }
+  return undefined;
+}
+
+// Validate a purchase's receipt with our server, activate premium, and
+// redirect on success. This is the logic that used to live in
+// store.when().verified() -- moved here so it can run directly off the
+// approved Transaction (which has real receipt data), instead of the fake
+// VerifiedReceipt produced by the unconfigured local validator.
+async function handleApprovedTransaction(t: any) {
+  // GUARD: Prevent redirect if already on payment-success page or recently completed
+  if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
+    noopLog('[IAP] Already on success page or recently completed, just finishing transaction');
+    if (t.finish && typeof t.finish === 'function') t.finish();
+    return;
+  }
+
+  window.iapPurchaseInitiated = false;
+
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    let userId = user?.id;
+    if (!userId) {
+      try {
+        const storedUserId = localStorage.getItem('driplove_iap_user_id');
+        if (storedUserId) {
+          userId = storedUserId;
+          noopLog('[IAP] Using stored user_id:', userId);
+        }
+      } catch (e) {
+        // localStorage not available
+      }
+    }
+
+    if (!userId) {
+      console.error('[IAP] No user identification available');
+      alert('Please log in to complete your purchase.');
+      return;
+    }
+
+    const productId = t.products?.[0]?.id || '';
+    const transactionId = t.transactionId || `iap_${Date.now()}`;
+
+    noopLog('[IAP] Processing approved transaction for user:', userId);
+    noopLog('[IAP] Transaction:', { productId, transactionId, platform: isAndroid() ? 'google' : 'apple' });
+
+    const { receiptData, purchaseToken } = extractReceiptData(t);
+
+    if (!receiptData) {
+      // No receipt data means we cannot verify this purchase with Apple/Google.
+      // Never grant premium without server-side verification -- the client is
+      // untrusted and must not be able to write its own entitlement.
+      console.warn('[IAP] No receipt data available; cannot verify purchase');
+      alert('Could not verify your purchase. Please use "Restore Purchases" or contact support.');
+      return;
+    }
+
+    noopLog('[IAP] Receipt data found, attempting server validation...');
+
+    // Add timeout protection for receipt validation (25 seconds)
+    const validationTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
+    });
+
+    // Choose the correct validator based on platform
+    const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
+    noopLog('[IAP] Using validator function:', validatorFunction);
+
+    // CRITICAL: Always include user_id in body for session-independent activation
+    const validationPromise = supabase.functions.invoke(validatorFunction, {
+      body: {
+        receiptData: receiptData,
+        productId: productId,
+        user_id: userId, // Fallback for session-expired scenarios
+        purchaseToken: purchaseToken || transactionId,
+        transactionId: transactionId
+      }
+    });
+
+    let validation, validationError;
+    try {
+      const result: any = await Promise.race([validationPromise, validationTimeout]);
+      validation = result.data;
+      validationError = result.error;
+      noopLog('[IAP] Validation response:', { validation, validationError });
+    } catch (timeoutError) {
+      console.error('[IAP] Receipt validation timeout');
+      validationError = timeoutError;
+    }
+
+    // The validator edge function is the ONLY thing that writes to
+    // user_subscriptions for this flow -- it runs with the service-role key
+    // after verifying the receipt with Apple/Google. The client never
+    // activates premium itself; a database trigger also rejects any
+    // client-originated write that grants or extends entitlement.
+    if (validationError || !validation?.valid || !validation?.active) {
+      console.warn('[IAP] Server validation failed or subscription inactive:', validationError?.message || validation);
+      alert('We could not verify your purchase yet. If you were charged, please try "Restore Purchases" in a moment, or contact support.');
+      return;
+    }
+
+    // If we have a live session for this exact user, double-check the
+    // entitlement was actually applied before redirecting (defends against
+    // a race where the session switched accounts mid-purchase). This read
+    // is RLS-gated to auth.uid() = user_id, so it only works when there IS
+    // a live session -- when we fell back to the stored user_id above
+    // (session expired mid-purchase), auth.uid() is null and this query
+    // would always return nothing, so we skip it and trust the validator's
+    // response directly: it already verified the receipt with Apple/Google
+    // and wrote the row itself using the service-role key.
+    if (user?.id && user.id === userId) {
+      const { data: subRow } = await supabase
+        .from('user_subscriptions')
+        .select('plan_name, status, expires_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const isPremiumNow = !!subRow && subRow.plan_name === 'premium' &&
+        (subRow.status === 'active' || subRow.status === 'cancelled') &&
+        (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+
+      if (!isPremiumNow) {
+        console.warn('[IAP] Validation ok but subscription not yet applied; skipping redirect');
+        alert('Your purchase was verified. It may take a moment to appear -- please reopen the app shortly.');
+        return;
+      }
+    }
+
+    try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
+    markPaymentCompleted();
+    if (t.finish && typeof t.finish === 'function') t.finish();
+    window.location.href = '/payment-success?status=successful&payment_type=iap';
+  } catch (error: any) {
+    console.error('[IAP] Error processing approved transaction:', error);
+    // Handle error - ensure user doesn't get premium access on failure
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Get current payment attempts
+        const { data: currentSub } = await supabase
+          .from('user_subscriptions')
+          .select('payment_attempts')
+          .eq('user_id', user.id)
+          .single();
+
+        const attempts = (currentSub?.payment_attempts || 0) + 1;
+
+        if (attempts >= 3) {
+          // Max attempts reached, deactivate subscription
+          await supabase.rpc('handle_payment_failure', {
+            p_user_id: user.id,
+            p_reason: `IAP verification failed after ${attempts} attempts: ` + error.message
+          });
+        } else {
+          // Increment attempt counter
+          await supabase
+            .from('user_subscriptions')
+            .update({
+              payment_attempts: attempts,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', user.id);
+        }
+      }
+    } catch (fallbackError) {
+      console.error('[IAP] Fallback error handling failed:', fallbackError);
+    }
+    alert('Payment processing failed. Please try again or contact support.');
+    if (t.finish && typeof t.finish === 'function') {
+      t.finish();
+    }
+  }
+}
+
 export function initIAP() {
   return new Promise<void>((resolve, reject) => {
     
@@ -165,203 +378,19 @@ export function initIAP() {
           }
         })
         .approved(t => {
-          // Only verify if user explicitly initiated the purchase
+          // Only process purchases the user explicitly initiated. We call our
+          // own validation directly here (see handleApprovedTransaction)
+          // instead of t.verify() -- that goes through store.when().verified(),
+          // which only talks to a `store.validator` we never configure, and
+          // silently fakes a successful verification with no real receipt data
+          // when none is configured.
           if (window.iapPurchaseInitiated) {
-            if (t.verify && typeof t.verify === 'function') {
-              t.verify();
-            }
+            handleApprovedTransaction(t);
           } else {
             if (t.finish && typeof t.finish === 'function') {
               t.finish();
             }
           }
-        })
-        .verified(async (r) => {
-          
-          // GUARD: Prevent redirect if already on payment-success page or recently completed
-          if (isOnPaymentSuccessPage() || wasPaymentRecentlyCompleted()) {
-            noopLog('[IAP] Already on success page or recently completed, just finishing transaction');
-            if (r?.finish && typeof r.finish === 'function') r.finish();
-            return;
-          }
-          
-          // Reset the purchase flag
-          window.iapPurchaseInitiated = false;
-          
-          // Validate receipt with server-side function for security
-          try {
-            const { supabase } = await import('@/integrations/supabase/client');
-            
-            // Get user - but also try to use stored user_id as fallback
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            // Determine payment method based on platform
-            const paymentMethod = isAndroid() ? 'google' : 'apple';
-            
-            // Try to get stored user_id from localStorage (set before purchase)
-            let userId = user?.id;
-            if (!userId) {
-              try {
-                const storedUserId = localStorage.getItem('driplove_iap_user_id');
-                if (storedUserId) {
-                  userId = storedUserId;
-                  noopLog('[IAP] Using stored user_id:', userId);
-                }
-              } catch (e) {
-                // localStorage not available
-              }
-            }
-            
-            if (!userId) {
-              console.error('[IAP] No user identification available');
-              alert('Please log in to complete your purchase.');
-              return;
-            }
-            
-            noopLog('[IAP] Processing verified receipt for user:', userId);
-            noopLog('[IAP] Receipt object:', {
-              productId: r.productId,
-              transactionId: r.transactionId,
-              hasReceipt: !!r.receipt,
-              hasPayload: !!r.payload,
-              platform: paymentMethod
-            });
-            
-            // Get receipt data from the transaction
-            const receiptData = r.receipt || r.payload || r.transactionReceipt;
-            const transactionId = r.transactionId || r.productId || `iap_${Date.now()}`;
-
-            if (!receiptData) {
-              // No receipt data means we cannot verify this purchase with Apple/Google.
-              // Never grant premium without server-side verification -- the client is
-              // untrusted and must not be able to write its own entitlement.
-              console.warn('[IAP] No receipt data available; cannot verify purchase');
-              alert('Could not verify your purchase. Please use "Restore Purchases" or contact support.');
-              return;
-            }
-
-            noopLog('[IAP] Receipt data found, attempting server validation...');
-
-            // Add timeout protection for receipt validation (25 seconds)
-            const validationTimeout = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
-            });
-
-            // Choose the correct validator based on platform
-            const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
-            noopLog('[IAP] Using validator function:', validatorFunction);
-
-            // CRITICAL: Always include user_id in body for session-independent activation
-            const validationPromise = supabase.functions.invoke(validatorFunction, {
-              body: {
-                receiptData: receiptData,
-                productId: r.productId,
-                user_id: userId, // Fallback for session-expired scenarios
-                purchaseToken: r.purchaseToken || r.transactionId,
-                transactionId: transactionId
-              }
-            });
-
-            let validation, validationError;
-            try {
-              const result: any = await Promise.race([validationPromise, validationTimeout]);
-              validation = result.data;
-              validationError = result.error;
-              noopLog('[IAP] Validation response:', { validation, validationError });
-            } catch (timeoutError) {
-              console.error('[IAP] Receipt validation timeout');
-              validationError = timeoutError;
-            }
-
-            // The validator edge function is the ONLY thing that writes to
-            // user_subscriptions for this flow -- it runs with the service-role key
-            // after verifying the receipt with Apple/Google. The client never
-            // activates premium itself; a database trigger also rejects any
-            // client-originated write that grants or extends entitlement.
-            if (validationError || !validation?.valid || !validation?.active) {
-              console.warn('[IAP] Server validation failed or subscription inactive:', validationError?.message || validation);
-              alert('We could not verify your purchase yet. If you were charged, please try "Restore Purchases" in a moment, or contact support.');
-              return;
-            }
-
-            // If we have a live session for this exact user, double-check the
-            // entitlement was actually applied before redirecting (defends against
-            // a race where the session switched accounts mid-purchase). This read
-            // is RLS-gated to auth.uid() = user_id, so it only works when there IS
-            // a live session -- when we fell back to the stored user_id above
-            // (session expired mid-purchase), auth.uid() is null and this query
-            // would always return nothing, so we skip it and trust the validator's
-            // response directly: it already verified the receipt with Apple/Google
-            // and wrote the row itself using the service-role key.
-            if (user?.id && user.id === userId) {
-              const { data: subRow } = await supabase
-                .from('user_subscriptions')
-                .select('plan_name, status, expires_at')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-              const isPremiumNow = !!subRow && subRow.plan_name === 'premium' &&
-                (subRow.status === 'active' || subRow.status === 'cancelled') &&
-                (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
-
-              if (!isPremiumNow) {
-                console.warn('[IAP] Validation ok but subscription not yet applied; skipping redirect');
-                alert('Your purchase was verified. It may take a moment to appear -- please reopen the app shortly.');
-                return;
-              }
-            }
-
-            try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
-            markPaymentCompleted();
-            window.location.href = '/payment-success?status=successful&payment_type=iap';
-          } catch (error: any) {
-            console.error('[IAP] Error processing verified receipt:', error);
-            // Handle error - ensure user doesn't get premium access on failure
-            try {
-              const { supabase } = await import('@/integrations/supabase/client');
-              const { data: { user } } = await supabase.auth.getUser();
-              if (user) {
-                // Get current payment attempts
-                const { data: currentSub } = await supabase
-                  .from('user_subscriptions')
-                  .select('payment_attempts')
-                  .eq('user_id', user.id)
-                  .single();
-
-                const attempts = (currentSub?.payment_attempts || 0) + 1;
-
-                if (attempts >= 3) {
-                  // Max attempts reached, deactivate subscription
-                  await supabase.rpc('handle_payment_failure', {
-                    p_user_id: user.id,
-                    p_reason: `IAP verification failed after ${attempts} attempts: ` + error.message
-                  });
-                } else {
-                  // Increment attempt counter
-                  await supabase
-                    .from('user_subscriptions')
-                    .update({ 
-                      payment_attempts: attempts,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('user_id', user.id);
-                }
-              }
-            } catch (fallbackError) {
-              console.error('[IAP] Fallback error handling failed:', fallbackError);
-            }
-            alert('Payment processing failed. Please try again or contact support.');
-          }
-          
-          if (r.finish && typeof r.finish === 'function') {
-            r.finish();
-          }
-        })
-        .unverified((r, err) => {
-          console.warn('[IAP] unverified:', r?.productId, err?.message);
-          window.iapPurchaseInitiated = false;
         });
     }
 
@@ -580,11 +609,13 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
         }
 
         noopLog('[IAP] Validating restored receipt with server...');
-        const { data: validation, error: valError } = await supabase.functions.invoke('iap-receipt-validator', {
+        const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
+        const { data: validation, error: valError } = await supabase.functions.invoke(validatorFunction, {
           body: {
             receiptData: receiptData,
             productId: productId,
             user_id: user.id,
+            purchaseToken: receiptData,
             transactionId: transactionId
           }
         });
@@ -610,11 +641,11 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
       // Check if this is one of our products and it's owned
       if (product && PRODUCT_IDS.includes(product.id) && product.owned) {
         noopLog('[IAP] Found owned product during restore:', product.id);
-        
-        const transaction = product.transaction || product.latestTransaction;
-        const receiptData = transaction?.appStoreReceipt || transaction?.receipt || transaction?.transactionReceipt;
-        const transactionId = transaction?.transactionId || transaction?.id;
-        
+
+        const transaction = findTransactionForProduct(store, product.id);
+        const { receiptData } = extractReceiptData(transaction);
+        const transactionId = transaction?.transactionId;
+
         const success = await validateAndSyncSubscription(product.id, transactionId, receiptData);
         
         if (success) {
@@ -633,11 +664,11 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
           if (product && product.owned) {
             foundOwned = true;
             noopLog('[IAP] Found already-owned product:', id);
-            
-            const transaction = product.transaction || product.latestTransaction;
-            const receiptData = transaction?.appStoreReceipt || transaction?.receipt || transaction?.transactionReceipt;
-            const transactionId = transaction?.transactionId || transaction?.id;
-            
+
+            const transaction = findTransactionForProduct(store, id);
+            const { receiptData } = extractReceiptData(transaction);
+            const transactionId = transaction?.transactionId;
+
             const success = await validateAndSyncSubscription(id, transactionId, receiptData);
             
             if (success) {
