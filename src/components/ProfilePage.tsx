@@ -1104,9 +1104,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         </div>
       </div>
 
-      {/* Scrollable Content - with padding to account for fixed header */}
+      {/* Scrollable Content - the toolbar above is sticky (in flow), so no
+          manual top offset is needed any more on any device. */}
       <div
-        className="max-w-4xl mx-auto p-4 space-y-8 overflow-x-hidden w-full top-pad-clear-headers"
+        className="max-w-4xl mx-auto p-4 pt-4 space-y-8 overflow-x-hidden w-full"
         style={{
           // Clears the two stacked fixed headers above (MainApp's + this page's own),
           // both of which grow with env(safe-area-inset-top) - this needs to grow with
