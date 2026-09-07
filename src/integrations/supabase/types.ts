@@ -517,6 +517,30 @@ export type Database = {
         }
         Relationships: []
       }
+      deleted_account_emails: {
+        Row: {
+          country_code: string | null
+          deleted_at: string
+          email: string
+          former_user_id: string
+          id: string
+        }
+        Insert: {
+          country_code?: string | null
+          deleted_at?: string
+          email: string
+          former_user_id: string
+          id?: string
+        }
+        Update: {
+          country_code?: string | null
+          deleted_at?: string
+          email?: string
+          former_user_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
       discover_feed_events: {
         Row: {
           created_at: string
@@ -1416,8 +1440,8 @@ export type Database = {
           show_demographics_enabled: boolean
           show_leads_enabled: boolean
           show_subscribers_enabled: boolean
-          terms_accepted_at: string | null
           status: string | null
+          terms_accepted_at: string | null
           total_commission_earned: number | null
           total_paid_subscribers: number | null
           total_signups: number | null
@@ -1439,8 +1463,8 @@ export type Database = {
           show_demographics_enabled?: boolean
           show_leads_enabled?: boolean
           show_subscribers_enabled?: boolean
-          terms_accepted_at?: string | null
           status?: string | null
+          terms_accepted_at?: string | null
           total_commission_earned?: number | null
           total_paid_subscribers?: number | null
           total_signups?: number | null
@@ -1462,8 +1486,8 @@ export type Database = {
           show_demographics_enabled?: boolean
           show_leads_enabled?: boolean
           show_subscribers_enabled?: boolean
-          terms_accepted_at?: string | null
           status?: string | null
+          terms_accepted_at?: string | null
           total_commission_earned?: number | null
           total_paid_subscribers?: number | null
           total_signups?: number | null
@@ -1547,22 +1571,22 @@ export type Database = {
           created_at: string | null
           id: string
           promo_code_id: string
-          user_id: string | null
           user_deleted_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           promo_code_id: string
-          user_id?: string | null
           user_deleted_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           promo_code_id?: string
-          user_id?: string | null
           user_deleted_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -2008,6 +2032,7 @@ export type Database = {
           flutterwave_transaction_id: string | null
           id: string
           next_billing_date: string | null
+          original_transaction_id: string | null
           payment_attempts: number | null
           payment_method: string | null
           plan_name: string
@@ -2025,6 +2050,7 @@ export type Database = {
           flutterwave_transaction_id?: string | null
           id?: string
           next_billing_date?: string | null
+          original_transaction_id?: string | null
           payment_attempts?: number | null
           payment_method?: string | null
           plan_name: string
@@ -2042,6 +2068,7 @@ export type Database = {
           flutterwave_transaction_id?: string | null
           id?: string
           next_billing_date?: string | null
+          original_transaction_id?: string | null
           payment_attempts?: number | null
           payment_method?: string | null
           plan_name?: string
@@ -2135,6 +2162,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_influencer_terms: {
+        Args: { p_code: string; p_password: string }
+        Returns: Json
+      }
       admin_cancel_premium_subscription: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -2157,6 +2188,10 @@ export type Database = {
           is_premium: boolean
           user_id: string
         }[]
+      }
+      admin_get_promo_setup_link: {
+        Args: { p_promo_code_id: string }
+        Returns: Json
       }
       admin_get_user_premium_status: {
         Args: { target_user_id: string }
@@ -2278,6 +2313,10 @@ export type Database = {
       }
       get_influencer_full_stats: {
         Args: { p_promo_code_id: string }
+        Returns: Json
+      }
+      get_influencer_lead_demographics: {
+        Args: { p_code: string; p_password: string }
         Returns: Json
       }
       get_influencer_referred_users: {
