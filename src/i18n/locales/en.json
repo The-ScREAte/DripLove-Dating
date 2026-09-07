@@ -299,6 +299,8 @@
     "loadingProfiles": "Loading profiles...",
     "noProfilesDescription": "No profiles are available in your area right now. Check back soon for new matches, or adjust your preferences in Settings to see more people.",
     "adjustPreferences": "Adjust your preferences in Settings to see more profiles",
+    "upgradeForMoreCountries": "Upgrade to Premium to see people in more countries and places around the world.",
+    "upgradeForMoreCountriesButton": "Unlock More Countries",
     "refresh": "Refresh",
     "swipeGuide": {
       "title": "Start Swiping",

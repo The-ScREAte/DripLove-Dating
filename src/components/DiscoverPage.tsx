@@ -88,12 +88,16 @@ const FREE_DAILY_SWIPE_LIMIT = 30;
 const PREMIUM_DAILY_SWIPE_LIMIT = 200;
 
 // Free users are capped at this distance (km) regardless of their own
-// max_distance/distance_preference setting - premium has no such cap. This
-// was independently redeclared as a local const under two different names
+// max_distance/distance_preference setting. This was independently
+// redeclared as a local const under two different names
 // (FREE_USER_MAX_DISTANCE, FREE_USER_MAX_DISTANCE_CACHE) plus two more raw
 // "500" literals, in four separate places in this file - the same drift
 // risk that caused the swipe-limit bug. One constant now.
-const FREE_USER_MAX_DISTANCE_KM = 500;
+const FREE_USER_MAX_DISTANCE_KM = 800;
+// Premium users can search further than free users, but still up to a
+// concrete ceiling rather than being fully unbounded - matches the max on
+// the distance slider in the profile's Location section.
+const PREMIUM_USER_MAX_DISTANCE_KM = 2000;
 
 // Below this profile-completion percentage, swiping is blocked once the user
 // has already had a few free look-arounds. Was hardcoded as "70" and "5"
@@ -1136,9 +1140,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     const premiumForFeed = premiumActive;
 
-    // For FREE users: enforce the shared max distance cap
+    // Enforce the shared max distance cap - free users get the lower cap,
+    // premium users get the much higher (but still concrete) one.
     const safeUserMaxDistance = premiumForFeed
-      ? safeUserMaxDistanceUncapped
+      ? Math.min(safeUserMaxDistanceUncapped, PREMIUM_USER_MAX_DISTANCE_KM)
       : Math.min(safeUserMaxDistanceUncapped, FREE_USER_MAX_DISTANCE_KM);
 
     const unlockedCountriesRaw = currentUserData?.unlocked_countries ?? currentUser.unlocked_countries;
@@ -2507,7 +2512,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         if (!isCancelled && currentUserData) {
           const baseCountryCode = getTrustedBaseCountryCode(currentUserData.country_code, currentUserData.country);
           const maxDistanceRaw = Number(currentUserData.max_distance ?? currentUserData.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
-          const maxDistance = Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? Math.min(maxDistanceRaw, FREE_USER_MAX_DISTANCE_KM) : DEFAULT_MAX_DISTANCE_KM;
+          // BUG FIX: this recovery pass capped distance at the free-tier limit
+          // unconditionally, same class of bug as the country-code fix above -
+          // a premium user's recovery query was silently narrowed to the free
+          // distance cap even though the main fetch respects their real one.
+          const distanceCapForRecovery = premiumActive ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM;
+          const maxDistance = Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? Math.min(maxDistanceRaw, distanceCapForRecovery) : DEFAULT_MAX_DISTANCE_KM;
           const minAge = Number(currentUserData.min_age ?? DEFAULT_MIN_AGE);
           const maxAge = Number(currentUserData.max_age ?? DEFAULT_MAX_AGE);
           // BUG FIX: this whole recovery pass used to be written as if every
@@ -2967,10 +2977,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         
         const keyForStorage = buildDeckCacheKey(cacheKey);
         
-        // For free users: calculate max distance (capped at the shared free-tier limit)
+        // Calculate max distance, capped at the shared per-tier limit
         const userMaxDistanceForCache = currentUser.max_distance || currentUser.distance_preference || 500;
         const freeUserMaxDistance = premiumActive
-          ? userMaxDistanceForCache
+          ? Math.min(userMaxDistanceForCache, PREMIUM_USER_MAX_DISTANCE_KM)
           : Math.min(userMaxDistanceForCache, FREE_USER_MAX_DISTANCE_KM);
         const userLat = currentUser.latitude;
         const userLon = currentUser.longitude;
@@ -5082,6 +5092,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
             <h2 className="text-lg font-semibold mb-1.5 text-white">{emptyTitle}</h2>
             <p className="text-gray-400 text-sm mb-5 max-w-xs">{emptyDescription}</p>
+            {!premiumActive && (
+              <div className="w-full mb-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <p className="text-xs text-yellow-200/90 mb-2">{t('discover.upgradeForMoreCountries')}</p>
+                <Button
+                  onClick={() => setShowPremiumUpgrade(true)}
+                  className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+                >
+                  <Crown className="w-4 h-4 mr-2" />
+                  {t('discover.upgradeForMoreCountriesButton')}
+                </Button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2.5 w-full">
               <Button
                 onClick={() => {

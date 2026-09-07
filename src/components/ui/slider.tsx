@@ -26,10 +26,14 @@ const Slider = React.forwardRef<
       {...props}
     >
       <SliderPrimitive.Track
-        className="relative h-2 w-full grow overflow-hidden rounded-full bg-secondary"
+        className="relative h-2 w-full grow overflow-hidden rounded-full bg-white/25"
         style={{ touchAction: 'none', transform: 'translateZ(0)' as any, WebkitUserSelect: 'none', userSelect: 'none' }}
       >
-        <SliderPrimitive.Range className="absolute h-full bg-primary" style={{ pointerEvents: 'none', transition: 'none' }} />
+        {/* The selected range (between the two thumbs for a range slider, or
+            from the start to the thumb for a single-value one) is the deep,
+            saturated fill - the unselected track stays light - so it's
+            immediately obvious what's "in range" vs. not. */}
+        <SliderPrimitive.Range className="absolute h-full bg-gradient-to-r from-pink-600 to-rose-700" style={{ pointerEvents: 'none', transition: 'none' }} />
       </SliderPrimitive.Track>
       {Array.from({ length: thumbsCount }).map((_, i) => (
         <SliderPrimitive.Thumb

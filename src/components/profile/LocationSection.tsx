@@ -11,6 +11,12 @@ import LocationInput from '@/components/forms/LocationInput';
 import UnlockCountriesDialog from './UnlockCountriesDialog';
 import { getCountriesList } from '@/constants/locationData';
 
+// Must match FREE_USER_MAX_DISTANCE_KM / PREMIUM_USER_MAX_DISTANCE_KM in
+// DiscoverPage.tsx (the values that actually gate the discovery query) and
+// the chk_max_distance DB constraint's outer bound (2000km).
+const FREE_MAX_DISTANCE_KM = 800;
+const PREMIUM_MAX_DISTANCE_KM = 2000;
+
 interface LocationSectionProps {
   editedProfile: any;
   isEditing: boolean;
@@ -47,6 +53,7 @@ const LocationSection = ({
   const { t } = useTranslation();
   const [showCountryDialog, setShowCountryDialog] = useState(false);
   const unlockedCountries = editedProfile.unlocked_countries || [];
+  const distanceMax = isPremium ? PREMIUM_MAX_DISTANCE_KM : FREE_MAX_DISTANCE_KM;
 
   const getCountryName = (code: string) => {
     const countries = getCountriesList();
@@ -140,9 +147,9 @@ const LocationSection = ({
           <Label className="text-white">What max distance do you want to see people?</Label>
           <div className="px-3">
           <Slider
-              value={[editedProfile.max_distance || 250]}
+              value={[Math.min(editedProfile.max_distance || 250, distanceMax)]}
               onValueChange={onDistanceChange || (() => {})}
-              max={500}
+              max={distanceMax}
               min={1}
               step={5}
               className="w-full"
@@ -150,10 +157,16 @@ const LocationSection = ({
             />
             <div className="flex justify-between text-xs text-white mt-1">
               <span>1 km</span>
-              <span className="font-medium">{editedProfile.max_distance || 250} km</span>
-              <span>500 km</span>
+              <span className="font-medium">{Math.min(editedProfile.max_distance || 250, distanceMax)} km</span>
+              <span>{distanceMax} km</span>
             </div>
           </div>
+          {!isPremium && (
+            <p className="text-xs text-yellow-200/80 flex items-center gap-1.5">
+              <Crown className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
+              Upgrade to Premium to search up to {PREMIUM_MAX_DISTANCE_KM} km.
+            </p>
+          )}
         </div>
       </div>
 
