@@ -596,16 +596,16 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       )}
 
       <Tabs defaultValue="pending" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-9">
-          <TabsTrigger value="pending" className="flex items-center gap-2 text-xs">
+        <TabsList className="flex w-full overflow-x-auto justify-start gap-1">
+          <TabsTrigger value="pending" className="flex items-center gap-2 text-xs shrink-0">
             <Clock className="w-3 h-3" />
             Pending Approval ({pendingImages.length})
           </TabsTrigger>
-          <TabsTrigger value="face-review" className="flex items-center gap-2 text-xs">
+          <TabsTrigger value="face-review" className="flex items-center gap-2 text-xs shrink-0">
             <Eye className="w-3 h-3" />
             Needs a Glance ({faceReviewImages.length})
           </TabsTrigger>
-          <TabsTrigger value="reported" className="flex items-center gap-2 text-xs">
+          <TabsTrigger value="reported" className="flex items-center gap-2 text-xs shrink-0">
             <AlertTriangle className="w-3 h-3" />
             Reported Images ({reportedImages.filter(r => r.status === 'pending').length})
           </TabsTrigger>
