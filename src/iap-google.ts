@@ -708,9 +708,37 @@ export const buyGoogleMonthly = async () => {
   }
 };
 
+// Find the real Transaction for an owned product among the store's locally
+// held receipts. Product has no `.transaction`/`.latestTransaction` field --
+// the transaction (and its purchaseToken, via its parent Receipt) lives on
+// the Receipt that contains it.
+function findGoogleTransactionForProduct(store: any, productId: string): any {
+  try {
+    const receipts = store?.localReceipts || [];
+    for (const receipt of receipts) {
+      const tx = (receipt.transactions || []).find((t: any) =>
+        (t.products || []).some((p: any) => p.id === productId)
+      );
+      if (tx) return tx;
+    }
+  } catch (e) {
+    console.warn('[Google IAP] Error finding transaction for product:', productId, e);
+  }
+  return undefined;
+}
+
 // Restore purchases
+//
+// IMPORTANT: this used to call store.restorePurchases() fire-and-forget and
+// race an 8-second timeout against a `productUpdated` listener waiting for
+// `product.owned`, while reading the purchase token off fields
+// (`product.transaction`/`.latestTransaction`) that don't exist on Product at
+// all. store.restorePurchases() already returns a Promise that resolves once
+// Google Play's queryPurchases() round trip actually completes -- awaiting it
+// directly, then reading the real Transaction off the store's receipts, is
+// both correct and far more reliable than the old polling approach.
 export function restoreGooglePurchases(): Promise<{ restored: boolean; message: string }> {
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async (resolve) => {
     // @ts-ignore
     const store = window.CdvPurchase?.store;
 
@@ -720,164 +748,81 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
       return;
     }
 
-    noopLog('[Google IAP] Starting restore purchases...');
-    
-    // Mark that we're restoring
     window.googleIapPurchaseInitiated = true;
-    
-    let hasRestoredPurchase = false;
-    let restoreError: any = null;
-    let hasResolved = false;
-    
-    const resolveOnce = (result: { restored: boolean; message: string }) => {
-      if (!hasResolved) {
-        hasResolved = true;
-        window.googleIapPurchaseInitiated = false;
-        resolve(result);
-      }
+
+    const finish = (result: { restored: boolean; message: string }) => {
+      window.googleIapPurchaseInitiated = false;
+      resolve(result);
     };
 
-    const validateAndSyncSubscription = async (productId: string, transactionId?: string, purchaseToken?: string | null, receiptData?: any) => {
+    // Safety net only -- store.restorePurchases() below is awaited for its
+    // real result; this just prevents the UI from hanging forever if the
+    // native side never calls back at all.
+    const safetyTimeout = new Promise<{ restored: boolean; message: string }>((res) => {
+      setTimeout(() => res({ restored: false, message: 'Restore is taking longer than expected. Please check your connection and try again.' }), 30000);
+    });
+
+    const doRestore = async (): Promise<{ restored: boolean; message: string }> => {
       try {
+        if (store.restorePurchases && typeof store.restorePurchases === 'function') {
+          noopLog('[Google IAP] Calling store.restorePurchases() and awaiting completion...');
+          await store.restorePurchases();
+        } else if (store.refresh && typeof store.refresh === 'function') {
+          noopLog('[Google IAP] restorePurchases() unavailable, falling back to store.refresh()...');
+          await store.refresh();
+        } else {
+          return { restored: false, message: 'Restore not available on this device' };
+        }
+
         const { supabase } = await import('@/integrations/supabase/client');
         const { data: { user } } = await supabase.auth.getUser();
         const userId = user?.id || getStoredIapUserId();
-
         if (!userId) {
-          console.error('[Google IAP] No user identification available during restore');
-          return false;
-        }
-        
-        const token = purchaseToken || extractPurchaseTokenFromAny(receiptData);
-
-        if (!token) {
-          console.warn('[Google IAP] Missing purchaseToken during restore; cannot verify');
-          return false;
+          return { restored: false, message: 'Please log in and try again.' };
         }
 
-        noopLog('[Google IAP] Validating restored purchase with server...');
-        const { data: validation, error: valError } = await supabase.functions.invoke('google-iap-validator', {
-          body: {
-            receiptData,
-            productId,
-            user_id: userId, // ✅ allow session-independent restore
-            purchaseToken: token,
-            transactionId,
-          },
-        });
-
-        if (valError || !validation?.valid) {
-          console.warn('[Google IAP] Server validation failed during restore:', valError || validation);
-          return false;
-        }
-
-        if (!validation.active) {
-          noopLog('[Google IAP] Server validation: subscription is not active');
-          return false;
-        }
-
-        // Entitlement is server-owned. The validator updates user_subscriptions.
-        noopLog('[Google IAP] ✅ Subscription validated/restored successfully');
-
-        clearGoogleIapPending();
-        try { localStorage.removeItem('driplove_iap_user_id'); } catch {}
-        return true;
-      } catch (error) {
-        console.error('[Google IAP] Error activating subscription:', error);
-        return false;
-      }
-    };
-
-    const onProductUpdated = async (product: any) => {
-      if (hasResolved) return;
-      
-      if (product && product.owned) {
-        noopLog('[Google IAP] Found owned product during restore:', product.id);
-        
-        const transaction = product.transaction || product.latestTransaction;
-        const receiptData = transaction?.receipt || transaction;
-        const purchaseToken = extractPurchaseTokenFromAny(transaction) || extractPurchaseTokenFromAny(product) || null;
-        const transactionId = transaction?.transactionId || transaction?.id || purchaseToken || undefined;
-        
-        const success = await validateAndSyncSubscription(product.id, transactionId, purchaseToken, receiptData);
-        
-        if (success) {
-          hasRestoredPurchase = true;
-          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
-        }
-      }
-    };
-    
-    // Check existing products first
-    const checkExistingProducts = async () => {
-      let foundOwned = false;
-      for (const id of GOOGLE_PRODUCT_IDS) {
-        try {
+        for (const id of GOOGLE_PRODUCT_IDS) {
           const product = store.get?.(id);
-          if (product && product.owned) {
-            foundOwned = true;
-            noopLog('[Google IAP] Found already-owned product:', id);
-            
-            const transaction = product.transaction || product.latestTransaction;
-            const receiptData = transaction?.receipt || transaction;
-            const purchaseToken = extractPurchaseTokenFromAny(transaction) || extractPurchaseTokenFromAny(product) || null;
-            const transactionId = transaction?.transactionId || transaction?.id || purchaseToken || undefined;
-            
-            const success = await validateAndSyncSubscription(id, transactionId, purchaseToken, receiptData);
-            
-            if (success) {
-              hasRestoredPurchase = true;
-              resolveOnce({ restored: true, message: 'Subscription restored successfully' });
-              return true;
-            }
+          if (!product || !product.owned) continue;
+
+          const transaction = findGoogleTransactionForProduct(store, id);
+          const purchaseToken =
+            transaction?.parentReceipt?.purchaseToken ||
+            transaction?.nativePurchase?.purchaseToken ||
+            extractPurchaseTokenFromAny(transaction);
+
+          if (!purchaseToken) {
+            console.warn('[Google IAP] Owned product found but no purchaseToken available:', id);
+            continue;
           }
-        } catch (err) {
-          console.warn('[Google IAP] Error checking product:', id, err);
+
+          noopLog('[Google IAP] Validating restored purchase for product:', id);
+          const { data: validation, error: valError } = await supabase.functions.invoke('google-iap-validator', {
+            body: {
+              receiptData: purchaseToken,
+              productId: id,
+              user_id: userId,
+              purchaseToken,
+              transactionId: transaction?.transactionId,
+            },
+          });
+
+          if (!valError && validation?.valid && validation?.active) {
+            clearGoogleIapPending();
+            try { localStorage.removeItem('driplove_iap_user_id'); } catch {}
+            return { restored: true, message: 'Subscription restored successfully' };
+          }
+          console.warn('[Google IAP] Server validation failed during restore:', valError || validation);
         }
+
+        return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+      } catch (error) {
+        console.error('[Google IAP] Error during restore:', error);
+        return { restored: false, message: 'Restore failed. Please try again.' };
       }
-      
-      if (!foundOwned) {
-        noopLog('[Google IAP] No owned products found in initial check');
-      }
-      return false;
     };
-    
-    // Set up listener
-    if (store.when && typeof store.when === 'function') {
-      try {
-        store.when().productUpdated(onProductUpdated);
-      } catch (err) {
-        console.warn('[Google IAP] Could not set up product listener:', err);
-      }
-    }
 
-    // Check existing products first
-    const foundExisting = await checkExistingProducts();
-    if (foundExisting) return;
-
-    if (store.restorePurchases && typeof store.restorePurchases === 'function') {
-      noopLog('[Google IAP] Calling store.restorePurchases()...');
-      store.restorePurchases();
-    } else if (store.refresh && typeof store.refresh === 'function') {
-      noopLog('[Google IAP] Calling store.refresh()...');
-      store.refresh();
-    } else {
-      resolveOnce({ restored: false, message: 'Restore not available on this device' });
-      return;
-    }
-    
-    // Wait for processing to complete
-    setTimeout(() => {
-      if (!hasResolved) {
-        if (restoreError) {
-          resolveOnce({ restored: false, message: restoreError.message || 'Restore failed' });
-        } else if (hasRestoredPurchase) {
-          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
-        } else {
-          // No subscription found
-          resolveOnce({ restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' });
-        }
-      }
-    }, 8000);
+    const result = await Promise.race([doRestore(), safetyTimeout]);
+    finish(result);
   });
 }

@@ -79,6 +79,44 @@ function findTransactionForProduct(store: any, productId: string): any {
   return undefined;
 }
 
+// Send a receipt/purchase token to our own server for verification. Shared
+// by both a fresh purchase (handleApprovedTransaction) and Restore Purchases,
+// so the two paths can never disagree about what counts as "verified".
+async function validateReceiptWithServer(
+  userId: string,
+  productId: string,
+  transactionId: string | undefined,
+  receiptData: string,
+  purchaseToken?: string
+): Promise<{ valid: boolean; active: boolean; error?: any }> {
+  const { supabase } = await import('@/integrations/supabase/client');
+  const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
+
+  const validationTimeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
+  });
+
+  const validationPromise = supabase.functions.invoke(validatorFunction, {
+    body: {
+      receiptData,
+      productId,
+      user_id: userId,
+      purchaseToken: purchaseToken || transactionId,
+      transactionId,
+    },
+  });
+
+  try {
+    const result: any = await Promise.race([validationPromise, validationTimeout]);
+    if (result.error || !result.data?.valid || !result.data?.active) {
+      return { valid: false, active: false, error: result.error || result.data };
+    }
+    return { valid: true, active: true };
+  } catch (error) {
+    return { valid: false, active: false, error };
+  }
+}
+
 // Validate a purchase's receipt with our server, activate premium, and
 // redirect on success. This is the logic that used to live in
 // store.when().verified() -- moved here so it can run directly off the
@@ -137,44 +175,17 @@ async function handleApprovedTransaction(t: any) {
 
     noopLog('[IAP] Receipt data found, attempting server validation...');
 
-    // Add timeout protection for receipt validation (25 seconds)
-    const validationTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
-    });
-
-    // Choose the correct validator based on platform
-    const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
-    noopLog('[IAP] Using validator function:', validatorFunction);
-
-    // CRITICAL: Always include user_id in body for session-independent activation
-    const validationPromise = supabase.functions.invoke(validatorFunction, {
-      body: {
-        receiptData: receiptData,
-        productId: productId,
-        user_id: userId, // Fallback for session-expired scenarios
-        purchaseToken: purchaseToken || transactionId,
-        transactionId: transactionId
-      }
-    });
-
-    let validation, validationError;
-    try {
-      const result: any = await Promise.race([validationPromise, validationTimeout]);
-      validation = result.data;
-      validationError = result.error;
-      noopLog('[IAP] Validation response:', { validation, validationError });
-    } catch (timeoutError) {
-      console.error('[IAP] Receipt validation timeout');
-      validationError = timeoutError;
-    }
-
     // The validator edge function is the ONLY thing that writes to
     // user_subscriptions for this flow -- it runs with the service-role key
     // after verifying the receipt with Apple/Google. The client never
     // activates premium itself; a database trigger also rejects any
     // client-originated write that grants or extends entitlement.
-    if (validationError || !validation?.valid || !validation?.active) {
-      console.warn('[IAP] Server validation failed or subscription inactive:', validationError?.message || validation);
+    const { valid, active, error: validationError } = await validateReceiptWithServer(
+      userId, productId, transactionId, receiptData, purchaseToken
+    );
+
+    if (!valid || !active) {
+      console.warn('[IAP] Server validation failed or subscription inactive:', validationError);
       alert('We could not verify your purchase yet. If you were charged, please try "Restore Purchases" in a moment, or contact support.');
       return;
     }
@@ -546,187 +557,118 @@ export const buyMonthly = async () => {
   }
 };
 
+const RESTORE_PRODUCT_IDS = [
+  'com.driplove.dating.premium.monthlysub3',
+  'com.driplove.dating.premium.monthlysub2',
+];
+
 // Call to restore purchases - returns a Promise with restoration result
+//
+// IMPORTANT: this used to work by calling store.restorePurchases() (fire and
+// forget) and then racing an 8-second timeout against a `productUpdated`
+// listener waiting for `product.owned` to flip true. That was wrong on two
+// counts:
+//  1. store.restorePurchases() already returns a Promise that only resolves
+//     once the real native round trip finishes -- on iOS that's
+//     SKPaymentQueue.restoreCompletedTransactions() PLUS a subsequent app
+//     receipt refresh, which can easily take longer than 8 seconds on a slow
+//     connection (exactly what produced the premature "No Purchase Found").
+//  2. On iOS, restoring an existing auto-renewable subscription does not
+//     redeliver it as a fresh `approved` transaction -- it just refreshes the
+//     local App Store receipt. Waiting on a transaction/productUpdated event
+//     that may never come was the wrong mechanism entirely.
+// The fix: await the real restore completion, then read whatever the store
+// now has on record (the refreshed Apple receipt, or Google's queried
+// purchases) directly, and validate that with our own server -- the same way
+// a fresh purchase is validated.
 export function restorePurchases(): Promise<{ restored: boolean; message: string }> {
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async (resolve) => {
     // @ts-ignore
     const store = window.CdvPurchase?.store;
-    
+
     if (!store) {
       console.error('[IAP] Cannot restore purchases - store not available');
       resolve({ restored: false, message: 'Store not available. Please ensure you are using the app on iOS.' });
       return;
     }
-    
-    noopLog('[IAP] Starting restore purchases...');
-    
-    // Mark that we're restoring (similar to purchase initiation)
+
     window.iapPurchaseInitiated = true;
-    
-    let hasRestoredPurchase = false;
-    let restoreError: any = null;
-    let hasResolved = false;
-    
-    const resolveOnce = (result: { restored: boolean; message: string }) => {
-      if (!hasResolved) {
-        hasResolved = true;
-        window.iapPurchaseInitiated = false;
-        resolve(result);
-      }
+
+    const finish = (result: { restored: boolean; message: string }) => {
+      window.iapPurchaseInitiated = false;
+      resolve(result);
     };
-    
-    const rejectOnce = (error: any) => {
-      if (!hasResolved) {
-        hasResolved = true;
-        window.iapPurchaseInitiated = false;
-        reject(error);
-      }
-    };
-    
-    // Set up temporary listener for owned products during restore
-    const PRODUCT_IDS = [
-      'com.driplove.dating.premium.monthlysub3',
-      'com.driplove.dating.premium.monthlysub2'
-    ];
-    
-    // Validates a restored purchase against the server (which owns the write to
-    // user_subscriptions). The client never writes entitlement directly -- trusting
-    // a local "owned" flag without a server-verified receipt would let anyone
-    // restore-purchase their way into premium without ever paying.
-    const validateAndSyncSubscription = async (productId: string, transactionId?: string, receiptData?: string) => {
+
+    // Safety net only -- store.restorePurchases() below is awaited for its
+    // real result; this just prevents the UI from hanging forever if the
+    // native side never calls back at all.
+    const safetyTimeout = new Promise<{ restored: boolean; message: string }>((res) => {
+      setTimeout(() => res({ restored: false, message: 'Restore is taking longer than expected. Please check your connection and try again.' }), 30000);
+    });
+
+    const doRestore = async (): Promise<{ restored: boolean; message: string }> => {
       try {
+        if (store.restorePurchases && typeof store.restorePurchases === 'function') {
+          noopLog('[IAP] Calling store.restorePurchases() and awaiting completion...');
+          await store.restorePurchases();
+        } else if (store.refresh && typeof store.refresh === 'function') {
+          noopLog('[IAP] restorePurchases() unavailable, falling back to store.refresh()...');
+          await store.refresh();
+        } else {
+          return { restored: false, message: 'Restore not available on this device' };
+        }
+
         const { supabase } = await import('@/integrations/supabase/client');
         const { data: { user } } = await supabase.auth.getUser();
-
         if (!user) {
-          console.error('[IAP] No user found during restore');
-          return false;
+          return { restored: false, message: 'Please log in and try again.' };
         }
 
-        if (!receiptData) {
-          console.warn('[IAP] No receipt data during restore; cannot verify without a server-validated receipt');
-          return false;
-        }
-
-        noopLog('[IAP] Validating restored receipt with server...');
-        const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
-        const { data: validation, error: valError } = await supabase.functions.invoke(validatorFunction, {
-          body: {
-            receiptData: receiptData,
-            productId: productId,
-            user_id: user.id,
-            purchaseToken: receiptData,
-            transactionId: transactionId
-          }
-        });
-
-        if (valError || !validation?.valid || !validation?.active) {
-          console.warn('[IAP] Server validation failed during restore:', valError || validation);
-          return false;
-        }
-
-        // Entitlement is server-owned; the validator already updated user_subscriptions.
-        noopLog('[IAP] ✅ Subscription validated/restored successfully');
-        try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
-        return true;
-      } catch (error) {
-        console.error('[IAP] Error validating restored subscription:', error);
-        return false;
-      }
-    };
-    
-    const onProductUpdated = async (product: any) => {
-      if (hasResolved) return;
-      
-      // Check if this is one of our products and it's owned
-      if (product && PRODUCT_IDS.includes(product.id) && product.owned) {
-        noopLog('[IAP] Found owned product during restore:', product.id);
-
-        const transaction = findTransactionForProduct(store, product.id);
-        const { receiptData } = extractReceiptData(transaction);
-        const transactionId = transaction?.transactionId;
-
-        const success = await validateAndSyncSubscription(product.id, transactionId, receiptData);
-        
-        if (success) {
-          hasRestoredPurchase = true;
-          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
-        }
-      }
-    };
-    
-    // Also check existing products immediately
-    const checkExistingProducts = async () => {
-      let foundOwned = false;
-      for (const id of PRODUCT_IDS) {
-        try {
-          const product = store.get?.(id);
-          if (product && product.owned) {
-            foundOwned = true;
-            noopLog('[IAP] Found already-owned product:', id);
-
+        if (isAndroid()) {
+          for (const id of RESTORE_PRODUCT_IDS) {
             const transaction = findTransactionForProduct(store, id);
-            const { receiptData } = extractReceiptData(transaction);
-            const transactionId = transaction?.transactionId;
+            const { receiptData, purchaseToken } = extractReceiptData(transaction);
+            if (!receiptData) continue;
 
-            const success = await validateAndSyncSubscription(id, transactionId, receiptData);
-            
-            if (success) {
-              hasRestoredPurchase = true;
-              resolveOnce({ restored: true, message: 'Subscription restored successfully' });
-              return true;
+            noopLog('[IAP] Validating restored Google purchase for product:', id);
+            const { valid, active } = await validateReceiptWithServer(
+              user.id, id, transaction?.transactionId, receiptData, purchaseToken
+            );
+            if (valid && active) {
+              try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
+              return { restored: true, message: 'Subscription restored successfully' };
             }
           }
-        } catch (err) {
-          console.warn('[IAP] Error checking product:', id, err);
+          return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
         }
+
+        // iOS: the refreshed local App Store receipt contains the complete
+        // purchase history (including the current subscription state), so
+        // we don't need to find a specific transaction -- just send the
+        // whole receipt, same as our server already does for a fresh purchase.
+        const receipts = store.localReceipts || [];
+        const appleReceipt = receipts.find((r: any) => r?.nativeData?.appStoreReceipt);
+        const receiptData = appleReceipt?.nativeData?.appStoreReceipt;
+
+        if (!receiptData) {
+          return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+        }
+
+        noopLog('[IAP] Validating restored Apple receipt...');
+        const { valid, active } = await validateReceiptWithServer(user.id, '', undefined, receiptData);
+        if (valid && active) {
+          try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
+          return { restored: true, message: 'Subscription restored successfully' };
+        }
+        return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+      } catch (error) {
+        console.error('[IAP] Error during restore:', error);
+        return { restored: false, message: 'Restore failed. Please try again.' };
       }
-      
-      if (!foundOwned) {
-        noopLog('[IAP] No owned products found in initial check');
-      }
-      return false;
     };
-    
-    // Set up listener
-    if (store.when && typeof store.when === 'function') {
-      try {
-        store.when().productUpdated(onProductUpdated);
-      } catch (err) {
-        console.warn('[IAP] Could not set up product listener:', err);
-      }
-    }
-    
-    // Check existing products first
-    const foundExisting = await checkExistingProducts();
-    if (foundExisting) return;
-    
-    // Trigger the restore/refresh
-    if (store.restorePurchases && typeof store.restorePurchases === 'function') {
-      noopLog('[IAP] Calling store.restorePurchases()...');
-      store.restorePurchases();
-    } else if (store.refresh && typeof store.refresh === 'function') {
-      noopLog('[IAP] Calling store.refresh()...');
-      store.refresh();
-    } else {
-      console.error('[IAP] No restore or refresh method available');
-      resolveOnce({ restored: false, message: 'Restore not available on this device' });
-      return;
-    }
-    
-    // Wait for processing to complete
-    setTimeout(() => {
-      if (!hasResolved) {
-        if (restoreError) {
-          resolveOnce({ restored: false, message: restoreError.message || 'Restore failed' });
-        } else if (hasRestoredPurchase) {
-          resolveOnce({ restored: true, message: 'Subscription restored successfully' });
-        } else {
-          // No subscription found
-          resolveOnce({ restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' });
-        }
-      }
-    }, 8000);
+
+    const result = await Promise.race([doRestore(), safetyTimeout]);
+    finish(result);
   });
 }
 

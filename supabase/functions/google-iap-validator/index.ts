@@ -420,6 +420,21 @@ serve(async (req: Request) => {
       }, { onConflict: 'user_id' })
 
     if (upsertError) {
+      // A DB trigger (prevent_shared_iap_subscription) blocks activating
+      // premium on this account when the same Google purchaseToken is
+      // already active on a DIFFERENT account -- a device's Play Store
+      // purchases are shared across every app account signed in on it, so
+      // without this check one paid subscription could unlock premium for
+      // unlimited accounts. Surface that as a normal "not valid" result
+      // (200) rather than a server error (500).
+      if (upsertError.message?.includes('IAP_SUBSCRIPTION_ALREADY_LINKED')) {
+        console.warn('🚫 [GOOGLE-IAP-VALIDATOR] Subscription already linked to a different account:', userId)
+        return json(200, {
+          valid: false,
+          active: false,
+          error: 'This subscription is already linked to a different account. Please use the original account, or contact support.',
+        })
+      }
       console.error('🔥 [GOOGLE-IAP-VALIDATOR] Supabase update error:', upsertError)
       return json(500, { error: 'Failed to update subscription', details: upsertError.message })
     }

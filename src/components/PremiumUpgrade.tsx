@@ -457,9 +457,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         ? restoreGooglePurchases() 
         : restorePurchases();
       
-      // Add timeout protection for the restore operation (15 seconds max)
+      // Add timeout protection for the restore operation. The underlying
+      // restore functions already have their own ~30s safety timeout with a
+      // real, correctly-worded result -- this outer timeout is only a last
+      // resort in case that promise never settles at all, so it's set just
+      // above that to let the inner timeout win first in the normal case.
       const timeoutPromise = new Promise<{ restored: boolean; message: string }>((_, reject) => {
-        setTimeout(() => reject(new Error('Restore timeout')), 15000);
+        setTimeout(() => reject(new Error('Restore timeout')), 35000);
       });
       
       try {

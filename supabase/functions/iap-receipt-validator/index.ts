@@ -184,6 +184,10 @@ serve(async (req) => {
     )
 
     const latest = relevantTxs[0]
+    // original_transaction_id stays constant across every renewal of a given
+    // subscription (transaction_id changes each renewal), so it's the right
+    // identifier for "is this the same underlying subscription" checks.
+    const originalTransactionId = latest.original_transaction_id || latest.transaction_id
     const expiresDate = latest.expires_date_ms
       ? new Date(parseInt(latest.expires_date_ms))
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -228,12 +232,28 @@ serve(async (req) => {
           expires_at: expiresDate.toISOString(),
           next_billing_date: expiresDate.toISOString(),
           provider_transaction_id: latest.transaction_id,
+          original_transaction_id: originalTransactionId,
           auto_renew: true,
           payment_method: 'apple',
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
 
       if (error) {
+        // A DB trigger (prevent_shared_iap_subscription) blocks activating
+        // premium on this account when the same Apple subscription is
+        // already active on a DIFFERENT account -- a device's App Store
+        // receipt is shared across every app account signed in on it, so
+        // without this check one paid subscription could unlock premium for
+        // unlimited accounts. Surface that as a normal "not valid" result
+        // (200) rather than a server error (500).
+        if (error.message?.includes('IAP_SUBSCRIPTION_ALREADY_LINKED')) {
+          console.warn('🚫 [IAP-RECEIPT-VALIDATOR] Subscription already linked to a different account:', userId)
+          return json(200, {
+            valid: false,
+            active: false,
+            error: 'This subscription is already linked to a different account. Please use the original account, or contact support.',
+          })
+        }
         console.error('🔥 Supabase update error:', error)
         return json(500, { error: 'Failed to update subscription' })
       }
