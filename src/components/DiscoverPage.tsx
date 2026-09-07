@@ -93,11 +93,11 @@ const PREMIUM_DAILY_SWIPE_LIMIT = 200;
 // (FREE_USER_MAX_DISTANCE, FREE_USER_MAX_DISTANCE_CACHE) plus two more raw
 // "500" literals, in four separate places in this file - the same drift
 // risk that caused the swipe-limit bug. One constant now.
-const FREE_USER_MAX_DISTANCE_KM = 800;
+const FREE_USER_MAX_DISTANCE_KM = 600;
 // Premium users can search further than free users, but still up to a
 // concrete ceiling rather than being fully unbounded - matches the max on
 // the distance slider in the profile's Location section.
-const PREMIUM_USER_MAX_DISTANCE_KM = 2000;
+const PREMIUM_USER_MAX_DISTANCE_KM = 1020;
 
 // Below this profile-completion percentage, swiping is blocked once the user
 // has already had a few free look-arounds. Was hardcoded as "70" and "5"

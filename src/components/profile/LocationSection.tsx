@@ -14,8 +14,8 @@ import { getCountriesList } from '@/constants/locationData';
 // Must match FREE_USER_MAX_DISTANCE_KM / PREMIUM_USER_MAX_DISTANCE_KM in
 // DiscoverPage.tsx (the values that actually gate the discovery query) and
 // the chk_max_distance DB constraint's outer bound (2000km).
-const FREE_MAX_DISTANCE_KM = 800;
-const PREMIUM_MAX_DISTANCE_KM = 2000;
+const FREE_MAX_DISTANCE_KM = 600;
+const PREMIUM_MAX_DISTANCE_KM = 1020;
 
 interface LocationSectionProps {
   editedProfile: any;
