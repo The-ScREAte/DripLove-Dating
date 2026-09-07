@@ -9,7 +9,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock } from 'lucide-react';
+import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock, ImageOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/utils/imageCompression';
@@ -45,6 +45,10 @@ interface ModerationDecision {
 const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagementProps) => {
   const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
+  // Tracks photo URLs whose <img> failed to load, so we can swap in a clean
+  // placeholder instead of leaving the browser's own broken-image glyph
+  // showing (a bare triangle icon with no context).
+  const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [moderating, setModerating] = useState(false);
@@ -688,13 +692,21 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             const pending = pendingCrops[userImage.image_url];
             return (
             <div key={userImage.image_url} className="relative group">
-              <img
-                loading="lazy"
-                decoding="async"
-                src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
-                alt={`User Image ${index + 1}`}
-                className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm"
-              />
+              {brokenImageUrls.has(userImage.image_url) && !pending ? (
+                <div className="w-full h-28 sm:h-36 rounded-lg shadow-sm bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
+                  <ImageOff className="w-6 h-6" />
+                  <span className="text-[10px]">Unavailable</span>
+                </div>
+              ) : (
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
+                  alt={`User Image ${index + 1}`}
+                  className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm"
+                  onError={() => setBrokenImageUrls((prev) => new Set(prev).add(userImage.image_url))}
+                />
+              )}
 
               {/* Pending approval indicator */}
               {userImage.is_approved === false && !pending && (

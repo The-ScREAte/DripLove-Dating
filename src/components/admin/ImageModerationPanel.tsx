@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User, Pencil } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User, Pencil, ImageOff } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import ImageViewer from '@/components/ImageViewer';
 import { getRawStorageUrl } from '@/utils/imageOptimizer';
@@ -75,6 +75,9 @@ interface ImageModerationPanelProps {
 }
 
 const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
+  // Tracks image ids whose <img> failed to load, so we swap in a clean
+  // placeholder instead of the browser's own broken-image glyph.
+  const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(new Set());
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   // Live photos (moderation_status='approved') that moderate-image flagged
   // with a non-blocking moderation_reason - a weak/no face match, or the AI
@@ -627,14 +630,22 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                     <Card key={image.id} className="border-yellow-200">
                       <CardContent className="p-2">
                         <div className="relative mb-2">
-                          <img
-                            loading="lazy"
-                            decoding="async"
-                            src={getRawStorageUrl(image.image_url)}
-                            alt="Pending approval"
-                            className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => handleImageClick(image.image_url)}
-                          />
+                          {brokenImageIds.has(image.id) ? (
+                            <div className="w-full h-32 rounded-md bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
+                              <ImageOff className="w-5 h-5" />
+                              <span className="text-[10px]">Unavailable</span>
+                            </div>
+                          ) : (
+                            <img
+                              loading="lazy"
+                              decoding="async"
+                              src={getRawStorageUrl(image.image_url)}
+                              alt="Pending approval"
+                              className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => handleImageClick(image.image_url)}
+                              onError={() => setBrokenImageIds((prev) => new Set(prev).add(image.id))}
+                            />
+                          )}
                           <Badge className={`absolute top-1 right-1 text-[10px] h-4 ${
                             image.moderation_status === 'flagged' ? 'bg-red-500' : 'bg-yellow-500'
                           }`}>
@@ -743,14 +754,22 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                     <Card key={image.id} className="border-blue-200">
                       <CardContent className="p-2">
                         <div className="relative mb-2">
-                          <img
-                            loading="lazy"
-                            decoding="async"
-                            src={getRawStorageUrl(image.image_url)}
-                            alt="Live, needs a glance"
-                            className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => handleImageClick(image.image_url)}
-                          />
+                          {brokenImageIds.has(image.id) ? (
+                            <div className="w-full h-32 rounded-md bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
+                              <ImageOff className="w-5 h-5" />
+                              <span className="text-[10px]">Unavailable</span>
+                            </div>
+                          ) : (
+                            <img
+                              loading="lazy"
+                              decoding="async"
+                              src={getRawStorageUrl(image.image_url)}
+                              alt="Live, needs a glance"
+                              className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => handleImageClick(image.image_url)}
+                              onError={() => setBrokenImageIds((prev) => new Set(prev).add(image.id))}
+                            />
+                          )}
                           <Badge className="absolute top-1 right-1 bg-blue-500 text-[10px] h-4">
                             Live
                           </Badge>
@@ -843,14 +862,22 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
                     <Card key={report.id} className="border-red-200">
                       <CardContent className="p-3">
                         <div className="relative mb-2">
-                          <img
-                            loading="lazy"
-                            decoding="async"
-                            src={getRawStorageUrl(report.image_url)}
-                            alt="Reported content"
-                            className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => handleImageClick(report.image_url)}
-                          />
+                          {brokenImageIds.has(report.id) ? (
+                            <div className="w-full h-40 rounded-lg bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
+                              <ImageOff className="w-6 h-6" />
+                              <span className="text-[10px]">Unavailable</span>
+                            </div>
+                          ) : (
+                            <img
+                              loading="lazy"
+                              decoding="async"
+                              src={getRawStorageUrl(report.image_url)}
+                              alt="Reported content"
+                              className="w-full h-40 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => handleImageClick(report.image_url)}
+                              onError={() => setBrokenImageIds((prev) => new Set(prev).add(report.id))}
+                            />
+                          )}
                           {getStatusBadge(report.status)}
                         </div>
                         
