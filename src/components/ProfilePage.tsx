@@ -940,20 +940,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
-        className="fixed left-0 right-0 z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm top-[clamp(62px,calc(env(safe-area-inset-top,10px)+42px),92px)] md:top-[clamp(78px,calc(env(safe-area-inset-top,10px)+58px),108px)]"
+        className="sticky top-0 z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm"
         style={{
-          // Start from where main header ends; slightly lowered for cleaner breathing room.
-          // env(safe-area-inset-top) is now reliable on Android too (see
-          // @capacitor-community/safe-area setup in src/main.tsx), and MainApp's own
-          // header padding is no longer platform-branched either, so one clamp now
-          // covers both platforms instead of two separately-tuned ranges.
-          // `top` moved into the className above (base + md: breakpoint) since
-          // an inline style can't express a responsive variant - tablet/medium
-          // screens get an extra ~16px of breathing room below the main header,
-          // where this toolbar previously sat a bit too close to it.
+          // Sticky (not fixed) so it is positioned by the browser relative to the
+          // real content area that starts right below MainApp's header, which is a
+          // normal flex child of variable height. The old fixed + clamp() offset was
+          // a guess at that header's height and fell under it on devices whose
+          // header rendered taller (e.g. Samsung tablets).
           paddingTop: '2px',
           width: '100%',
         }}
+      
       >
   <div className="px-3 py-1.5">
           <div className="flex justify-center">
