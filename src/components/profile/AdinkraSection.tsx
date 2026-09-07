@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react';
@@ -66,11 +66,6 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
   };
 
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader>
-        <CardTitle className="text-white">{t('profile.myAdinkra')}</CardTitle>
-      </CardHeader>
-      <CardContent>
         <div className="space-y-4">
           <Label className="text-gray-200">{t('profile.adinkraDescription')}</Label>
 
@@ -263,8 +258,6 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
             <p className="text-sm text-gray-400">{t('profile.noAdinkraSelected')}</p>
           )}
         </div>
-      </CardContent>
-    </Card>
   );
 };
 

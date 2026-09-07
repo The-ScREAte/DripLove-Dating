@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Button } from '@/components/ui/button';
-import { Edit, Save, X, Crown, MessageCircle, ChevronDown, Trash2, Gamepad2, Eye } from 'lucide-react';
+import { Crown, MessageCircle, ChevronDown, ChevronRight, Trash2, Gamepad2 } from 'lucide-react';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 import BasicInfoSection from './profile/BasicInfoSection';
+import ProfileBasicsChips from './profile/ProfileBasicsChips';
 import LocationSection from './profile/LocationSection';
 
 import LifestyleSection from './profile/LifestyleSection';
@@ -22,6 +24,9 @@ import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
 import FavoritesSection from './profile/FavoritesSection';
 import AdinkraSection from './profile/AdinkraSection';
+import LanguagesSection from './profile/LanguagesSection';
+import PetsSection from './profile/PetsSection';
+import SocialMediaSection from './profile/SocialMediaSection';
 import ImageManagement from './profile/ImageManagement';
 import AdvertisementSection from './profile/AdvertisementSection';
 
@@ -128,7 +133,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const showInterestsSection = openSection === 'interests';
   const showFavoritesSection = openSection === 'favorites';
   const showAdinkraSection = openSection === 'adinkra';
-  
+  const showLanguagesSection = openSection === 'languages';
+  const showPetsSection = openSection === 'pets';
+  const showSocialMediaSection = openSection === 'socialMedia';
+
   const showAccountActionsSection = openSection === 'accountActions';
   const showAdvertisementSection = openSection === 'advertisement';
 
@@ -339,6 +347,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     country: '',
     country_code: '',
     date_of_birth: '',
+    height_cm: null as number | null,
     max_distance: 250,
     min_age: DEFAULT_PREFERENCE_MIN_AGE,
     max_age: DEFAULT_PREFERENCE_MAX_AGE,
@@ -370,6 +379,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     adinkra_symbols: [] as string[],
     preferred_language: 'en',
     unlocked_countries: [] as string[],
+    languages: [] as string[],
+    family_plans: '',
+    communication_style: [] as string[],
+    love_style: [] as string[],
+    pets: [] as string[],
+    social_media: '',
   });
 
   // Initialize userImages state
@@ -433,6 +448,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           country: profile.country || '',
           country_code: profile.country_code || '',
           date_of_birth: profile.date_of_birth || '',
+          height_cm: profile.height_cm ?? null,
           max_distance: profile.max_distance || profile.distance_preference || 250,
           min_age: profile.min_age || DEFAULT_PREFERENCE_MIN_AGE,
           max_age: profile.max_age || DEFAULT_PREFERENCE_MAX_AGE,
@@ -464,6 +480,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           adinkra_symbols: Array.isArray(profile.adinkra_symbols) ? profile.adinkra_symbols : [],
           preferred_language: detectedLanguage,
           unlocked_countries: Array.isArray(profile.unlocked_countries) ? profile.unlocked_countries : [],
+          languages: Array.isArray(profile.languages) ? profile.languages : [],
+          family_plans: profile.family_plans || '',
+          communication_style: Array.isArray(profile.communication_style) ? profile.communication_style : [],
+          love_style: Array.isArray(profile.love_style) ? profile.love_style : [],
+          pets: Array.isArray(profile.pets) ? profile.pets : [],
+          social_media: profile.social_media || '',
         });
       } catch (error) {
         console.error('Error initializing profile data:', error);
@@ -476,6 +498,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           country: '',
           country_code: '',
           date_of_birth: '',
+          height_cm: null,
           max_distance: 250,
           min_age: DEFAULT_PREFERENCE_MIN_AGE,
           max_age: DEFAULT_PREFERENCE_MAX_AGE,
@@ -507,6 +530,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           adinkra_symbols: [],
           preferred_language: 'en',
           unlocked_countries: [],
+          languages: [],
+          family_plans: '',
+          communication_style: [],
+          love_style: [],
+          pets: [],
+          social_media: '',
         });
       }
     }
@@ -527,6 +556,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   const handleSelectChange = (name: string, value: string) => {
     setEditedProfile(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Toggles a single-select field: tapping the already-selected option clears it.
+  const handleSingleToggleChange = (name: string, value: string) => {
+    setEditedProfile(prev => ({ ...prev, [name]: (prev as any)[name] === value ? '' : value }));
+  };
+
+  // Toggles a value in/out of an array field (multi-select chips).
+  const handleArrayToggleChange = (name: string, value: string) => {
+    setEditedProfile(prev => {
+      const current: string[] = Array.isArray((prev as any)[name]) ? (prev as any)[name] : [];
+      const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
+      return { ...prev, [name]: next };
+    });
   };
 
   const handleLocationChange = (location: {
@@ -615,6 +658,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country: editedProfile.country?.trim() || null,
         country_code: editedProfile.country_code?.trim() || null,
         date_of_birth: profile?.date_of_birth || currentUser?.user_metadata?.date_of_birth || '1990-01-01',
+        height_cm: editedProfile.height_cm || null,
         email: currentUser.email,
         max_distance: editedProfile.max_distance || 250,
         min_age: editedProfile.min_age || DEFAULT_PREFERENCE_MIN_AGE,
@@ -640,6 +684,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         longitude: editedProfile.longitude || null,
         is_custom_city: editedProfile.is_custom_city || false,
         unlocked_countries: Array.isArray(editedProfile.unlocked_countries) ? editedProfile.unlocked_countries : [],
+        languages: Array.isArray(editedProfile.languages) ? editedProfile.languages : [],
+        family_plans: editedProfile.family_plans || null,
+        communication_style: Array.isArray(editedProfile.communication_style) ? editedProfile.communication_style : [],
+        love_style: Array.isArray(editedProfile.love_style) ? editedProfile.love_style : [],
+        pets: Array.isArray(editedProfile.pets) ? editedProfile.pets : [],
+        social_media: editedProfile.social_media || null,
         introvert_extrovert:
           typeof editedProfile.introvert_extrovert === 'number' &&
           editedProfile.introvert_extrovert >= 0 &&
@@ -758,6 +808,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         country: profile.country || '',
         country_code: profile.country_code || '',
         date_of_birth: profile.date_of_birth || '',
+        height_cm: profile.height_cm ?? null,
         max_distance: profile.max_distance || profile.distance_preference || 250,
         min_age: profile.min_age || DEFAULT_PREFERENCE_MIN_AGE,
         max_age: profile.max_age || DEFAULT_PREFERENCE_MAX_AGE,
@@ -789,6 +840,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         adinkra_symbols: profile.adinkra_symbols || [],
         preferred_language: detectedLanguage,
         unlocked_countries: Array.isArray(profile.unlocked_countries) ? profile.unlocked_countries : [],
+        languages: Array.isArray(profile.languages) ? profile.languages : [],
+        family_plans: profile.family_plans || '',
+        communication_style: Array.isArray(profile.communication_style) ? profile.communication_style : [],
+        love_style: Array.isArray(profile.love_style) ? profile.love_style : [],
+        pets: Array.isArray(profile.pets) ? profile.pets : [],
+        social_media: profile.social_media || '',
       });
     }
     setIsEditing(false);
@@ -953,16 +1010,52 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       
       >
   <div className="px-3 py-1.5">
-          <div className="flex justify-center">
-            <div className="flex flex-wrap items-center justify-center gap-2.5 w-full">
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* Avatar + name + preview link */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              {previewImages[0] ? (
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  src={optimizeImageUrl(previewImages[0], { width: 120, quality: 70 })}
+                  alt={profile?.first_name || 'Profile photo'}
+                  className="w-14 h-14 rounded-full object-cover shrink-0 border border-pink-500/30"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-neutral-800 border border-pink-500/30 shrink-0" />
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 leading-none">
+                  <h2 className="text-lg font-bold text-white truncate">{profile?.first_name || ''}</h2>
+                  {showVerifiedBadge && (
+                    <img loading="lazy" decoding="async" src="/images/verified.svg" alt="Verified" className="w-4 h-4 shrink-0" />
+                  )}
+                </div>
+                {isOwnProfile && (
+                  <button
+                    type="button"
+                    onClick={() => setShowProfilePreview(true)}
+                    disabled={!previewMatch}
+                    style={{ height: 14, lineHeight: '14px', margin: 0, padding: 0 }}
+                    className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-50"
+                    aria-label="Preview my profile"
+                  >
+                    Preview <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Circular icon actions */}
+            <div className="flex items-center gap-2 shrink-0">
               {/* Only render the upsell once premium is positively known to be
                   false - `undefined` means "still resolving", and showing the
                   crown then made subscribers briefly think they weren't. */}
               {isPremium === false && (
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
-                  size="sm"
-                  className="h-9 w-9 px-0 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200 border-2 border-pink-600"
+                  style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
+                  className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white shadow-sm"
                   aria-label={t('Upgrade')}
                 >
                   <Crown className="w-4 h-4" />
@@ -973,82 +1066,36 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <div className="relative">
                   <Button
                     onClick={openProfileMessages}
-                    className="h-9 px-3.5 border-pink-500/40 text-white hover:bg-pink-900/30 disabled:opacity-50 bg-black border"
-                    variant="outline"
+                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
+                    className="rounded-full bg-neutral-900 border border-pink-500/30 text-white hover:bg-neutral-800"
                     aria-label="Open profile messages"
                   >
                     <MessageCircle className="w-4 h-4" />
                   </Button>
                   {broadcastUnreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-pink-600 text-white text-[10px] flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-pink-600 text-white text-[9px] flex items-center justify-center">
                       {broadcastUnreadCount}
                     </span>
                   )}
                 </div>
               )}
 
-              {/* Preview button (own profile only) - shows this profile the
-                  exact way Discover/LikedMePage render it to other users. */}
-              {isOwnProfile && (
-                <Button
-                  onClick={() => setShowProfilePreview(true)}
-                  disabled={!previewMatch}
-                  className="h-9 px-3.5 border-pink-500/40 text-white hover:bg-pink-900/30 disabled:opacity-50 bg-black border"
-                  variant="outline"
-                  aria-label="Preview my profile"
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
-              )}
-
               {/* Games button (own profile only) */}
               {isOwnProfile && (
                 <Button
                   onClick={() => navigate('/games')}
-                  className="h-9 px-3.5 border-pink-500/40 text-purple-300 hover:bg-purple-900/30 bg-black border"
-                  variant="outline"
-                  size="sm"
+                  style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
+                  className="rounded-full bg-neutral-900 border border-pink-500/30 text-purple-300 hover:bg-neutral-800"
                   aria-label="Play games"
                 >
                   <Gamepad2 className="w-4 h-4" />
                 </Button>
               )}
-
-              {/* Single toggle button - Edit becomes Cancel - icon-only */}
-              <Button
-                onClick={isEditing ? handleCancel : () => setIsEditing(true)}
-                disabled={isSaving}
-                size="sm"
-                className={`h-9 w-9 px-0 font-medium transition-all duration-200 ${
-                  isEditing
-                    ? 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50'
-                    : 'bg-neutral-800 hover:bg-neutral-700 text-white border border-pink-300/60'
-                }`}
-                variant={isEditing ? 'default' : 'default'}
-                aria-label={isEditing ? t('common.cancel') : t('common.edit')}
-              >
-                {isEditing ? (
-                  <X className="w-4 h-4" />
-                ) : (
-                  <Edit className="w-4 h-4" />
-                )}
-              </Button>
-              {/* Save button only shows when editing - icon-only */}
-              {isEditing && (
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="h-9 w-9 px-0 bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
-                  aria-label={isSaving ? t('common.saving') : t('common.save')}
-                >
-                  <Save className="w-4 h-4" />
-                </Button>
-              )}
             </div>
           </div>
-          
+
           {/* Profile Completion Progress Bar with Verified Badge */}
-          <div className="mt-8">
+          <div className="mt-2">
             <div className="flex items-center gap-3">
               <div className="flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden">
                 <div
@@ -1249,11 +1296,19 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             </Dialog>
           )}
 
+          <ProfileBasicsChips editedProfile={editedProfile} onOpenSection={toggleSection} />
+
           <CollapsibleSection
             title={t('profile.basicInfo')}
             isOpen={showBasicInfoSection}
             onToggle={() => toggleSection('basicInfo')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <BasicInfoSection 
               editedProfile={editedProfile} 
@@ -1289,6 +1344,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showLocationSection}
             onToggle={() => toggleSection('location')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <LocationSection 
               editedProfile={editedProfile} 
@@ -1311,11 +1372,18 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showLifestyleSection}
             onToggle={() => toggleSection('lifestyle')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
-            <LifestyleSection 
-              editedProfile={editedProfile} 
-              isEditing={isEditing} 
-              onSelectChange={handleSelectChange} 
+            <LifestyleSection
+              editedProfile={editedProfile}
+              isEditing={isEditing}
+              onSelectChange={handleSelectChange}
+              onFamilyPlansToggle={(value) => handleSingleToggleChange('family_plans', value)}
             />
           </CollapsibleSection>
           <CollapsibleSection
@@ -1323,6 +1391,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showWorkEducationSection}
             onToggle={() => toggleSection('workEducation')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <WorkEducationSection 
               editedProfile={editedProfile} 
@@ -1335,11 +1409,76 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showPersonalitySection}
             onToggle={() => toggleSection('personality')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
-            <PersonalitySection 
-              editedProfile={editedProfile} 
-              isEditing={isEditing} 
-              onSliderChange={handleSliderChange} 
+            <PersonalitySection
+              editedProfile={editedProfile}
+              isEditing={isEditing}
+              onSliderChange={handleSliderChange}
+              onCommunicationStyleToggle={(value) => handleArrayToggleChange('communication_style', value)}
+              onLoveStyleToggle={(value) => handleArrayToggleChange('love_style', value)}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Languages"
+            isOpen={showLanguagesSection}
+            onToggle={() => toggleSection('languages')}
+            className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          >
+            <LanguagesSection
+              editedProfile={editedProfile}
+              isEditing={isEditing}
+              onToggleLanguage={(value) => handleArrayToggleChange('languages', value)}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Pets"
+            isOpen={showPetsSection}
+            onToggle={() => toggleSection('pets')}
+            className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          >
+            <PetsSection
+              editedProfile={editedProfile}
+              isEditing={isEditing}
+              onTogglePet={(value) => handleArrayToggleChange('pets', value)}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Social Media"
+            isOpen={showSocialMediaSection}
+            onToggle={() => toggleSection('socialMedia')}
+            className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          >
+            <SocialMediaSection
+              editedProfile={editedProfile}
+              isEditing={isEditing}
+              onToggleSocialMedia={(value) => handleSingleToggleChange('social_media', value)}
             />
           </CollapsibleSection>
           <CollapsibleSection
@@ -1347,6 +1486,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showFunQuestionsSection}
             onToggle={() => toggleSection('funQuestions')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <FunQuestionsSection 
               editedProfile={editedProfile} 
@@ -1359,6 +1504,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showInterestsSection}
             onToggle={() => toggleSection('interests')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <InterestsSection
               editedProfile={editedProfile}
@@ -1372,6 +1523,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showFavoritesSection}
             onToggle={() => toggleSection('favorites')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <FavoritesSection
               editedProfile={editedProfile}
@@ -1385,6 +1542,12 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             isOpen={showAdinkraSection}
             onToggle={() => toggleSection('adinkra')}
             className="mt-3"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
           >
             <AdinkraSection 
               editedProfile={editedProfile} 

@@ -159,7 +159,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
   }, [videoSrc, isIOS]);
   
   return (
-  <div className="min-h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-start text-center relative overflow-hidden">
+  <div className="min-h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex flex-col items-center justify-start text-center relative overflow-hidden">
       <style>{`
         @keyframes bubbleFloatSlow {
           0% { transform: translate3d(0, 0, 0) scale(1); }
@@ -204,17 +204,17 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           className="absolute top-0 left-0 w-full h-full object-cover opacity-40"
           style={{ willChange: 'auto' }}
         />
-        {/* Gradient overlay to blend video with pink background - smoother transition */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent from-40% via-pink-500/10 via-55% via-pink-500/30 via-70% to-pink-500"></div>
+        {/* Gradient overlay to blend video with dark pink background - smoother transition */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent from-40% via-[#7a0a40]/20 via-55% via-[#7a0a40]/50 via-70% to-[#d6136e]"></div>
       </div>
 
       {/* Background Bubbles */}
       <div className="absolute inset-0">
-        <div className="welcome-bubble welcome-bubble-a bg-purple-400 opacity-30 rounded-full w-20 h-20 absolute top-10 left-20"></div>
-        <div className="welcome-bubble welcome-bubble-b bg-pink-400 opacity-30 rounded-full w-48 h-48 absolute bottom-32 right-20"></div>
-        <div className="welcome-bubble welcome-bubble-c bg-purple-300 opacity-20 rounded-full w-12 h-12 absolute top-32 right-32"></div>
-        <div className="welcome-bubble welcome-bubble-d bg-pink-300 opacity-20 rounded-full w-32 h-32 absolute bottom-40 left-10"></div>
-        <div className="welcome-bubble welcome-bubble-e bg-purple-200 opacity-25 rounded-full w-24 h-24 absolute top-5 right-5"></div>
+        <div className="welcome-bubble welcome-bubble-a bg-[#ff2d87] opacity-20 rounded-full w-20 h-20 absolute top-10 left-20"></div>
+        <div className="welcome-bubble welcome-bubble-b bg-[#d6136e] opacity-25 rounded-full w-48 h-48 absolute bottom-32 right-20"></div>
+        <div className="welcome-bubble welcome-bubble-c bg-[#a3125c] opacity-20 rounded-full w-12 h-12 absolute top-32 right-32"></div>
+        <div className="welcome-bubble welcome-bubble-d bg-[#7a0a40] opacity-25 rounded-full w-32 h-32 absolute bottom-40 left-10"></div>
+        <div className="welcome-bubble welcome-bubble-e bg-[#ff5fa3] opacity-15 rounded-full w-24 h-24 absolute top-5 right-5"></div>
       </div>
 
       {/* Logo and Tagline */}

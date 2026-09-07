@@ -1,15 +1,13 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock, ImageOff } from 'lucide-react';
+import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock, ImageOff, Plus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/utils/imageCompression';
@@ -31,6 +29,7 @@ interface ImageManagementProps {
 }
 
 interface UserImage {
+  id: string;
   image_url: string;
   is_approved?: boolean;
   moderation_status?: string;
@@ -65,7 +64,131 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   const [pendingCrops, setPendingCrops] = useState<Record<string, { blob: Blob; previewUrl: string }>>({});
   const [savingCropUrl, setSavingCropUrl] = useState<string | null>(null);
   const [discardWarningUrl, setDiscardWarningUrl] = useState<string | null>(null);
+  // Which photo's action overlay (crop/replace/delete) is open - tap-to-reveal
+  // since hover doesn't exist on touch devices.
+  const [activeImageUrl, setActiveImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Drag-to-reorder: long-press a thumbnail (so a normal tap still opens the
+  // preview and a normal swipe still scrolls the row) then drag it over
+  // another slot to swap positions. The first photo is the profile's main one.
+  const [dragUrl, setDragUrl] = useState<string | null>(null);
+  const [overUrl, setOverUrl] = useState<string | null>(null);
+  const thumbRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pressTimerRef = useRef<number | null>(null);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const LONG_PRESS_MS = 280;
+  const MOVE_CANCEL_PX = 18;
+
+  const clearPressTimer = () => {
+    if (pressTimerRef.current) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const persistImageOrder = async (ordered: UserImage[]) => {
+    try {
+      await Promise.all(
+        ordered.map((img, index) =>
+          supabase.from('user_images').update({ image_order: index }).eq('id', img.id)
+        )
+      );
+    } catch (error) {
+      console.error('Error saving photo order:', error);
+      toast({ title: 'Error', description: 'Failed to save the new photo order. Please try again.', variant: 'destructive' });
+      void fetchUserImages();
+    }
+  };
+
+  const handleThumbPointerDown = (e: React.PointerEvent, url: string) => {
+    if (pendingCrops[url]) return;
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    isDraggingRef.current = false;
+    clearPressTimer();
+    pressTimerRef.current = window.setTimeout(() => {
+      isDraggingRef.current = true;
+      setDragUrl(url);
+      setOverUrl(url);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleThumbPointerMove = (e: React.PointerEvent) => {
+    if (!pressStartRef.current) return;
+
+    if (!isDraggingRef.current) {
+      const dx = e.clientX - pressStartRef.current.x;
+      const dy = e.clientY - pressStartRef.current.y;
+      if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
+        // Moved before the long-press fired - this is a scroll/swipe, not a drag.
+        clearPressTimer();
+        pressStartRef.current = null;
+      }
+      return;
+    }
+
+    // Actively dragging - stop the row's own touch-scroll from fighting it.
+    e.preventDefault();
+    for (const [url, el] of Object.entries(thumbRefs.current)) {
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (e.clientX >= rect.left && e.clientX <= rect.right) {
+        setOverUrl((prev) => (prev === url ? prev : url));
+        break;
+      }
+    }
+  };
+
+  const handleThumbPointerUp = (e: React.PointerEvent, url: string) => {
+    clearPressTimer();
+
+    // If a drag was in progress, the document-level pointerup listener below
+    // commits it - it fires reliably even if the finger lifts off over a gap
+    // or the "+" tile rather than back over a thumbnail.
+    if (isDraggingRef.current) return;
+
+    // Not a drag - a plain tap opens the big preview.
+    pressStartRef.current = null;
+    if (!pendingCrops[url]) {
+      setActiveImageUrl(url);
+    }
+  };
+
+  // Commits the drag wherever the pointer is released - not just when it's
+  // released back over a thumbnail - so a drag can never get stuck.
+  useEffect(() => {
+    if (!dragUrl) return;
+
+    const commit = () => {
+      const draggedUrl = dragUrl;
+      const targetUrl = overUrl;
+      isDraggingRef.current = false;
+      pressStartRef.current = null;
+      setDragUrl(null);
+      setOverUrl(null);
+
+      if (draggedUrl && targetUrl && draggedUrl !== targetUrl) {
+        setUserImages((prev) => {
+          const fromIndex = prev.findIndex((img) => img.image_url === draggedUrl);
+          const toIndex = prev.findIndex((img) => img.image_url === targetUrl);
+          if (fromIndex === -1 || toIndex === -1) return prev;
+          const next = [...prev];
+          const [moved] = next.splice(fromIndex, 1);
+          next.splice(toIndex, 0, moved);
+          void persistImageOrder(next);
+          return next;
+        });
+      }
+    };
+
+    document.addEventListener('pointerup', commit);
+    document.addEventListener('pointercancel', commit);
+    return () => {
+      document.removeEventListener('pointerup', commit);
+      document.removeEventListener('pointercancel', commit);
+    };
+  }, [dragUrl, overUrl]);
 
   // Warn on a real page unload while any crop is pending.
   useEffect(() => {
@@ -176,7 +299,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       // slot, so it's excluded here.
       const { data: images, error } = await supabase
         .from('user_images')
-        .select('image_url, is_approved, moderation_status')
+        .select('id, image_url, is_approved, moderation_status')
         .eq('user_id', currentUser.id)
         .neq('image_order', -1)
         .order('image_order', { ascending: true });
@@ -184,6 +307,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       if (error) throw error;
 
       setUserImages((images || []).map(img => ({
+        id: img.id,
         image_url: img.image_url,
         is_approved: img.is_approved ?? true,
         moderation_status: img.moderation_status ?? 'approved'
@@ -547,40 +671,32 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   };
 
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-white">
-          <span className="flex items-center gap-2">
-            {t('profile.photos')} ({userImages.length}/7)
-            {isVerified && (
-              <img
-                loading="lazy"
-                src="/images/verified.svg"
-                alt="Verified"
-                className="w-5 h-5"
-              />
-            )}
-          </span>
-          <Upload className="w-5 h-5 text-pink-600" />
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {/* Face Verification Section - Only show if NOT verified */}
+    <>
+      <div className="flex items-center justify-between gap-2 mb-3 text-gray-300 text-sm">
+        <div className="flex items-center gap-2">
+          <Upload className="w-4 h-4 text-pink-500" />
+          <span>{userImages.length}/7</span>
+          {isVerified && (
+            <img
+              loading="lazy"
+              src="/images/verified.svg"
+              alt="Verified"
+              className="w-4 h-4"
+            />
+          )}
+        </div>
         {!isVerified && !showFaceVerification && (
-          <div
-            id="verify-identity-card"
-            className="mb-4 bg-black border border-purple-500/30 rounded-lg p-3 flex flex-col items-center gap-2 text-center"
+          <Button
+            size="sm"
+            onClick={() => setShowFaceVerification(true)}
+            style={{ height: 20, minHeight: 20, padding: '0 10px' }}
+            className="text-[11px] gap-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-full"
           >
-            <p className="font-medium text-purple-300 text-sm">Verify Identity</p>
-            <Button
-              onClick={() => setShowFaceVerification(true)}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs h-7 px-4 rounded-full"
-            >
-              <Camera className="w-3 h-3 mr-1" />
-              Verify
-            </Button>
-          </div>
+            <Camera size={11} style={{ width: 11, height: 11 }} />
+            Verify
+          </Button>
         )}
+      </div>
 
         {/* Face Verification Camera View */}
         {showFaceVerification && (
@@ -616,37 +732,14 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           </div>
         )}
         {userImages.length < 5 && (
-          <div className="mb-6">
-            <Label htmlFor="image_upload" className="block mb-2 text-gray-200">{t('profile.uploadImage')}</Label>
-
-            {replacingImageUrl && (
-              <div className="mb-2 p-2 bg-black border border-blue-500/30 rounded text-sm text-blue-300 flex items-center justify-between">
-                <span>🔄 Replace mode active - Click to cancel and upload new image instead</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setReplacingImageUrl(null);
-                    toast({
-                      title: "Replace cancelled",
-                      description: "You can now upload a new image normally.",
-                      variant: "default"
-                    });
-                  }}
-                  className="h-6 px-2 text-xs text-blue-300 hover:bg-blue-500/10"
-                >
-                  Cancel Replace
-                </Button>
-              </div>
-            )}
-
+          <div className="mb-3">
             <Input
               type="file"
               id="image_upload"
               accept="image/*"
               onChange={handleImageUpload}
               disabled={uploading || moderating}
-              className="w-full bg-black/40 border-pink-500/30 text-white file:text-white"
+              className="hidden"
               onClick={() => {
                 // Clear replace mode when user clicks the upload button directly
                 if (replacingImageUrl) {
@@ -687,13 +780,33 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           {userImages.map((userImage, index) => {
             const pending = pendingCrops[userImage.image_url];
             return (
-            <div key={userImage.image_url} className="relative group">
+            <div
+              key={userImage.image_url}
+              ref={(el) => { thumbRefs.current[userImage.image_url] = el; }}
+              onPointerDown={(e) => handleThumbPointerDown(e, userImage.image_url)}
+              onPointerMove={handleThumbPointerMove}
+              onPointerUp={(e) => handleThumbPointerUp(e, userImage.image_url)}
+              onContextMenu={(e) => e.preventDefault()}
+              style={{
+                touchAction: 'pan-x',
+                WebkitUserSelect: 'none',
+                userSelect: 'none',
+                WebkitTouchCallout: 'none',
+              }}
+              className={`relative shrink-0 w-16 h-24 sm:w-20 sm:h-28 transition-transform ${
+                dragUrl === userImage.image_url
+                  ? 'opacity-60 scale-105 z-10'
+                  : overUrl === userImage.image_url && dragUrl
+                    ? 'ring-2 ring-pink-400'
+                    : ''
+              }`}
+            >
               {brokenImageUrls.has(userImage.image_url) && !pending ? (
-                <div className="w-full h-28 sm:h-36 rounded-lg shadow-sm bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
+                <div className="w-full h-full rounded-xl shadow-sm bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
                   <ImageOff className="w-6 h-6" />
                   <span className="text-[10px]">Unavailable</span>
                 </div>
@@ -701,11 +814,19 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                 <img
                   loading="lazy"
                   decoding="async"
+                  draggable={false}
                   src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
                   alt={`User Image ${index + 1}`}
-                  className="w-full h-28 sm:h-36 object-cover rounded-lg shadow-sm"
+                  className="w-full h-full object-cover rounded-xl shadow-sm pointer-events-none select-none"
                   onError={() => setBrokenImageUrls((prev) => new Set(prev).add(userImage.image_url))}
                 />
+              )}
+
+              {/* Main photo indicator */}
+              {index === 0 && !pending && (
+                <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded-full pointer-events-none">
+                  Main
+                </div>
               )}
 
               {/* Pending approval indicator */}
@@ -717,7 +838,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
               {/* Unsaved crop - review, then explicitly Save or Cancel; nothing
                   else on this photo is actionable while a crop is pending. */}
-              {pending ? (
+              {pending && (
                 <>
                   <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full">
                     Unsaved crop
@@ -742,74 +863,22 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                     </Button>
                   </div>
                 </>
-              ) : (
-              <div className="absolute top-2 right-2 flex gap-1">
-                {/* Crop - always available, on any photo */}
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setCroppingImageUrl(userImage.image_url)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-pink-600 hover:bg-pink-700 rounded-full shadow-md"
-                  title="Crop photo"
-                >
-                  <Pencil className="w-3 h-3" />
-                </Button>
-                {/* Show Replace button if only 2 images remain, otherwise show Delete */}
-                {userImages.length <= 2 ? (
-                  <Button 
-                    variant="default"
-                    size="sm" 
-                    onClick={() => handleReplaceImage(userImage.image_url)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700 rounded-full shadow-md"
-                    title="Replace image"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                  </Button>
-                ) : (
-                  <>
-                    {/* Replace button - always available */}
-                    <Button 
-                      variant="default"
-                      size="sm" 
-                      onClick={() => handleReplaceImage(userImage.image_url)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 bg-blue-600 hover:bg-blue-700 rounded-full shadow-md"
-                      title="Replace image"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </Button>
-                    
-                    {/* Delete button - only when more than 2 images */}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 rounded-full shadow-md"
-                          title="Delete image"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle className="text-white">Delete Image</AlertDialogTitle>
-                          <AlertDialogDescription className="text-gray-300">Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-black border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">Cancel</AlertDialogCancel>
-                          <AlertDialogAction disabled={deleting} onClick={() => handleDeleteImage(userImage.image_url)} className="bg-red-600 hover:bg-red-700">
-                            {deleting ? 'Deleting...' : 'Delete'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                )}
-              </div>
               )}
             </div>
             );
           })}
+
+          {userImages.length < 5 && (
+            <button
+              type="button"
+              onClick={() => (document.getElementById('image_upload') as HTMLInputElement)?.click()}
+              disabled={uploading || moderating}
+              aria-label={t('profile.uploadImage')}
+              className="shrink-0 w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 border-dashed border-pink-500/40 flex items-center justify-center text-pink-400 hover:bg-pink-500/10 disabled:opacity-50 transition-colors"
+            >
+              <Plus className="w-7 h-7" />
+            </button>
+          )}
         </div>
 
         {userImages.length === 0 && (
@@ -819,7 +888,96 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             <p className="text-sm">Upload your first photo to get started!</p>
           </div>
         )}
-      </CardContent>
+
+      {/* Full-size photo preview - tap a thumbnail to open it big, with the
+          crop/replace/delete actions available right below it. */}
+      {activeImageUrl && (() => {
+        const previewUrl = activeImageUrl;
+        return (
+          <div
+            className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4"
+            onClick={() => setActiveImageUrl(null)}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveImageUrl(null)}
+              className="absolute top-4 right-4 text-white/80 hover:text-white"
+              aria-label="Close"
+            >
+              <X size={28} />
+            </button>
+
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <img
+                src={optimizeImageUrl(previewUrl, { width: 1200, quality: 80 })}
+                alt="Photo preview"
+                className="max-w-[92vw] max-h-[70vh] object-contain rounded-xl block"
+              />
+
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                <Button
+                  onClick={() => { setCroppingImageUrl(previewUrl); setActiveImageUrl(null); }}
+                  style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                  className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                  title="Crop photo"
+                >
+                  <Pencil size={15} style={{ width: 15, height: 15 }} />
+                </Button>
+
+                {userImages.length <= 2 ? (
+                  <Button
+                    onClick={() => { handleReplaceImage(previewUrl); setActiveImageUrl(null); }}
+                    style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                    className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                    title="Replace image"
+                  >
+                    <RefreshCw size={15} style={{ width: 15, height: 15 }} />
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={() => { handleReplaceImage(previewUrl); setActiveImageUrl(null); }}
+                      style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                      className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                      title="Replace image"
+                    >
+                      <RefreshCw size={15} style={{ width: 15, height: 15 }} />
+                    </Button>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                          className="shrink-0 bg-black/60 hover:bg-red-600/90 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-red-400 hover:text-white"
+                          title="Delete image"
+                        >
+                          <Trash2 size={15} style={{ width: 15, height: 15 }} />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-white">Delete Image</AlertDialogTitle>
+                          <AlertDialogDescription className="text-gray-300">Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-black border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            disabled={deleting}
+                            onClick={() => { handleDeleteImage(previewUrl); setActiveImageUrl(null); }}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            {deleting ? 'Deleting...' : 'Delete'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {croppingImageUrl && currentUser?.id && (
         <PhotoCropModal
@@ -868,7 +1026,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
           </div>
         </div>
       )}
-    </Card>
+    </>
   );
 };
 

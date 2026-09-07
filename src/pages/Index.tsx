@@ -277,7 +277,7 @@ const Index = ({
 
   if (loading) {
     return (
-      <div className="w-full h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-purple-500 to-pink-500">
+      <div className="w-full h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e]">
         <HoppingLogo size={68} />
       </div>
     );
@@ -322,7 +322,7 @@ const Index = ({
         )}
 
         {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
+          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background */}
             <VideoBackground />
             <AuthForm 
@@ -334,7 +334,7 @@ const Index = ({
         )}
 
         {currentView === 'register' && (
-          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
+          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background - always rendered, loads async */}
             <VideoBackground />
             <RegistrationForm 
@@ -345,7 +345,7 @@ const Index = ({
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="h-fill bg-gradient-to-br from-purple-500 to-pink-500 flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
+          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             <VideoBackground />
             <Suspense fallback={<PageLoader />}>
               <ProfileCompletionPage />

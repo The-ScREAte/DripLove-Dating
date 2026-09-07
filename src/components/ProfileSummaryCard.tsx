@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Heart, MessageCircle, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -158,13 +158,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
   return (
     <div className="mx-auto w-full max-w-3xl px-4">
       <Card className="shadow-lg bg-black border-pink-500/40 w-full">
-        <CardHeader className="py-3 px-4">
-          <CardTitle className="flex items-center space-x-1.5 text-sm text-white">
-            <Users className="w-4 h-4 text-pink-400" />
-            <span>{t('profile.yourDripLoveSummary')}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 pt-0">
+        <CardContent className="px-4 pt-3 pb-4">
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="space-y-1">
               <div className="flex justify-center">

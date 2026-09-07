@@ -1258,6 +1258,13 @@ export type Database = {
       profiles: {
         Row: {
           account_status: string | null
+          communication_style: string[] | null
+          family_plans: string | null
+          height_cm: number | null
+          languages: string[] | null
+          love_style: string[] | null
+          pets: string[] | null
+          social_media: string | null
           adinkra_symbols: string[] | null
           bio: string | null
           city: string | null
@@ -1313,6 +1320,13 @@ export type Database = {
         }
         Insert: {
           account_status?: string | null
+          communication_style?: string[] | null
+          family_plans?: string | null
+          height_cm?: number | null
+          languages?: string[] | null
+          love_style?: string[] | null
+          pets?: string[] | null
+          social_media?: string | null
           adinkra_symbols?: string[] | null
           bio?: string | null
           city?: string | null
@@ -1368,6 +1382,13 @@ export type Database = {
         }
         Update: {
           account_status?: string | null
+          communication_style?: string[] | null
+          family_plans?: string | null
+          height_cm?: number | null
+          languages?: string[] | null
+          love_style?: string[] | null
+          pets?: string[] | null
+          social_media?: string | null
           adinkra_symbols?: string[] | null
           bio?: string | null
           city?: string | null

@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { sanitizeName, sanitizeBio } from '@/utils/inputSanitization';
 import { containsBadWords } from '@/utils/textModeration';
 
@@ -13,6 +13,16 @@ interface BasicInfoSectionProps {
   isEditing: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
+
+// 137cm (4'6") to 213cm (7'0") covers the practical range for a height picker.
+const HEIGHT_OPTIONS_CM = Array.from({ length: 213 - 137 + 1 }, (_, i) => 137 + i);
+
+const formatHeight = (cm: number) => {
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}'${inches}" (${cm} cm)`;
+};
 
 const getSanitizedValue = (name: string, value: string) => {
   let sanitizedValue = value;
@@ -55,12 +65,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
   const age = calculateAge(editedProfile.date_of_birth);
   
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader>
-        <CardTitle className="text-white">{t('profile.basicInfo')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-5 pt-1">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="first_name" className="text-gray-200">{t('profile.firstName')}</Label>
@@ -147,6 +152,29 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               />
             </div>
           </div>
+
+          <div>
+            <Label htmlFor="height" className="text-gray-200">{t('profile.height', 'Height')}</Label>
+            <Select
+              value={editedProfile.height_cm ? String(editedProfile.height_cm) : undefined}
+              onValueChange={(value) => onInputChange({
+                target: { name: 'height_cm', value: Number(value) }
+              } as any)}
+              disabled={!isEditing}
+            >
+              <SelectTrigger id="height" className="w-full bg-black/40 border-pink-500/30 text-white disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400">
+                <SelectValue placeholder={t('profile.selectHeight', 'Select your height')} />
+              </SelectTrigger>
+              <SelectContent className="bg-black border-pink-500/30 max-h-72">
+                {HEIGHT_OPTIONS_CM.map((cm) => (
+                  <SelectItem key={cm} value={String(cm)} className="text-white focus:bg-pink-500/15 focus:text-white">
+                    {formatHeight(cm)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <Label htmlFor="bio" className="text-gray-200">{t('profile.bio')}</Label>
             <Textarea
@@ -183,8 +211,6 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
             </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
   );
 };
 

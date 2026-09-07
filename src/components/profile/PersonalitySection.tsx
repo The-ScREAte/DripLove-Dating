@@ -1,24 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import ChipSelect from './ChipSelect';
+import { COMMUNICATION_STYLE_OPTIONS, LOVE_STYLE_OPTIONS } from '@/constants/profileTraits';
 
 interface PersonalitySectionProps {
   editedProfile: any;
   isEditing: boolean;
   onSliderChange: (name: string, value: number[]) => void;
+  onCommunicationStyleToggle: (value: string) => void;
+  onLoveStyleToggle: (value: string) => void;
 }
 
-const PersonalitySection = ({ editedProfile, isEditing, onSliderChange }: PersonalitySectionProps) => {
+const PersonalitySection = ({ editedProfile, isEditing, onSliderChange, onCommunicationStyleToggle, onLoveStyleToggle }: PersonalitySectionProps) => {
   const { t } = useTranslation();
   
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader>
-        <CardTitle className="text-white">{t('profile.personality')}</CardTitle>
-      </CardHeader>
-      <CardContent>
         <div className="space-y-6">
           <div>
             <Label htmlFor="introvert_extrovert" className="text-gray-200">
@@ -77,9 +75,29 @@ const PersonalitySection = ({ editedProfile, isEditing, onSliderChange }: Person
               </div>
             </div>
           </div>
+
+          <div>
+            <Label className="text-gray-200 mb-1.5 block">{t('profile.communicationStyle', 'Communication style')}</Label>
+            <ChipSelect
+              options={COMMUNICATION_STYLE_OPTIONS}
+              selected={Array.isArray(editedProfile.communication_style) ? editedProfile.communication_style : []}
+              onToggle={onCommunicationStyleToggle}
+              disabled={!isEditing}
+              accent="blue"
+            />
+          </div>
+
+          <div>
+            <Label className="text-gray-200 mb-1.5 block">{t('profile.loveStyle', 'Love style')}</Label>
+            <ChipSelect
+              options={LOVE_STYLE_OPTIONS}
+              selected={Array.isArray(editedProfile.love_style) ? editedProfile.love_style : []}
+              onToggle={onLoveStyleToggle}
+              disabled={!isEditing}
+              accent="pink"
+            />
+          </div>
         </div>
-      </CardContent>
-    </Card>
   );
 };
 

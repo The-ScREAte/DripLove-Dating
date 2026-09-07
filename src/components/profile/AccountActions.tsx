@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -191,11 +190,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
   };
 
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader className={isAndroidNative ? 'p-4' : undefined}>
-        <CardTitle className={`text-white ${isAndroidNative ? 'text-xl' : ''}`}>{t('profile.accountActions')}</CardTitle>
-      </CardHeader>
-      <CardContent className={isAndroidNative ? 'p-4 pt-0 space-y-3' : 'space-y-4'}>
+    <div className={isAndroidNative ? 'space-y-3' : 'space-y-4'}>
         {/* 1. Support & Help - Most important for users */}
         <div className="bg-black border border-pink-500/30 p-4 rounded-lg">
           <div className="flex items-center space-x-2 mb-3">
@@ -615,8 +610,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 

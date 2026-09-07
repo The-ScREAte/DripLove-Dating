@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -93,15 +92,10 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
   );
 
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader>
-        <CardTitle className="text-white">{t('profile.funQuestions')}</CardTitle>
-        <p className="text-sm text-gray-400">
-          {t('profile.funQuestionsDescription')}
-        </p>
-      </CardHeader>
-      <CardContent>
         <div className="space-y-4">
+          <p className="text-sm text-gray-400">
+            {t('profile.funQuestionsDescription')}
+          </p>
           {renderQuestionField(
             'fun_fact',
             t('profile.funFact'),
@@ -118,8 +112,6 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
             t('profile.lastGoogledPlaceholder')
           )}
         </div>
-      </CardContent>
-    </Card>
   );
 };
 

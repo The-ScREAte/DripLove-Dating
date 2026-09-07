@@ -1,29 +1,26 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ChipSelect from './ChipSelect';
+import { FAMILY_PLANS_OPTIONS } from '@/constants/profileTraits';
 
 interface LifestyleSectionProps {
   editedProfile: any;
   isEditing: boolean;
   onSelectChange: (name: string, value: string) => void;
+  onFamilyPlansToggle: (value: string) => void;
 }
 
 const selectTriggerClass = "w-full bg-black/40 border-pink-500/30 text-white";
 const selectContentClass = "bg-black border-pink-500/30";
 const selectItemClass = "text-white focus:bg-pink-500/15 focus:text-white";
 
-const LifestyleSection = ({ editedProfile, isEditing, onSelectChange }: LifestyleSectionProps) => {
+const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPlansToggle }: LifestyleSectionProps) => {
   const { t } = useTranslation();
 
   return (
-    <Card className="bg-black border-pink-500/30">
-      <CardHeader>
-        <CardTitle className="text-white">{t('profile.lifestyle')}</CardTitle>
-      </CardHeader>
-      <CardContent>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -94,9 +91,17 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange }: Lifestyl
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <Label className="text-gray-200 mb-1.5 block">{t('profile.familyPlans', 'Family plans')}</Label>
+            <ChipSelect
+              options={FAMILY_PLANS_OPTIONS}
+              selected={editedProfile.family_plans ? [editedProfile.family_plans] : []}
+              onToggle={onFamilyPlansToggle}
+              disabled={!isEditing}
+              accent="rose"
+            />
+          </div>
         </div>
-      </CardContent>
-    </Card>
   );
 };
 
