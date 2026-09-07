@@ -781,6 +781,7 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
           return { restored: false, message: 'Please log in and try again.' };
         }
 
+        let alreadyLinkedMessage: string | null = null;
         for (const id of GOOGLE_PRODUCT_IDS) {
           const product = store.get?.(id);
           if (!product || !product.owned) continue;
@@ -813,9 +814,17 @@ export function restoreGooglePurchases(): Promise<{ restored: boolean; message: 
             return { restored: true, message: 'Subscription restored successfully' };
           }
           console.warn('[Google IAP] Server validation failed during restore:', valError || validation);
+          // GAP FIX: surface the real reason ("this subscription is tied to a
+          // different account") instead of collapsing it into the same
+          // generic "nothing to restore" message - retrying restore can
+          // never fix that case, so the user needs to know it's different.
+          const message: string | undefined = typeof validation?.error === 'string' ? validation.error : undefined;
+          if (message && message.toLowerCase().includes('already linked')) {
+            alreadyLinkedMessage = message;
+          }
         }
 
-        return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+        return { restored: false, message: alreadyLinkedMessage || 'No active subscription found. If you previously purchased, it may have expired.' };
       } catch (error) {
         console.error('[Google IAP] Error during restore:', error);
         return { restored: false, message: 'Restore failed. Please try again.' };

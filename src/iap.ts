@@ -42,6 +42,68 @@ function wasPaymentRecentlyCompleted(): boolean {
   return false;
 }
 
+// GAP FIX: window.iapPurchaseInitiated is an in-memory flag - it's lost the
+// instant the app is closed or the page reloads. If the network drops (or
+// the user backgrounds/closes the app) in the moment right after paying,
+// Apple's transaction queue still redelivers that approved-but-unfinished
+// transaction on next launch (that's the whole point of the queue), but by
+// then window.iapPurchaseInitiated is back to false - so .approved() used to
+// treat it as "not user-initiated" and just call t.finish(), discarding the
+// one chance to validate it. The user was charged and nothing ever showed.
+// Persisting the same intent as a short-lived localStorage flag (mirroring
+// the pattern already used on the Android side, iap-google.ts) survives
+// exactly that gap, so the redelivered transaction still gets validated.
+const IAP_PENDING_KEY = 'driplove_iap_pending';
+const IAP_PENDING_TS_KEY = 'driplove_iap_pending_ts';
+const IAP_PENDING_TTL_MS = 15 * 60 * 1000;
+
+function markIapPending() {
+  try {
+    localStorage.setItem(IAP_PENDING_KEY, '1');
+    localStorage.setItem(IAP_PENDING_TS_KEY, String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+function clearIapPending() {
+  try {
+    localStorage.removeItem(IAP_PENDING_KEY);
+    localStorage.removeItem(IAP_PENDING_TS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function hasRecentIapPending(): boolean {
+  try {
+    const pending = localStorage.getItem(IAP_PENDING_KEY) === '1';
+    const tsRaw = localStorage.getItem(IAP_PENDING_TS_KEY);
+    const ts = tsRaw ? Number(tsRaw) : 0;
+    const isRecent = pending && Number.isFinite(ts) && ts > 0 && (Date.now() - ts) < IAP_PENDING_TTL_MS;
+    if (pending && !isRecent) clearIapPending();
+    return isRecent;
+  } catch {
+    return false;
+  }
+}
+
+// GAP FIX: the validator can reject a receipt because the underlying
+// Apple/Google subscription is already linked to a DIFFERENT account (see
+// prevent_shared_iap_subscription). validateReceiptWithServer's `error` can
+// be a plain string, an Error, or the parsed {valid:false, error:"..."} body
+// from a normal 200 response - this pulls a human message out of whichever
+// shape actually came back, so callers can tell that case apart from a
+// genuine "nothing to restore" instead of collapsing both into the same
+// generic message.
+function extractValidationErrorMessage(error: any): string | null {
+  if (!error) return null;
+  if (typeof error === 'string') return error;
+  if (typeof error?.error === 'string') return error.error;
+  if (typeof error?.message === 'string') return error.message;
+  return null;
+}
+
 // Pull the raw platform receipt (Apple base64 receipt, or Google purchase
 // token) directly off a Transaction's parent Receipt. We deliberately never
 // call transaction.verify()/store.when().verified() -- that chain only talks
@@ -186,7 +248,15 @@ async function handleApprovedTransaction(t: any) {
 
     if (!valid || !active) {
       console.warn('[IAP] Server validation failed or subscription inactive:', validationError);
-      alert('We could not verify your purchase yet. If you were charged, please try "Restore Purchases" in a moment, or contact support.');
+      const message = extractValidationErrorMessage(validationError);
+      if (message && message.toLowerCase().includes('already linked')) {
+        // Tell them the real reason instead of the generic "try again"
+        // message - retrying or restoring will never succeed here, since
+        // this specific subscription is tied to a different account.
+        alert(message);
+      } else {
+        alert('We could not verify your purchase yet. If you were charged, please try "Restore Purchases" in a moment, or contact support.');
+      }
       return;
     }
 
@@ -220,6 +290,7 @@ async function handleApprovedTransaction(t: any) {
     }
 
     try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
+    clearIapPending();
     markPaymentCompleted();
     if (t.finish && typeof t.finish === 'function') t.finish();
     window.location.href = '/payment-success?status=successful&payment_type=iap';
@@ -395,7 +466,13 @@ export function initIAP() {
           // which only talks to a `store.validator` we never configure, and
           // silently fakes a successful verification with no real receipt data
           // when none is configured.
-          if (window.iapPurchaseInitiated) {
+          //
+          // hasRecentIapPending() catches the redelivery case: an approved
+          // transaction that never got finished last session (app closed or
+          // network dropped right after paying) comes back through this same
+          // event on the next launch, in a fresh page load where
+          // window.iapPurchaseInitiated has already reset to false.
+          if (window.iapPurchaseInitiated || hasRecentIapPending()) {
             handleApprovedTransaction(t);
           } else {
             if (t.finish && typeof t.finish === 'function') {
@@ -509,6 +586,7 @@ export const buyMonthly = async () => {
   }
   
   window.iapPurchaseInitiated = true;
+  markIapPending();
 
   // Try to find the first valid product that can be purchased
   let product;
@@ -624,22 +702,33 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
           return { restored: false, message: 'Please log in and try again.' };
         }
 
+        const NOT_FOUND_MESSAGE = 'No active subscription found. If you previously purchased, it may have expired.';
+
         if (isAndroid()) {
+          let alreadyLinkedMessage: string | null = null;
           for (const id of RESTORE_PRODUCT_IDS) {
             const transaction = findTransactionForProduct(store, id);
             const { receiptData, purchaseToken } = extractReceiptData(transaction);
             if (!receiptData) continue;
 
             noopLog('[IAP] Validating restored Google purchase for product:', id);
-            const { valid, active } = await validateReceiptWithServer(
+            const { valid, active, error } = await validateReceiptWithServer(
               user.id, id, transaction?.transactionId, receiptData, purchaseToken
             );
             if (valid && active) {
               try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
               return { restored: true, message: 'Subscription restored successfully' };
             }
+            // GAP FIX: surface the real reason ("this subscription is tied to
+            // a different account") instead of collapsing it into the same
+            // generic "nothing to restore" message - retrying restore can
+            // never fix that case, so the user needs to know it's different.
+            const message = extractValidationErrorMessage(error);
+            if (message && message.toLowerCase().includes('already linked')) {
+              alreadyLinkedMessage = message;
+            }
           }
-          return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+          return { restored: false, message: alreadyLinkedMessage || NOT_FOUND_MESSAGE };
         }
 
         // iOS: the refreshed local App Store receipt contains the complete
@@ -651,16 +740,20 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
         const receiptData = appleReceipt?.nativeData?.appStoreReceipt;
 
         if (!receiptData) {
-          return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+          return { restored: false, message: NOT_FOUND_MESSAGE };
         }
 
         noopLog('[IAP] Validating restored Apple receipt...');
-        const { valid, active } = await validateReceiptWithServer(user.id, '', undefined, receiptData);
+        const { valid, active, error } = await validateReceiptWithServer(user.id, '', undefined, receiptData);
         if (valid && active) {
           try { localStorage.removeItem('driplove_iap_user_id'); } catch (e) {}
           return { restored: true, message: 'Subscription restored successfully' };
         }
-        return { restored: false, message: 'No active subscription found. If you previously purchased, it may have expired.' };
+        const message = extractValidationErrorMessage(error);
+        if (message && message.toLowerCase().includes('already linked')) {
+          return { restored: false, message };
+        }
+        return { restored: false, message: NOT_FOUND_MESSAGE };
       } catch (error) {
         console.error('[IAP] Error during restore:', error);
         return { restored: false, message: 'Restore failed. Please try again.' };
