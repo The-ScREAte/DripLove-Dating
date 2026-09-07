@@ -205,20 +205,20 @@ const RedirectLinkCreator = () => {
   return (
     <div className="space-y-6">
       {/* Create New Redirect */}
-      <Card>
+      <Card className="bg-black border-pink-500/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LinkIcon className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2 text-white">
+            <LinkIcon className="w-5 h-5 text-pink-500" />
             Create Redirect Link
           </CardTitle>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-gray-400 mt-1">
             Generate smart redirect links that detect user device and redirect accordingly
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="ios-link">
-              iOS Link <span className="text-gray-400">(Optional)</span>
+            <Label htmlFor="ios-link" className="text-white">
+              iOS Link <span className="text-gray-500">(Optional)</span>
             </Label>
             <Input
               id="ios-link"
@@ -226,13 +226,14 @@ const RedirectLinkCreator = () => {
               placeholder="https://apps.apple.com/app/..."
               value={iosLink}
               onChange={(e) => setIosLink(e.target.value)}
+              className="bg-black/40 border-pink-500/30 text-white placeholder:text-gray-600"
             />
             <p className="text-xs text-gray-500">App Store link for iPhone/iPad users</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="android-link">
-              Android Link <span className="text-gray-400">(Optional)</span>
+            <Label htmlFor="android-link" className="text-white">
+              Android Link <span className="text-gray-500">(Optional)</span>
             </Label>
             <Input
               id="android-link"
@@ -240,13 +241,14 @@ const RedirectLinkCreator = () => {
               placeholder="https://play.google.com/store/apps/..."
               value={androidLink}
               onChange={(e) => setAndroidLink(e.target.value)}
+              className="bg-black/40 border-pink-500/30 text-white placeholder:text-gray-600"
             />
             <p className="text-xs text-gray-500">Play Store link for Android users</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="web-link">
-              Web Link <span className="text-red-500">*</span>
+            <Label htmlFor="web-link" className="text-white">
+              Web Link <span className="text-red-400">*</span>
             </Label>
             <Input
               id="web-link"
@@ -254,6 +256,7 @@ const RedirectLinkCreator = () => {
               placeholder="https://driplove.love"
               value={webLink}
               onChange={(e) => setWebLink(e.target.value)}
+              className="bg-black/40 border-pink-500/30 text-white placeholder:text-gray-600"
             />
             <p className="text-xs text-gray-500">Fallback link for desktop/other devices (required)</p>
           </div>
@@ -261,7 +264,7 @@ const RedirectLinkCreator = () => {
           <Button
             onClick={handleCreateRedirect}
             disabled={isCreating || !webLink.trim()}
-            className="w-full"
+            className="w-full bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white"
           >
             {isCreating ? 'Creating...' : 'Create Redirect Link'}
           </Button>
@@ -269,10 +272,10 @@ const RedirectLinkCreator = () => {
       </Card>
 
       {/* Existing Redirect Links */}
-      <Card>
+      <Card className="bg-black border-pink-500/30">
         <CardHeader>
-          <CardTitle>Existing Redirect Links</CardTitle>
-          <p className="text-sm text-gray-600 mt-1">
+          <CardTitle className="text-white">Existing Redirect Links</CardTitle>
+          <p className="text-sm text-gray-400 mt-1">
             Manage and track your redirect links
           </p>
         </CardHeader>
@@ -288,27 +291,34 @@ const RedirectLinkCreator = () => {
               {redirectLinks.map((link) => (
                 <div
                   key={link.id}
-                  className="border rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow"
+                  className="border border-pink-500/20 rounded-lg p-4 space-y-3 hover:border-pink-500/40 transition-colors"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                  <div className="flex items-start justify-between gap-2">
+                    {/* min-w-0 is load-bearing here: without it, a flex item
+                        never shrinks below its content's natural width no
+                        matter what break-all says, so the long destination
+                        URLs below were forcing this whole column wider than
+                        the card and pushing the delete button off-screen. */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <code className="text-xs sm:text-sm font-mono bg-pink-500/10 text-pink-200 px-2 py-1 rounded break-all">
                           {DOMAIN}/r/{link.id}
                         </code>
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
                           onClick={() => handleCopyLink(link.id)}
-                          className="h-7 w-7 p-0"
+                          className="h-7 w-7 shrink-0 text-gray-300 hover:text-white hover:bg-pink-500/15"
+                          title="Copy link"
                         >
                           <Copy className="w-3 h-3" />
                         </Button>
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
                           onClick={() => handleTestLink(link.id)}
-                          className="h-7 w-7 p-0"
+                          className="h-7 w-7 shrink-0 text-gray-300 hover:text-white hover:bg-pink-500/15"
+                          title="Open link"
                         >
                           <ExternalLink className="w-3 h-3" />
                         </Button>
@@ -316,24 +326,24 @@ const RedirectLinkCreator = () => {
 
                       <div className="grid grid-cols-1 gap-2 text-xs">
                         {link.ios_url && (
-                          <div className="flex items-start gap-2">
-                            <span className="font-semibold text-gray-600 min-w-[70px]">iOS:</span>
-                            <span className="text-gray-800 break-all">{link.ios_url}</span>
+                          <div className="flex items-start gap-2 min-w-0">
+                            <span className="font-semibold text-gray-400 shrink-0 min-w-[60px]">iOS:</span>
+                            <span className="text-gray-300 break-all min-w-0">{link.ios_url}</span>
                           </div>
                         )}
                         {link.android_url && (
-                          <div className="flex items-start gap-2">
-                            <span className="font-semibold text-gray-600 min-w-[70px]">Android:</span>
-                            <span className="text-gray-800 break-all">{link.android_url}</span>
+                          <div className="flex items-start gap-2 min-w-0">
+                            <span className="font-semibold text-gray-400 shrink-0 min-w-[60px]">Android:</span>
+                            <span className="text-gray-300 break-all min-w-0">{link.android_url}</span>
                           </div>
                         )}
-                        <div className="flex items-start gap-2">
-                          <span className="font-semibold text-gray-600 min-w-[70px]">Web:</span>
-                          <span className="text-gray-800 break-all">{link.web_url}</span>
+                        <div className="flex items-start gap-2 min-w-0">
+                          <span className="font-semibold text-gray-400 shrink-0 min-w-[60px]">Web:</span>
+                          <span className="text-gray-300 break-all min-w-0">{link.web_url}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4 text-xs text-gray-500 pt-1">
+                      <div className="flex items-center gap-4 text-xs text-gray-500 pt-1 flex-wrap">
                         <span>Clicks: {link.clicks}</span>
                         <span>Created: {new Date(link.created_at).toLocaleDateString()}</span>
                         {link.last_clicked_at && (
@@ -343,10 +353,11 @@ const RedirectLinkCreator = () => {
                     </div>
 
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="ghost"
                       onClick={() => handleDeleteLink(link.id)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      className="h-8 w-8 shrink-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      title="Delete link"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
