@@ -18,6 +18,7 @@ import ProfilePage from '@/components/ProfilePage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
+import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type UserImageRow = Database['public']['Tables']['user_images']['Row'];
@@ -139,22 +140,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // that should still be exempt (Profile, the mini-games) locally call
   // .disable() while they're showing and restore this baseline on their own
   // unmount - see useAllowScreenshots.ts. No-op on web (no such API there).
+  //
+  // Index.tsx already fires this the instant isAuthenticated flips true -
+  // faster, since it doesn't wait on MainApp's own lazy-chunk load. This is
+  // now just a defensive backup (calling enable()/disable() again is a
+  // harmless no-op if already in that state).
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { Capacitor } = await import('@capacitor/core');
-      if (!Capacitor.isNativePlatform() || cancelled) return;
-      const { PrivacyScreen } = await import('@capacitor-community/privacy-screen');
-      if (!cancelled) await PrivacyScreen.enable();
-    })();
+    void enablePrivacyScreen();
     return () => {
-      cancelled = true;
-      void (async () => {
-        const { Capacitor } = await import('@capacitor/core');
-        if (!Capacitor.isNativePlatform()) return;
-        const { PrivacyScreen } = await import('@capacitor-community/privacy-screen');
-        await PrivacyScreen.disable();
-      })();
+      void disablePrivacyScreen();
     };
   }, []);
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { CameraOff } from 'lucide-react';
+import { getPrivacyScreenPlugin } from '@/utils/privacyScreenBridge';
 
 // Reacts to the native PrivacyScreen plugin's screenshot/recording
 // detection (already emitted on iOS via UIApplication.userDidTakeScreenshot
@@ -14,12 +15,23 @@ import { CameraOff } from 'lucide-react';
 // recording from happening or to blank out the image already saved to
 // Photos - this overlay is shown immediately after the fact, matching what
 // the user sees, but the captured image itself is not altered.
-const ScreenCaptureBlockedOverlay = () => {
+//
+// `isAuthenticated` gates whether the listeners are even active: the native
+// screenshotTaken/screenRecordingStarted events fire unconditionally
+// (native code has no concept of login state), but the actual capture block
+// (PrivacyScreen.enable(), see privacyScreenBridge.ts) is only ever turned
+// on post-login - so without this gate, screenshotting the landing/login
+// page popped a "blocked" message for a screenshot that was never actually
+// blocked there.
+const ScreenCaptureBlockedOverlay = ({ isAuthenticated = false }: { isAuthenticated?: boolean }) => {
   const [mode, setMode] = useState<'none' | 'screenshot' | 'recording'>('none');
   const dismissTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!Capacitor.isNativePlatform() || !isAuthenticated) {
+      setMode('none');
+      return;
+    }
 
     let screenshotHandle: { remove: () => void } | undefined;
     let recordingStartHandle: { remove: () => void } | undefined;
@@ -27,8 +39,8 @@ const ScreenCaptureBlockedOverlay = () => {
     let cancelled = false;
 
     (async () => {
-      const { PrivacyScreen } = await import('@capacitor-community/privacy-screen');
-      if (cancelled) return;
+      const PrivacyScreen = await getPrivacyScreenPlugin();
+      if (cancelled || !PrivacyScreen) return;
 
       screenshotHandle = await PrivacyScreen.addListener('screenshotTaken', () => {
         setMode('screenshot');
@@ -53,7 +65,7 @@ const ScreenCaptureBlockedOverlay = () => {
       recordingStartHandle?.remove();
       recordingStopHandle?.remove();
     };
-  }, []);
+  }, [isAuthenticated]);
 
   if (mode === 'none') return null;
 

@@ -12,6 +12,7 @@ import { transformFormDataForSubmission } from '@/utils/formValidation';
 import VideoBackground from '@/components/VideoBackground';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 import { preloadExchangeRates } from '@/services/exchangeRateService';
+import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -157,6 +158,21 @@ const Index = ({
       setLoading(false);
     }
   }, [isAuthenticated, setViewIfChanged, toast, user?.app_metadata?.provider]);
+
+  // Screenshot/recording protection tracks auth state directly, fired here
+  // rather than waiting on MainApp (lazy-loaded, only mounts once routing +
+  // a profile DB round-trip below have both finished) to mount and run its
+  // own enable() effect. Real content was rendering and screenshot-able for
+  // a real, user-visible stretch in that gap - this closes it as tight as
+  // the JS side can. MainApp keeps its own enable/disable-on-mount/unmount
+  // effect too, as a harmless (idempotent) defensive backup.
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      void enablePrivacyScreen();
+    } else {
+      void disablePrivacyScreen();
+    }
+  }, [isAuthenticated, user]);
 
   // React to global auth state (single source of truth lives in AppWrapper)
   useEffect(() => {

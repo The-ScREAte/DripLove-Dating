@@ -73,7 +73,7 @@ const App = ({
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <ScreenCaptureBlockedOverlay />
+          <ScreenCaptureBlockedOverlay isAuthenticated={isAuthenticated} />
 
           {/* Mobile-optimized container */}
           <div className="w-full h-full"

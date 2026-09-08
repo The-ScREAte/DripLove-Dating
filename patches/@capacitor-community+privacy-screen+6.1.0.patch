@@ -12,10 +12,10 @@ index 273ca02..5c143a0 100644
      }
      lintOptions {
 diff --git a/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift b/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
-index 5be6f4b..8d0e936 100644
+index 5be6f4b..d0c0597 100644
 --- a/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
 +++ b/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
-@@ -14,32 +14,55 @@ import UIKit
+@@ -14,78 +14,117 @@ import UIKit
          self.plugin = plugin
          self.config = config
          self.privacyViewController = PrivacyScreen.createPrivacyViewController(config: config)
@@ -85,11 +85,57 @@ index 5be6f4b..8d0e936 100644
          }
      }
  
-@@ -59,34 +82,18 @@ import UIKit
++    // DripLove: skip the run-loop hop when we're already on the main thread
++    // (Capacitor plugin calls land here on main thread in practice) - every
++    // deferred DispatchQueue.main.async is one more tick of latency between
++    // the JS enable() call and the mask actually being live, which is
++    // exactly the gap that let real content through on a fast screenshot
++    // right after login.
+     @objc public func enable(completion: (() -> Void)?) {
+         self.isEnabled = true
+-        DispatchQueue.main.async {
++        let apply = {
+             self.plugin.bridge?.webView?.disableScreenshots(imageName: self.config.imageName, screenPrevent: self.screenPrevent)
+             completion?()
          }
++        if Thread.isMainThread {
++            apply()
++        } else {
++            DispatchQueue.main.async(execute: apply)
++        }
      }
  
--    @objc public func handleWillResignActiveNotification() {
+     @objc public func disable(completion: (() -> Void)?) {
+         self.isEnabled = false
+-        DispatchQueue.main.async {
++        let apply = {
+             self.plugin.bridge?.webView?.enableScreenshots(screenPrevent: self.screenPrevent)
+             completion?()
+         }
++        if Thread.isMainThread {
++            apply()
++        } else {
++            DispatchQueue.main.async(execute: apply)
++        }
+     }
+ 
++    // DripLove: re-enabled (product decision reversed after real-device
++    // testing showed real content visible/capturable in the iOS App
++    // Switcher while backgrounded, logged in). Gated on `self.isEnabled` -
++    // the same flag `enable()`/`disable()` already maintain from the JS
++    // post-login lifecycle - so this is automatically post-login-only with
++    // no separate auth check needed here.
++    //
++    // Unlike the original upstream version (which presented a UIViewController
++    // via DispatchQueue.main.async), this adds the cover view directly and
++    // synchronously. UIApplication.willResignActiveNotification always fires
++    // on the main thread already, and the App Switcher snapshot is taken as
++    // part of this same transition - deferring to the next run-loop turn, or
++    // going through UIViewController's own presentation/transition machinery,
++    // both risked losing the race against that snapshot. A direct addSubview
++    // is the fastest thing UIKit offers: it's guaranteed to be part of the
++    // very same layout/render pass this method returns into.
+     @objc public func handleWillResignActiveNotification() {
 -        guard self.isEnabled else {
 -            return
 -        }
@@ -110,25 +156,19 @@ index 5be6f4b..8d0e936 100644
 -                }
 -            }
 -        }
--    }
--
--    @objc public func handleDidBecomeActiveNotification() {
++        guard self.isEnabled, let mainWindow = window, let coverView = privacyViewController.view else { return }
++        guard coverView.superview == nil else { return }
++        coverView.frame = mainWindow.bounds
++        coverView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
++        mainWindow.addSubview(coverView)
++        mainWindow.bringSubviewToFront(coverView)
+     }
+ 
+     @objc public func handleDidBecomeActiveNotification() {
 -        DispatchQueue.main.async {
 -            self.privacyViewController.dismiss(animated: false, completion: nil)
 -        }
--    }
-+    // DripLove: the app-switcher/background "privacy cover" (a plain gray
-+    // full-screen view presented over the app whenever it resigns active,
-+    // e.g. opening the App Switcher) is intentionally disabled - product
-+    // decision was to keep normal content visible at all times and instead
-+    // rely solely on real screenshot/recording detection (screenshotTaken /
-+    // screenRecordingStarted, already emitted below) plus an in-app "blocked"
-+    // overlay on the JS side. Left as no-ops rather than deleted so the
-+    // plugin's public surface (and this file's diff against upstream) stays
-+    // minimal.
-+    @objc public func handleWillResignActiveNotification() {}
-+
-+    @objc public func handleDidBecomeActiveNotification() {}
++        privacyViewController.view?.removeFromSuperview()
+     }
  
      @objc public func handleDidChangeStatusBarOrientationNotification() {
-         self.plugin.bridge?.webView?.frame = CGRect(x: 0.0, y: 0.0, width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)

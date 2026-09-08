@@ -127,14 +127,32 @@ const config: CapacitorConfig = {
     // technique hooks into, so testing here can only confirm the app still
     // renders normally, not that a screenshot actually comes out blank.
     //
-    // Also patched out: the plugin's own background/app-switcher "privacy
-    // cover" (a gray full-screen view shown whenever the app resigns
-    // active, e.g. opening the App Switcher) - product decision was to keep
-    // real content visible there, relying on the capture-time block above
-    // instead. screenshotTaken/screenRecordingStarted (still emitted by the
-    // plugin) additionally drive an in-app "Screen capture blocked" message
-    // - see src/components/ScreenCaptureBlockedOverlay.tsx - the same
-    // pattern apps like WhatsApp use on top of their own capture block.
+    // The plugin's own background/app-switcher "privacy cover" (a full-screen
+    // view shown whenever the app resigns active, e.g. opening the App
+    // Switcher) is back on (re-enabled in the patch) after real-device
+    // testing showed real content visible/capturable there - the earlier
+    // "keep content visible, rely on capture-time block alone" decision is
+    // reversed. It's presented via a direct, synchronous UIView insertion
+    // (not the original's UIViewController presentation behind a
+    // DispatchQueue.main.async) specifically so it lands in the same
+    // run-loop pass the App Switcher snapshot is taken in - see
+    // handleWillResignActiveNotification in PrivacyScreen.swift. It's
+    // automatically post-login-only via the same `isEnabled` flag enable()/
+    // disable() already maintain, no separate auth check needed.
+    //
+    // screenshotTaken/screenRecordingStarted additionally drive an in-app
+    // "Screen capture blocked" message - see
+    // src/components/ScreenCaptureBlockedOverlay.tsx (gated on
+    // isAuthenticated so it can't fire on the landing/login page, where
+    // protection was never actually on) - the same pattern apps like
+    // WhatsApp use on top of their own capture block.
+    //
+    // enable()/disable() are called from src/pages/Index.tsx the instant
+    // isAuthenticated changes (src/utils/privacyScreenBridge.ts), not from
+    // MainApp.tsx's mount - MainApp is lazy-loaded, so waiting on it added a
+    // real, user-visible gap where content was on screen and screenshot-able
+    // before protection engaged. MainApp keeps its own enable/disable-on-
+    // mount/unmount as a harmless (idempotent) defensive backup.
     //
     // Web has no equivalent of either mechanism - no browser API can block
     // or reliably detect a screenshot/recording at all, native-only.
