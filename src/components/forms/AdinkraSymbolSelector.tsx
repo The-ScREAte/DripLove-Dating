@@ -192,7 +192,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                     return (
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
-                          className={`cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14 ${
+                          className={`bg-white text-black cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14 ${
                             isSelected ? 'border-primary border-2 bg-primary/10 shadow-md' : canSelect ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105' : 'border-border opacity-50 cursor-not-allowed'
                           }`}
                           onClick={() => canSelect && toggleSymbol(symbol.name)}
@@ -288,7 +288,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
                           className={`
-                            cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
+                            bg-white text-black cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
                             ${isSelected
                               ? 'border-primary border-2 bg-primary/10 shadow-md'
                               : canSelect
@@ -364,7 +364,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                 const selectedInGroup = selectedCounts[group.id] || 0;
                 
                 return (
-                  <Card key={group.id} className="overflow-visible">
+                  <Card key={group.id} className="overflow-visible bg-white text-black">
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.id)}
@@ -434,7 +434,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                               <div key={symbol.name} className="relative info-tooltip-container">
                                 <Card
                                   className={`
-                                    cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
+                                    bg-white text-black cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
                                     ${isSelected
                                       ? 'border-primary border-2 bg-primary/10 shadow-md'
                                       : canSelect

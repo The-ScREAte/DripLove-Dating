@@ -1497,7 +1497,7 @@ const ProfileCompletionPage = () => {
                         variant="outline"
                         onClick={handleCancel}
                         disabled={isSubmitting}
-                        className="w-full h-8 text-xs px-2 border-gray-300 text-black hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
+                        className="w-full h-8 text-xs px-2 bg-white border-gray-300 text-black hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
                       >
                         {t('profileCompletion.cancel')}
                       </Button>

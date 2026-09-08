@@ -1199,7 +1199,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 type="button" 
                 variant="outline"
                 onClick={() => setCurrentStep(currentStep - 1)}
-                className="h-9 px-4 sm:w-auto border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
+                className="h-9 px-4 sm:w-auto bg-white border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
               >
                 {t('registration.back')}
               </Button>
