@@ -67,12 +67,12 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
 
   return (
         <div className="space-y-4">
-          <Label className="text-gray-200">{t('profile.adinkraDescription')}</Label>
+          <Label className="text-white">{t('profile.adinkraDescription')}</Label>
 
           {/* Selected Symbols */}
           {selectedSymbols.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-gray-400">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
+              <p className="text-sm text-white/60">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                 {selectedSymbols.map((symbolName: string, index: number) => {
                   const symbol = ALL_SYMBOLS.find(s => s.name === symbolName);
@@ -150,7 +150,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           {/* Available Symbols */}
           {isEditing && (
             <div className="space-y-4">
-              <p className="text-sm font-medium text-gray-400">{t('profile.availableSymbols')}</p>
+              <p className="text-sm font-medium text-white/60">{t('profile.availableSymbols')}</p>
               
               {/* Browse Countries Section */}
               <div className="space-y-2">
@@ -162,7 +162,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🌍</span>
                     <span className="font-semibold text-white">Browse Other Signs</span>
-                    <span className="text-xs text-gray-400">({AFRICAN_SYMBOL_GROUPS.length} groups)</span>
+                    <span className="text-xs text-white/60">({AFRICAN_SYMBOL_GROUPS.length} groups)</span>
                   </div>
                   {showOtherCountries ? (
                     <ChevronUp className="w-5 h-5" />
@@ -179,7 +179,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                           <span className="text-xl">{group.flag}</span>
                           <div className="flex-1">
                             <p className="font-medium text-sm text-white">{group.country}</p>
-                            <p className="text-xs text-gray-400">{group.ethnicGroup} • {group.use}</p>
+                            <p className="text-xs text-white/60">{group.ethnicGroup} • {group.use}</p>
                           </div>
                           <button
                             type="button"
@@ -255,7 +255,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           )}
 
           {!isEditing && selectedSymbols.length === 0 && (
-            <p className="text-sm text-gray-400">{t('profile.noAdinkraSelected')}</p>
+            <p className="text-sm text-white/60">{t('profile.noAdinkraSelected')}</p>
           )}
         </div>
   );

@@ -24,7 +24,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="relationship_intent" className="text-gray-200">{t('profile.relationshipIntent')}</Label>
+              <Label htmlFor="relationship_intent" className="text-white">{t('profile.relationshipIntent')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('relationship_intent', value)} value={editedProfile.relationship_intent}>
                 <SelectTrigger id="relationship_intent" className={selectTriggerClass}>
                   <SelectValue placeholder={t('common.select')} />
@@ -37,7 +37,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
               </Select>
             </div>
             <div>
-              <Label htmlFor="smoking" className="text-gray-200">{t('profile.smoking')}</Label>
+              <Label htmlFor="smoking" className="text-white">{t('profile.smoking')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('smoking', value)} value={editedProfile.smoking}>
                 <SelectTrigger id="smoking" className={selectTriggerClass}>
                   <SelectValue placeholder={t('common.select')} />
@@ -52,7 +52,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="drinking" className="text-gray-200">{t('profile.drinking')}</Label>
+              <Label htmlFor="drinking" className="text-white">{t('profile.drinking')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('drinking', value)} value={editedProfile.drinking}>
                 <SelectTrigger id="drinking" className={selectTriggerClass}>
                   <SelectValue placeholder={t('common.select')} />
@@ -65,7 +65,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
               </Select>
             </div>
             <div>
-              <Label htmlFor="exercise_level" className="text-gray-200">{t('profile.exercise')}</Label>
+              <Label htmlFor="exercise_level" className="text-white">{t('profile.exercise')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('exercise_level', value)} value={editedProfile.exercise_level}>
                 <SelectTrigger id="exercise_level" className={selectTriggerClass}>
                   <SelectValue placeholder={t('common.select')} />
@@ -79,7 +79,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
             </div>
           </div>
           <div>
-            <Label htmlFor="sleeping_schedule" className="text-gray-200">{t('profile.sleepingSchedule')}</Label>
+            <Label htmlFor="sleeping_schedule" className="text-white">{t('profile.sleepingSchedule')}</Label>
             <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('sleeping_schedule', value)} value={editedProfile.sleeping_schedule}>
               <SelectTrigger id="sleeping_schedule" className={selectTriggerClass}>
                 <SelectValue placeholder={t('common.select')} />
@@ -92,7 +92,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
             </Select>
           </div>
           <div>
-            <Label className="text-gray-200 mb-1.5 block">{t('profile.familyPlans', 'Family plans')}</Label>
+            <Label className="text-white mb-1.5 block">{t('profile.familyPlans', 'Family plans')}</Label>
             <ChipSelect
               options={FAMILY_PLANS_OPTIONS}
               selected={editedProfile.family_plans ? [editedProfile.family_plans] : []}

@@ -17,7 +17,7 @@ const FavoritesSection = ({ editedProfile, profile, isEditing, onFavoritesChange
 
   return (
         <div className="space-y-1.5">
-          <Label htmlFor="favorites" className="text-xs text-gray-200">{t('profile.chooseFavorites')}</Label>
+          <Label htmlFor="favorites" className="text-xs text-white">{t('profile.chooseFavorites')}</Label>
           <FavoritesEditor
             favorites={parseFavorites(isEditing ? editedProfile.favorites : profile?.favorites)}
             onFavoritesChange={onFavoritesChange}

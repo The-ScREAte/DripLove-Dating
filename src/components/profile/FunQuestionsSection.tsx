@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FUN_QUESTIONS, QuestionType } from '@/constants/funQuestions';
 import { Shuffle } from 'lucide-react';
@@ -45,21 +44,20 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
   ) => (
     <div key={questionType}>
       <div className="flex items-center justify-between mb-2">
-        <Label htmlFor={questionType} className="text-gray-200">{label}</Label>
+        <Label htmlFor={questionType} className="text-white">{label}</Label>
         {isEditing && (
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
             onClick={() => toggleSuggestions(questionType)}
-            className="text-xs h-7 px-2 border-pink-500/30 text-gray-200 hover:bg-pink-500/10 hover:text-white"
+            style={{ height: 22, minHeight: 22, padding: '0 8px' }}
+            className="flex items-center gap-1 rounded-full bg-neutral-900 border border-pink-500/40 text-white text-[11px] leading-none whitespace-nowrap shrink-0 transition-colors hover:bg-neutral-800"
           >
-            <Shuffle className="w-3 h-3 mr-1" />
+            <Shuffle className="w-3 h-3" />
             {t('profile.suggestions')}
-          </Button>
+          </button>
         )}
       </div>
-      
+
       <Input
         type="text"
         id={questionType}
@@ -67,13 +65,13 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
         value={editedProfile[questionType] || ''}
         onChange={onInputChange}
         disabled={!isEditing}
-        className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400"
+        className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/40"
         placeholder={placeholder}
       />
 
       {isEditing && showSuggestions[questionType] && (
         <div className="mt-2 border border-pink-500/20 rounded-lg bg-black max-h-40 overflow-y-auto">
-          <div className="p-2 text-xs font-medium text-gray-300 border-b border-pink-500/20 bg-neutral-900">
+          <div className="p-2 text-xs font-medium text-white/70 border-b border-pink-500/20 bg-neutral-900">
             {t('profile.selectSuggestion')}
           </div>
           {FUN_QUESTIONS[questionType].map((suggestion, index) => (
@@ -81,7 +79,7 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
               key={index}
               type="button"
               onClick={() => handleSelectSuggestion(questionType, suggestion)}
-              className="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-pink-500/10 border-b border-pink-500/10 last:border-b-0 focus:outline-none focus:bg-pink-500/15"
+              className="w-full text-left px-3 py-2 text-sm text-white hover:bg-pink-500/10 border-b border-pink-500/10 last:border-b-0 focus:outline-none focus:bg-pink-500/15"
             >
               {suggestion}
             </button>
@@ -93,7 +91,7 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
 
   return (
         <div className="space-y-4">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-white/60">
             {t('profile.funQuestionsDescription')}
           </p>
           {renderQuestionField(

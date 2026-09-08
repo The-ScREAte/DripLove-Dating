@@ -147,7 +147,7 @@ const FaceVerificationSection = ({
         </div>
       )}
 
-      <div className="text-xs text-gray-500 flex items-start gap-2">
+      <div className="text-xs text-white/40 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <span>
           Face verification uses secure technology to confirm your identity. 

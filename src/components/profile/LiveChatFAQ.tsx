@@ -179,7 +179,7 @@ const LiveChatFAQ: React.FC = () => {
             </div>
             <div>
               <h4 className="font-semibold text-white">Need Help?</h4>
-              <p className="text-sm text-gray-400">Get instant answers</p>
+              <p className="text-sm text-white/60">Get instant answers</p>
             </div>
           </div>
           <Button 
@@ -231,7 +231,7 @@ const LiveChatFAQ: React.FC = () => {
 
                   {/* Quick Actions */}
                   <div className="pt-4 space-y-2">
-                    <p className="text-sm text-gray-400 text-center">Was this helpful?</p>
+                    <p className="text-sm text-white/60 text-center">Was this helpful?</p>
                     <div className="flex justify-center gap-2">
                       <Button
                         variant="outline"
@@ -247,7 +247,7 @@ const LiveChatFAQ: React.FC = () => {
               ) : selectedCategory === 'all' ? (
                 // Category Selection
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-400 mb-4">What can I help you with today?</p>
+                  <p className="text-sm text-white/60 mb-4">What can I help you with today?</p>
                   {categories.filter(c => c.id !== 'all').map((category) => (
                     <button
                       key={category.id}
@@ -260,7 +260,7 @@ const LiveChatFAQ: React.FC = () => {
                         </div>
                         <span className="font-medium text-white">{category.label}</span>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-500" />
+                      <ChevronRight className="w-5 h-5 text-white/40" />
                     </button>
                   ))}
                 </div>
@@ -277,9 +277,9 @@ const LiveChatFAQ: React.FC = () => {
                         <div className="w-8 h-8 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-full flex items-center justify-center text-pink-400 flex-shrink-0">
                           {faq.icon}
                         </div>
-                        <span className="text-gray-100 text-sm">{faq.question}</span>
+                        <span className="text-white text-sm">{faq.question}</span>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                      <ChevronRight className="w-5 h-5 text-white/40 flex-shrink-0" />
                     </button>
                   ))}
                 </div>
@@ -288,7 +288,7 @@ const LiveChatFAQ: React.FC = () => {
 
             {/* Footer */}
             <div className="border-t border-pink-500/20 p-4">
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-white/60 text-center">
                 Still need help? Email us at{' '}
                 <a href="mailto:driploveinfo@gmail.com" className="text-pink-600 font-medium">
                   driploveinfo@gmail.com

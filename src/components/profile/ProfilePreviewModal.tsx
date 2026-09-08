@@ -284,7 +284,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 variant="outline"
                 onClick={(e) => { e.stopPropagation(); setShowDiscardWarning(true); }}
                 disabled={savingCrop}
-                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
               >
                 Cancel
               </Button>
@@ -307,13 +307,13 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           >
             <div className="w-full max-w-xs rounded-xl border border-pink-500/30 bg-black p-4 text-center">
               <p className="text-sm text-white mb-1 font-semibold">Discard your crop?</p>
-              <p className="text-xs text-gray-300 mb-4">Your cropped photo hasn't been saved yet.</p>
+              <p className="text-xs text-white/80 mb-4">Your cropped photo hasn't been saved yet.</p>
               <div className="flex items-center justify-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setShowDiscardWarning(false)}
-                  className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+                  className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
                 >
                   Keep editing
                 </Button>
@@ -347,7 +347,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 {profile.first_name} {profile.last_name}, {calculateAge(profile.date_of_birth)}
               </h2>
               {!showMoreInfo && profile.city && (
-                <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-gray-300">
+                <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-white/80">
                   <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
                   <span>{profile.city}, {profile.country}</span>
                 </div>
@@ -416,7 +416,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           }}
         >
           {profile.relationship_intent && (
-            <div className="flex items-center text-xs text-gray-300">
+            <div className="flex items-center text-xs text-white/80">
               <Heart className="w-3 h-3 mr-1" />
               <span>{formatRelationshipIntent(profile.relationship_intent)}</span>
             </div>
@@ -424,7 +424,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           {profile.bio && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
               <h4 className="font-semibold text-pink-400 mb-1">{t('discover.matchCard.about')}</h4>
-              <p className="text-gray-200 text-sm leading-relaxed">{profile.bio}</p>
+              <p className="text-white text-sm leading-relaxed">{profile.bio}</p>
             </div>
           )}
 
@@ -436,28 +436,28 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                   <div className="flex items-center text-sm">
                     <span className="mr-2 flex-shrink-0" aria-hidden="true">🚬</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.smoking')}:</span>
-                    <span className="text-gray-200">{profile.smoking}</span>
+                    <span className="text-white">{profile.smoking}</span>
                   </div>
                 )}
                 {profile.drinking && profile.drinking !== 'not_specified' && (
                   <div className="flex items-center text-sm">
                     <span className="mr-2 flex-shrink-0" aria-hidden="true">🍸</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.drinking')}:</span>
-                    <span className="text-gray-200">{profile.drinking}</span>
+                    <span className="text-white">{profile.drinking}</span>
                   </div>
                 )}
                 {profile.exercise_level && profile.exercise_level !== 'not_specified' && (
                   <div className="flex items-center text-sm">
                     <span className="mr-2 flex-shrink-0" aria-hidden="true">🏋️</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.exercise')}:</span>
-                    <span className="text-gray-200">{profile.exercise_level}</span>
+                    <span className="text-white">{profile.exercise_level}</span>
                   </div>
                 )}
                 {profile.sleeping_schedule && profile.sleeping_schedule !== 'not_specified' && (
                   <div className="flex items-center text-sm">
                     <span className="mr-2 flex-shrink-0" aria-hidden="true">😴</span>
                     <span className="font-semibold mr-2 text-white">{t('discover.matchCard.sleep')}:</span>
-                    <span className="text-gray-200">{profile.sleeping_schedule}</span>
+                    <span className="text-white">{profile.sleeping_schedule}</span>
                   </div>
                 )}
               </div>
@@ -471,13 +471,13 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 {profile.occupation && (
                   <div className="flex items-center text-sm">
                     <Briefcase className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-gray-200">{profile.occupation}</span>
+                    <span className="text-white">{profile.occupation}</span>
                   </div>
                 )}
                 {profile.education_level && (
                   <div className="flex items-center text-sm">
                     <GraduationCap className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-gray-200">{profile.education_level}</span>
+                    <span className="text-white">{profile.education_level}</span>
                   </div>
                 )}
               </div>
@@ -519,7 +519,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.language')}</h4>
               <div className="flex items-center text-sm">
                 <Languages className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
-                <span className="text-gray-200">{preferredLanguageName}</span>
+                <span className="text-white">{preferredLanguageName}</span>
               </div>
             </div>
           )}

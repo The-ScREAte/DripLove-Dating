@@ -124,7 +124,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   
   // Computed section states
   const showBasicInfoSection = openSection === 'basicInfo';
-  const showPhotoSection = openSection === 'photos';
   const showLocationSection = openSection === 'location';
   const showLifestyleSection = openSection === 'lifestyle';
   const showWorkEducationSection = openSection === 'workEducation';
@@ -884,7 +883,8 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           .from('user_images')
           .select('image_url, is_approved, moderation_status')
           .eq('user_id', currentUser.id)
-          .neq('image_order', -1);
+          .neq('image_order', -1)
+          .order('image_order', { ascending: true });
 
         if (error) {
           // Only log non-table existence errors
@@ -979,7 +979,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       <div className="h-full w-full bg-black flex items-center justify-center" style={{ minHeight: '100%' }}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">{t('common.loading')}</p>
+          <p className="text-white/60">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -1014,34 +1014,56 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             {/* Avatar + name + preview link */}
             <div className="flex items-center gap-2.5 min-w-0">
               {previewImages[0] ? (
-                <img
-                  loading="lazy"
-                  decoding="async"
-                  src={optimizeImageUrl(previewImages[0], { width: 120, quality: 70 })}
-                  alt={profile?.first_name || 'Profile photo'}
-                  className="w-14 h-14 rounded-full object-cover shrink-0 border border-pink-500/30"
-                />
+                <div
+                  style={{ width: 56, height: 56, minWidth: 56, minHeight: 56, position: 'relative', borderRadius: '9999px', overflow: 'hidden' }}
+                  className="shrink-0 border-2 border-pink-500/60"
+                >
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src={optimizeImageUrl(previewImages[0], { width: 120, quality: 70 })}
+                    alt={profile?.first_name || 'Profile photo'}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center',
+                    }}
+                  />
+                </div>
               ) : (
                 <div className="w-14 h-14 rounded-full bg-neutral-800 border border-pink-500/30 shrink-0" />
               )}
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 leading-none">
-                  <h2 className="text-lg font-bold text-white truncate">{profile?.first_name || ''}</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }} className="min-w-0">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
+                  <h2 style={{ margin: 0, lineHeight: 1 }} className="text-lg font-bold text-white truncate">{profile?.first_name || ''}</h2>
                   {showVerifiedBadge && (
                     <img loading="lazy" decoding="async" src="/images/verified.svg" alt="Verified" className="w-4 h-4 shrink-0" />
                   )}
                 </div>
                 {isOwnProfile && (
-                  <button
-                    type="button"
-                    onClick={() => setShowProfilePreview(true)}
-                    disabled={!previewMatch}
-                    style={{ height: 14, lineHeight: '14px', margin: 0, padding: 0 }}
-                    className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-300 disabled:opacity-50"
+                  <div
+                    role="button"
+                    tabIndex={previewMatch ? 0 : -1}
+                    aria-disabled={!previewMatch}
+                    onClick={() => { if (previewMatch) setShowProfilePreview(true); }}
+                    onKeyDown={(e) => {
+                      if (previewMatch && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        setShowProfilePreview(true);
+                      }
+                    }}
+                    style={{ height: 22, minHeight: 22, padding: '0 8px' }}
+                    className={`flex items-center gap-1 rounded-full bg-neutral-900 border border-pink-500/50 text-white text-[11px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer ${
+                      previewMatch ? '' : 'opacity-50 pointer-events-none cursor-default'
+                    }`}
                     aria-label="Preview my profile"
                   >
                     Preview <ChevronRight className="w-3 h-3" />
-                  </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1205,7 +1227,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                     <div className="flex items-center justify-center py-12">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-pink-500 mx-auto mb-3"></div>
-                        <p className="text-sm text-gray-400">{t('profile.loadingUpdates', 'Loading updates...')}</p>
+                        <p className="text-sm text-white/60">{t('profile.loadingUpdates', 'Loading updates...')}</p>
                       </div>
                     </div>
                   ) : broadcastMessages.length === 0 ? (
@@ -1214,7 +1236,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                         <span className="text-4xl">😊</span>
                       </div>
                       <p className="text-xl font-semibold text-white mb-2">{t('profile.allCaughtUp', 'All caught up')}</p>
-                      <p className="text-sm text-gray-400">{t('profile.noNewUpdates', 'No new updates right now.')}</p>
+                      <p className="text-sm text-white/60">{t('profile.noNewUpdates', 'No new updates right now.')}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -1238,7 +1260,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                             >
                               <div className="flex-1 min-w-0 pr-3">
                                 <div className="flex items-center gap-2 mb-1.5">
-                                  <h3 className={`text-base truncate ${isUnread ? 'font-bold text-white' : 'font-semibold text-gray-300'}`}>
+                                  <h3 className={`text-base truncate ${isUnread ? 'font-bold text-white' : 'font-semibold text-white/80'}`}>
                                     {msg.title}
                                   </h3>
                                   {isUnread && (
@@ -1247,7 +1269,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                                     </span>
                                   )}
                                 </div>
-                                <p className={`text-xs ${isUnread ? 'font-semibold text-pink-300' : 'text-gray-400'}`}>
+                                <p className={`text-xs ${isUnread ? 'font-semibold text-pink-300' : 'text-white/60'}`}>
                                   {new Date(msg.sent_at || msg.created_at).toLocaleDateString('en-US', {
                                     year: 'numeric',
                                     month: 'short',
@@ -1259,7 +1281,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                               </div>
                               <ChevronDown
                                 className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
-                                  isUnread ? 'text-pink-400' : 'text-gray-500'
+                                  isUnread ? 'text-pink-400' : 'text-white/40'
                                 } ${isExpanded ? 'transform rotate-180' : ''}`}
                               />
                             </div>
@@ -1267,7 +1289,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                             {/* Expanded Message Body */}
                             {isExpanded && (
                               <div className="px-4 pb-4 border-t border-pink-500/20">
-                                <div className="mt-4 text-sm text-gray-200 whitespace-pre-wrap leading-relaxed bg-black/60 rounded-lg p-4 border border-pink-500/20">
+                                <div className="mt-4 text-sm text-white whitespace-pre-wrap leading-relaxed bg-black/60 rounded-lg p-4 border border-pink-500/20">
                                   {msg.message}
                                 </div>
                                 <div className="mt-4 flex justify-end">
@@ -1299,6 +1321,26 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <ProfileBasicsChips editedProfile={editedProfile} onOpenSection={toggleSection} />
 
           <CollapsibleSection
+            title={t('profile.photos')}
+            isOpen
+            onToggle={() => {}}
+            className="mt-3 border-pink-500/30"
+            showEditButton
+            isEditing={isEditing}
+            isSaving={isSaving}
+            onEdit={() => setIsEditing(true)}
+            onSave={handleSave}
+            onCancel={handleCancel}
+          >
+            <ImageManagement
+              currentUser={currentUser}
+              profile={profile}
+              onProfileUpdate={onProfileUpdate}
+              isEditing={isEditing}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
             title={t('profile.basicInfo')}
             isOpen={showBasicInfoSection}
             onToggle={() => toggleSection('basicInfo')}
@@ -1310,22 +1352,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             onSave={handleSave}
             onCancel={handleCancel}
           >
-            <BasicInfoSection 
-              editedProfile={editedProfile} 
-              isEditing={isEditing} 
-              onInputChange={handleInputChange} 
-            />
-          </CollapsibleSection>
-          <CollapsibleSection
-            title={t('profile.photos')}
-            isOpen={showPhotoSection}
-            onToggle={() => toggleSection('photos')}
-            className="mt-3"
-          >
-            <ImageManagement 
-              currentUser={currentUser} 
-              profile={profile}
-              onProfileUpdate={onProfileUpdate}
+            <BasicInfoSection
+              editedProfile={editedProfile}
+              isEditing={isEditing}
+              onInputChange={handleInputChange}
             />
           </CollapsibleSection>
           <CollapsibleSection
@@ -1577,7 +1607,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           <div className="flex justify-center w-full">
             <Button
               onClick={onLogout}
-              className="w-full max-w-xs bg-gray-900 hover:bg-gray-800 text-white font-medium"
+              className="w-full max-w-xs bg-neutral-900 hover:bg-neutral-800 text-white font-medium"
             >
               Log Out
             </Button>

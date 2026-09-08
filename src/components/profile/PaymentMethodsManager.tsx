@@ -116,9 +116,9 @@ const PaymentMethodsManager: React.FC = () => {
   return (
     <div className="space-y-3">
       {loading ? (
-        <p className="text-center text-gray-400 text-sm py-4">Loading your cards...</p>
+        <p className="text-center text-white/60 text-sm py-4">Loading your cards...</p>
       ) : cards.length === 0 ? (
-        <p className="text-center text-gray-400 text-sm py-4">No cards on file yet.</p>
+        <p className="text-center text-white/60 text-sm py-4">No cards on file yet.</p>
       ) : (
         <div className="space-y-2">
           {cards.map((card) => (
@@ -140,7 +140,7 @@ const PaymentMethodsManager: React.FC = () => {
                     )}
                   </div>
                   {card.expMonth && card.expYear && (
-                    <p className="text-xs text-gray-500">Expires {String(card.expMonth).padStart(2, '0')}/{card.expYear}</p>
+                    <p className="text-xs text-white/40">Expires {String(card.expMonth).padStart(2, '0')}/{card.expYear}</p>
                   )}
                 </div>
               </div>

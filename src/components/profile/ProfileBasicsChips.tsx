@@ -146,7 +146,7 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
   );
 
   return (
-    <div className="overflow-x-auto pb-2 -mx-1 px-1">
+    <div className="overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
       <div className="flex flex-col gap-1.5 w-max">
         <div className="flex gap-1.5">{row1.map(renderChip)}</div>
         <div className="flex gap-1.5">{row2.map(renderChip)}</div>

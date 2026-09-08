@@ -556,7 +556,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
   };
 
   if (advertiserProfile === null) {
-    return <p className="text-center text-gray-400 text-sm py-4">Loading...</p>;
+    return <p className="text-center text-white/60 text-sm py-4">Loading...</p>;
   }
 
   if (advertiserProfile === 'none' && !showOnboardingForm) {
@@ -564,7 +564,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
       <div className="text-center py-4 space-y-3">
         <Megaphone className="w-8 h-8 text-pink-400 mx-auto" />
         <h3 className="text-white font-semibold">Setup to advertise on DripLove</h3>
-        <p className="text-xs text-gray-400 max-w-xs mx-auto">
+        <p className="text-xs text-white/60 max-w-xs mx-auto">
           Get access to millions of users on DripLove all over the world and reach a larger, specific audience.
         </p>
         <Button
@@ -583,21 +583,21 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
       <div className="space-y-4">
         <div>
           <h3 className="text-white font-semibold">Add a Payment Method</h3>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-white/60 mt-1">
             Add a payment method to use for your advertisement with {onboardingForm.businessName}. Payment is
             securely processed and stored by Stripe - DripLove never sees or stores your card details.
           </p>
         </div>
 
         <div className="rounded-lg border border-pink-500/20 bg-pink-500/5 p-3">
-          <p className="text-xs text-gray-300 leading-relaxed">
+          <p className="text-xs text-white/80 leading-relaxed">
             Your card will not be charged today. Once your advertiser account is approved, charges for each
             ad will be made to this card based on the ad's price and the number of days it runs, in
             accordance with the Terms and Conditions accepted below.
           </p>
         </div>
 
-        <label className="flex items-start gap-2 text-xs text-gray-300 cursor-pointer">
+        <label className="flex items-start gap-2 text-xs text-white/80 cursor-pointer">
           <Checkbox
             checked={onboardingForm.agreed}
             onCheckedChange={(checked) => setOnboardingForm(prev => ({ ...prev, agreed: checked === true }))}
@@ -714,7 +714,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
           <div className="text-center py-4 space-y-2">
             <Clock className="w-8 h-8 text-pink-400 mx-auto" />
             <h3 className="text-white font-semibold">Application under review</h3>
-            <p className="text-xs text-gray-400 max-w-xs mx-auto">
+            <p className="text-xs text-white/60 max-w-xs mx-auto">
               We're reviewing your advertiser application for {advertiserProfile.business_name}.
               You'll be able to start creating ads once it's approved.
             </p>
@@ -729,7 +729,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
       <div className="text-center py-4 space-y-2">
         <XCircle className="w-8 h-8 text-red-400 mx-auto" />
         <h3 className="text-white font-semibold">Application not approved</h3>
-        <p className="text-xs text-gray-400 max-w-xs mx-auto">
+        <p className="text-xs text-white/60 max-w-xs mx-auto">
           Your advertiser application wasn't approved. Contact driploveofficial@gmail.com for details.
         </p>
       </div>
@@ -776,7 +776,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
             <CollapsibleContent className="mt-4">
               {adStep === 'content' ? (
               <form onSubmit={handleContentSubmit} className="space-y-4">
-                <p className="text-xs text-gray-300 bg-pink-500/10 border border-pink-500/20 rounded-lg p-2.5">
+                <p className="text-xs text-white/80 bg-pink-500/10 border border-pink-500/20 rounded-lg p-2.5">
                   Ads are reviewed before they go live. You'll see the status on each of your ads below. Within some few hours.
                 </p>
 
@@ -794,7 +794,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-sm font-medium text-white">Short Description</Label>
-                    <span className={`text-xs ${countWords(formData.about) >= MAX_ABOUT ? 'text-orange-400' : 'text-gray-400'}`}>
+                    <span className={`text-xs ${countWords(formData.about) >= MAX_ABOUT ? 'text-orange-400' : 'text-white/60'}`}>
                       {countWords(formData.about)}/{MAX_ABOUT} words
                     </span>
                   </div>
@@ -872,7 +872,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     placeholder="e.g. www.example.com"
                     className="bg-black border-pink-500/30 text-white"
                   />
-                  <p className="text-xs text-gray-400 mt-1">https:// is added automatically if you leave it off.</p>
+                  <p className="text-xs text-white/60 mt-1">https:// is added automatically if you leave it off.</p>
                 </div>
 
                 <div>
@@ -897,7 +897,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     <Label className="block text-sm font-medium mb-2 text-white">
                       Target Countries ({formData.target_countries.length} selected)
                     </Label>
-                    <p className="text-xs text-gray-400 mb-2">Available to all countries if none are selected.</p>
+                    <p className="text-xs text-white/60 mb-2">Available to all countries if none are selected.</p>
                     <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-pink-500/20 rounded-md">
                       {COUNTRY_OPTIONS.map((country) => {
                         const isSelected = formData.target_countries.includes(country.code);
@@ -920,7 +920,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                               }}
                               className="w-4 h-4 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
                             />
-                            <span className={isSelected ? 'font-medium text-white' : 'text-gray-200'}>{country.name}</span>
+                            <span className={isSelected ? 'font-medium text-white' : 'text-white'}>{country.name}</span>
                           </label>
                         );
                       })}
@@ -936,7 +936,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-white font-semibold flex items-center gap-1.5"><Rocket className="w-4 h-4 text-pink-400" />Set Up Your Campaign</h3>
-                    <p className="text-xs text-gray-400 mt-1">"{formData.name}" is ready. Now choose your budget, duration, audience and placement.</p>
+                    <p className="text-xs text-white/60 mt-1">"{formData.name}" is ready. Now choose your budget, duration, audience and placement.</p>
                   </div>
 
                   <div>
@@ -948,7 +948,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, budgetPerDay: String(amount) }))}
                           className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
-                            Number(formData.budgetPerDay) === amount ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'
+                            Number(formData.budgetPerDay) === amount ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'
                           }`}
                         >
                           ${amount}/day
@@ -974,7 +974,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, durationDays: String(days) }))}
                           className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
-                            Number(formData.durationDays) === days ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'
+                            Number(formData.durationDays) === days ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'
                           }`}
                         >
                           {days} {days === 1 ? 'day' : 'days'}
@@ -993,7 +993,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
                   <div>
                     <Label className="block text-sm font-medium mb-2 text-white">3. Who do you want to reach?</Label>
-                    <p className="text-xs text-gray-400 mb-2">Countries - available everywhere if none are selected.</p>
+                    <p className="text-xs text-white/60 mb-2">Countries - available everywhere if none are selected.</p>
                     <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 border border-pink-500/20 rounded-md mb-3">
                       {COUNTRY_OPTIONS.map((country) => {
                         const isSelected = formData.target_countries.includes(country.code);
@@ -1009,7 +1009,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                               }}
                               className="w-4 h-4 rounded-full border-2 border-pink-500 data-[state=checked]:bg-pink-600 data-[state=checked]:border-pink-600 data-[state=checked]:text-white"
                             />
-                            <span className={isSelected ? 'font-medium text-white' : 'text-gray-200'}>{country.name}</span>
+                            <span className={isSelected ? 'font-medium text-white' : 'text-white'}>{country.name}</span>
                           </label>
                         );
                       })}
@@ -1043,7 +1043,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                               ...prev,
                               targetGenders: isSelected ? prev.targetGenders.filter(g => g !== gender) : [...prev.targetGenders, gender],
                             }))}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium border ${isSelected ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'}`}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium border ${isSelected ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'}`}
                           >
                             {gender}
                           </button>
@@ -1061,7 +1061,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, placement: tier }))}
                           className={`flex-1 px-3 py-1.5 rounded-full text-sm font-medium border capitalize ${
-                            formData.placement === tier ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-gray-300 hover:bg-pink-500/10'
+                            formData.placement === tier ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'
                           }`}
                         >
                           {tier}
@@ -1081,14 +1081,14 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     return (
                       <div className="rounded-lg border border-pink-500/20 bg-pink-500/5 p-3 space-y-1.5">
                         <p className="flex items-center gap-1.5 text-sm font-semibold text-white"><TrendingUp className="w-4 h-4 text-pink-400" />Your Campaign</p>
-                        <p className="text-xs text-gray-300">Budget: ${formData.budgetPerDay || 0}/day &middot; Duration: ~{formData.durationDays || 0} days &middot; Total: ${totalBudget.toFixed(2)}</p>
-                        <p className="text-xs text-gray-300">
+                        <p className="text-xs text-white/80">Budget: ${formData.budgetPerDay || 0}/day &middot; Duration: ~{formData.durationDays || 0} days &middot; Total: ${totalBudget.toFixed(2)}</p>
+                        <p className="text-xs text-white/80">
                           Estimated daily impressions: {formatImpressions(estimate.dailyMin)}&ndash;{formatImpressions(estimate.dailyMax)}
                         </p>
-                        <p className="text-xs text-gray-300">
+                        <p className="text-xs text-white/80">
                           Estimated total impressions: {formatImpressions(estimate.totalMin)}&ndash;{formatImpressions(estimate.totalMax)}
                         </p>
-                        <p className="text-[11px] text-gray-500">
+                        <p className="text-[11px] text-white/40">
                           This is an estimate, not a guarantee. Duration is a target, not a cutoff - DripLove keeps showing your ad to matching users until it delivers the impressions your budget paid for, even if that takes longer than {formData.durationDays || 0} days.
                         </p>
                       </div>
@@ -1111,9 +1111,9 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
           <div>
             <Label className="block text-sm font-medium mb-2 text-white">My Ads</Label>
             {loading ? (
-              <p className="text-center text-gray-400 text-sm py-4">Loading...</p>
+              <p className="text-center text-white/60 text-sm py-4">Loading...</p>
             ) : ads.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-4">You haven't created any ads yet</p>
+              <p className="text-center text-white/60 text-sm py-4">You haven't created any ads yet</p>
             ) : (
               <div className="grid gap-2">
                 {ads.map((ad) => {
@@ -1130,7 +1130,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                       >
                         {ad.media_type === 'video' && ad.video_url ? (
                           <div className="w-12 h-12 shrink-0 bg-neutral-900 rounded flex items-center justify-center">
-                            <Video className="w-5 h-5 text-gray-400" />
+                            <Video className="w-5 h-5 text-white/60" />
                           </div>
                         ) : (
                           <img
@@ -1152,11 +1152,11 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                               {ad.is_active ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                             </span>
                             {hasCampaign && (
-                              isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-gray-500 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-500 ml-auto shrink-0" />
+                              isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-white/40 ml-auto shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-white/40 ml-auto shrink-0" />
                             )}
                           </div>
                           {hasCampaign && (
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-gray-400">
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-white/60">
                               <span>💰 ${spentSoFar.toFixed(2)} of ${(ad.total_budget || 0).toFixed(2)}</span>
                               <span>👁 {formatImpressions(ad.impressions || 0)}</span>
                               <span>🖱 {formatImpressions(ad.clicks || 0)}</span>
@@ -1178,28 +1178,28 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
                       {hasCampaign && isExpanded && (
                         <div className="mt-3 pt-3 border-t border-pink-500/10 space-y-2">
-                          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
                             <div className="h-full bg-pink-500 rounded-full transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
                           </div>
-                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-300">
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-white/80">
                             <div>
-                              <p className="text-gray-500">Spent so far</p>
-                              <p className="text-white font-medium">${spentSoFar.toFixed(2)} <span className="text-gray-500 font-normal">/ ${(ad.total_budget || 0).toFixed(2)}</span></p>
+                              <p className="text-white/40">Spent so far</p>
+                              <p className="text-white font-medium">${spentSoFar.toFixed(2)} <span className="text-white/40 font-normal">/ ${(ad.total_budget || 0).toFixed(2)}</span></p>
                             </div>
                             <div>
-                              <p className="text-gray-500">Views (impressions)</p>
+                              <p className="text-white/40">Views (impressions)</p>
                               <p className="text-white font-medium">{formatImpressions(ad.impressions || 0)}</p>
                             </div>
                             <div>
-                              <p className="text-gray-500">Clicks</p>
+                              <p className="text-white/40">Clicks</p>
                               <p className="text-white font-medium">{formatImpressions(ad.clicks || 0)}</p>
                             </div>
                             <div>
-                              <p className="text-gray-500">CTR</p>
+                              <p className="text-white/40">CTR</p>
                               <p className="text-white font-medium">{ad.impressions ? (((ad.clicks || 0) / ad.impressions) * 100).toFixed(1) : '0.0'}%</p>
                             </div>
                           </div>
-                          <p className="text-[11px] text-gray-500">
+                          <p className="text-[11px] text-white/40">
                             {progress >= 1
                               ? 'This campaign has delivered its full budget of impressions.'
                               : `${Math.round(progress * 100)}% delivered so far (${formatImpressions(ad.impressions || 0)} of ~${formatImpressions(ad.estimated_impressions_max || 0)} estimated). Duration is a target, not a cutoff - it keeps running until it delivers.`}

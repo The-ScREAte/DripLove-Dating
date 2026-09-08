@@ -207,8 +207,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             Chat with Support
           </Button>
 
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <Mail className="w-4 h-4 text-gray-400" />
+          <div className="flex items-center gap-2 text-sm text-white/80">
+            <Mail className="w-4 h-4 text-white/60" />
             <a
               href="mailto:driploveinfo@gmail.com"
               className="text-pink-400 hover:text-pink-300 underline"
@@ -236,7 +236,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         <div className="bg-black p-4 rounded-lg border border-yellow-500/30">
           <div className="flex flex-col space-y-3">
             <span className="font-medium text-white">{t('settings.enjoyingDripLove')}</span>
-            <p className={isAndroidNative ? 'text-xs text-gray-400' : 'text-sm text-gray-400'}>
+            <p className={isAndroidNative ? 'text-xs text-white/60' : 'text-sm text-white/60'}>
               {t('settings.rateExperience')}
             </p>
             <RateAppButton className="w-full sm:w-auto" />
@@ -246,7 +246,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         {/* 4. Legal Links - Reference info */}
         {!hideLogoutTermsPrivacy && (onShowTerms || onShowPrivacy) && (
           <div className="bg-black p-4 rounded-lg border border-pink-500/20">
-            <p className="text-xs text-gray-400 mb-2 font-medium">Legal</p>
+            <p className="text-xs text-white/60 mb-2 font-medium">Legal</p>
             <div className={isAndroidNative ? 'flex flex-wrap justify-center gap-3 text-xs' : 'flex flex-wrap justify-center gap-4 text-sm'}>
               {onShowTerms && (
                 <button
@@ -257,7 +257,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                 </button>
               )}
               {onShowTerms && onShowPrivacy && (
-                <span className="text-gray-500">•</span>
+                <span className="text-white/40">•</span>
               )}
               {onShowPrivacy && (
                 <button
@@ -277,7 +277,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             onClick={handleLogout}
             variant="outline"
             size={isAndroidNative ? 'sm' : 'default'}
-            className={`w-full flex items-center justify-center space-x-2 border-pink-500/30 text-gray-200 hover:bg-pink-500/10 ${isAndroidNative ? 'text-xs' : ''}`}
+            className={`w-full flex items-center justify-center space-x-2 border-pink-500/30 text-white hover:bg-pink-500/10 ${isAndroidNative ? 'text-xs' : ''}`}
           >
             <LogOut className="w-4 h-4" />
             <span>{t('common.logout')}</span>
@@ -525,7 +525,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-white">Delete Account</AlertDialogTitle>
                 <AlertDialogDescription asChild>
-                  <div className="text-gray-300">
+                  <div className="text-white/80">
                     <p>
                       Are you sure you want to permanently delete your account? This action will:
                     </p>
@@ -536,7 +536,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                       <li>Remove all likes given and received</li>
                     </ul>
                     <p className="mt-2">
-                      <strong className="text-gray-100">
+                      <strong className="text-white">
                         This action cannot be undone and your profile won't exist anymore.
                       </strong>
                     </p>
@@ -544,7 +544,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="bg-black border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">No, Cancel</AlertDialogCancel>
+                <AlertDialogCancel className="bg-black border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white">No, Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDeleteAccountRequest}
                   className="bg-red-600 hover:bg-red-700"
@@ -561,8 +561,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           <DialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
             <DialogHeader>
               <DialogTitle className="text-white">Confirm Account Deletion</DialogTitle>
-              <DialogDescription className="text-gray-300">
-                This action is permanent and cannot be undone. Type <strong className="text-gray-100">{DELETE_CONFIRMATION_PHRASE}</strong> below to confirm.
+              <DialogDescription className="text-white/80">
+                This action is permanent and cannot be undone. Type <strong className="text-white">{DELETE_CONFIRMATION_PHRASE}</strong> below to confirm.
               </DialogDescription>
             </DialogHeader>
             <div>
@@ -574,7 +574,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   setDeleteConfirmText(e.target.value);
                   setDeleteError('');
                 }}
-                className={`bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 ${deleteError ? 'border-red-500' : ''}`}
+                className={`bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 ${deleteError ? 'border-red-500' : ''}`}
                 autoCapitalize="characters"
                 autoComplete="off"
               />
@@ -591,7 +591,7 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   setDeleteError('');
                 }}
                 disabled={deletingAccount}
-                className="border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white"
+                className="border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white"
               >
                 Cancel
               </Button>

@@ -19,6 +19,10 @@ const ACCENTS: Record<ChipAccent, { idle: string; active: string }> = {
   rose: { idle: 'border-rose-500/40 text-rose-200 hover:bg-rose-500/10', active: 'bg-rose-600 border-rose-500 text-white' },
 };
 
+// Matches the basics chip row exactly - inline height/padding, not Tailwind's
+// h-* /px-*, since those have proven unreliable elsewhere in this app.
+const chipStyle = { height: 22, minHeight: 22, padding: '0 8px' } as const;
+
 interface ChipSelectProps {
   options: ChipOption[];
   selected: string[];
@@ -36,14 +40,15 @@ const ChipSelect = ({ options, selected, onToggle, disabled, accent = 'pink', em
   if (disabled) {
     const chosen = options.filter((opt) => selected.includes(opt.value));
     if (chosen.length === 0) {
-      return <p className="text-xs text-gray-400">{emptyText}</p>;
+      return <p className="text-xs text-white/60">{emptyText}</p>;
     }
     return (
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {chosen.map((opt) => (
           <span
             key={opt.value}
-            className={`h-6 px-2 flex items-center rounded-full border bg-black/40 text-xs font-medium whitespace-nowrap ${colors.idle}`}
+            style={chipStyle}
+            className={`flex items-center rounded-full bg-neutral-900 border text-[11px] leading-none whitespace-nowrap capitalize shrink-0 ${colors.idle}`}
           >
             {opt.label}
           </span>
@@ -54,7 +59,7 @@ const ChipSelect = ({ options, selected, onToggle, disabled, accent = 'pink', em
 
   // Edit mode: show every option, tap to select/deselect.
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => {
         const isActive = selected.includes(opt.value);
         return (
@@ -62,8 +67,9 @@ const ChipSelect = ({ options, selected, onToggle, disabled, accent = 'pink', em
             key={opt.value}
             type="button"
             onClick={() => onToggle(opt.value)}
-            className={`h-6 px-2 flex items-center rounded-full border text-xs font-medium leading-none transition-colors whitespace-nowrap ${
-              isActive ? colors.active : `bg-black/40 ${colors.idle}`
+            style={chipStyle}
+            className={`flex items-center rounded-full border text-[11px] leading-none whitespace-nowrap capitalize shrink-0 transition-colors ${
+              isActive ? colors.active : `bg-neutral-900 ${colors.idle}`
             }`}
           >
             {opt.label}

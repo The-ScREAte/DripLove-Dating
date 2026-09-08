@@ -16,6 +16,12 @@ import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
+import {
+  DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface ImageManagementProps {
   currentUser: {
@@ -26,6 +32,10 @@ interface ImageManagementProps {
     face_descriptor?: string | null;
   } | null;
   onProfileUpdate?: () => void;
+  // Dragging to reorder is only enabled while the section's Edit mode is on
+  // (the pencil button in its header) - otherwise a tap on a thumbnail just
+  // opens the preview.
+  isEditing?: boolean;
 }
 
 interface UserImage {
@@ -41,7 +51,119 @@ interface ModerationDecision {
   hasFace?: boolean | null;
 }
 
-const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagementProps) => {
+interface SortablePhotoThumbProps {
+  userImage: UserImage;
+  index: number;
+  isBroken: boolean;
+  pending?: { blob: Blob; previewUrl: string };
+  savingCropUrl: string | null;
+  isEditing: boolean;
+  onImageError: (url: string) => void;
+  onOpenPreview: (url: string) => void;
+  onDiscardWarning: (url: string) => void;
+  onSaveCrop: (url: string) => void;
+}
+
+const SortablePhotoThumb = ({
+  userImage,
+  index,
+  isBroken,
+  pending,
+  savingCropUrl,
+  isEditing,
+  onImageError,
+  onOpenPreview,
+  onDiscardWarning,
+  onSaveCrop,
+}: SortablePhotoThumbProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: userImage.image_url,
+    disabled: !!pending || !isEditing,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // Locked to 'none' only once actually dragging so the row's normal touch
+    // scroll still works for a plain swipe - see useSortable's isDragging.
+    touchAction: isDragging ? 'none' : 'pan-x',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => { if (!pending) onOpenPreview(userImage.image_url); }}
+      className={`relative shrink-0 w-16 h-24 sm:w-20 sm:h-28 select-none [-webkit-touch-callout:none] ${
+        isDragging ? 'opacity-60 scale-105 z-10' : ''
+      }`}
+    >
+      {isBroken && !pending ? (
+        <div className="w-full h-full rounded-xl shadow-sm bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-white/40">
+          <ImageOff className="w-6 h-6" />
+          <span className="text-[10px]">Unavailable</span>
+        </div>
+      ) : (
+        <img
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
+          alt={`User Image ${index + 1}`}
+          className="w-full h-full object-cover rounded-xl shadow-sm pointer-events-none select-none"
+          onError={() => onImageError(userImage.image_url)}
+        />
+      )}
+
+      {/* Main photo indicator */}
+      {index === 0 && !pending && (
+        <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded-full pointer-events-none">
+          Main
+        </div>
+      )}
+
+      {/* Pending approval indicator */}
+      {userImage.is_approved === false && !pending && (
+        <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+          <Shield className="w-3 h-3" /> Reviewing...
+        </div>
+      )}
+
+      {/* Unsaved crop - review, then explicitly Save or Cancel; nothing
+          else on this photo is actionable while a crop is pending. */}
+      {pending && (
+        <>
+          <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full">
+            Unsaved crop
+          </div>
+          <div className="absolute bottom-2 inset-x-2 flex gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onDiscardWarning(userImage.image_url)}
+              disabled={savingCropUrl === userImage.image_url}
+              className="flex-1 h-7 px-2 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onSaveCrop(userImage.image_url)}
+              disabled={savingCropUrl === userImage.image_url}
+              className="flex-1 h-7 px-2 text-xs bg-pink-600 hover:bg-pink-700 text-white"
+            >
+              {savingCropUrl === userImage.image_url ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = false }: ImageManagementProps) => {
   const { t } = useTranslation();
   const [userImages, setUserImages] = useState<UserImage[]>([]);
   // Tracks photo URLs whose <img> failed to load, so we can swap in a clean
@@ -69,32 +191,45 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
   const [activeImageUrl, setActiveImageUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Drag-to-reorder: long-press a thumbnail (so a normal tap still opens the
-  // preview and a normal swipe still scrolls the row) then drag it over
-  // another slot to swap positions. The first photo is the profile's main one.
-  const [dragUrl, setDragUrl] = useState<string | null>(null);
-  const [overUrl, setOverUrl] = useState<string | null>(null);
-  const thumbRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const pressTimerRef = useRef<number | null>(null);
-  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isDraggingRef = useRef(false);
-  const LONG_PRESS_MS = 280;
-  const MOVE_CANCEL_PX = 18;
-
-  const clearPressTimer = () => {
-    if (pressTimerRef.current) {
-      window.clearTimeout(pressTimerRef.current);
-      pressTimerRef.current = null;
-    }
-  };
+  // Drag-to-reorder via dnd-kit: mouse activates on a small drag distance,
+  // touch needs a brief hold first (so a normal swipe still scrolls the row
+  // and a normal tap still opens the big preview). The first photo is the
+  // profile's main one.
+  const dragSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+  );
 
   const persistImageOrder = async (ordered: UserImage[]) => {
     try {
-      await Promise.all(
+      // image_order has two DB constraints: a check constraint requiring
+      // -1 (rejected) or 1-7 (NOT 0-based - a plain array index silently
+      // failed slot 1 every time), and a unique index on (user_id,
+      // image_order) for image_order > 0. Reassigning positions in a single
+      // pass can collide mid-update (row A wants the slot row B currently
+      // holds, before B has moved off it), so every row is cleared to -1
+      // first - allowed to repeat, since that's the same value used for a
+      // rejected photo - and only then does each take its real 1-based slot,
+      // with nothing left occupying a positive value to collide with.
+      const clearResults = await Promise.all(
+        ordered.map((img) => supabase.from('user_images').update({ image_order: -1 }).eq('id', img.id))
+      );
+      const clearFailed = clearResults.find((r) => r.error);
+      if (clearFailed?.error) throw clearFailed.error;
+
+      const results = await Promise.all(
         ordered.map((img, index) =>
-          supabase.from('user_images').update({ image_order: index }).eq('id', img.id)
+          supabase.from('user_images').update({ image_order: index + 1 }).eq('id', img.id)
         )
       );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+
+      toast({ title: 'Photo order saved', duration: 1500 });
+      // The first slot is the profile's main photo - let the parent know so
+      // the header avatar (and anything else reading the profile) picks up
+      // the new order right away instead of showing a stale main photo.
+      onProfileUpdate?.();
     } catch (error) {
       console.error('Error saving photo order:', error);
       toast({ title: 'Error', description: 'Failed to save the new photo order. Please try again.', variant: 'destructive' });
@@ -102,93 +237,51 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
     }
   };
 
-  const handleThumbPointerDown = (e: React.PointerEvent, url: string) => {
-    if (pendingCrops[url]) return;
-    pressStartRef.current = { x: e.clientX, y: e.clientY };
-    isDraggingRef.current = false;
-    clearPressTimer();
-    pressTimerRef.current = window.setTimeout(() => {
-      isDraggingRef.current = true;
-      setDragUrl(url);
-      setOverUrl(url);
-    }, LONG_PRESS_MS);
+  // The new order shows up instantly (local state below), but the DB write
+  // is debounced - if the user reorders a few more photos in quick
+  // succession, each one resets the timer instead of firing a save per
+  // drag, and only the final arrangement is written once it's held stable
+  // for 5s. Flushed immediately on unmount so a pending reorder is never
+  // silently dropped.
+  const pendingOrderRef = useRef<UserImage[] | null>(null);
+  const persistTimerRef = useRef<number | null>(null);
+
+  const flushPendingImageOrder = useCallback(() => {
+    if (persistTimerRef.current) {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    if (pendingOrderRef.current) {
+      const toSave = pendingOrderRef.current;
+      pendingOrderRef.current = null;
+      void persistImageOrder(toSave);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const scheduleImageOrderSave = (ordered: UserImage[]) => {
+    pendingOrderRef.current = ordered;
+    if (persistTimerRef.current) window.clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = window.setTimeout(flushPendingImageOrder, 5000);
   };
 
-  const handleThumbPointerMove = (e: React.PointerEvent) => {
-    if (!pressStartRef.current) return;
-
-    if (!isDraggingRef.current) {
-      const dx = e.clientX - pressStartRef.current.x;
-      const dy = e.clientY - pressStartRef.current.y;
-      if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
-        // Moved before the long-press fired - this is a scroll/swipe, not a drag.
-        clearPressTimer();
-        pressStartRef.current = null;
-      }
-      return;
-    }
-
-    // Actively dragging - stop the row's own touch-scroll from fighting it.
-    e.preventDefault();
-    for (const [url, el] of Object.entries(thumbRefs.current)) {
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      if (e.clientX >= rect.left && e.clientX <= rect.right) {
-        setOverUrl((prev) => (prev === url ? prev : url));
-        break;
-      }
-    }
-  };
-
-  const handleThumbPointerUp = (e: React.PointerEvent, url: string) => {
-    clearPressTimer();
-
-    // If a drag was in progress, the document-level pointerup listener below
-    // commits it - it fires reliably even if the finger lifts off over a gap
-    // or the "+" tile rather than back over a thumbnail.
-    if (isDraggingRef.current) return;
-
-    // Not a drag - a plain tap opens the big preview.
-    pressStartRef.current = null;
-    if (!pendingCrops[url]) {
-      setActiveImageUrl(url);
-    }
-  };
-
-  // Commits the drag wherever the pointer is released - not just when it's
-  // released back over a thumbnail - so a drag can never get stuck.
   useEffect(() => {
-    if (!dragUrl) return;
+    return () => flushPendingImageOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    const commit = () => {
-      const draggedUrl = dragUrl;
-      const targetUrl = overUrl;
-      isDraggingRef.current = false;
-      pressStartRef.current = null;
-      setDragUrl(null);
-      setOverUrl(null);
-
-      if (draggedUrl && targetUrl && draggedUrl !== targetUrl) {
-        setUserImages((prev) => {
-          const fromIndex = prev.findIndex((img) => img.image_url === draggedUrl);
-          const toIndex = prev.findIndex((img) => img.image_url === targetUrl);
-          if (fromIndex === -1 || toIndex === -1) return prev;
-          const next = [...prev];
-          const [moved] = next.splice(fromIndex, 1);
-          next.splice(toIndex, 0, moved);
-          void persistImageOrder(next);
-          return next;
-        });
-      }
-    };
-
-    document.addEventListener('pointerup', commit);
-    document.addEventListener('pointercancel', commit);
-    return () => {
-      document.removeEventListener('pointerup', commit);
-      document.removeEventListener('pointercancel', commit);
-    };
-  }, [dragUrl, overUrl]);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setUserImages((prev) => {
+      const oldIndex = prev.findIndex((img) => img.image_url === active.id);
+      const newIndex = prev.findIndex((img) => img.image_url === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const next = arrayMove(prev, oldIndex, newIndex);
+      scheduleImageOrderSave(next);
+      return next;
+    });
+  };
 
   // Warn on a real page unload while any crop is pending.
   useEffect(() => {
@@ -576,6 +669,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
       // Refresh the image list
       await fetchUserImages();
+      onProfileUpdate?.();
     } catch (error) {
       console.error('Error uploading image:', error);
 
@@ -645,6 +739,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
       }
 
       await fetchUserImages();
+      onProfileUpdate?.();
     } catch (error) {
       console.error('Error deleting image:', error);
       toast({ title: "Error", description: "Failed to delete image. Please try again.", variant: "destructive" });
@@ -672,7 +767,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2 mb-3 text-gray-300 text-sm">
+      <div className="flex items-center justify-between gap-2 mb-3 text-white/80 text-sm">
         <div className="flex items-center gap-2">
           <Upload className="w-4 h-4 text-pink-500" />
           <span>{userImages.length}/7</span>
@@ -685,15 +780,29 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             />
           )}
         </div>
-        {!isVerified && !showFaceVerification && (
+        {!showFaceVerification && (
           <Button
             size="sm"
-            onClick={() => setShowFaceVerification(true)}
+            onClick={() => {
+              if (isVerified) {
+                toast({ title: 'Already verified', description: 'You have been verified already.' });
+                return;
+              }
+              setShowFaceVerification(true);
+            }}
             style={{ height: 20, minHeight: 20, padding: '0 10px' }}
-            className="text-[11px] gap-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-full"
+            className={`text-[11px] gap-1 rounded-full text-white ${
+              isVerified
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+            }`}
           >
-            <Camera size={11} style={{ width: 11, height: 11 }} />
-            Verify
+            {isVerified ? (
+              <CheckCircle size={11} style={{ width: 11, height: 11 }} />
+            ) : (
+              <Camera size={11} style={{ width: 11, height: 11 }} />
+            )}
+            {isVerified ? 'Verified' : 'Verify'}
           </Button>
         )}
       </div>
@@ -731,159 +840,95 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             </div>
           </div>
         )}
-        {userImages.length < 5 && (
-          <div className="mb-3">
-            <Input
-              type="file"
-              id="image_upload"
-              accept="image/*"
-              onChange={handleImageUpload}
-              disabled={uploading || moderating}
-              className="hidden"
-              onClick={() => {
-                // Clear replace mode when user clicks the upload button directly
-                if (replacingImageUrl) {
-                  setReplacingImageUrl(null);
-                }
-              }}
-            />
-            {moderating && (
-              <div className="text-sm text-purple-600 mt-2 flex items-center">
-                <Shield className="animate-pulse w-4 h-4 mr-2" />
-                Checking image content...
-              </div>
-            )}
-            {uploading && (
-              <div className="text-sm text-gray-400 mt-2 flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>
-                Uploading...
-              </div>
-            )}
-            {moderationResult && !uploading && (
-              <div className={`text-sm mt-2 flex items-center ${
-                moderationResult.status === 'approved'
-                  ? 'text-green-600'
-                  : moderationResult.status === 'pending'
-                    ? 'text-amber-500'
-                    : 'text-red-500'
-              }`}>
-                {moderationResult.status === 'approved' ? (
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                ) : moderationResult.status === 'pending' ? (
-                  <Clock className="w-4 h-4 mr-2" />
-                ) : (
-                  <Shield className="w-4 h-4 mr-2" />
-                )}
-                {moderationResult.message}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          {userImages.map((userImage, index) => {
-            const pending = pendingCrops[userImage.image_url];
-            return (
-            <div
-              key={userImage.image_url}
-              ref={(el) => { thumbRefs.current[userImage.image_url] = el; }}
-              onPointerDown={(e) => handleThumbPointerDown(e, userImage.image_url)}
-              onPointerMove={handleThumbPointerMove}
-              onPointerUp={(e) => handleThumbPointerUp(e, userImage.image_url)}
-              onContextMenu={(e) => e.preventDefault()}
-              style={{
-                touchAction: 'pan-x',
-                WebkitUserSelect: 'none',
-                userSelect: 'none',
-                WebkitTouchCallout: 'none',
-              }}
-              className={`relative shrink-0 w-16 h-24 sm:w-20 sm:h-28 transition-transform ${
-                dragUrl === userImage.image_url
-                  ? 'opacity-60 scale-105 z-10'
-                  : overUrl === userImage.image_url && dragUrl
-                    ? 'ring-2 ring-pink-400'
-                    : ''
-              }`}
-            >
-              {brokenImageUrls.has(userImage.image_url) && !pending ? (
-                <div className="w-full h-full rounded-xl shadow-sm bg-neutral-800 border border-pink-500/20 flex flex-col items-center justify-center gap-1 text-gray-500">
-                  <ImageOff className="w-6 h-6" />
-                  <span className="text-[10px]">Unavailable</span>
-                </div>
-              ) : (
-                <img
-                  loading="lazy"
-                  decoding="async"
-                  draggable={false}
-                  src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
-                  alt={`User Image ${index + 1}`}
-                  className="w-full h-full object-cover rounded-xl shadow-sm pointer-events-none select-none"
-                  onError={() => setBrokenImageUrls((prev) => new Set(prev).add(userImage.image_url))}
-                />
-              )}
-
-              {/* Main photo indicator */}
-              {index === 0 && !pending && (
-                <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] px-1.5 py-0.5 rounded-full pointer-events-none">
-                  Main
-                </div>
-              )}
-
-              {/* Pending approval indicator */}
-              {userImage.is_approved === false && !pending && (
-                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-                  <Shield className="w-3 h-3" /> Reviewing...
-                </div>
-              )}
-
-              {/* Unsaved crop - review, then explicitly Save or Cancel; nothing
-                  else on this photo is actionable while a crop is pending. */}
-              {pending && (
-                <>
-                  <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-full">
-                    Unsaved crop
-                  </div>
-                  <div className="absolute bottom-2 inset-x-2 flex gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setDiscardWarningUrl(userImage.image_url)}
-                      disabled={savingCropUrl === userImage.image_url}
-                      className="flex-1 h-7 px-2 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleSavePendingCrop(userImage.image_url)}
-                      disabled={savingCropUrl === userImage.image_url}
-                      className="flex-1 h-7 px-2 text-xs bg-pink-600 hover:bg-pink-700 text-white"
-                    >
-                      {savingCropUrl === userImage.image_url ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
-                </>
-              )}
+        {/* Always mounted (just hidden) so both "+" (add) and "Replace" can
+            reliably trigger it via getElementById - it used to live inside
+            the `userImages.length < 5` block below, which meant Replace
+            silently did nothing once you had 5+ photos, since the input it
+            needs to click didn't exist in the DOM at all. */}
+        <div className="mb-3">
+          <Input
+            type="file"
+            id="image_upload"
+            accept="image/*"
+            onChange={handleImageUpload}
+            disabled={uploading || moderating}
+            className="hidden"
+          />
+          {moderating && (
+            <div className="text-sm text-purple-600 mt-2 flex items-center">
+              <Shield className="animate-pulse w-4 h-4 mr-2" />
+              Checking image content...
             </div>
-            );
-          })}
-
-          {userImages.length < 5 && (
-            <button
-              type="button"
-              onClick={() => (document.getElementById('image_upload') as HTMLInputElement)?.click()}
-              disabled={uploading || moderating}
-              aria-label={t('profile.uploadImage')}
-              className="shrink-0 w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 border-dashed border-pink-500/40 flex items-center justify-center text-pink-400 hover:bg-pink-500/10 disabled:opacity-50 transition-colors"
-            >
-              <Plus className="w-7 h-7" />
-            </button>
+          )}
+          {uploading && (
+            <div className="text-sm text-white/60 mt-2 flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-600 mr-2"></div>
+              Uploading...
+            </div>
+          )}
+          {moderationResult && !uploading && (
+            <div className={`text-sm mt-2 flex items-center ${
+              moderationResult.status === 'approved'
+                ? 'text-green-600'
+                : moderationResult.status === 'pending'
+                  ? 'text-amber-500'
+                  : 'text-red-500'
+            }`}>
+              {moderationResult.status === 'approved' ? (
+                <CheckCircle className="w-4 h-4 mr-2" />
+              ) : moderationResult.status === 'pending' ? (
+                <Clock className="w-4 h-4 mr-2" />
+              ) : (
+                <Shield className="w-4 h-4 mr-2" />
+              )}
+              {moderationResult.message}
+            </div>
           )}
         </div>
 
+        <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={userImages.map((img) => img.image_url)} strategy={horizontalListSortingStrategy}>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+              {userImages.map((userImage, index) => (
+                <SortablePhotoThumb
+                  key={userImage.image_url}
+                  userImage={userImage}
+                  index={index}
+                  isBroken={brokenImageUrls.has(userImage.image_url)}
+                  pending={pendingCrops[userImage.image_url]}
+                  savingCropUrl={savingCropUrl}
+                  isEditing={isEditing}
+                  onImageError={(url) => setBrokenImageUrls((prev) => new Set(prev).add(url))}
+                  onOpenPreview={setActiveImageUrl}
+                  onDiscardWarning={setDiscardWarningUrl}
+                  onSaveCrop={handleSavePendingCrop}
+                />
+              ))}
+
+              {userImages.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Adding a new photo is never a replace, even if a
+                    // previous Replace attempt was left dangling (e.g. the
+                    // file picker was cancelled without choosing a file).
+                    setReplacingImageUrl(null);
+                    (document.getElementById('image_upload') as HTMLInputElement)?.click();
+                  }}
+                  disabled={uploading || moderating}
+                  aria-label={t('profile.uploadImage')}
+                  className="shrink-0 w-16 h-24 sm:w-20 sm:h-28 rounded-xl border-2 border-dashed border-pink-500/40 flex items-center justify-center text-pink-400 hover:bg-pink-500/10 disabled:opacity-50 transition-colors"
+                >
+                  <Plus className="w-7 h-7" />
+                </button>
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
+
         {userImages.length === 0 && (
-          <div className="text-center py-8 text-gray-400">
-            <Upload className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+          <div className="text-center py-8 text-white/60">
+            <Upload className="w-12 h-12 mx-auto mb-4 text-white/50" />
             <p>No photos uploaded yet</p>
             <p className="text-sm">Upload your first photo to get started!</p>
           </div>
@@ -957,10 +1002,10 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
                       <AlertDialogContent className="sm:max-w-md bg-black border border-pink-500/30 text-white">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-white">Delete Image</AlertDialogTitle>
-                          <AlertDialogDescription className="text-gray-300">Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
+                          <AlertDialogDescription className="text-white/80">Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-black border-pink-500/30 text-gray-200 hover:bg-neutral-800 hover:text-white">Cancel</AlertDialogCancel>
+                          <AlertDialogCancel className="bg-black border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white">Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             disabled={deleting}
                             onClick={() => { handleDeleteImage(previewUrl); setActiveImageUrl(null); }}
@@ -1005,13 +1050,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate }: ImageManagem
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-white mb-1 font-semibold">Discard your crop?</p>
-            <p className="text-xs text-gray-300 mb-4">Your cropped photo hasn't been saved yet.</p>
+            <p className="text-xs text-white/80 mb-4">Your cropped photo hasn't been saved yet.</p>
             <div className="flex items-center justify-center gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setDiscardWarningUrl(null)}
-                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-gray-100 hover:text-black"
+                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
               >
                 Keep editing
               </Button>

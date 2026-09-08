@@ -15,7 +15,7 @@ interface WorkEducationSectionProps {
 const selectTriggerClass = "w-full bg-black/40 border-pink-500/30 text-white";
 const selectContentClass = "bg-black border-pink-500/30";
 const selectItemClass = "text-white focus:bg-pink-500/15 focus:text-white";
-const inputClass = "w-full mt-2 bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400";
+const inputClass = "w-full mt-2 bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60";
 
 const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkEducationSectionProps) => {
   const { t } = useTranslation();
@@ -24,7 +24,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="occupation" className="text-gray-200">{t('profile.occupation')}</Label>
+              <Label htmlFor="occupation" className="text-white">{t('profile.occupation')}</Label>
               <Select
                 value={editedProfile.occupation}
                 onValueChange={value => onInputChange({
@@ -57,7 +57,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
               )}
             </div>
             <div>
-              <Label htmlFor="industry" className="text-gray-200">{t('profile.industry')}</Label>
+              <Label htmlFor="industry" className="text-white">{t('profile.industry')}</Label>
               <Select
                 value={editedProfile.industry}
                 onValueChange={value => onInputChange({
@@ -91,7 +91,7 @@ const WorkEducationSection = ({ editedProfile, isEditing, onInputChange }: WorkE
             </div>
           </div>
           <div>
-            <Label htmlFor="education_level" className="text-gray-200">{t('profile.education')}</Label>
+            <Label htmlFor="education_level" className="text-white">{t('profile.education')}</Label>
             <Select
               value={editedProfile.education_level}
               onValueChange={value => onInputChange({

@@ -1,8 +1,6 @@
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { X, Plus } from 'lucide-react';
 
 interface InterestsEditorProps {
@@ -38,6 +36,10 @@ const PREDEFINED_INTERESTS = [
   'Wellness', 'Mental Health', 'Mindfulness', 'Journaling', 'Early Mornings', 'Late Nights'
 ];
 
+// Matches the basics chip row exactly - inline height/padding, not Tailwind's
+// h-* /px-*, since those have proven unreliable elsewhere in this app.
+const chipStyle = { height: 22, minHeight: 22, padding: '0 8px' } as const;
+
 const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: InterestsEditorProps) => {
   const [newInterest, setNewInterest] = useState('');
   const [showAddCustom, setShowAddCustom] = useState(false);
@@ -64,11 +66,15 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
 
   if (disabled) {
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {interests.map((interest) => (
-          <Badge key={interest} variant="secondary" className="bg-neutral-800 text-gray-100 border-pink-500/20">
+          <span
+            key={interest}
+            style={chipStyle}
+            className="flex items-center rounded-full bg-neutral-900 border border-pink-500/40 text-pink-200 text-[11px] leading-none whitespace-nowrap shrink-0"
+          >
             {interest}
-          </Badge>
+          </span>
         ))}
       </div>
     );
@@ -78,20 +84,19 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
     <div className="space-y-4">
       {/* Selected Interests */}
       <div>
-        <h4 className="text-sm font-medium mb-2 text-gray-200">Selected Interests ({interests.length}/10):</h4>
-        <div className="flex flex-wrap gap-2">
+        <h4 className="text-sm font-medium mb-2 text-white">Selected Interests ({interests.length}/10):</h4>
+        <div className="flex flex-wrap gap-1.5">
           {interests.map((interest) => (
-            <Badge key={interest} variant="default" className="flex items-center gap-1 bg-pink-600/80 text-white border-transparent">
+            <button
+              key={interest}
+              type="button"
+              onClick={() => removeInterest(interest)}
+              style={{ ...chipStyle, paddingRight: 6 }}
+              className="flex items-center gap-1 rounded-full bg-pink-600 border border-pink-500 text-white text-[11px] leading-none whitespace-nowrap shrink-0"
+            >
               {interest}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 p-0 hover:bg-transparent text-white"
-                onClick={() => removeInterest(interest)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
+              <X className="w-2.5 h-2.5" />
+            </button>
           ))}
         </div>
       </div>
@@ -99,56 +104,61 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
       {/* Available Interests */}
       {interests.length < 10 && (
         <div>
-          <h4 className="text-sm font-medium mb-2 text-gray-200">Choose from popular interests:</h4>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <h4 className="text-sm font-medium mb-2 text-white">Choose from popular interests:</h4>
+          <div className="flex flex-wrap gap-1.5 mb-4">
             {availableInterests.slice(0, 15).map((interest) => (
-              <Button
+              <button
                 key={interest}
-                variant="outline"
-                size="sm"
+                type="button"
                 onClick={() => addInterest(interest)}
-                className="text-xs bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white"
+                style={chipStyle}
+                className="flex items-center rounded-full bg-neutral-900 border border-pink-500/40 text-white text-[11px] leading-none whitespace-nowrap shrink-0 transition-colors hover:bg-neutral-800 hover:text-white"
               >
                 {interest}
-              </Button>
+              </button>
             ))}
           </div>
 
           {/* Add Custom Interest */}
           <div className="space-y-2">
             {!showAddCustom ? (
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={() => setShowAddCustom(true)}
-                className="flex items-center gap-1 bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white"
+                style={chipStyle}
+                className="flex items-center gap-1 rounded-full bg-neutral-900 border border-pink-500/40 text-white text-[11px] leading-none whitespace-nowrap shrink-0 transition-colors hover:bg-neutral-800 hover:text-white"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="w-3 h-3" />
                 Add Custom Interest
-              </Button>
+              </button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Input
                   placeholder="Enter custom interest..."
                   value={newInterest}
                   onChange={(e) => setNewInterest(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addCustomInterest()}
-                  className="flex-1 bg-neutral-900 border-pink-500/30 text-white placeholder:text-gray-500"
+                  className="flex-1 h-8 bg-neutral-900 border-pink-500/30 text-white text-xs placeholder:text-white/40"
                 />
-                <Button onClick={addCustomInterest} size="sm">
+                <button
+                  type="button"
+                  onClick={addCustomInterest}
+                  style={chipStyle}
+                  className="flex items-center rounded-full bg-pink-600 border border-pink-500 text-white text-[11px] leading-none whitespace-nowrap shrink-0"
+                >
                   Add
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white"
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setShowAddCustom(false);
                     setNewInterest('');
                   }}
+                  style={chipStyle}
+                  className="flex items-center rounded-full bg-neutral-900 border border-pink-500/40 text-white text-[11px] leading-none whitespace-nowrap shrink-0 transition-colors hover:bg-neutral-800 hover:text-white"
                 >
                   Cancel
-                </Button>
+                </button>
               </div>
             )}
           </div>

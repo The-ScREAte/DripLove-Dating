@@ -44,7 +44,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           <CardTitle className="text-lg font-semibold text-white">
             {title}
           </CardTitle>
-          <div className="flex items-center gap-2 text-gray-300">
+          <div className="flex items-center gap-2 text-white/80">
             {isOpen && showEditButton && (
               isEditing ? (
                 <>

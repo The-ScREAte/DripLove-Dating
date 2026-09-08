@@ -211,7 +211,7 @@ const UnlockCountriesDialog = ({
             variant="outline"
             onClick={onClose}
             disabled={isSaving}
-            className="w-auto h-9 px-4 bg-white border-pink-500/30 text-black hover:bg-gray-100"
+            className="w-auto h-9 px-4 bg-white border-pink-500/30 text-black hover:bg-neutral-200"
           >
             {t('common.cancel')}
           </Button>

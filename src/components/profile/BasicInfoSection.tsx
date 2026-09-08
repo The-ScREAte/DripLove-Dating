@@ -68,7 +68,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
         <div className="space-y-5 pt-1">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="first_name" className="text-gray-200">{t('profile.firstName')}</Label>
+              <Label htmlFor="first_name" className="text-white">{t('profile.firstName')}</Label>
               <Input
                 type="text"
                 id="first_name"
@@ -93,11 +93,11 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                   });
                 }}
                 disabled={!isEditing}
-                className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400"
+                className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60"
               />
             </div>
             <div>
-              <Label htmlFor="last_name" className="text-gray-200">{t('profile.lastName')}</Label>
+              <Label htmlFor="last_name" className="text-white">{t('profile.lastName')}</Label>
               <Input
                 type="text"
                 id="last_name"
@@ -122,7 +122,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                   });
                 }}
                 disabled={!isEditing}
-                className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400"
+                className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60"
               />
             </div>
           </div>
@@ -130,31 +130,31 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
           {/* Date of Birth and Age Display */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="date_of_birth" className="text-gray-200">{t('profile.dateOfBirth', 'Date of Birth')}</Label>
+              <Label htmlFor="date_of_birth" className="text-white">{t('profile.dateOfBirth', 'Date of Birth')}</Label>
               <Input
                 type="date"
                 id="date_of_birth"
                 name="date_of_birth"
                 value={editedProfile.date_of_birth || ''}
                 disabled={true}
-                className="w-full bg-black/30 border-pink-500/10 text-gray-400 cursor-not-allowed"
+                className="w-full bg-black/30 border-pink-500/10 text-white/60 cursor-not-allowed"
               />
             </div>
             <div>
-              <Label htmlFor="age" className="text-gray-200">{t('profile.age', 'Age')}</Label>
+              <Label htmlFor="age" className="text-white">{t('profile.age', 'Age')}</Label>
               <Input
                 type="text"
                 id="age"
                 name="age"
                 value={age ? `${age} years old` : 'Not set'}
                 disabled={true}
-                className="w-full bg-black/30 border-pink-500/10 text-gray-400 cursor-not-allowed"
+                className="w-full bg-black/30 border-pink-500/10 text-white/60 cursor-not-allowed"
               />
             </div>
           </div>
 
           <div>
-            <Label htmlFor="height" className="text-gray-200">{t('profile.height', 'Height')}</Label>
+            <Label htmlFor="height" className="text-white">{t('profile.height', 'Height')}</Label>
             <Select
               value={editedProfile.height_cm ? String(editedProfile.height_cm) : undefined}
               onValueChange={(value) => onInputChange({
@@ -162,7 +162,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               } as any)}
               disabled={!isEditing}
             >
-              <SelectTrigger id="height" className="w-full bg-black/40 border-pink-500/30 text-white disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400">
+              <SelectTrigger id="height" className="w-full bg-black/40 border-pink-500/30 text-white disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60">
                 <SelectValue placeholder={t('profile.selectHeight', 'Select your height')} />
               </SelectTrigger>
               <SelectContent className="bg-black border-pink-500/30 max-h-72">
@@ -176,7 +176,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
           </div>
 
           <div>
-            <Label htmlFor="bio" className="text-gray-200">{t('profile.bio')}</Label>
+            <Label htmlFor="bio" className="text-white">{t('profile.bio')}</Label>
             <Textarea
               id="bio"
               name="bio"
@@ -203,10 +203,10 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 });
               }}
               disabled={!isEditing}
-              className="w-full min-h-[100px] resize-none bg-black/40 border-pink-500/30 text-white placeholder:text-gray-500 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-gray-400"
+              className="w-full min-h-[100px] resize-none bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60"
               placeholder={t('profile.bioPlaceholder')}
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-white/60 mt-1">
               {t('profile.dobChangeNote', 'Note: Change of Date of Birth: Contact admin and be ready to provide proof of date change.')}
             </p>
           </div>

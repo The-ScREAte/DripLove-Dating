@@ -94,7 +94,7 @@ const CardForm: React.FC<StripeCardStepProps> = ({ clientSecret, submitting, can
         <CardElement options={CARD_ELEMENT_OPTIONS} />
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
-      <p className="flex items-center gap-1.5 text-xs text-gray-500">
+      <p className="flex items-center gap-1.5 text-xs text-white/40">
         <ShieldCheck className="w-3.5 h-3.5 text-pink-400 shrink-0" />
         Card details are encrypted and handled directly by Stripe.
       </p>

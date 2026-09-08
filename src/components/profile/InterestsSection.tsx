@@ -16,7 +16,7 @@ const InterestsSection = ({ editedProfile, profile, isEditing, onInterestsChange
 
   return (
         <div className="space-y-2">
-          <Label htmlFor="interests" className="text-gray-200">{t('profile.chooseInterests')}</Label>
+          <Label htmlFor="interests" className="text-white">{t('profile.chooseInterests')}</Label>
           <InterestsEditor
             interests={isEditing ? editedProfile.interests || [] : profile?.interests || []}
             onInterestsChange={onInterestsChange}
