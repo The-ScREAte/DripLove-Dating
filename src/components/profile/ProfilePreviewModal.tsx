@@ -8,6 +8,12 @@ import {
   Languages,
   ArrowDown,
   ArrowUp,
+  Ruler,
+  Baby,
+  MessageCircle,
+  Gift,
+  PawPrint,
+  Share2,
 } from 'lucide-react';
 import { Pencil } from 'lucide-react';
 import { PotentialMatch } from '@/types';
@@ -16,6 +22,14 @@ import { getLanguageName } from '@/utils/languageNames';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from '../discover/MatchCardHelpers';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
+import {
+  FAMILY_PLANS_OPTIONS,
+  COMMUNICATION_STYLE_OPTIONS,
+  LOVE_STYLE_OPTIONS,
+  PETS_OPTIONS,
+  SOCIAL_MEDIA_OPTIONS,
+  traitLabel,
+} from '@/constants/profileTraits';
 import MusicLinkBadge from '../discover/MusicLinkBadge';
 import { SlideRenderer } from '../discover/SlideRenderer';
 import UserAdinkraDisplay from '../discover/UserAdinkraDisplay';
@@ -23,6 +37,14 @@ import SwipeButtons from '../discover/SwipeButtons';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { calculateProfileCompletion } from '@/utils/profileCompletion';
+
+const formatHeightLabel = (cm: number) => {
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}'${inches}" (${cm} cm)`;
+};
 
 interface ProfilePreviewModalProps {
   profile: PotentialMatch;
@@ -132,6 +154,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
 
   const slides = useMemo(() => buildSlides(profile, images), [profile, images]);
   const previewHighlights = useMemo(() => getPreviewHighlights(profile), [profile]);
+  // Same "earned" verified badge shown on the user's own profile page (>=85%
+  // profile completion), not a face-verification flag.
+  const showVerifiedBadge = useMemo(
+    () => calculateProfileCompletion(profile, images).showVerifiedBadge,
+    [profile, images]
+  );
   const musicHighlight = useMemo(() => findFavoriteWithLink(profile.favorites), [profile]);
   const userBackgroundColor = useMemo(
     () => getUserColorHash(profile.id, BACKGROUND_COLORS),
@@ -343,13 +371,31 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         >
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold mb-1 text-white">
-                {profile.first_name} {profile.last_name}, {calculateAge(profile.date_of_birth)}
-              </h2>
+              <div className="flex items-center gap-2 mb-1 leading-tight">
+                <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
+                  {profile.first_name} {profile.last_name}, {calculateAge(profile.date_of_birth)}
+                </h2>
+                {showVerifiedBadge && (
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src="/images/verified.svg"
+                    alt="Verified profile"
+                    title="Verified profile"
+                    className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
+                    aria-hidden="false"
+                  />
+                )}
+              </div>
               {!showMoreInfo && profile.city && (
                 <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-white/80">
                   <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                  <span>{profile.city}, {profile.country}</span>
+                  <span>
+                    {profile.city}, {profile.country}
+                    {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
+                      <span className="ml-2">• {formatHeightLabel(profile.height_cm)}</span>
+                    )}
+                  </span>
                 </div>
               )}
 
@@ -428,6 +474,16 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             </div>
           )}
 
+          {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.height', 'Height')}</h4>
+              <div className="flex items-center text-sm">
+                <Ruler className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                <span className="text-white">{formatHeightLabel(profile.height_cm)}</span>
+              </div>
+            </div>
+          )}
+
           {hasLifestyle && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
               <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.lifestyle')}</h4>
@@ -464,6 +520,16 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             </div>
           )}
 
+          {profile.family_plans && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.familyPlans', 'Family Plans')}</h4>
+              <div className="flex items-center text-sm">
+                <Baby className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                <span className="text-white">{traitLabel(FAMILY_PLANS_OPTIONS, profile.family_plans)}</span>
+              </div>
+            </div>
+          )}
+
           {(profile.occupation || profile.education_level) && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
               <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.workEducation')}</h4>
@@ -480,6 +546,92 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                     <span className="text-white">{profile.education_level}</span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {(typeof profile.introvert_extrovert === 'number' || typeof profile.spontaneous_planner === 'number' || typeof profile.messy_organized === 'number') && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-3">{t('discover.matchCard.personality')}</h4>
+              <div className="space-y-4">
+                {typeof profile.introvert_extrovert === 'number' && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-white/60">{t('discover.matchCard.introvert')}</span>
+                    <div className="flex-1 bg-white/10 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${profile.introvert_extrovert}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm text-white/60">{t('discover.matchCard.extrovert')}</span>
+                  </div>
+                )}
+                {typeof profile.spontaneous_planner === 'number' && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-white/80">{t('discover.matchCard.spontaneousVsPlanner', { percentage: profile.spontaneous_planner })}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-white/60">{t('discover.matchCard.spontaneous')}</span>
+                      <div className="flex-1 bg-white/10 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${profile.spontaneous_planner}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm text-white/60">{t('discover.matchCard.planner')}</span>
+                    </div>
+                  </div>
+                )}
+                {typeof profile.messy_organized === 'number' && (
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-white/80">{t('discover.matchCard.messyVsOrganized', { percentage: profile.messy_organized })}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-white/60">{t('discover.matchCard.messy')}</span>
+                      <div className="flex-1 bg-white/10 rounded-full h-2">
+                        <div
+                          className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${profile.messy_organized}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm text-white/60">{t('discover.matchCard.organized')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {profile.communication_style && profile.communication_style.length > 0 && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                <MessageCircle className="w-3.5 h-3.5 text-pink-500" />
+                {t('discover.matchCard.communicationStyle', 'Communication Style')}
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {profile.communication_style.map((value, index) => (
+                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                    {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profile.love_style && profile.love_style.length > 0 && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                <Gift className="w-3.5 h-3.5 text-pink-500" />
+                {t('discover.matchCard.loveStyle', 'Love Style')}
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {profile.love_style.map((value, index) => (
+                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                    {traitLabel(LOVE_STYLE_OPTIONS, value)}
+                  </span>
+                ))}
               </div>
             </div>
           )}
@@ -510,6 +662,45 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                     )}
                   </span>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {profile.pets && profile.pets.length > 0 && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                <PawPrint className="w-3.5 h-3.5 text-pink-500" />
+                {t('discover.matchCard.pets', 'Pets')}
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {profile.pets.map((value, index) => (
+                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                    {traitLabel(PETS_OPTIONS, value)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profile.languages && profile.languages.length > 0 && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.languagesSpoken', 'Languages')}</h4>
+              <div className="flex flex-wrap gap-1">
+                {profile.languages.map((lang, index) => (
+                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                    {lang}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profile.social_media && (
+            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.socialMedia', 'Social Media')}</h4>
+              <div className="flex items-center text-sm">
+                <Share2 className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                <span className="text-white">{traitLabel(SOCIAL_MEDIA_OPTIONS, profile.social_media)}</span>
               </div>
             </div>
           )}

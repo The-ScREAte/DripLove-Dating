@@ -40,3 +40,7 @@ export const SOCIAL_MEDIA_OPTIONS = [
   { value: 'off_the_grid', label: 'Off the grid' },
   { value: 'passive_scroller', label: 'Passive scroller' },
 ];
+
+// Shared value->label lookup for any of the option lists above.
+export const traitLabel = (options: { value: string; label: string }[], value: string): string =>
+  options.find((opt) => opt.value === value)?.label || value;

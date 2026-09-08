@@ -3,7 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Users, Heart, X, Calendar, MapPin, ArrowLeft, ArrowUp, ArrowDown,
-  Briefcase, GraduationCap, Crown, Lock, Languages, RefreshCw, ArrowDownToLine
+  Briefcase, GraduationCap, Crown, Lock, Languages, RefreshCw, ArrowDownToLine,
+  Ruler, Baby, MessageCircle, Gift, PawPrint, Share2
 } from 'lucide-react';
 
 // ANDROID FIX: Use platform utils instead of synchronous Capacitor import
@@ -32,6 +33,22 @@ import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BOR
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink, parseFavorites } from '@/constants/favorites';
 import MusicLinkBadge from './discover/MusicLinkBadge';
 import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
+import { calculateProfileCompletion } from '@/utils/profileCompletion';
+import {
+  FAMILY_PLANS_OPTIONS,
+  COMMUNICATION_STYLE_OPTIONS,
+  LOVE_STYLE_OPTIONS,
+  PETS_OPTIONS,
+  SOCIAL_MEDIA_OPTIONS,
+  traitLabel,
+} from '@/constants/profileTraits';
+
+const formatHeightLabel = (cm: number) => {
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}'${inches}" (${cm} cm)`;
+};
 
 // =========================================================
 // GLOBAL CACHES
@@ -807,6 +824,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return getPreviewHighlights(selectedProfile as unknown as PotentialMatch);
   }, [selectedProfile]);
 
+  // Same "earned" verified badge shown on the user's own profile page (>=85%
+  // profile completion), not a face-verification flag.
+  const showVerifiedBadge = useMemo(() => {
+    if (!selectedProfile) return false;
+    const profileImages = userImages[selectedProfile.id] || [];
+    return calculateProfileCompletion(selectedProfile, profileImages).showVerifiedBadge;
+  }, [selectedProfile, userImages]);
+
   // One cultural sign to surface as its own chip: whichever sign this profile
   // shares with the current user if they have one in common, otherwise just
   // one of the profile's own signs (deterministic, so it doesn't change on
@@ -1394,9 +1419,22 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
-                    {selectedProfile.first_name} {selectedProfile.last_name}
-                  </h2>
+                  <div className="flex items-center gap-2 mb-1 leading-tight">
+                    <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
+                      {selectedProfile.first_name} {selectedProfile.last_name}
+                    </h2>
+                    {showVerifiedBadge && (
+                      <img
+                        loading="lazy"
+                        decoding="async"
+                        src="/images/verified.svg"
+                        alt="Verified profile"
+                        title="Verified profile"
+                        className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
+                        aria-hidden="false"
+                      />
+                    )}
+                  </div>
                   <div className="flex items-center gap-3 text-[clamp(12px,3.4vw,14px)] text-gray-300 mt-1">
                     <div className="flex items-center">
                       <Calendar className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
@@ -1404,7 +1442,12 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     </div>
                     <div className="flex items-center">
                       <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                      <span>{selectedProfile.city}, {selectedProfile.country}</span>
+                      <span>
+                        {selectedProfile.city}, {selectedProfile.country}
+                        {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
+                          <span className="ml-2">• {formatHeightLabel(selectedProfile.height_cm)}</span>
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -1530,6 +1573,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Height</h4>
+                  <div className="flex items-center text-sm">
+                    <Ruler className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                    <span className="text-gray-200">{formatHeightLabel(selectedProfile.height_cm)}</span>
+                  </div>
+                </div>
+              )}
+
               {[selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Lifestyle</h4>
@@ -1566,6 +1619,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {selectedProfile.family_plans && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Family Plans</h4>
+                  <div className="flex items-center text-sm">
+                    <Baby className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                    <span className="text-gray-200">{traitLabel(FAMILY_PLANS_OPTIONS, selectedProfile.family_plans)}</span>
+                  </div>
+                </div>
+              )}
+
               {(selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry) && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Work & Education</h4>
@@ -1588,6 +1651,86 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                         <span className="text-gray-200">{selectedProfile.industry}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {(typeof selectedProfile.introvert_extrovert === 'number' || typeof selectedProfile.spontaneous_planner === 'number' || typeof selectedProfile.messy_organized === 'number') && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-3">Personality</h4>
+                  <div className="space-y-4">
+                    {typeof selectedProfile.introvert_extrovert === 'number' && (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-400">Introvert</span>
+                        <div className="flex-1 bg-white/10 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${selectedProfile.introvert_extrovert}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-400">Extrovert</span>
+                      </div>
+                    )}
+                    {typeof selectedProfile.spontaneous_planner === 'number' && (
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-400">Spontaneous</span>
+                          <div className="flex-1 bg-white/10 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${selectedProfile.spontaneous_planner}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-400">Planner</span>
+                        </div>
+                      </div>
+                    )}
+                    {typeof selectedProfile.messy_organized === 'number' && (
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-400">Messy</span>
+                          <div className="flex-1 bg-white/10 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${selectedProfile.messy_organized}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-400">Organized</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {selectedProfile.communication_style && selectedProfile.communication_style.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-pink-500" />
+                    Communication Style
+                  </h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProfile.communication_style.map((value, index) => (
+                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                        {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedProfile.love_style && selectedProfile.love_style.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                    <Gift className="w-3.5 h-3.5 text-pink-500" />
+                    Love Style
+                  </h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProfile.love_style.map((value, index) => (
+                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                        {traitLabel(LOVE_STYLE_OPTIONS, value)}
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1622,6 +1765,45 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {selectedProfile.pets && selectedProfile.pets.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                    <PawPrint className="w-3.5 h-3.5 text-pink-500" />
+                    Pets
+                  </h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProfile.pets.map((value, index) => (
+                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                        {traitLabel(PETS_OPTIONS, value)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedProfile.languages && selectedProfile.languages.length > 0 && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Languages</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedProfile.languages.map((lang, index) => (
+                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                        {lang}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedProfile.social_media && (
+                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                  <h4 className="font-semibold text-pink-400 mb-2">Social Media</h4>
+                  <div className="flex items-center text-sm">
+                    <Share2 className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
+                    <span className="text-gray-200">{traitLabel(SOCIAL_MEDIA_OPTIONS, selectedProfile.social_media)}</span>
+                  </div>
+                </div>
+              )}
+
               {selectedProfile.preferred_language && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Language</h4>
@@ -1644,10 +1826,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
               {!(
                 selectedProfile.bio ||
+                (typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0) ||
                 [selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) ||
+                selectedProfile.family_plans ||
                 selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry ||
+                (typeof selectedProfile.introvert_extrovert === 'number' || typeof selectedProfile.spontaneous_planner === 'number' || typeof selectedProfile.messy_organized === 'number') ||
+                (selectedProfile.communication_style && selectedProfile.communication_style.length > 0) ||
+                (selectedProfile.love_style && selectedProfile.love_style.length > 0) ||
                 (selectedProfile.interests && selectedProfile.interests.length > 0) ||
                 selectedProfileFavorites.length > 0 ||
+                (selectedProfile.pets && selectedProfile.pets.length > 0) ||
+                (selectedProfile.languages && selectedProfile.languages.length > 0) ||
+                selectedProfile.social_media ||
                 selectedProfile.preferred_language ||
                 selectedProfile.relationship_intent
               ) && (

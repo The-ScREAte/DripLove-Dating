@@ -23,6 +23,9 @@ export interface PotentialMatch {
   images: string[];
   is_verified?: boolean;
   gender: string;
+  preference?: string;
+  max_distance?: number;
+  distance_preference?: number;
   latitude?: number;
   longitude?: number;
   min_age?: number;
@@ -39,6 +42,13 @@ export interface PotentialMatch {
   spontaneous_planner?: number;
   messy_organized?: number;
   adinkra_symbols?: string[];
+  height_cm?: number | null;
+  languages?: string[];
+  family_plans?: string;
+  communication_style?: string[];
+  love_style?: string[];
+  pets?: string[];
+  social_media?: string;
   distance?: number; // Precomputed distance in km
   last_login_at?: string | null; // Used for the liked-you activity gate (DiscoverPage.tsx)
   // Set only on profiles mixed in from the archived (inactive 30+ days) pool.

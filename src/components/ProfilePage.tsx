@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Crown, MessageCircle, ChevronDown, ChevronRight, Trash2, Gamepad2 } from 'lucide-react';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import CachedImage from '@/components/common/CachedImage';
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -121,6 +122,17 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const toggleSection = (sectionName: string) => {
     setOpenSection(prevSection => prevSection === sectionName ? null : sectionName);
   };
+
+  // Scrolls the newly-opened section into view - whether it was opened via its
+  // own header or via a ProfileBasicsChips tap further up the page, so the
+  // user can actually see what just expanded instead of it opening off-screen.
+  useEffect(() => {
+    if (!openSection) return;
+    const id = setTimeout(() => {
+      document.getElementById(`section-${openSection}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => clearTimeout(id);
+  }, [openSection]);
   
   // Computed section states
   const showBasicInfoSection = openSection === 'basicInfo';
@@ -934,6 +946,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       images: previewImages,
       is_verified: profile.is_verified,
       gender: profile.gender || '',
+      preference: profile.preference || undefined,
+      max_distance: profile.max_distance ?? undefined,
+      distance_preference: profile.distance_preference ?? undefined,
       fun_fact: profile.fun_fact,
       perfect_first_date: profile.perfect_first_date,
       last_googled: profile.last_googled,
@@ -946,6 +961,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       spontaneous_planner: profile.spontaneous_planner,
       messy_organized: profile.messy_organized,
       adinkra_symbols: profile.adinkra_symbols || [],
+      height_cm: profile.height_cm ?? undefined,
+      languages: Array.isArray(profile.languages) ? profile.languages : [],
+      family_plans: profile.family_plans || undefined,
+      communication_style: Array.isArray(profile.communication_style) ? profile.communication_style : [],
+      love_style: Array.isArray(profile.love_style) ? profile.love_style : [],
+      pets: Array.isArray(profile.pets) ? profile.pets : [],
+      social_media: profile.social_media || undefined,
     };
   }, [profile, previewImages]);
 
@@ -1015,13 +1037,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             <div className="flex items-center gap-2.5 min-w-0">
               {previewImages[0] ? (
                 <div
-                  style={{ width: 56, height: 56, minWidth: 56, minHeight: 56, position: 'relative', borderRadius: '9999px', overflow: 'hidden' }}
+                  style={{ width: 44, height: 44, minWidth: 44, minHeight: 44, position: 'relative', borderRadius: 9999, overflow: 'hidden', backgroundColor: '#171717' }}
                   className="shrink-0 border-2 border-pink-500/60"
                 >
-                  <img
+                  <CachedImage
                     loading="lazy"
                     decoding="async"
-                    src={optimizeImageUrl(previewImages[0], { width: 120, quality: 70 })}
+                    src={optimizeImageUrl(previewImages[0], { width: 88, height: 88, quality: 70 })}
                     alt={profile?.first_name || 'Profile photo'}
                     style={{
                       position: 'absolute',
@@ -1030,12 +1052,11 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
-                      objectPosition: 'center',
                     }}
                   />
                 </div>
               ) : (
-                <div className="w-14 h-14 rounded-full bg-neutral-800 border border-pink-500/30 shrink-0" />
+                <div style={{ width: 44, height: 44, minWidth: 44, minHeight: 44 }} className="rounded-full bg-neutral-800 border border-pink-500/30 shrink-0" />
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }} className="min-w-0">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
@@ -1344,6 +1365,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.basicInfo')}
             isOpen={showBasicInfoSection}
             onToggle={() => toggleSection('basicInfo')}
+            id="section-basicInfo"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1362,6 +1384,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title="Advertisement"
             isOpen={showAdvertisementSection}
             onToggle={() => toggleSection('advertisement')}
+            id="section-advertisement"
             className="mt-3"
           >
             <AdvertisementSection
@@ -1373,6 +1396,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.preferences')}
             isOpen={showLocationSection}
             onToggle={() => toggleSection('location')}
+            id="section-location"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1401,6 +1425,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.lifestyle')}
             isOpen={showLifestyleSection}
             onToggle={() => toggleSection('lifestyle')}
+            id="section-lifestyle"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1420,6 +1445,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.workEducation')}
             isOpen={showWorkEducationSection}
             onToggle={() => toggleSection('workEducation')}
+            id="section-workEducation"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1438,6 +1464,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.personality')}
             isOpen={showPersonalitySection}
             onToggle={() => toggleSection('personality')}
+            id="section-personality"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1459,6 +1486,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title="Languages"
             isOpen={showLanguagesSection}
             onToggle={() => toggleSection('languages')}
+            id="section-languages"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1478,6 +1506,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title="Pets"
             isOpen={showPetsSection}
             onToggle={() => toggleSection('pets')}
+            id="section-pets"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1497,6 +1526,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title="Social Media"
             isOpen={showSocialMediaSection}
             onToggle={() => toggleSection('socialMedia')}
+            id="section-socialMedia"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1515,6 +1545,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.funQuestions')}
             isOpen={showFunQuestionsSection}
             onToggle={() => toggleSection('funQuestions')}
+            id="section-funQuestions"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1533,6 +1564,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.interests')}
             isOpen={showInterestsSection}
             onToggle={() => toggleSection('interests')}
+            id="section-interests"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1552,6 +1584,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.favorites')}
             isOpen={showFavoritesSection}
             onToggle={() => toggleSection('favorites')}
+            id="section-favorites"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1571,6 +1604,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.adinkra')}
             isOpen={showAdinkraSection}
             onToggle={() => toggleSection('adinkra')}
+            id="section-adinkra"
             className="mt-3"
             showEditButton
             isEditing={isEditing}
@@ -1590,6 +1624,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.accountActions')}
             isOpen={showAccountActionsSection}
             onToggle={() => toggleSection('accountActions')}
+            id="section-accountActions"
             className="mt-3"
           >
             {/* Only show the rest of the account actions here, not logout/terms/privacy */}

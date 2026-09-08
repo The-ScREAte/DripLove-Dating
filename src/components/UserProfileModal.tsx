@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2, X, Settings, Save, Pencil } from 'lucide-react';
+import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2, X, Settings, Save, Pencil, Ruler, Baby, MessageCircle, Gift, PawPrint, Share2, Languages } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
@@ -13,6 +13,24 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '@/hooks/use-toast';
 import { getCountriesList } from '@/constants/locationData';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import CachedImage from '@/components/common/CachedImage';
+import { calculateProfileCompletion } from '@/utils/profileCompletion';
+import {
+  FAMILY_PLANS_OPTIONS,
+  COMMUNICATION_STYLE_OPTIONS,
+  LOVE_STYLE_OPTIONS,
+  PETS_OPTIONS,
+  SOCIAL_MEDIA_OPTIONS,
+  traitLabel,
+} from '@/constants/profileTraits';
+import { favoriteEmoji, formatFavoriteLabel, parseFavorites } from '@/constants/favorites';
+
+const formatHeightLabel = (cm: number) => {
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}'${inches}" (${cm} cm)`;
+};
 // Lazy, not a static import: PhotoCropModal needs its own isolated build
 // chunk (see vite.config.ts) to avoid a circular-chunk crash.
 const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
@@ -222,6 +240,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
     return age;
   };
 
+  // Same "earned" verified badge shown everywhere else (>=85% profile
+  // completion) - not a face-verification flag.
+  const showVerifiedBadge = profile ? calculateProfileCompletion(profile, userImages).showVerifiedBadge : false;
+
+  const favorites = parseFavorites(profile?.favorites);
+
   const handleImageClick = (index: number) => {
     setSelectedImageIndex(index);
     setIsImageViewerOpen(true);
@@ -272,7 +296,10 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
-          <DialogHeader className="flex flex-row items-center justify-end">
+          {/* Absolutely positioned (not a normal grid row) so the close button
+              doesn't reserve its own gap-4 row above the avatar - it just
+              floats in the corner instead of pushing everything else down. */}
+          <DialogHeader className="absolute top-3 right-3 z-20 space-y-0">
             {/* Visually hidden, not removed - Radix requires a DialogTitle for
                 accessibility (it's what aria-labelledby points at), but showing
                 it here duplicated the name that's already the hero heading
@@ -295,11 +322,11 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {/* Header with main image and basic info */}
               <div className="text-center">
               {userImages.length > 0 ? (
-                <div className="relative w-32 h-32 mx-auto mb-4">
-                  <img loading="lazy" decoding="async"
+                <div className="relative w-24 h-24 mx-auto mb-4">
+                  <CachedImage loading="lazy" decoding="async"
                     src={optimizeImageUrl(userImages[0], { width: 500, quality: 60 })}
                     alt={`${profile?.first_name} ${profile?.last_name}`}
-                    className="w-32 h-32 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-pink-500/40"
+                    className="w-24 h-24 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-pink-500/40"
                     onClick={() => handleImageClick(0)}
                   />
                   {isAdmin && (
@@ -328,16 +355,28 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   )}
                 </div>
               ) : (
-                <Avatar className="w-32 h-32 mx-auto mb-4 border-4 border-pink-500/40">
+                <Avatar className="w-24 h-24 mx-auto mb-4 border-4 border-pink-500/40">
                   <AvatarFallback className="bg-pink-950 text-pink-300 text-2xl">
                     {profile?.first_name?.charAt(0)}{profile?.last_name?.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
               )}
 
-                <h2 className="text-2xl font-bold text-white">
-                  {profile?.first_name} {profile?.last_name}
-                </h2>
+                <div className="flex items-center justify-center gap-2">
+                  <h2 className="text-2xl font-bold text-white">
+                    {profile?.first_name} {profile?.last_name}
+                  </h2>
+                  {showVerifiedBadge && (
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src="/images/verified.svg"
+                      alt="Verified profile"
+                      title="Verified profile"
+                      className="w-6 h-6"
+                    />
+                  )}
+                </div>
 
                 {(isEditingPreferences ? editedDateOfBirth : profile?.date_of_birth) && (
                   <p className="text-gray-300 mb-2">
@@ -348,7 +387,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                 {(profile?.city || profile?.country) && (
                   <div className="flex items-center justify-center text-gray-300 mb-4">
                     <MapPin className="w-4 h-4 mr-1" />
-                    <span>{profile?.city}{profile?.city && profile?.country && ', '}{profile?.country}</span>
+                    <span>
+                      {profile?.city}{profile?.city && profile?.country && ', '}{profile?.country}
+                      {typeof profile?.height_cm === 'number' && profile.height_cm > 0 && (
+                        <span className="ml-2">• {formatHeightLabel(profile.height_cm)}</span>
+                      )}
+                    </span>
                   </div>
                 )}
               </div>
@@ -648,7 +692,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                     <div className="grid grid-cols-3 gap-2">
                       {userImages.slice(0, 6).map((image, index) => (
                         <div key={index} className="relative group">
-                          <img
+                          <CachedImage
                             loading="lazy"
                             decoding="async"
                             src={optimizeImageUrl(image, { width: 300, quality: 60 })}
@@ -755,6 +799,19 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                 </Card>
               )}
 
+              {/* Family Plans */}
+              {profile?.family_plans && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <Baby className="w-4 h-4 mr-2 text-blue-400" />
+                      Family Plans
+                    </h3>
+                    <p className="text-gray-200">{traitLabel(FAMILY_PLANS_OPTIONS, profile.family_plans)}</p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Work & Education */}
               {(profile?.occupation || profile?.industry || profile?.education_level) && (
                 <Card className="bg-black border-pink-500/20">
@@ -842,6 +899,44 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                 </Card>
               )}
 
+              {/* Communication Style */}
+              {profile?.communication_style && profile.communication_style.length > 0 && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <MessageCircle className="w-4 h-4 mr-2 text-blue-400" />
+                      Communication Style
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.communication_style.map((value: string) => (
+                        <Badge key={value} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
+                          {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Love Style */}
+              {profile?.love_style && profile.love_style.length > 0 && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <Gift className="w-4 h-4 mr-2 text-blue-400" />
+                      Love Style
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.love_style.map((value: string) => (
+                        <Badge key={value} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
+                          {traitLabel(LOVE_STYLE_OPTIONS, value)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Fun Questions */}
               {(profile?.fun_fact || profile?.perfect_first_date || profile?.last_googled) && (
                 <Card className="bg-black border-pink-500/20">
@@ -883,6 +978,74 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         </Badge>
                       ))}
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Favorites */}
+              {favorites.length > 0 && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 text-white">{t('matches.favorites', 'Favorites')}</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {favorites.map((favorite, index) => (
+                        <Badge key={index} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40 gap-1">
+                          <span>{favoriteEmoji(favorite.category)}</span>
+                          <span>{formatFavoriteLabel(favorite)}</span>
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Pets */}
+              {profile?.pets && profile.pets.length > 0 && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <PawPrint className="w-4 h-4 mr-2 text-blue-400" />
+                      Pets
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.pets.map((value: string) => (
+                        <Badge key={value} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
+                          {traitLabel(PETS_OPTIONS, value)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Languages spoken */}
+              {profile?.languages && profile.languages.length > 0 && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <Languages className="w-4 h-4 mr-2 text-blue-400" />
+                      Languages
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.languages.map((lang: string) => (
+                        <Badge key={lang} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
+                          {lang}
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Social Media */}
+              {profile?.social_media && (
+                <Card className="bg-black border-pink-500/20">
+                  <CardContent className="pt-6">
+                    <h3 className="font-semibold mb-3 flex items-center text-white">
+                      <Share2 className="w-4 h-4 mr-2 text-blue-400" />
+                      Social Media
+                    </h3>
+                    <p className="text-gray-200">{traitLabel(SOCIAL_MEDIA_OPTIONS, profile.social_media)}</p>
                   </CardContent>
                 </Card>
               )}

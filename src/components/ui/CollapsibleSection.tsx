@@ -8,6 +8,7 @@ interface CollapsibleSectionProps {
   onToggle: () => void;
   children: React.ReactNode;
   className?: string;
+  id?: string;
   /** Shows Edit / Save+Cancel controls in the header (top-right, next to the
       chevron) while the section is open - lets the user edit and save right
       from here instead of scrolling back up to the page's main Edit button. */
@@ -27,6 +28,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onToggle,
   children,
   className = "",
+  id,
   showEditButton = false,
   isEditing = false,
   isSaving = false,
@@ -35,7 +37,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onCancel,
 }) => {
   return (
-    <Card className={`w-full bg-black border-pink-500/30 ${className}`}>
+    <Card id={id} className={`w-full bg-black border-pink-500/30 ${className}`}>
       <CardHeader
         className="cursor-pointer hover:bg-pink-500/10 transition-colors duration-200 px-6 py-2.5"
         onClick={onToggle}

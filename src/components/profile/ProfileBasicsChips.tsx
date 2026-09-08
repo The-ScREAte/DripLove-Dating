@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Ruler, Briefcase, GraduationCap, User, Heart, Compass, Wine, Plus, Languages, Baby, MessageCircle, Gift, PawPrint, Share2 } from 'lucide-react';
+import { Home, Ruler, Briefcase, GraduationCap, User, Heart, Compass, Wine, Plus, Languages, Baby, MessageCircle, Gift, PawPrint, Share2, Sparkles, Star, Lightbulb } from 'lucide-react';
 import { FAMILY_PLANS_OPTIONS, COMMUNICATION_STYLE_OPTIONS, LOVE_STYLE_OPTIONS, PETS_OPTIONS, SOCIAL_MEDIA_OPTIONS } from '@/constants/profileTraits';
 
 interface ProfileBasicsChipsProps {
@@ -23,6 +23,9 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
   const communicationStyle: string[] = Array.isArray(editedProfile.communication_style) ? editedProfile.communication_style : [];
   const loveStyle: string[] = Array.isArray(editedProfile.love_style) ? editedProfile.love_style : [];
   const pets: string[] = Array.isArray(editedProfile.pets) ? editedProfile.pets : [];
+  const interests: string[] = Array.isArray(editedProfile.interests) ? editedProfile.interests : [];
+  const favorites: unknown[] = Array.isArray(editedProfile.favorites) ? editedProfile.favorites : [];
+  const hasFunQuestion = !!(editedProfile.fun_fact || editedProfile.perfect_first_date || editedProfile.last_googled);
 
   // label is '' when nothing's set yet - the chip then renders icon + a bare "+"
   // (an add-it prompt) instead of a placeholder word, keeping it tiny.
@@ -125,6 +128,27 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
       section: 'socialMedia',
       border: 'border-violet-500/50',
     },
+    {
+      key: 'interests',
+      icon: <Sparkles className="w-3 h-3" />,
+      label: interests.length > 0 ? String(interests.length) : '',
+      section: 'interests',
+      border: 'border-lime-500/50',
+    },
+    {
+      key: 'favorites',
+      icon: <Star className="w-3 h-3" />,
+      label: favorites.length > 0 ? String(favorites.length) : '',
+      section: 'favorites',
+      border: 'border-yellow-500/50',
+    },
+    {
+      key: 'funQuestions',
+      icon: <Lightbulb className="w-3 h-3" />,
+      label: hasFunQuestion ? '✓' : '',
+      section: 'funQuestions',
+      border: 'border-pink-400/50',
+    },
   ];
 
   // Two rows, filled column-first (item 0 -> row 1, item 1 -> row 2, item 2 -> row 1, ...)
@@ -147,7 +171,7 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
 
   return (
     <div className="overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-      <div className="flex flex-col gap-1.5 w-max">
+      <div className="flex flex-col gap-1.5 w-max mx-auto">
         <div className="flex gap-1.5">{row1.map(renderChip)}</div>
         <div className="flex gap-1.5">{row2.map(renderChip)}</div>
       </div>

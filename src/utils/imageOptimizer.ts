@@ -45,7 +45,13 @@ export function optimizeImageUrl(
       parsed.searchParams.set('width', String(width));
       if (height) parsed.searchParams.set('height', String(height));
       parsed.searchParams.set('quality', String(quality));
-      parsed.searchParams.set('resize', 'cover');
+      // 'cover' crops to fill both dimensions - meaningless (and actively
+      // harmful) without a height: Supabase's transform then leaves the
+      // image at its ORIGINAL height while forcing width to the requested
+      // value, silently squashing/stretching every image that only passes
+      // width. 'contain' correctly scales the whole image proportionally
+      // when only one dimension is given.
+      parsed.searchParams.set('resize', height ? 'cover' : 'contain');
       return parsed.toString();
     };
 

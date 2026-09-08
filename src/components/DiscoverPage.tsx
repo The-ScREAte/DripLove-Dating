@@ -195,6 +195,8 @@ type ProfileRow = Pick<
   | 'favorites'
   | 'gender'
   | 'preference'
+  | 'max_distance'
+  | 'distance_preference'
   | 'is_verified'
   | 'latitude'
   | 'longitude'
@@ -212,6 +214,13 @@ type ProfileRow = Pick<
   | 'adinkra_symbols'
   | 'created_at'
   | 'last_login_at'
+  | 'height_cm'
+  | 'languages'
+  | 'family_plans'
+  | 'communication_style'
+  | 'love_style'
+  | 'pets'
+  | 'social_media'
 > & {
   // Set client-side only when a row was fetched via the archived-users
   // mix-in, before it's converted to a PotentialMatch - never a real column
@@ -236,6 +245,9 @@ const toPotentialMatch = (
     ? adinkraRaw.filter((i): i is string => typeof i === 'string')
     : undefined;
 
+  const asStringArray = (raw: unknown): string[] | undefined =>
+    Array.isArray(raw) ? raw.filter((i): i is string => typeof i === 'string') : undefined;
+
   return {
     id: profile.id,
     first_name: profile.first_name ?? '',
@@ -252,6 +264,9 @@ const toPotentialMatch = (
     images: extras?.images ?? [],
     is_verified: profile.is_verified ?? undefined,
     gender: profile.gender ?? '',
+    preference: profile.preference ?? undefined,
+    max_distance: profile.max_distance ?? undefined,
+    distance_preference: profile.distance_preference ?? undefined,
     latitude: profile.latitude ?? undefined,
     longitude: profile.longitude ?? undefined,
     fun_fact: profile.fun_fact ?? undefined,
@@ -266,6 +281,13 @@ const toPotentialMatch = (
     spontaneous_planner: profile.spontaneous_planner ?? undefined,
     messy_organized: profile.messy_organized ?? undefined,
     adinkra_symbols,
+    height_cm: profile.height_cm ?? undefined,
+    languages: asStringArray(profile.languages),
+    family_plans: profile.family_plans ?? undefined,
+    communication_style: asStringArray(profile.communication_style),
+    love_style: asStringArray(profile.love_style),
+    pets: asStringArray(profile.pets),
+    social_media: profile.social_media ?? undefined,
     distance: extras?.distance,
     is_archived: profile.__isArchivedMixin || undefined,
     last_login_at: profile.last_login_at ?? undefined,
@@ -3600,7 +3622,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               const { data: freshRows } = await Promise.race([
                 supabase
                   .from('profiles')
-                  .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at')
+                  .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, max_distance, distance_preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at, is_verified, height_cm, languages, family_plans, communication_style, love_style, pets, social_media')
                   .in('id', fetchIds)
                   .in('country_code', rescueAllowedCountryCodes)
                   .eq('account_status', 'active')
@@ -4447,7 +4469,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // If not in current matches, try to fetch their profile data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, is_verified')
+          .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, max_distance, distance_preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, is_verified, height_cm, languages, family_plans, communication_style, love_style, pets, social_media')
           .eq('id', lastPassedUser.user_id)
           .eq('account_status', 'active')
           .single();

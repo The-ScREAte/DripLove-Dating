@@ -4,7 +4,7 @@ import ReportButton from '../ReportButton';
 import UserAdinkraDisplay from './UserAdinkraDisplay';
 import ReportModal from '../modals/ReportModal';
 import styles from './MatchCard.module.css';
-import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ArrowDown, ArrowUp, User, Languages, Heart } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Calendar, Crown, Shield, ArrowDown, ArrowUp, User, Languages, Heart, Ruler, Baby, MessageCircle, Gift, PawPrint, Share2 } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
@@ -13,7 +13,23 @@ import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BOR
 import { SlideRenderer } from './SlideRenderer';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
+import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import MusicLinkBadge from './MusicLinkBadge';
+import {
+  FAMILY_PLANS_OPTIONS,
+  COMMUNICATION_STYLE_OPTIONS,
+  LOVE_STYLE_OPTIONS,
+  PETS_OPTIONS,
+  SOCIAL_MEDIA_OPTIONS,
+  traitLabel,
+} from '@/constants/profileTraits';
+
+const formatHeightLabel = (cm: number) => {
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}'${inches}" (${cm} cm)`;
+};
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -133,6 +149,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
   // ⭐ PHASE 1.3: Move heavy logic OUTSIDE + use memoized buildSlides
   const slides = useMemo(() => buildSlides(stableMatch, memoUserImages), [stableMatch, memoUserImages]);
   const previewHighlights = useMemo(() => getPreviewHighlights(stableMatch), [stableMatch]);
+
+  // Same "earned" verified badge shown on the user's own profile page (>=85%
+  // profile completion) - not the face-verification `isVerified` prop, which
+  // tracks something different.
+  const showVerifiedBadge = useMemo(
+    () => calculateProfileCompletion(stableMatch, memoUserImages).showVerifiedBadge,
+    [stableMatch, memoUserImages]
+  );
 
   // One cultural sign to surface as its own chip: whichever sign this profile
   // shares with the current user if they have one in common, otherwise just
@@ -577,7 +601,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
                     {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
                   </h2>
-                  {isVerified && (
+                  {showVerifiedBadge && (
                     <img
                       loading="lazy"
                       decoding="async"
@@ -609,6 +633,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           )))} km away
                         </span>
                       ))}
+                      {typeof match.height_cm === 'number' && match.height_cm > 0 && (
+                        <span className="ml-2">• {formatHeightLabel(match.height_cm)}</span>
+                      )}
                     </span>
                   </div>
                 )}
@@ -845,6 +872,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </div>
             )}
 
+            {/* Height */}
+            {typeof match.height_cm === 'number' && match.height_cm > 0 && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.height', 'Height')}</h4>
+                <div className="flex items-center text-sm">
+                  <Ruler className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
+                  <span className="text-gray-200">{formatHeightLabel(match.height_cm)}</span>
+                </div>
+              </div>
+            )}
+
             {/* Lifestyle */}
             {([
               match.smoking,
@@ -883,6 +921,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       <span className="text-gray-200">{match.sleeping_schedule}</span>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Family Plans */}
+            {match.family_plans && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.familyPlans', 'Family Plans')}</h4>
+                <div className="flex items-center text-sm">
+                  <Baby className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
+                  <span className="text-gray-200">{traitLabel(FAMILY_PLANS_OPTIONS, match.family_plans)}</span>
                 </div>
               </div>
             )}
@@ -963,6 +1012,40 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </div>
             )}
 
+            {/* Communication Style */}
+            {match.communication_style && match.communication_style.length > 0 && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                  <MessageCircle className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] text-pink-500" />
+                  {t('discover.matchCard.communicationStyle', 'Communication Style')}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {match.communication_style.map((value, index) => (
+                    <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                      {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Love Style */}
+            {match.love_style && match.love_style.length > 0 && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                  <Gift className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] text-pink-500" />
+                  {t('discover.matchCard.loveStyle', 'Love Style')}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {match.love_style.map((value, index) => (
+                    <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                      {traitLabel(LOVE_STYLE_OPTIONS, value)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Interests */}
             {match.interests?.length > 0 && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -997,6 +1080,48 @@ const MatchCard: React.FC<MatchCardProps> = ({
                       )}
                     </span>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pets */}
+            {match.pets && match.pets.length > 0 && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
+                  <PawPrint className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] text-pink-500" />
+                  {t('discover.matchCard.pets', 'Pets')}
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {match.pets.map((value, index) => (
+                    <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                      {traitLabel(PETS_OPTIONS, value)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Languages spoken */}
+            {match.languages && match.languages.length > 0 && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.languagesSpoken', 'Languages')}</h4>
+                <div className="flex flex-wrap gap-1">
+                  {match.languages.map((lang, index) => (
+                    <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
+                      {lang}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Social Media */}
+            {match.social_media && (
+              <div className="bg-black border border-pink-500/20 rounded-lg p-3">
+                <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.socialMedia', 'Social Media')}</h4>
+                <div className="flex items-center text-sm">
+                  <Share2 className="w-[clamp(11px,3vw,13px)] h-[clamp(11px,3vw,13px)] mr-2 flex-shrink-0 text-pink-500" />
+                  <span className="text-gray-200">{traitLabel(SOCIAL_MEDIA_OPTIONS, match.social_media)}</span>
                 </div>
               </div>
             )}

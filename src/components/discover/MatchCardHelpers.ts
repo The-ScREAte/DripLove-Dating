@@ -2,9 +2,29 @@
 // This reduces Android WebView render cost by 30-40%
 
 import { PotentialMatch } from '@/types';
+import {
+  FAMILY_PLANS_OPTIONS,
+  COMMUNICATION_STYLE_OPTIONS,
+  LOVE_STYLE_OPTIONS,
+  PETS_OPTIONS,
+  SOCIAL_MEDIA_OPTIONS,
+  traitLabel,
+} from '@/constants/profileTraits';
 
 export interface SlideContent {
-  type: 'image' | 'bio' | 'fun_fact' | 'perfect_first_date' | 'last_googled' | 'placeholder';
+  type:
+    | 'image'
+    | 'bio'
+    | 'fun_fact'
+    | 'perfect_first_date'
+    | 'last_googled'
+    | 'height'
+    | 'family_plans'
+    | 'communication_style'
+    | 'love_style'
+    | 'pets'
+    | 'social_media'
+    | 'placeholder';
   content: string;
   index: number;
 }
@@ -62,11 +82,48 @@ export const buildSlides = (
     nonImageContent.push({ type: 'bio' as const, content: match.bio, index: -1 });
   }
 
-  // Choose one fun question deterministically
+  // Choose one fun question deterministically - the pool includes both the
+  // original free-text prompts and the newer trait fields (family plans,
+  // communication/love style, pets, social media), so which one shows up is
+  // random per profile rather than always the same field for everyone or
+  // all of them at once.
   const funQuestions: SlideContent[] = [];
   if (match.fun_fact?.trim()) funQuestions.push({ type: 'fun_fact' as const, content: match.fun_fact, index: -1 });
   if (match.perfect_first_date?.trim()) funQuestions.push({ type: 'perfect_first_date' as const, content: match.perfect_first_date, index: -1 });
   if (match.last_googled?.trim()) funQuestions.push({ type: 'last_googled' as const, content: match.last_googled, index: -1 });
+  if (typeof match.height_cm === 'number' && match.height_cm > 0) {
+    const totalInches = Math.round(match.height_cm / 2.54);
+    const feet = Math.floor(totalInches / 12);
+    const inches = totalInches % 12;
+    funQuestions.push({ type: 'height' as const, content: `${feet}'${inches}" (${match.height_cm} cm)`, index: -1 });
+  }
+  if (match.family_plans?.trim()) {
+    funQuestions.push({ type: 'family_plans' as const, content: traitLabel(FAMILY_PLANS_OPTIONS, match.family_plans), index: -1 });
+  }
+  if (match.communication_style && match.communication_style.length > 0) {
+    funQuestions.push({
+      type: 'communication_style' as const,
+      content: match.communication_style.map((v) => traitLabel(COMMUNICATION_STYLE_OPTIONS, v)).join(', '),
+      index: -1,
+    });
+  }
+  if (match.love_style && match.love_style.length > 0) {
+    funQuestions.push({
+      type: 'love_style' as const,
+      content: match.love_style.map((v) => traitLabel(LOVE_STYLE_OPTIONS, v)).join(', '),
+      index: -1,
+    });
+  }
+  if (match.pets && match.pets.length > 0) {
+    funQuestions.push({
+      type: 'pets' as const,
+      content: match.pets.map((v) => traitLabel(PETS_OPTIONS, v)).join(', '),
+      index: -1,
+    });
+  }
+  if (match.social_media?.trim()) {
+    funQuestions.push({ type: 'social_media' as const, content: traitLabel(SOCIAL_MEDIA_OPTIONS, match.social_media), index: -1 });
+  }
 
   if (funQuestions.length > 0) {
     const idx = Math.floor(rand() * funQuestions.length);

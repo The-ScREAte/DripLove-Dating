@@ -1,9 +1,10 @@
 // ⭐ ANDROID OPTIMIZATION: Memoized slide components to reduce re-render cost by 40-60%
 import React from 'react';
-import { User, Quote, Heart, Coffee, Search } from 'lucide-react';
+import { User, Quote, Heart, Coffee, Search, Baby, MessageCircle, Gift, PawPrint, Share2, Ruler } from 'lucide-react';
 import { SlideContent } from './MatchCardHelpers';
 import { useTranslation } from 'react-i18next';
 import styles from './MatchCard.module.css';
+import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
 
 interface SlideRendererProps {
   slide: SlideContent;
@@ -36,18 +37,52 @@ const areBlobMapsEqual = (
 // Only use opacity transition for blob URLs where we know loading is instant
 const ImageSlide = React.memo<{
   imageSrc: string;
+  originalUrl: string;
   matchFirstName: string;
   matchLastName: string;
   usingBlob: boolean;
   showLoader: boolean;
-}>(({ imageSrc, matchFirstName, matchLastName, usingBlob, showLoader }) => {
+}>(({ imageSrc, originalUrl, matchFirstName, matchLastName, usingBlob, showLoader }) => {
   const [hasError, setHasError] = React.useState(false);
-  
-  // Reset error state when image source changes
+  // Once the live network request fails, this holds a persistent-cache
+  // fallback (IndexedDB, survives app restarts) so the photo can still show
+  // with no internet, as long as it loaded successfully at least once before.
+  const [fallbackSrc, setFallbackSrc] = React.useState<string | null>(null);
+  const triedCacheRef = React.useRef(false);
+  const fallbackObjectUrlRef = React.useRef<string | null>(null);
+
+  // Reset error/fallback state when image source changes
   React.useEffect(() => {
     setHasError(false);
+    setFallbackSrc(null);
+    triedCacheRef.current = false;
+    return () => {
+      if (fallbackObjectUrlRef.current) {
+        URL.revokeObjectURL(fallbackObjectUrlRef.current);
+        fallbackObjectUrlRef.current = null;
+      }
+    };
   }, [imageSrc]);
-  
+
+  const handleError = React.useCallback(async () => {
+    if (usingBlob || triedCacheRef.current) {
+      setHasError(true);
+      return;
+    }
+    triedCacheRef.current = true;
+    const cached = await getCachedObjectUrl(originalUrl);
+    if (cached) {
+      fallbackObjectUrlRef.current = cached;
+      setFallbackSrc(cached);
+    } else {
+      setHasError(true);
+    }
+  }, [originalUrl, usingBlob]);
+
+  const handleLoad = React.useCallback(() => {
+    if (!usingBlob && !fallbackSrc) warmImageCache(originalUrl);
+  }, [fallbackSrc, originalUrl, usingBlob]);
+
   // Show placeholder if image failed to load
   if (hasError) {
     return (
@@ -85,11 +120,12 @@ const ImageSlide = React.memo<{
         key={imageSrc}
         loading="eager"
         decoding="async"
-        src={imageSrc}
+        src={fallbackSrc ?? imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
         className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
         draggable={false}
-        onError={() => setHasError(true)}
+        onLoad={handleLoad}
+        onError={handleError}
       />
     </div>
   );
@@ -180,6 +216,30 @@ const LastGoogledSlide = React.memo<{
 ));
 LastGoogledSlide.displayName = 'LastGoogledSlide';
 
+// Generic trait prompt slide (family plans / communication style / love
+// style / pets / social media) - same layout as the fun-fact-style slides
+// above, just parametrized by icon + title instead of five near-duplicate
+// components.
+const TraitPromptSlide = React.memo<{
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  content: string;
+  userBackgroundColor: string;
+}>(({ icon: Icon, title, content, userBackgroundColor }) => (
+  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
+    <div className="max-w-sm mx-auto text-center">
+      <div className="flex items-center justify-center mb-6">
+        <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
+          <Icon className="w-8 h-8 text-white" />
+        </div>
+      </div>
+      <h3 className="text-2xl font-bold text-white mb-6">{title}</h3>
+      <p className="text-white text-lg leading-relaxed font-medium">{content}</p>
+    </div>
+  </div>
+));
+TraitPromptSlide.displayName = 'TraitPromptSlide';
+
 // Placeholder Slide Component
 const PlaceholderSlide = React.memo<{
   matchFirstName: string;
@@ -231,6 +291,7 @@ export const SlideRenderer = React.memo<SlideRendererProps>(({
       return (
         <ImageSlide
           imageSrc={imageSrc}
+          originalUrl={originalUrl}
           matchFirstName={matchFirstName}
           matchLastName={matchLastName}
           usingBlob={usingBlob}
@@ -252,6 +313,18 @@ export const SlideRenderer = React.memo<SlideRendererProps>(({
       return <PerfectFirstDateSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
     case 'last_googled':
       return <LastGoogledSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'height':
+      return <TraitPromptSlide icon={Ruler} title="Height" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'family_plans':
+      return <TraitPromptSlide icon={Baby} title="Family Plans" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'communication_style':
+      return <TraitPromptSlide icon={MessageCircle} title="Communication Style" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'love_style':
+      return <TraitPromptSlide icon={Gift} title="Love Style" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'pets':
+      return <TraitPromptSlide icon={PawPrint} title="Pets" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'social_media':
+      return <TraitPromptSlide icon={Share2} title="Social Media" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
     case 'placeholder':
       return <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
     default:

@@ -16,6 +16,7 @@ import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
+import CachedImage from '@/components/common/CachedImage';
 import {
   DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -106,14 +107,14 @@ const SortablePhotoThumb = ({
           <span className="text-[10px]">Unavailable</span>
         </div>
       ) : (
-        <img
+        <CachedImage
           loading="lazy"
           decoding="async"
           draggable={false}
-          src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, quality: 60 })}
+          src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, height: 750, quality: 60 })}
           alt={`User Image ${index + 1}`}
           className="w-full h-full object-cover rounded-xl shadow-sm pointer-events-none select-none"
-          onError={() => onImageError(userImage.image_url)}
+          onLoadError={() => onImageError(userImage.image_url)}
         />
       )}
 
@@ -953,7 +954,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
             </button>
 
             <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <img
+              <CachedImage
                 src={optimizeImageUrl(previewUrl, { width: 1200, quality: 80 })}
                 alt="Photo preview"
                 className="max-w-[92vw] max-h-[70vh] object-contain rounded-xl block"
