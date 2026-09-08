@@ -12,10 +12,80 @@ index 273ca02..5c143a0 100644
      }
      lintOptions {
 diff --git a/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift b/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
-index 5be6f4b..6a9f49a 100644
+index 5be6f4b..8d0e936 100644
 --- a/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
 +++ b/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
-@@ -59,34 +59,18 @@ import UIKit
+@@ -14,32 +14,55 @@ import UIKit
+         self.plugin = plugin
+         self.config = config
+         self.privacyViewController = PrivacyScreen.createPrivacyViewController(config: config)
++        self.window = window
+ 
+         super.init()
+-        if config.enable {
+-            self.enable(completion: nil)
+-        }
+ 
+-        self.window = window
+         let preventScreenshots = config.preventScreenshots ?? true
+         if preventScreenshots {
+-            configurePreventionScreenshot()
++            // Sets up the reparent-under-a-secure-field structure once, then
++            // leaves `enable`/`disable` (isSecureTextEntry) to control
++            // whether it's actually masking captures from here on -
++            // config.enable seeds the initial state.
++            configurePreventionScreenshot(initiallyEnabled: config.enable)
++        } else if config.enable {
++            self.enable(completion: nil)
+         }
+     }
+ 
+-    public func configurePreventionScreenshot() {
+-        guard let mainWindow = window else { return }
++    // DripLove: fixed a real ordering bug - the original version called
++    // `enable()` (which sets isSecureTextEntry = true, but only inside a
++    // DispatchQueue.main.async block) and then reparented mainWindow.layer
++    // under `screenPrevent.layer.sublayers?.first/last` SYNCHRONOUSLY, in
++    // the same init call. UIKit only builds a UITextField's special secure
++    // rendering sublayers once it's actually marked secure - since the
++    // isSecureTextEntry write hadn't landed yet at that point,
++    // `screenPrevent.layer.sublayers` was empty or (worse) held only an
++    // unrelated placeholder layer sized to the field's near-zero intrinsic
++    // size. Reparenting the entire app window under either one is exactly
++    // what produced the blank white screen at launch this was disabled for.
++    // Fixed by setting isSecureTextEntry = true *before* reparenting, and
++    // deferring the reparent itself by a run-loop tick so the field has
++    // actually been laid out and built its secure sublayer first.
++    private func configurePreventionScreenshot(initiallyEnabled: Bool) {
++        guard let mainWindow = window, !mainWindow.subviews.contains(screenPrevent) else { return }
++
++        mainWindow.addSubview(screenPrevent)
++        screenPrevent.isHidden = true
++        screenPrevent.isUserInteractionEnabled = false
++        screenPrevent.centerYAnchor.constraint(equalTo: mainWindow.centerYAnchor).isActive = true
++        screenPrevent.centerXAnchor.constraint(equalTo: mainWindow.centerXAnchor).isActive = true
++        screenPrevent.isSecureTextEntry = true
+ 
+-        if !mainWindow.subviews.contains(screenPrevent) {
+-            mainWindow.addSubview(screenPrevent)
+-            screenPrevent.centerYAnchor.constraint(equalTo: mainWindow.centerYAnchor).isActive = true
+-            screenPrevent.centerXAnchor.constraint(equalTo: mainWindow.centerXAnchor).isActive = true
+-            mainWindow.layer.superlayer?.addSublayer(screenPrevent.layer)
++        DispatchQueue.main.async {
++            mainWindow.layer.superlayer?.addSublayer(self.screenPrevent.layer)
+             if #available(iOS 17.0, *) {
+-                screenPrevent.layer.sublayers?.last?.addSublayer(mainWindow.layer)
++                self.screenPrevent.layer.sublayers?.last?.addSublayer(mainWindow.layer)
+             } else {
+-                screenPrevent.layer.sublayers?.first?.addSublayer(mainWindow.layer)
++                self.screenPrevent.layer.sublayers?.first?.addSublayer(mainWindow.layer)
+             }
++            self.screenPrevent.isSecureTextEntry = initiallyEnabled
++            self.isEnabled = initiallyEnabled
+         }
+     }
+ 
+@@ -59,34 +82,18 @@ import UIKit
          }
      }
  

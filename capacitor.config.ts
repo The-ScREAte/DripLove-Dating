@@ -98,39 +98,49 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: true
     },
-    // Screenshot/screen-recording protection, ON everywhere by default at
-    // launch. Individual screens that should be exempt (Profile, the
-    // mini-games) call PrivacyScreen.disable() for as long as they're
-    // showing - see src/hooks/useAllowScreenshots.ts.
+    // Screenshot/screen-recording protection. OFF by default at launch
+    // (landing/auth/registration/profile-completion - everything Index.tsx
+    // renders before MainApp mounts - stay screenshot-able), turned ON for
+    // the whole logged-in app experience by MainApp.tsx calling
+    // PrivacyScreen.enable() on mount / .disable() on unmount. Individual
+    // screens inside that should still be exempt (Profile, the mini-games)
+    // call .disable() for as long as they're showing, restoring the
+    // logged-in baseline on unmount - see src/hooks/useAllowScreenshots.ts.
     //
-    // Android: `enable` alone is enough - it sets FLAG_SECURE, which makes
-    // the OS refuse to capture the window at all (screenshot AND recording),
-    // no further app code needed.
+    // Android: FLAG_SECURE - the OS refuses to capture the window at all
+    // (screenshot AND recording), no further app code needed, works in the
+    // Simulator/emulator exactly like a real device.
     //
-    // iOS has no equivalent OS-level block, and preventScreenshots stays
-    // OFF: that mode (PrivacyScreen.swift, configurePreventionScreenshot)
-    // implements it via a well-known but fragile secure-UITextField hack
-    // that re-parents the ENTIRE app window's CALayer underneath a hidden
-    // text field's layer. That's what caused a blank white screen at launch
-    // on iOS (nothing rendered, not even the index page) - the layer
-    // re-parenting doesn't reliably compose on every iOS version. Instead,
-    // iOS gets real-time screenshot/recording *detection*
-    // (screenshotTaken / screenRecordingStarted, both already emitted by
-    // this plugin) answered with an in-app "Screen capture blocked" overlay
-    // - see src/components/ScreenCaptureBlockedOverlay.tsx. This doesn't
-    // blank the image already saved to Photos (no public iOS API allows
-    // that without the same risky layer trick above), but it does match
-    // what the user sees, same as the pattern apps like WhatsApp use.
+    // iOS has no OS-level flag; preventScreenshots implements the same
+    // outcome via the well-known secure-UITextField-layer technique
+    // (re-parenting the app window's CALayer under a secure text field, so
+    // iOS's own capture pipeline excludes it - see PrivacyScreen.swift,
+    // configurePreventionScreenshot). This previously caused a blank white
+    // screen at launch because the original plugin code reparented the
+    // window layer *before* the secure field had actually been marked
+    // secure (UIKit only builds its special secure rendering sublayers once
+    // isSecureTextEntry is true and the field has had a layout pass) - see
+    // the patch in patches/@capacitor-community+privacy-screen+6.1.0.patch
+    // for the ordering fix. Only verifiable on a real device: the iOS
+    // Simulator's screenshot/recording tools capture the framebuffer
+    // directly and do not route through the real capture pipeline this
+    // technique hooks into, so testing here can only confirm the app still
+    // renders normally, not that a screenshot actually comes out blank.
     //
-    // The plugin's own background/app-switcher "privacy cover" (a gray
-    // full-screen view shown whenever the app resigns active, e.g. opening
-    // the App Switcher) is patched out - see
-    // patches/@capacitor-community+privacy-screen+6.1.0.patch - product
-    // decision was to keep real content visible at all times rather than
-    // hide it behind a permanent gray screen.
+    // Also patched out: the plugin's own background/app-switcher "privacy
+    // cover" (a gray full-screen view shown whenever the app resigns
+    // active, e.g. opening the App Switcher) - product decision was to keep
+    // real content visible there, relying on the capture-time block above
+    // instead. screenshotTaken/screenRecordingStarted (still emitted by the
+    // plugin) additionally drive an in-app "Screen capture blocked" message
+    // - see src/components/ScreenCaptureBlockedOverlay.tsx - the same
+    // pattern apps like WhatsApp use on top of their own capture block.
+    //
+    // Web has no equivalent of either mechanism - no browser API can block
+    // or reliably detect a screenshot/recording at all, native-only.
     PrivacyScreen: {
-      enable: true,
-      preventScreenshots: false // iOS only - see note above
+      enable: false,
+      preventScreenshots: true // iOS only - see note above
     }
   },
   cordova: {

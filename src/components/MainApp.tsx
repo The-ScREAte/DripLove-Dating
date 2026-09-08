@@ -133,6 +133,31 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, [activeTab]);
 
+  // Screenshot/screen-recording protection for the whole logged-in app -
+  // OFF everywhere before this (landing, auth, registration, profile
+  // completion), ON for as long as MainApp is mounted. Individual screens
+  // that should still be exempt (Profile, the mini-games) locally call
+  // .disable() while they're showing and restore this baseline on their own
+  // unmount - see useAllowScreenshots.ts. No-op on web (no such API there).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform() || cancelled) return;
+      const { PrivacyScreen } = await import('@capacitor-community/privacy-screen');
+      if (!cancelled) await PrivacyScreen.enable();
+    })();
+    return () => {
+      cancelled = true;
+      void (async () => {
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+        const { PrivacyScreen } = await import('@capacitor-community/privacy-screen');
+        await PrivacyScreen.disable();
+      })();
+    };
+  }, []);
+
   // Measure the real rendered height of the fixed header and bottom nav (both
   // grow/shrink with env(safe-area-inset-*) - see their own styles below) and
   // publish them as CSS custom properties. Screens like DiscoverPage that need
