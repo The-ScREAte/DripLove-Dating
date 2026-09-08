@@ -52,33 +52,46 @@ interface InfluencerSession {
   has_pending_payout: boolean;
 }
 
-// Single-hue horizontal bar breakdown (magnitude comparison across a small
-// set of categories) - bar length is the value, count is direct-labeled, no
-// legend needed since each row's own label already names its category.
-const DemographicBarGroup = ({ title, buckets }: { title: string; buckets: DemographicBucket[] | null }) => {
+const PIE_COLORS = ['#ec4899', '#a855f7', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#14b8a6', '#6366f1'];
+
+// Pie chart (pure CSS conic-gradient, no charting library) with a
+// color-keyed legend listing each category's share and raw count.
+const DemographicPie = ({ title, buckets }: { title: string; buckets: DemographicBucket[] | null }) => {
   if (!buckets || buckets.length === 0) return null;
   const total = buckets.reduce((sum, b) => sum + b.count, 0);
   if (total === 0) return null;
 
+  let cumulative = 0;
+  const gradientStops = buckets
+    .map((b, i) => {
+      const start = (cumulative / total) * 360;
+      cumulative += b.count;
+      const end = (cumulative / total) * 360;
+      return `${PIE_COLORS[i % PIE_COLORS.length]} ${start}deg ${end}deg`;
+    })
+    .join(', ');
+
   return (
     <div>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{title}</p>
-      <div className="space-y-2">
-        {buckets.map((b) => {
-          const pct = total > 0 ? (b.count / total) * 100 : 0;
-          return (
-            <div key={b.label} className="flex items-center gap-2 text-sm">
-              <span className="w-16 shrink-0 text-gray-600">{b.label}</span>
-              <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-pink-500"
-                  style={{ width: `${Math.max(pct, b.count > 0 ? 4 : 0)}%` }}
-                />
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">{title}</p>
+      <div className="flex items-center gap-4">
+        <div
+          className="w-20 h-20 rounded-full shrink-0 shadow-sm"
+          style={{ background: buckets.length > 1 ? `conic-gradient(${gradientStops})` : PIE_COLORS[0] }}
+        />
+        <div className="flex-1 space-y-1.5 min-w-0">
+          {buckets.map((b, i) => {
+            const pct = Math.round((b.count / total) * 100);
+            return (
+              <div key={b.label} className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                <span className="text-gray-700 truncate flex-1">{b.label}</span>
+                <span className="text-gray-400 shrink-0">{pct}%</span>
+                <span className="font-medium text-gray-900 w-5 text-right shrink-0">{b.count}</span>
               </div>
-              <span className="w-8 shrink-0 text-right font-medium text-gray-900">{b.count}</span>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -121,6 +134,7 @@ const InfluencerPortal = () => {
   // more private for the people who signed up.
   const [genderBreakdown, setGenderBreakdown] = useState<DemographicBucket[] | null>(null);
   const [ageBreakdown, setAgeBreakdown] = useState<DemographicBucket[] | null>(null);
+  const [locationBreakdown, setLocationBreakdown] = useState<DemographicBucket[] | null>(null);
   const [loadingDemographics, setLoadingDemographics] = useState(false);
 
   // Check for existing session on mount (display-only, no auto-refresh with credentials)
@@ -217,10 +231,11 @@ const InfluencerPortal = () => {
 
       if (error) throw error;
 
-      const result = data as unknown as { success: boolean; gender?: DemographicBucket[]; age_groups?: DemographicBucket[]; error?: string };
+      const result = data as unknown as { success: boolean; gender?: DemographicBucket[]; age_groups?: DemographicBucket[]; location?: DemographicBucket[]; error?: string };
       if (result.success) {
         setGenderBreakdown(result.gender || []);
         setAgeBreakdown(result.age_groups || []);
+        setLocationBreakdown(result.location || []);
       }
     } catch (err) {
       console.error('Error fetching lead demographics:', err);
@@ -635,8 +650,9 @@ const InfluencerPortal = () => {
                 </p>
               ) : (
                 <div className="space-y-5">
-                  <DemographicBarGroup title="Gender" buckets={genderBreakdown} />
-                  <DemographicBarGroup title="Age" buckets={ageBreakdown} />
+                  <DemographicPie title="Gender" buckets={genderBreakdown} />
+                  <DemographicPie title="Age" buckets={ageBreakdown} />
+                  <DemographicPie title="Location" buckets={locationBreakdown} />
                 </div>
               )}
             </CardContent>

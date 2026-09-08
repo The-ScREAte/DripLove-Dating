@@ -750,10 +750,15 @@ body.keyboard-open .chat-messages-container {
      (never the app's global dark look) - every shadcn component underneath
      (Card, Input, Select, Dialog, Popover, Button...) reads its colors from
      these CSS variables, which the global `.dark` class on <html> otherwise
-     overrides everywhere. Re-declaring the original light values here,
-     scoped to this one container, fixes every admin Card/Input/dropdown/
-     outline-button at once instead of hand-patching each component. */
-  .admin-page-container {
+     overrides everywhere. Re-declaring the original light values here fixes
+     every admin Card/Input/dropdown/outline-button at once instead of
+     hand-patching each component. Also applied to `body` whenever an admin
+     container exists anywhere in it - Radix Dialog/Select/Popover content
+     portals straight to `document.body`, landing as a *sibling* of
+     .admin-page-container rather than a descendant, so scoping to the
+     container alone left every admin dropdown/dialog still dark. */
+  .admin-page-container,
+  body:has(.admin-page-container) {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
