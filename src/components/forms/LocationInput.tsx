@@ -632,7 +632,7 @@ const LocationInput = ({
 
             {/* City Suggestions Dropdown */}
             {showCitySuggestions && filteredCities.length > 0 && (
-              <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto">
+              <Card className="absolute top-full left-0 right-0 z-50 mt-1.5 max-h-64 overflow-y-auto bg-white text-black border border-gray-200 shadow-lg rounded-xl">
                 <CardContent className="p-2">
                   <div className="text-xs text-black mb-2 px-2">
                     {cityInput === '' && selectedCountryData
@@ -646,7 +646,7 @@ const LocationInput = ({
                     <Button
                       key={index}
                       variant="ghost"
-                      className="w-full justify-start text-left h-auto p-2"
+                      className="w-full justify-start text-left h-auto p-2.5 rounded-lg hover:bg-pink-50"
                       onClick={() => handleCitySelect(city)}
                     >
                       <div className="flex items-center justify-between w-full">
