@@ -1258,16 +1258,10 @@ export type Database = {
       profiles: {
         Row: {
           account_status: string | null
-          communication_style: string[] | null
-          family_plans: string | null
-          height_cm: number | null
-          languages: string[] | null
-          love_style: string[] | null
-          pets: string[] | null
-          social_media: string | null
           adinkra_symbols: string[] | null
           bio: string | null
           city: string | null
+          communication_style: string[] | null
           country: string
           country_code: string | null
           created_at: string | null
@@ -1278,10 +1272,12 @@ export type Database = {
           email: string
           exercise_level: string | null
           face_descriptor: string | null
+          family_plans: string | null
           favorites: Json
           first_name: string
           fun_fact: string | null
           gender: string | null
+          height_cm: number | null
           id: string
           industry: string | null
           interests: string[] | null
@@ -1290,6 +1286,7 @@ export type Database = {
           is_archived: boolean | null
           is_custom_city: boolean | null
           is_verified: boolean
+          languages: string[] | null
           last_googled: string | null
           last_login_at: string | null
           last_name: string
@@ -1297,12 +1294,14 @@ export type Database = {
           like_me_cooldown_until: string | null
           login_count: number | null
           longitude: number | null
+          love_style: string[] | null
           max_age: number | null
           max_distance: number | null
           messy_organized: number | null
           min_age: number | null
           occupation: string | null
           perfect_first_date: string | null
+          pets: string[] | null
           preference: string
           preferred_language: string | null
           profile_completion: number
@@ -1310,6 +1309,7 @@ export type Database = {
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
+          social_media: string | null
           spontaneous_planner: number | null
           terms_accepted: boolean | null
           terms_accepted_at: string | null
@@ -1320,16 +1320,10 @@ export type Database = {
         }
         Insert: {
           account_status?: string | null
-          communication_style?: string[] | null
-          family_plans?: string | null
-          height_cm?: number | null
-          languages?: string[] | null
-          love_style?: string[] | null
-          pets?: string[] | null
-          social_media?: string | null
           adinkra_symbols?: string[] | null
           bio?: string | null
           city?: string | null
+          communication_style?: string[] | null
           country: string
           country_code?: string | null
           created_at?: string | null
@@ -1340,10 +1334,12 @@ export type Database = {
           email: string
           exercise_level?: string | null
           face_descriptor?: string | null
+          family_plans?: string | null
           favorites?: Json
           first_name: string
           fun_fact?: string | null
           gender?: string | null
+          height_cm?: number | null
           id: string
           industry?: string | null
           interests?: string[] | null
@@ -1352,6 +1348,7 @@ export type Database = {
           is_archived?: boolean | null
           is_custom_city?: boolean | null
           is_verified?: boolean
+          languages?: string[] | null
           last_googled?: string | null
           last_login_at?: string | null
           last_name: string
@@ -1359,12 +1356,14 @@ export type Database = {
           like_me_cooldown_until?: string | null
           login_count?: number | null
           longitude?: number | null
+          love_style?: string[] | null
           max_age?: number | null
           max_distance?: number | null
           messy_organized?: number | null
           min_age?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
+          pets?: string[] | null
           preference: string
           preferred_language?: string | null
           profile_completion?: number
@@ -1372,6 +1371,7 @@ export type Database = {
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
+          social_media?: string | null
           spontaneous_planner?: number | null
           terms_accepted?: boolean | null
           terms_accepted_at?: string | null
@@ -1382,16 +1382,10 @@ export type Database = {
         }
         Update: {
           account_status?: string | null
-          communication_style?: string[] | null
-          family_plans?: string | null
-          height_cm?: number | null
-          languages?: string[] | null
-          love_style?: string[] | null
-          pets?: string[] | null
-          social_media?: string | null
           adinkra_symbols?: string[] | null
           bio?: string | null
           city?: string | null
+          communication_style?: string[] | null
           country?: string
           country_code?: string | null
           created_at?: string | null
@@ -1402,10 +1396,12 @@ export type Database = {
           email?: string
           exercise_level?: string | null
           face_descriptor?: string | null
+          family_plans?: string | null
           favorites?: Json
           first_name?: string
           fun_fact?: string | null
           gender?: string | null
+          height_cm?: number | null
           id?: string
           industry?: string | null
           interests?: string[] | null
@@ -1414,6 +1410,7 @@ export type Database = {
           is_archived?: boolean | null
           is_custom_city?: boolean | null
           is_verified?: boolean
+          languages?: string[] | null
           last_googled?: string | null
           last_login_at?: string | null
           last_name?: string
@@ -1421,12 +1418,14 @@ export type Database = {
           like_me_cooldown_until?: string | null
           login_count?: number | null
           longitude?: number | null
+          love_style?: string[] | null
           max_age?: number | null
           max_distance?: number | null
           messy_organized?: number | null
           min_age?: number | null
           occupation?: string | null
           perfect_first_date?: string | null
+          pets?: string[] | null
           preference?: string
           preferred_language?: string | null
           profile_completion?: number
@@ -1434,6 +1433,7 @@ export type Database = {
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
+          social_media?: string | null
           spontaneous_planner?: number | null
           terms_accepted?: boolean | null
           terms_accepted_at?: string | null
@@ -2378,6 +2378,7 @@ export type Database = {
           adinkra_symbols: string[] | null
           bio: string | null
           city: string | null
+          communication_style: string[] | null
           country: string
           country_code: string | null
           created_at: string | null
@@ -2388,10 +2389,12 @@ export type Database = {
           email: string
           exercise_level: string | null
           face_descriptor: string | null
+          family_plans: string | null
           favorites: Json
           first_name: string
           fun_fact: string | null
           gender: string | null
+          height_cm: number | null
           id: string
           industry: string | null
           interests: string[] | null
@@ -2400,6 +2403,7 @@ export type Database = {
           is_archived: boolean | null
           is_custom_city: boolean | null
           is_verified: boolean
+          languages: string[] | null
           last_googled: string | null
           last_login_at: string | null
           last_name: string
@@ -2407,12 +2411,14 @@ export type Database = {
           like_me_cooldown_until: string | null
           login_count: number | null
           longitude: number | null
+          love_style: string[] | null
           max_age: number | null
           max_distance: number | null
           messy_organized: number | null
           min_age: number | null
           occupation: string | null
           perfect_first_date: string | null
+          pets: string[] | null
           preference: string
           preferred_language: string | null
           profile_completion: number
@@ -2420,6 +2426,7 @@ export type Database = {
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
+          social_media: string | null
           spontaneous_planner: number | null
           terms_accepted: boolean | null
           terms_accepted_at: string | null
