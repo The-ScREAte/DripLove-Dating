@@ -30,6 +30,12 @@ export type LikerProfile = {
   fun_fact?: string | null;
   perfect_first_date?: string | null;
   last_googled?: string | null;
+  family_plans?: string | null;
+  social_media?: string | null;
+  communication_style?: string[] | null;
+  love_style?: string[] | null;
+  pets?: string[] | null;
+  languages?: string[] | null;
   [key: string]: unknown;
 };
 
