@@ -66,7 +66,7 @@ const BasicInfoSection = ({
               style={getInputStyles()}
               placeholder={t('registration.firstName')}
             />
-            {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
+            {errors.firstName && <p className="text-red-700 text-xs font-semibold mt-1">{errors.firstName}</p>}
           </div>
         </div>
         
@@ -86,7 +86,7 @@ const BasicInfoSection = ({
               style={getInputStyles()}
               placeholder={t('registration.lastName')}
             />
-            {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
+            {errors.lastName && <p className="text-red-700 text-xs font-semibold mt-1">{errors.lastName}</p>}
           </div>
         </div>
       </div>
@@ -158,7 +158,7 @@ const BasicInfoSection = ({
             style={getInputStyles()}
             placeholder={t('auth.email')}
           />
-          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+          {errors.email && <p className="text-red-700 text-xs font-semibold mt-1">{errors.email}</p>}
         </div>
       </div>
         <div className="space-y-2 min-[390px]:order-1">
@@ -172,7 +172,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               className={`compact-date-input text-sm pl-2.5 pr-7 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
             />
-            {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
+            {errors.dateOfBirth && <p className="text-red-700 text-xs font-semibold mt-1">{errors.dateOfBirth}</p>}
           </div>
         </div>
       </div>
@@ -201,7 +201,7 @@ const BasicInfoSection = ({
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+            {errors.password && <p className="text-red-700 text-xs font-semibold mt-1">{errors.password}</p>}
           </div>
         </div>
         
@@ -225,7 +225,7 @@ const BasicInfoSection = ({
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
-            {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
+            {errors.confirmPassword && <p className="text-red-700 text-xs font-semibold mt-1">{errors.confirmPassword}</p>}
           </div>
         </div>
       </div>

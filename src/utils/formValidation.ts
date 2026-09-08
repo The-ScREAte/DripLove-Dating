@@ -26,7 +26,7 @@ export const validateRegistrationForm = (formData: any) => {
 
   // Password confirmation
   if (formData.password !== formData.confirmPassword) {
-    newErrors.confirmPassword = 'Passwords do not match';
+    newErrors.confirmPassword = "Passwords don't match";
   }
 
   // Age validation (must be 18+)

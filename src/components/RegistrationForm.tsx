@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
+import { MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
+import HoppingLogo from '@/components/HoppingLogo';
 const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
@@ -573,7 +574,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     
     // Password confirmation
     if (formData.password !== formData.confirmPassword) {
-      firstStepErrors.confirmPassword = 'Passwords do not match';
+      firstStepErrors.confirmPassword = "Passwords don't match";
     }
     
     // Age validation (must be 18+)
@@ -944,9 +945,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
         <Card className="w-full max-w-full sm:max-w-xl mx-auto rounded-none backdrop-blur-sm bg-white/40 shadow-none border border-white/40 animate-fade-in">
       <CardHeader className="text-center px-3 sm:px-6 pb-5 sm:pb-6">
         <div className="flex justify-center mb-4">
-          <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full hover-scale">
-            <Heart className="w-8 h-8 text-white" />
-          </div>
+          <HoppingLogo size={64} />
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
           {currentStep === 1 ? t('registration.createAccount') : t('registration.tellUsMore')}
@@ -1194,13 +1193,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+          <div className="flex flex-row justify-end gap-3">
             {currentStep > 1 && (
               <Button 
                 type="button" 
                 variant="outline"
                 onClick={() => setCurrentStep(currentStep - 1)}
-                className="h-9 px-4 sm:w-auto bg-white border-pink-400 text-pink-600 hover:bg-pink-50 transition-all duration-200 animate-fade-in"
+                className="h-9 px-4 flex-1 sm:flex-none sm:w-auto bg-white border-2 border-[#7a0a40] text-[#7a0a40] hover:bg-pink-50 transition-all duration-200 animate-fade-in"
               >
                 {t('registration.back')}
               </Button>
@@ -1215,7 +1214,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length < 2
                 ))
               }
-              className="h-9 px-4 sm:w-auto bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-9 px-4 flex-1 sm:flex-none sm:w-auto bg-gradient-to-r from-[#3d0320] via-[#7a0a40] to-[#d6136e] hover:opacity-90 text-white font-semibold rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creatingAccount
                 ? t('registration.creatingAccount')
