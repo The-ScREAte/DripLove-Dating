@@ -94,7 +94,10 @@ const putCachedBlob = async (url: string, blob: Blob): Promise<void> => {
 // Fire-and-forget: fetches `url` and stores it if not already cached. Safe to
 // call on every successful <img> load - it no-ops quickly once cached.
 export const warmImageCache = (url: string): void => {
-  if (!url) return;
+  // Local-only URLs (an unsaved photo pick/crop preview) have nothing to
+  // "restore offline" - they're ephemeral and revoked as soon as the picker
+  // moves on, so caching them just wastes a write.
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) return;
   void (async () => {
     try {
       const existing = await getCachedBlob(url);

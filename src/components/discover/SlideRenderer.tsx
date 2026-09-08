@@ -48,14 +48,25 @@ const ImageSlide = React.memo<{
   // fallback (IndexedDB, survives app restarts) so the photo can still show
   // with no internet, as long as it loaded successfully at least once before.
   const [fallbackSrc, setFallbackSrc] = React.useState<string | null>(null);
-  const triedCacheRef = React.useRef(false);
+  const [triedCache, setTriedCache] = React.useState(false);
   const fallbackObjectUrlRef = React.useRef<string | null>(null);
 
-  // Reset error/fallback state when image source changes
-  React.useEffect(() => {
+  // Reset error/fallback state the moment imageSrc changes, computed during
+  // render (React's "adjust state while rendering" pattern) instead of via a
+  // useEffect - setState inside an effect body forces an extra throwaway
+  // render on every single swipe, which adds up across a deck of photos.
+  // Refs can't be written during render either, so triedCache is plain state.
+  const [prevImageSrc, setPrevImageSrc] = React.useState(imageSrc);
+  if (prevImageSrc !== imageSrc) {
+    setPrevImageSrc(imageSrc);
     setHasError(false);
     setFallbackSrc(null);
-    triedCacheRef.current = false;
+    setTriedCache(false);
+  }
+
+  // Cleanup only - revoking the previous fallback object URL, if any, once
+  // imageSrc moves on or the component unmounts. No setState here.
+  React.useEffect(() => {
     return () => {
       if (fallbackObjectUrlRef.current) {
         URL.revokeObjectURL(fallbackObjectUrlRef.current);
@@ -65,11 +76,11 @@ const ImageSlide = React.memo<{
   }, [imageSrc]);
 
   const handleError = React.useCallback(async () => {
-    if (usingBlob || triedCacheRef.current) {
+    if (usingBlob || triedCache) {
       setHasError(true);
       return;
     }
-    triedCacheRef.current = true;
+    setTriedCache(true);
     const cached = await getCachedObjectUrl(originalUrl);
     if (cached) {
       fallbackObjectUrlRef.current = cached;
@@ -77,11 +88,18 @@ const ImageSlide = React.memo<{
     } else {
       setHasError(true);
     }
-  }, [originalUrl, usingBlob]);
+  }, [originalUrl, triedCache, usingBlob]);
 
   const handleLoad = React.useCallback(() => {
-    if (!usingBlob && !fallbackSrc) warmImageCache(originalUrl);
-  }, [fallbackSrc, originalUrl, usingBlob]);
+    // Warm the persistent cache off the real (never blob:) originalUrl even
+    // when this card is displaying an in-memory blob preview - Discover
+    // preloads the next card's blob ahead of time, so most swipe photos would
+    // otherwise never reach the offline cache at all. warmImageCache no-ops
+    // once already cached, and the underlying fetch() hits the browser's own
+    // HTTP cache (Supabase serves these with Cache-Control: max-age=3600), so
+    // this doesn't cost a second real network download.
+    if (!fallbackSrc) warmImageCache(originalUrl);
+  }, [fallbackSrc, originalUrl]);
 
   // Show placeholder if image failed to load
   if (hasError) {

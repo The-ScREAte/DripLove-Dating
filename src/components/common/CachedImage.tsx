@@ -14,13 +14,25 @@ type CachedImageProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> &
 // successfully loaded image is opportunistically stored for next time.
 const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
   ({ src, onError, onLoad, onLoadError, ...rest }, ref) => {
+    // Resets effectiveSrc/triedCache the moment `src` changes, computed
+    // during render (React's sanctioned "adjust state while rendering"
+    // pattern) rather than in a useEffect - setState inside an effect body
+    // forces an extra throwaway render on every src change, which adds up
+    // across a swipe deck of dozens of photos. Refs can't be written during
+    // render either, so this is plain state rather than a ref.
+    const [prevSrc, setPrevSrc] = useState(src);
     const [effectiveSrc, setEffectiveSrc] = useState(src);
-    const triedCacheRef = useRef(false);
+    const [triedCache, setTriedCache] = useState(false);
     const objectUrlRef = useRef<string | null>(null);
-
-    useEffect(() => {
+    if (prevSrc !== src) {
+      setPrevSrc(src);
       setEffectiveSrc(src);
-      triedCacheRef.current = false;
+      setTriedCache(false);
+    }
+
+    // Cleanup only - revoking the previous fallback object URL, if any, once
+    // `src` moves on or the component unmounts. No setState here.
+    useEffect(() => {
       return () => {
         if (objectUrlRef.current) {
           URL.revokeObjectURL(objectUrlRef.current);
@@ -32,19 +44,19 @@ const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
     const handleLoad = useCallback(
       (e: React.SyntheticEvent<HTMLImageElement>) => {
         onLoad?.(e);
-        if (!triedCacheRef.current) warmImageCache(src);
+        if (!triedCache) warmImageCache(src);
       },
-      [onLoad, src]
+      [onLoad, src, triedCache]
     );
 
     const handleError = useCallback(
       async (e: React.SyntheticEvent<HTMLImageElement>) => {
         onError?.(e);
-        if (triedCacheRef.current) {
+        if (triedCache) {
           onLoadError?.();
           return;
         }
-        triedCacheRef.current = true;
+        setTriedCache(true);
         const cachedUrl = await getCachedObjectUrl(src);
         if (cachedUrl) {
           objectUrlRef.current = cachedUrl;
@@ -53,7 +65,7 @@ const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
           onLoadError?.();
         }
       },
-      [onError, onLoadError, src]
+      [onError, onLoadError, src, triedCache]
     );
 
     return <img ref={ref} src={effectiveSrc} onLoad={handleLoad} onError={handleError} {...rest} />;
