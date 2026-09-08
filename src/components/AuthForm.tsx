@@ -559,7 +559,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
             <CardTitle className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
               {showForgotPassword ? t('auth.resetPassword') : t('auth.createAccount')}
             </CardTitle>
-            <CardDescription className="text-gray-600 text-sm">
+            <CardDescription className="text-black text-sm">
               {showForgotPassword ? t('auth.enterEmailForReset') : t('auth.joinDripLoveToday')}
             </CardDescription>
           </>
@@ -571,7 +571,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         {showForgotPassword ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">{t('auth.email')}</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-black">{t('auth.email')}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -583,7 +583,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
-                  className={`mobile-input-field pl-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                  className={`mobile-input-field pl-10 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                     errors.email ? 'border-red-500 focus:border-red-500' : ''
                   }`}
                   style={getInputStyles()}
@@ -610,7 +610,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
             <div className="mt-6 text-center">
               <button
                 onClick={() => setShowForgotPassword(false)}
-                className="text-pink-600 hover:text-pink-700 font-semibold transition-colors"
+                className="text-black hover:text-gray-700 font-bold transition-colors"
               >
                 {t('auth.backToSignIn')}
               </button>
@@ -625,7 +625,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
               method="post"
             >
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-sm font-semibold text-gray-700">{t('auth.email')}</Label>
+                <Label htmlFor="email" className="text-sm font-semibold text-black">{t('auth.email')}</Label>
                 <div className="relative">
                   <Input
                     id="email"
@@ -636,7 +636,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`mobile-input-field py-4 px-4 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-4 px-4 bg-white text-black placeholder:text-black border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.email ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -651,12 +651,12 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-sm font-semibold text-gray-700">{t('auth.password')}</Label>
+                  <Label htmlFor="password" className="text-sm font-semibold text-black">{t('auth.password')}</Label>
                   {isLogin && (
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(true)}
-                      className="text-sm text-pink-600 hover:text-pink-700 font-medium transition-colors"
+                      className="text-sm text-black hover:text-gray-700 font-bold transition-colors"
                     >
                       {t('auth.forgotPassword')}
                     </button>
@@ -672,7 +672,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`mobile-input-field py-4 px-4 pr-12 border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-4 px-4 pr-12 bg-white text-black placeholder:text-black border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.password ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -694,7 +694,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
 
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-sm font-medium">{t('auth.confirmPassword')}</Label>
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium text-black">{t('auth.confirmPassword')}</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
@@ -706,7 +706,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                       onChange={handleInputChange}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      className={`mobile-input-field pl-10 pr-10 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                      className={`mobile-input-field pl-10 pr-10 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
                         errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
                       }`}
                       style={getInputStyles()}
@@ -744,11 +744,11 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
             </form>
 
             <div className="mt-6 text-center pb-4">
-              <p className="text-base text-gray-600">
+              <p className="text-base text-black">
                 {isLogin ? t('auth.dontHaveAccount') : t('auth.alreadyHaveAccount')}
                 <button
                   onClick={onToggle}
-                  className="ml-2 text-pink-600 hover:text-pink-700 font-bold transition-colors"
+                  className="ml-2 text-black hover:text-gray-700 font-bold transition-colors"
                 >
                   {isLogin ? t('auth.signUp') : t('auth.signIn')}
                 </button>

@@ -86,12 +86,12 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
             }}
             placeholder="Enter promo code"
             disabled={disabled || validationResult?.valid}
-            className={`pr-10 ${
-              validationResult?.valid 
-                ? 'border-green-500 bg-green-50' 
-                : validationResult?.valid === false 
-                  ? 'border-red-500 bg-red-50' 
-                  : ''
+            className={`pr-10 text-black placeholder:text-black ${
+              validationResult?.valid
+                ? 'border-green-500 bg-green-50'
+                : validationResult?.valid === false
+                  ? 'border-red-500 bg-red-50'
+                  : 'bg-white'
             }`}
           />
           {validationResult && (
@@ -124,7 +124,7 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
             type="button" 
             variant="ghost" 
             onClick={handleClear}
-            className="shrink-0 text-gray-500"
+            className="shrink-0 text-black"
           >
             Clear
           </Button>

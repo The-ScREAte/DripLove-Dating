@@ -1160,23 +1160,23 @@ const ProfileCompletionPage = () => {
           <Card className="w-full backdrop-blur-sm bg-white/40 rounded-none shadow-none border border-white/40 relative animate-fade-in">
             <CardContent className="px-4 sm:px-6 py-5 sm:py-6 pb-6 sm:pb-8">
               {/* Title inside white card */}
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-5 sm:mb-6 text-center">
+              <h1 className="text-2xl sm:text-3xl font-bold text-black mb-5 sm:mb-6 text-center">
                 {t('profileCompletion.title')}
               </h1>
               
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">{t('profileCompletion.basicInformation')}</h3>
+                    <h3 className="text-lg font-semibold text-black">{t('profileCompletion.basicInformation')}</h3>
                     
                     <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">{t('profileCompletion.firstName')} *</label>
+                        <label className="text-sm font-medium text-black">{t('profileCompletion.firstName')} *</label>
                         <input
                           name="firstName"
                           type="text"
                           value={formData.firstName}
                           onChange={handleInputChange}
-                          className="w-full px-2.5 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
                           placeholder={t('profileCompletion.enterYourFirstName')}
                           required
                         />
@@ -1184,13 +1184,13 @@ const ProfileCompletionPage = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">{t('profileCompletion.lastName')} *</label>
+                        <label className="text-sm font-medium text-black">{t('profileCompletion.lastName')} *</label>
                         <input
                           name="lastName"
                           type="text"
                           value={formData.lastName}
                           onChange={handleInputChange}
-                          className="w-full px-2.5 py-2 border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
                           placeholder={t('profileCompletion.enterYourLastName')}
                           required
                         />
@@ -1202,7 +1202,7 @@ const ProfileCompletionPage = () => {
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
                         <Shield className="w-5 h-5 text-purple-600" />
-                        <label className="text-sm font-medium text-gray-700">Face Verification *</label>
+                        <label className="text-sm font-medium text-black">Face Verification *</label>
                       </div>
 
                       {showFaceVerification ? (
@@ -1237,13 +1237,13 @@ const ProfileCompletionPage = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">{t('profileCompletion.dateOfBirth')} *</label>
+                      <label className="text-sm font-medium text-black">{t('profileCompletion.dateOfBirth')} *</label>
                       <input
                         name="dateOfBirth"
                         type="date"
                         value={formData.dateOfBirth}
                         onChange={handleInputChange}
-                        className="compact-date-input w-full px-2.5 pr-7 py-2 text-sm border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                        className="compact-date-input w-full px-2.5 pr-7 py-2 text-sm bg-white text-black border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
                         required
                       />
                       {errors.dateOfBirth && <p className="text-sm text-red-500">{errors.dateOfBirth}</p>}
@@ -1251,12 +1251,12 @@ const ProfileCompletionPage = () => {
 
                     <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Gender *</label>
+                        <label className="text-sm font-medium text-black">Gender *</label>
                         <Select
                           value={formData.gender}
                           onValueChange={(value) => handleSelectChange('gender', value)}
                         >
-                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
                             <SelectValue placeholder="Select your gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1269,12 +1269,12 @@ const ProfileCompletionPage = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Looking for *</label>
+                        <label className="text-sm font-medium text-black">Looking for *</label>
                         <Select
                           value={formData.preference}
                           onValueChange={(value) => handleSelectChange('preference', value)}
                         >
-                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
                             <SelectValue placeholder="Select your preference" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1288,12 +1288,12 @@ const ProfileCompletionPage = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Relationship Intent *</label>
+                      <label className="text-sm font-medium text-black">Relationship Intent *</label>
                       <Select
                         value={formData.relationshipIntent}
                         onValueChange={(value) => handleSelectChange('relationshipIntent', value)}
                       >
-                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
                           <SelectValue placeholder="What are you looking for?" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1308,12 +1308,12 @@ const ProfileCompletionPage = () => {
 
                   <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">{t('profileCompletion.occupation')} *</label>
+                      <label className="text-sm font-medium text-black">{t('profileCompletion.occupation')} *</label>
                       <Select
                         value={formData.occupation}
                         onValueChange={(value) => handleSelectChange('occupation', value)}
                       >
-                          <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1328,12 +1328,12 @@ const ProfileCompletionPage = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">{t('profileCompletion.industry')} *</label>
+                      <label className="text-sm font-medium text-black">{t('profileCompletion.industry')} *</label>
                       <Select
                         value={formData.industry}
                         onValueChange={(value) => handleSelectChange('industry', value)}
                       >
-                        <SelectTrigger className="pl-2.5 pr-2.5 border-gray-200 focus:border-pink-400">
+                        <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1349,12 +1349,12 @@ const ProfileCompletionPage = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">{t('profileCompletion.education')} *</label>
+                    <label className="text-sm font-medium text-black">{t('profileCompletion.education')} *</label>
                     <Select
                       value={formData.educationLevel}
                       onValueChange={(value) => handleSelectChange('educationLevel', value)}
                     >
-                      <SelectTrigger className="border-gray-200 focus:border-pink-400">
+                      <SelectTrigger className="bg-white text-black border-gray-200 focus:border-pink-400">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1371,7 +1371,7 @@ const ProfileCompletionPage = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800">Location</h3>
+                    <h3 className="text-lg font-semibold text-black">Location</h3>
                     <LocationInput
                       country={formData.country}
                       city={formData.city}
@@ -1395,8 +1395,8 @@ const ProfileCompletionPage = () => {
 
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-gray-800">{t('profileCompletion.profilePhotos')} *</h3>
-                      <p className="text-[11px] text-gray-600 whitespace-nowrap">2+ photos required</p>
+                      <h3 className="text-sm font-semibold text-black">{t('profileCompletion.profilePhotos')} *</h3>
+                      <p className="text-[11px] text-black whitespace-nowrap">2+ photos required</p>
                     </div>
                     
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-pink-400 transition-colors">
@@ -1410,8 +1410,8 @@ const ProfileCompletionPage = () => {
                       />
                       <Label htmlFor="image-upload" className="cursor-pointer block">
                         <Upload className="mx-auto h-5 w-5 text-gray-400 mb-1" />
-                        <p className="text-xs text-gray-600">Upload photos</p>
-                        <p className="text-[11px] text-gray-500">JPG/PNG up to 10MB</p>
+                        <p className="text-xs text-black">Upload photos</p>
+                        <p className="text-[11px] text-black">JPG/PNG up to 10MB</p>
                       </Label>
                     </div>
                     {images.length > 0 && (
@@ -1497,7 +1497,7 @@ const ProfileCompletionPage = () => {
                         variant="outline"
                         onClick={handleCancel}
                         disabled={isSubmitting}
-                        className="w-full h-8 text-xs px-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
+                        className="w-full h-8 text-xs px-2 border-gray-300 text-black hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
                       >
                         {t('profileCompletion.cancel')}
                       </Button>

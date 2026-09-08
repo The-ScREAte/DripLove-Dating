@@ -537,7 +537,7 @@ const LocationInput = ({
             </span>
           )}
           {isProfileEdit && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground" aria-label="Location locked">
+            <span className="flex items-center gap-1 text-xs text-black" aria-label="Location locked">
               <Lock className="w-3 h-3" />
               <span className="text-[10px]">Auto-detect only</span>
             </span>
@@ -563,8 +563,8 @@ const LocationInput = ({
               onValueChange={handleCountryChange} 
               disabled={loadingCountries}
             >
-              <SelectTrigger 
-                className={`pl-2.5 pr-2.5 ${errors.country ? 'border-red-500' : ''}`}
+              <SelectTrigger
+                className={`pl-2.5 pr-2.5 bg-white text-black ${errors.country ? 'border-red-500' : ''}`}
               >
                 <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country (cannot be changed later)"} />
               </SelectTrigger>
@@ -591,7 +591,7 @@ const LocationInput = ({
           /* Show loading state when detecting */
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-muted-foreground">
+              <span className="font-medium text-black">
                 Detecting your location...
               </span>
             </div>
@@ -626,7 +626,7 @@ const LocationInput = ({
             placeholder={selectedCountryData?.name 
               ? `Select a city in ${selectedCountryData.name} or type to search` 
               : 'Type your city name (at least 2 characters)'}
-            className={`px-2.5 ${errors.city ? 'border-red-500' : ''}`}
+            className={`px-2.5 bg-white text-black placeholder:text-black ${errors.city ? 'border-red-500' : ''}`}
             disabled={disabled}
           />
 
@@ -634,7 +634,7 @@ const LocationInput = ({
             {showCitySuggestions && filteredCities.length > 0 && (
               <Card className="absolute top-full left-0 right-0 z-50 mt-1 max-h-64 overflow-y-auto">
                 <CardContent className="p-2">
-                  <div className="text-xs text-gray-600 mb-2 px-2">
+                  <div className="text-xs text-black mb-2 px-2">
                     {cityInput === '' && selectedCountryData
                       ? `📍 Available cities in ${selectedCountryData.name} (click to select):`
                       : selectedCountryData
@@ -653,9 +653,9 @@ const LocationInput = ({
                         <div>
                           <div className="font-medium">{city.name}</div>
                           {city.state && (
-                            <div className="text-xs text-gray-500">{city.state}</div>
+                            <div className="text-xs text-black">{city.state}</div>
                           )}
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="flex items-center gap-2 text-xs text-black">
                             {city.population && (
                               <span>~{(city.population / 1000000).toFixed(1)}M people</span>
                             )}
@@ -708,7 +708,7 @@ const LocationInput = ({
              selectedCountryData?.code === 'GB' ? 'Postcode' : 
              'Postal Code'}
             {selectedCountryData?.continent === 'Africa' && (
-              <span className="text-xs text-gray-500 ml-1">(optional)</span>
+              <span className="text-xs text-black ml-1">(optional)</span>
             )}
           </Label>
           <Input
@@ -726,7 +726,7 @@ const LocationInput = ({
               selectedCountryData?.code === 'NL' ? '1012' :
               'Enter postal code'
             }
-            className={`px-2.5 ${errors.zipCode ? 'border-red-500' : ''}`}
+            className={`px-2.5 bg-white text-black placeholder:text-black ${errors.zipCode ? 'border-red-500' : ''}`}
             disabled={disabled}
           />
           {errors.zipCode && (
