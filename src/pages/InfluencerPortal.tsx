@@ -462,7 +462,7 @@ const InfluencerPortal = () => {
   if (!session) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md bg-white text-black">
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
               <Gift className="w-8 h-8 text-white" />
@@ -482,6 +482,7 @@ const InfluencerPortal = () => {
                   onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                   placeholder="Enter your promo code"
                   disabled={loading}
+                  className="bg-white text-black placeholder:text-black"
                 />
               </div>
               <div>
@@ -494,6 +495,7 @@ const InfluencerPortal = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     disabled={loading}
+                    className="bg-white text-black placeholder:text-black"
                   />
                   <button
                     type="button"
@@ -536,7 +538,7 @@ const InfluencerPortal = () => {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-md mx-auto space-y-4 pb-12">
         {/* Header */}
-        <Card className="border-t-4 border-t-pink-500 overflow-hidden">
+        <Card className="border-t-4 border-t-pink-500 overflow-hidden bg-white text-black">
           <CardContent className="py-4">
             <div className="flex justify-between items-start">
               <div>
@@ -550,7 +552,7 @@ const InfluencerPortal = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleLogout}
-                className="border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                className="bg-white border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
               >
                 <LogOut className="w-4 h-4 mr-1.5" /> Log Out
               </Button>
@@ -562,7 +564,7 @@ const InfluencerPortal = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowTerms(true)}
-                  className="h-8 text-xs border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  className="h-8 text-xs bg-white border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 >
                   <FileText className="w-3.5 h-3.5 mr-1.5" />
                   Terms
@@ -572,7 +574,7 @@ const InfluencerPortal = () => {
                   size="sm"
                   onClick={refreshStats}
                   disabled={refreshing}
-                  className="h-8 text-xs border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  className="h-8 text-xs bg-white border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
                   {refreshing ? 'Refreshing…' : 'Refresh'}
@@ -584,7 +586,7 @@ const InfluencerPortal = () => {
 
         {/* Performance - leads/subscribers, whichever the admin has shared */}
         {showPerformance && (
-          <Card>
+          <Card className="bg-white text-black">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-700">Your Performance</CardTitle>
             </CardHeader>
@@ -618,7 +620,7 @@ const InfluencerPortal = () => {
             not just subscribers. Gated on its own admin toggle, independent
             of the plain leads count above. */}
         {session.show_demographics_enabled && (
-          <Card>
+          <Card className="bg-white text-black">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-700">Lead Demographics</CardTitle>
             </CardHeader>
@@ -643,7 +645,7 @@ const InfluencerPortal = () => {
 
         {/* Earnings + Payout - only for promoters with commission activated */}
         {session.commission_enabled && (
-          <Card>
+          <Card className="bg-white text-black">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-700 flex items-center justify-between">
                 <span>Earnings</span>
@@ -685,6 +687,7 @@ const InfluencerPortal = () => {
                         min="1"
                         max={session.outstanding_usd}
                         step="0.01"
+                        className="bg-white text-black placeholder:text-black"
                       />
                       <Button
                         onClick={handleRequestPayout}
@@ -705,7 +708,7 @@ const InfluencerPortal = () => {
         )}
 
         {nothingToShow && (
-          <Card>
+          <Card className="bg-white text-black">
             <CardContent className="py-6 text-center text-sm text-gray-500">
               Your code is active and your referrals are being tracked. Reach out to the DripLove team for more details.
             </CardContent>
@@ -780,7 +783,7 @@ const InfluencerPortal = () => {
                   You agreed to these terms on {session.terms_accepted_at ? new Date(session.terms_accepted_at).toLocaleDateString() : '—'}.
                 </p>
                 <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
-                  <Button variant="outline" onClick={() => setShowTerms(false)}>Close</Button>
+                  <Button variant="outline" className="bg-white" onClick={() => setShowTerms(false)}>Close</Button>
                 </DialogFooter>
               </>
             )}

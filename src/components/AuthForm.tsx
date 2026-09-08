@@ -583,7 +583,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                   onChange={handleInputChange}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
-                  className={`mobile-input-field pl-10 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                  className={`mobile-input-field pl-10 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${
                     errors.email ? 'border-red-500 focus:border-red-500' : ''
                   }`}
                   style={getInputStyles()}
@@ -636,7 +636,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`mobile-input-field py-4 px-4 bg-white text-black placeholder:text-black border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-4 px-4 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.email ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -672,7 +672,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`mobile-input-field py-4 px-4 pr-12 bg-white text-black placeholder:text-black border-gray-300 focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-4 px-4 pr-12 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.password ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -706,7 +706,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                       onChange={handleInputChange}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
-                      className={`mobile-input-field pl-10 pr-10 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${
+                      className={`mobile-input-field pl-10 pr-10 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${
                         errors.confirmPassword ? 'border-red-500 focus:border-red-500' : ''
                       }`}
                       style={getInputStyles()}

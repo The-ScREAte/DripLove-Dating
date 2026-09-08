@@ -91,7 +91,7 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
                 ? 'border-green-500 bg-green-50'
                 : validationResult?.valid === false
                   ? 'border-red-500 bg-red-50'
-                  : 'bg-white'
+                  : 'bg-white border-black'
             }`}
           />
           {validationResult && (

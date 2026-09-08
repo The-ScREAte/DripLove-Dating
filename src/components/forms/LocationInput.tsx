@@ -564,7 +564,7 @@ const LocationInput = ({
               disabled={loadingCountries}
             >
               <SelectTrigger
-                className={`pl-2.5 pr-2.5 bg-white text-black ${errors.country ? 'border-red-500' : ''}`}
+                className={`pl-2.5 pr-2.5 bg-white text-black border-black ${errors.country ? 'border-red-500' : ''}`}
               >
                 <SelectValue placeholder={loadingCountries ? "Loading countries..." : "Select your country (cannot be changed later)"} />
               </SelectTrigger>
@@ -626,7 +626,7 @@ const LocationInput = ({
             placeholder={selectedCountryData?.name 
               ? `Select a city in ${selectedCountryData.name} or type to search` 
               : 'Type your city name (at least 2 characters)'}
-            className={`px-2.5 bg-white text-black placeholder:text-black ${errors.city ? 'border-red-500' : ''}`}
+            className={`px-2.5 bg-white text-black placeholder:text-black border-black ${errors.city ? 'border-red-500' : ''}`}
             disabled={disabled}
           />
 
@@ -726,7 +726,7 @@ const LocationInput = ({
               selectedCountryData?.code === 'NL' ? '1012' :
               'Enter postal code'
             }
-            className={`px-2.5 bg-white text-black placeholder:text-black ${errors.zipCode ? 'border-red-500' : ''}`}
+            className={`px-2.5 bg-white text-black placeholder:text-black border-black ${errors.zipCode ? 'border-red-500' : ''}`}
             disabled={disabled}
           />
           {errors.zipCode && (

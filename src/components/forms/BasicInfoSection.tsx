@@ -62,7 +62,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
+              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
               style={getInputStyles()}
               placeholder={t('registration.firstName')}
             />
@@ -82,7 +82,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
+              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
               style={getInputStyles()}
               placeholder={t('registration.lastName')}
             />
@@ -154,7 +154,7 @@ const BasicInfoSection = ({
             onChange={onInputChange}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
-            className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
+            className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
             style={getInputStyles()}
             placeholder={t('auth.email')}
           />
@@ -170,7 +170,7 @@ const BasicInfoSection = ({
               type="date"
               value={formData.dateOfBirth}
               onChange={onInputChange}
-              className={`compact-date-input text-sm pl-2.5 pr-7 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
+              className={`compact-date-input text-sm pl-2.5 pr-7 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
             />
             {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
           </div>
@@ -190,7 +190,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 pr-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
+              className={`mobile-input-field pl-8 pr-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
               style={getInputStyles()}
               placeholder={t('auth.password')}
             />
@@ -215,7 +215,7 @@ const BasicInfoSection = ({
               type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={onInputChange}
-              className={`pl-8 pr-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+              className={`pl-8 pr-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.confirmPassword ? 'border-red-500' : ''}`}
               placeholder={t('auth.password')}
             />
             <button

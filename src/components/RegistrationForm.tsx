@@ -974,7 +974,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-black">{t('profile.occupation')}</Label>
                 <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
-                  <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
+                  <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
@@ -988,7 +988,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-black">{t('profile.industry')}</Label>
                 <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
-                  <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
+                  <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1003,7 +1003,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-black">{t('registration.educationLevel')}</Label>
               <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
-                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
+                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1048,7 +1048,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-black">{t('registration.iAm')} *</Label>
               <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
-                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
+                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={t('registration.selectGender')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1062,7 +1062,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-black">{t('registration.lookingFor')} *</Label>
               <Select value={formData.preference} onValueChange={(value) => handleSelectChange('preference', value)}>
-                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
+                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={t('registration.selectPreference')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -1079,7 +1079,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           <div className="space-y-2 animate-scale-in">
             <Label className="text-sm font-medium text-black">{t('registration.relationshipIntent')}</Label>
             <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
-              <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
+              <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
                 <SelectValue placeholder={t('registration.whatLookingFor')} />
               </SelectTrigger>
               <SelectContent>

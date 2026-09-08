@@ -1176,7 +1176,7 @@ const ProfileCompletionPage = () => {
                           type="text"
                           value={formData.firstName}
                           onChange={handleInputChange}
-                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-black rounded-md focus:border-pink-400 focus:ring-pink-400"
                           placeholder={t('profileCompletion.enterYourFirstName')}
                           required
                         />
@@ -1190,7 +1190,7 @@ const ProfileCompletionPage = () => {
                           type="text"
                           value={formData.lastName}
                           onChange={handleInputChange}
-                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-black rounded-md focus:border-pink-400 focus:ring-pink-400"
                           placeholder={t('profileCompletion.enterYourLastName')}
                           required
                         />
@@ -1243,7 +1243,7 @@ const ProfileCompletionPage = () => {
                         type="date"
                         value={formData.dateOfBirth}
                         onChange={handleInputChange}
-                        className="compact-date-input w-full px-2.5 pr-7 py-2 text-sm bg-white text-black border border-gray-200 rounded-md focus:border-pink-400 focus:ring-pink-400"
+                        className="compact-date-input w-full px-2.5 pr-7 py-2 text-sm bg-white text-black border border-black rounded-md focus:border-pink-400 focus:ring-pink-400"
                         required
                       />
                       {errors.dateOfBirth && <p className="text-sm text-red-500">{errors.dateOfBirth}</p>}
@@ -1256,7 +1256,7 @@ const ProfileCompletionPage = () => {
                           value={formData.gender}
                           onValueChange={(value) => handleSelectChange('gender', value)}
                         >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                             <SelectValue placeholder="Select your gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1274,7 +1274,7 @@ const ProfileCompletionPage = () => {
                           value={formData.preference}
                           onValueChange={(value) => handleSelectChange('preference', value)}
                         >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                             <SelectValue placeholder="Select your preference" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1293,7 +1293,7 @@ const ProfileCompletionPage = () => {
                         value={formData.relationshipIntent}
                         onValueChange={(value) => handleSelectChange('relationshipIntent', value)}
                       >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                           <SelectValue placeholder="What are you looking for?" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1313,7 +1313,7 @@ const ProfileCompletionPage = () => {
                         value={formData.occupation}
                         onValueChange={(value) => handleSelectChange('occupation', value)}
                       >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
+                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1333,7 +1333,7 @@ const ProfileCompletionPage = () => {
                         value={formData.industry}
                         onValueChange={(value) => handleSelectChange('industry', value)}
                       >
-                        <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-gray-200 focus:border-pink-400">
+                        <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1354,7 +1354,7 @@ const ProfileCompletionPage = () => {
                       value={formData.educationLevel}
                       onValueChange={(value) => handleSelectChange('educationLevel', value)}
                     >
-                      <SelectTrigger className="bg-white text-black border-gray-200 focus:border-pink-400">
+                      <SelectTrigger className="bg-white text-black border-black focus:border-pink-400">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>

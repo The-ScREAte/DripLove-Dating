@@ -119,12 +119,12 @@ const InfluencerSetPassword = () => {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-100 p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md bg-white text-black">
           <CardContent className="pt-6 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Invalid Link</h2>
             <p className="text-gray-600 mb-6">{error}</p>
-            <Button onClick={() => navigate('/influencer')} variant="outline">
+            <Button onClick={() => navigate('/influencer')} variant="outline" className="bg-white">
               Go to Login
             </Button>
           </CardContent>
@@ -136,7 +136,7 @@ const InfluencerSetPassword = () => {
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-100 p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md bg-white text-black">
           <CardContent className="pt-6 text-center">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Password Set Successfully!</h2>
@@ -160,7 +160,7 @@ const InfluencerSetPassword = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-100 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md bg-white text-black">
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-white" />
@@ -189,7 +189,7 @@ const InfluencerSetPassword = () => {
                   placeholder="Enter your password"
                   required
                   minLength={6}
-                  className="pr-10"
+                  className="pr-10 bg-white text-black placeholder:text-black"
                 />
                 <button
                   type="button"
@@ -211,7 +211,7 @@ const InfluencerSetPassword = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm your password"
                   required
-                  className="pr-10"
+                  className="pr-10 bg-white text-black placeholder:text-black"
                 />
                 <button
                   type="button"
