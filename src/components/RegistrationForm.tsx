@@ -983,7 +983,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-black">
                     {occupationOptions.map(option => (
                       <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}
@@ -997,7 +997,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                   <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-black">
                     {industryOptions.map(option => (
                       <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}
@@ -1012,7 +1012,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white text-black">
                   <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
                   <SelectItem value="Some College">{t('registration.someCollege')}</SelectItem>
                   <SelectItem value="Associate Degree">{t('registration.associateDegree')}</SelectItem>
@@ -1057,7 +1057,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={t('registration.selectGender')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white text-black">
                   <SelectItem value="male">{t('registration.male')}</SelectItem>
                   <SelectItem value="female">{t('registration.female')}</SelectItem>
                   <SelectItem value="other">{t('registration.other')}</SelectItem>
@@ -1071,7 +1071,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
                 <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
                   <SelectValue placeholder={t('registration.selectPreference')} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white text-black">
                   <SelectItem value="male">{t('registration.male')}</SelectItem>
                   <SelectItem value="female">{t('registration.female')}</SelectItem>
                   <SelectItem value="everyone">{t('registration.everyone')}</SelectItem>
@@ -1088,7 +1088,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
                 <SelectValue placeholder={t('registration.whatLookingFor')} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-black">
                 <SelectItem value="casual">{t('registration.casual')}</SelectItem>
                 <SelectItem value="serious">{t('registration.serious')}</SelectItem>
                 <SelectItem value="open_to_anything">{t('registration.openToAnything')}</SelectItem>

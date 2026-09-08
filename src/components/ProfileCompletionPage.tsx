@@ -1259,7 +1259,7 @@ const ProfileCompletionPage = () => {
                           <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                             <SelectValue placeholder="Select your gender" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white text-black">
                             <SelectItem value="male">Male</SelectItem>
                             <SelectItem value="female">Female</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
@@ -1277,7 +1277,7 @@ const ProfileCompletionPage = () => {
                           <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                             <SelectValue placeholder="Select your preference" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white text-black">
                             <SelectItem value="male">Male</SelectItem>
                             <SelectItem value="female">Female</SelectItem>
                             <SelectItem value="everyone">Both</SelectItem>
@@ -1296,7 +1296,7 @@ const ProfileCompletionPage = () => {
                           <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                           <SelectValue placeholder="What are you looking for?" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black">
                           <SelectItem value="casual">Casual</SelectItem>
                           <SelectItem value="serious">Serious</SelectItem>
                           <SelectItem value="open_to_anything">Open to Anything</SelectItem>
@@ -1316,7 +1316,7 @@ const ProfileCompletionPage = () => {
                           <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black">
                           {occupationOptions.map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}
@@ -1336,7 +1336,7 @@ const ProfileCompletionPage = () => {
                         <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black">
                           {industryOptions.map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}
@@ -1357,7 +1357,7 @@ const ProfileCompletionPage = () => {
                       <SelectTrigger className="bg-white text-black border-black focus:border-pink-400">
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white text-black">
                         <SelectItem value="High School">High School</SelectItem>
                         <SelectItem value="Some College">Some College</SelectItem>
                         <SelectItem value="Associate Degree">Associate Degree</SelectItem>
