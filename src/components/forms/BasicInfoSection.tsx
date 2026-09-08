@@ -51,7 +51,7 @@ const BasicInfoSection = ({
       
       <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName" className="text-sm font-medium">{t('registration.firstName')} *</Label>
+          <Label htmlFor="firstName" className="text-sm font-medium text-black">{t('registration.firstName')} *</Label>
           <div className="relative">
             <User className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
             <Input
@@ -62,7 +62,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
+              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
               style={getInputStyles()}
               placeholder={t('registration.firstName')}
             />
@@ -71,7 +71,7 @@ const BasicInfoSection = ({
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="lastName" className="text-sm font-medium">{t('registration.lastName')} *</Label>
+          <Label htmlFor="lastName" className="text-sm font-medium text-black">{t('registration.lastName')} *</Label>
           <div className="relative">
             <User className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
             <Input
@@ -82,7 +82,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
+              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
               style={getInputStyles()}
               placeholder={t('registration.lastName')}
             />
@@ -96,7 +96,7 @@ const BasicInfoSection = ({
         <div className="space-y-3 mt-2">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-purple-600" />
-            <Label className="text-sm font-medium">Face Verification *</Label>
+            <Label className="text-sm font-medium text-black">Face Verification *</Label>
           </div>
 
           {showFaceVerification ? (
@@ -143,7 +143,7 @@ const BasicInfoSection = ({
 
       <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-2 min-[390px]:order-2">
-        <Label htmlFor="email" className="text-sm font-medium">{t('auth.email')} *</Label>
+        <Label htmlFor="email" className="text-sm font-medium text-black">{t('auth.email')} *</Label>
         <div className="relative">
           <Mail className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
           <Input
@@ -154,7 +154,7 @@ const BasicInfoSection = ({
             onChange={onInputChange}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
-            className={`mobile-input-field pl-8 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
+            className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
             style={getInputStyles()}
             placeholder={t('auth.email')}
           />
@@ -162,7 +162,7 @@ const BasicInfoSection = ({
         </div>
       </div>
         <div className="space-y-2 min-[390px]:order-1">
-          <Label htmlFor="dateOfBirth" className="text-sm font-medium">{t('registration.dateOfBirth')} *</Label>
+          <Label htmlFor="dateOfBirth" className="text-sm font-medium text-black">{t('registration.dateOfBirth')} *</Label>
           <div className="relative">
             <Input
               id="dateOfBirth"
@@ -170,7 +170,7 @@ const BasicInfoSection = ({
               type="date"
               value={formData.dateOfBirth}
               onChange={onInputChange}
-              className={`compact-date-input text-sm pl-2.5 pr-7 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
+              className={`compact-date-input text-sm pl-2.5 pr-7 bg-white text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
             />
             {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</p>}
           </div>
@@ -179,7 +179,7 @@ const BasicInfoSection = ({
       
       <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium">{t('auth.password')} *</Label>
+          <Label htmlFor="password" className="text-sm font-medium text-black">{t('auth.password')} *</Label>
           <div className="relative">
             <Lock className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
             <Input
@@ -190,7 +190,7 @@ const BasicInfoSection = ({
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 pr-8 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
+              className={`mobile-input-field pl-8 pr-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
               style={getInputStyles()}
               placeholder={t('auth.password')}
             />
@@ -206,7 +206,7 @@ const BasicInfoSection = ({
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword" className="text-sm font-medium">{t('auth.confirmPassword')} *</Label>
+          <Label htmlFor="confirmPassword" className="text-sm font-medium text-black">{t('auth.confirmPassword')} *</Label>
           <div className="relative">
             <Lock className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
             <Input
@@ -215,7 +215,7 @@ const BasicInfoSection = ({
               type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={onInputChange}
-              className={`pl-8 pr-8 border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+              className={`pl-8 pr-8 bg-white text-black placeholder:text-black border-gray-200 focus:border-pink-400 focus:ring-pink-400 ${errors.confirmPassword ? 'border-red-500' : ''}`}
               placeholder={t('auth.password')}
             />
             <button
