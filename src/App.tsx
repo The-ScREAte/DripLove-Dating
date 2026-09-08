@@ -8,6 +8,7 @@ import AppRoutes from "@/components/AppRoutes";
 import { useGlobalKeyboardOffset } from "@/hooks/useGlobalKeyboardOffset";
 import { detectDeviceLanguage } from "@/utils/languageSync";
 import i18n from "@/i18n/config";
+import ScreenCaptureBlockedOverlay from "@/components/ScreenCaptureBlockedOverlay";
 
 // ⭐ ANDROID PERFORMANCE: Optimized QueryClient with aggressive caching
 // Reduces network requests and improves UI responsiveness on Android
@@ -72,7 +73,8 @@ const App = ({
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          
+          <ScreenCaptureBlockedOverlay />
+
           {/* Mobile-optimized container */}
           <div className="w-full h-full"
                style={{ 

@@ -11,3 +11,54 @@ index 273ca02..5c143a0 100644
          }
      }
      lintOptions {
+diff --git a/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift b/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
+index 5be6f4b..6a9f49a 100644
+--- a/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
++++ b/node_modules/@capacitor-community/privacy-screen/ios/Sources/PrivacyScreenPlugin/PrivacyScreen.swift
+@@ -59,34 +59,18 @@ import UIKit
+         }
+     }
+ 
+-    @objc public func handleWillResignActiveNotification() {
+-        guard self.isEnabled else {
+-            return
+-        }
+-        DispatchQueue.main.async {
+-            let window = UIApplication.shared.connectedScenes
+-                .filter({$0.activationState == .foregroundActive || $0.activationState == .foregroundInactive})
+-                .compactMap({$0 as? UIWindowScene}).first?.windows.filter({$0.isKeyWindow}).first
+-            if var rootVC = window?.rootViewController, !self.privacyViewController.isBeingPresented {
+-                while let topVC = rootVC.presentedViewController {
+-                    rootVC = topVC
+-                }
+-                if rootVC.presentedViewController != self.privacyViewController && !self.privacyViewController.isBeingPresented && !self.privacyViewController.isBeingDismissed {
+-                    rootVC.present(self.privacyViewController, animated: false, completion: nil)
+-                }
+-            } else {
+-                if self.plugin.bridge?.viewController?.presentedViewController != self.privacyViewController {
+-                    self.plugin.bridge?.viewController?.present(self.privacyViewController, animated: false, completion: nil)
+-                }
+-            }
+-        }
+-    }
+-
+-    @objc public func handleDidBecomeActiveNotification() {
+-        DispatchQueue.main.async {
+-            self.privacyViewController.dismiss(animated: false, completion: nil)
+-        }
+-    }
++    // DripLove: the app-switcher/background "privacy cover" (a plain gray
++    // full-screen view presented over the app whenever it resigns active,
++    // e.g. opening the App Switcher) is intentionally disabled - product
++    // decision was to keep normal content visible at all times and instead
++    // rely solely on real screenshot/recording detection (screenshotTaken /
++    // screenRecordingStarted, already emitted below) plus an in-app "blocked"
++    // overlay on the JS side. Left as no-ops rather than deleted so the
++    // plugin's public surface (and this file's diff against upstream) stays
++    // minimal.
++    @objc public func handleWillResignActiveNotification() {}
++
++    @objc public func handleDidBecomeActiveNotification() {}
+ 
+     @objc public func handleDidChangeStatusBarOrientationNotification() {
+         self.plugin.bridge?.webView?.frame = CGRect(x: 0.0, y: 0.0, width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)

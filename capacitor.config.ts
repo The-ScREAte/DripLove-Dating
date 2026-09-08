@@ -103,16 +103,31 @@ const config: CapacitorConfig = {
     // mini-games) call PrivacyScreen.disable() for as long as they're
     // showing - see src/hooks/useAllowScreenshots.ts.
     //
-    // preventScreenshots is OFF: this plugin's iOS implementation
-    // (PrivacyScreen.swift, configurePreventionScreenshot) implements it via
-    // a well-known but fragile secure-UITextField hack that re-parents the
-    // ENTIRE app window's CALayer underneath a hidden text field's layer.
-    // That's what caused a blank white screen at launch on iOS (nothing
-    // rendered, not even the index page) - the layer re-parenting doesn't
-    // reliably compose on every iOS version. `enable` alone still covers
-    // Android's FLAG_SECURE and iOS's background/app-switcher hide via a
-    // normal, standard presented view controller - neither of those touch
-    // the window's layer tree, so they're not implicated in this bug.
+    // Android: `enable` alone is enough - it sets FLAG_SECURE, which makes
+    // the OS refuse to capture the window at all (screenshot AND recording),
+    // no further app code needed.
+    //
+    // iOS has no equivalent OS-level block, and preventScreenshots stays
+    // OFF: that mode (PrivacyScreen.swift, configurePreventionScreenshot)
+    // implements it via a well-known but fragile secure-UITextField hack
+    // that re-parents the ENTIRE app window's CALayer underneath a hidden
+    // text field's layer. That's what caused a blank white screen at launch
+    // on iOS (nothing rendered, not even the index page) - the layer
+    // re-parenting doesn't reliably compose on every iOS version. Instead,
+    // iOS gets real-time screenshot/recording *detection*
+    // (screenshotTaken / screenRecordingStarted, both already emitted by
+    // this plugin) answered with an in-app "Screen capture blocked" overlay
+    // - see src/components/ScreenCaptureBlockedOverlay.tsx. This doesn't
+    // blank the image already saved to Photos (no public iOS API allows
+    // that without the same risky layer trick above), but it does match
+    // what the user sees, same as the pattern apps like WhatsApp use.
+    //
+    // The plugin's own background/app-switcher "privacy cover" (a gray
+    // full-screen view shown whenever the app resigns active, e.g. opening
+    // the App Switcher) is patched out - see
+    // patches/@capacitor-community+privacy-screen+6.1.0.patch - product
+    // decision was to keep real content visible at all times rather than
+    // hide it behind a permanent gray screen.
     PrivacyScreen: {
       enable: true,
       preventScreenshots: false // iOS only - see note above
