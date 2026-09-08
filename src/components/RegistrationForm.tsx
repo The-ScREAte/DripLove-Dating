@@ -78,10 +78,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   const [currentStep, setCurrentStep] = useState(1);
   const [images, setImages] = useState<ImageUpload[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Set once the account is actually created (at the step 2 -> 3 transition,
-  // not at final submit anymore) - lets step 3's photo picker upload +
-  // moderate each photo live, the same way profile completion does, since
-  // that requires a real signed-in user to own the photo row.
+  // Set once the account is actually created (on final submit, after photos
+  // on step 2 have already passed their checks) - lets the photo picker
+  // upload + moderate each photo live once it's set, the same way profile
+  // completion does, since that requires a real signed-in user to own the
+  // photo row. Photos can still be picked before this is set (e.g. picked
+  // before an earlier submit attempt), in which case they fall back to
+  // 'pending' and get uploaded for real during the final submit's own loop.
   const [accountUserId, setAccountUserId] = useState<string | null>(null);
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
@@ -104,17 +107,19 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   }, []);
 
-  // Resume mid-registration after a reload: the account is now created at
-  // the step 2 -> 3 transition (not at final submit), and supabase-js
-  // persists that session in its own localStorage automatically - so if one
-  // exists here, this browser already has an account from an unfinished
-  // registration. Jump straight back to the photo step rather than
-  // re-showing step 1 (which would try to sign up the same email again).
+  // Resume mid-registration after a reload: the account is only created on
+  // final submit now, but a partially-completed signUp (e.g. the request
+  // succeeded but the app closed before finishing) still leaves a session
+  // behind - supabase-js persists that in its own localStorage automatically,
+  // so if one exists here, this browser already has an account from an
+  // unfinished registration. Jump straight back to step 2 (which now
+  // includes photos) rather than re-showing step 1, which would try to sign
+  // up the same email again.
   React.useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user?.id) return;
       setAccountUserId(session.user.id);
-      setCurrentStep(3);
+      setCurrentStep(2);
 
       const { data: existingRows } = await supabase
         .from('user_images')
@@ -204,7 +209,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     }
   };
 
-  // Photos are now uploaded live during step 3 (see uploadAndModerateImage),
+  // Photos are now uploaded live as they're picked on step 2 (see uploadAndModerateImage),
   // so by the time any exist they're already real user_images rows, not
   // just local state - restoring them from localStorage's blob preview URLs
   // never actually worked across a reload anyway (those URLs die with the
@@ -295,8 +300,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
   // picked, instead of deferring to final submit - so the user finds out
   // immediately if a photo needs replacing. Requires an actual DB row to
   // attach the result to, which requires the account to already exist -
-  // accountUserId is only set once the step 2 -> 3 transition has created
-  // it. Shared by both the initial picker and re-cropping an existing photo.
+  // accountUserId is only set once final submit has created it, so a photo
+  // picked before that just falls back to 'pending' below. Shared by both
+  // the initial picker and re-cropping an existing photo.
   const uploadAndModerateImage = (file: File, preview: string, order: number) => {
     if (!accountUserId) {
       setImages(prev => prev.map(img => img.preview === preview ? { ...img, status: 'pending' } : img));
@@ -606,20 +612,68 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       return;
     }
 
-    if (currentStep === 2) {
-      // Validate second step
-      const validationErrors = validateRegistrationForm(formData);
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors(validationErrors);
-        return;
-      }
+    // Step 2 (now includes photos on the same page) - validate its fields
+    // first, then the photos, before ever creating the account - so a user
+    // who hasn't picked 2 photos yet never gets an account created for
+    // nothing (the submit button is also disabled for this same reason, but
+    // this is the safety net if it's ever reached some other way).
+    const validationErrors = validateRegistrationForm(formData);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
 
-      // The account is created HERE now (not at final submit) - step 3's
-      // photo picker needs a real signed-in user to check each photo live
-      // as it's picked, the same way profile completion already does.
+    if (images.some(img => img.status === 'moderating')) {
+      toast({
+        title: 'Still checking your photos',
+        description: 'Give it just a moment - photos are quick to check.',
+        variant: 'default',
+      });
+      return;
+    }
+
+    const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
+
+    if (approvedImages.length < 2) {
+      toast({
+        title: t('registration.errors.photosRequired'),
+        description: t('registration.uploadAtLeastTwoPhotos'),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const rejectedImages = images.filter(img => img.status === 'rejected');
+    if (rejectedImages.length > 0) {
+      toast({
+        title: t('registration.errors.someImagesRejected'),
+        description: t('registration.removeRejectedImages'),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Ready = already uploaded live (imageId) or has a file to fall back to
+    // uploading now (live-check failed earlier, e.g. a network blip).
+    const readyImages = approvedImages.filter(img => img.imageId || img.file);
+    if (readyImages.length < 2) {
+      toast({
+        title: t('registration.errors.photosNeedReupload'),
+        description: t('registration.reuploadTwoPhotos'),
+        variant: "destructive"
+      });
+      setImages(prev => prev.filter(img => img.imageId || img.file));
+      return;
+    }
+
+    // The account is only created here, on final submit (once photos have
+    // already passed the checks above) - guarded so a resumed session
+    // (accountUserId already set from the mount effect) never tries to sign
+    // up the same email twice.
+    let userId: string | null = accountUserId;
+    if (!userId) {
       setCreatingAccount(true);
 
-      let userId: string | null = null;
       try {
         // Check if user profile already exists (this is the only check that matters)
         const { data: existingProfile } = await supabase
@@ -786,7 +840,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       }
 
       // Index face in AWS Rekognition with user's name (now, after the
-      // account exists, but BEFORE moderating photos in step 3) -
+      // account exists, but BEFORE moderating the photos below) -
       // moderate-image's face match for each photo searches this
       // Rekognition collection, so the user's own face has to be indexed
       // first or every photo would come back as a false "doesn't match
@@ -807,57 +861,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
       setAccountUserId(userId);
       setCreatingAccount(false);
-      setCurrentStep(3);
-      return;
     }
 
-    // Step 3 (final) - the account already exists; photos are checked live
-    // as they're picked (uploadAndModerateImage). This just needs everything
-    // to have settled into a real verdict before letting the user finish.
-    if (images.some(img => img.status === 'moderating')) {
-      toast({
-        title: 'Still checking your photos',
-        description: 'Give it just a moment - photos are quick to check.',
-        variant: 'default',
-      });
-      return;
-    }
-
-    const approvedImages = images.filter(img => img.status === 'approved' || img.status === 'pending');
-
-    if (approvedImages.length < 2) {
-      toast({
-        title: t('registration.errors.photosRequired'),
-        description: t('registration.uploadAtLeastTwoPhotos'),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const rejectedImages = images.filter(img => img.status === 'rejected');
-    if (rejectedImages.length > 0) {
-      toast({
-        title: t('registration.errors.someImagesRejected'),
-        description: t('registration.removeRejectedImages'),
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Ready = already uploaded live (imageId) or has a file to fall back to
-    // uploading now (live-check failed earlier, e.g. a network blip).
-    const readyImages = approvedImages.filter(img => img.imageId || img.file);
-    if (readyImages.length < 2) {
-      toast({
-        title: t('registration.errors.photosNeedReupload'),
-        description: t('registration.reuploadTwoPhotos'),
-        variant: "destructive"
-      });
-      setImages(prev => prev.filter(img => img.imageId || img.file));
-      return;
-    }
-
-    if (!accountUserId) {
+    if (!userId) {
       toast({ title: 'Something went wrong', description: 'Please restart registration.', variant: 'destructive' });
       return;
     }
@@ -883,7 +889,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           };
           const fileExt = mimeToExt[image.file.type] || 'jpg';
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-          const filePath = `${accountUserId}/${fileName}`;
+          const filePath = `${userId}/${fileName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('user-photos')
@@ -894,7 +900,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
           const { data: insertedRow, error: dbError } = await supabase
             .from('user_images')
-            .insert({ user_id: accountUserId, image_url: publicUrl, image_order: imageOrder })
+            .insert({ user_id: userId, image_url: publicUrl, image_order: imageOrder })
             .select('id')
             .single();
           if (dbError) throw dbError;
@@ -943,7 +949,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           </div>
         </div>
         <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          {currentStep === 1 ? t('registration.createAccount') : currentStep === 2 ? t('registration.tellUsMore') : t('registration.addPhotos')}
+          {currentStep === 1 ? t('registration.createAccount') : t('registration.tellUsMore')}
         </CardTitle>
       </CardHeader>
       <CardContent className="animate-fade-in px-3 sm:px-6 pb-5 sm:pb-8">
@@ -1100,11 +1106,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
               />
               {errors.adinkraSymbols && <p className="text-red-500 text-xs mt-1">{errors.adinkraSymbols}</p>}
             </div>
-          </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className="space-y-4 animate-fade-in">
 
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between gap-3">
@@ -1190,7 +1191,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
 
                 {/* Note: Face verification is now shown in step 1 under name fields */}
               </div>
-            </div>
+          </div>
           )}
 
           <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
@@ -1206,20 +1207,25 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
             )}
             <Button
               type="submit"
-              disabled={isSubmitting || creatingAccount || (currentStep === 3 && images.some(img => img.status === 'moderating'))}
+              disabled={
+                isSubmitting ||
+                creatingAccount ||
+                (currentStep === 2 && (
+                  images.some(img => img.status === 'moderating') ||
+                  images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length < 2
+                ))
+              }
               className="h-9 px-4 sm:w-auto bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creatingAccount
                 ? t('registration.creatingAccount')
                 : isSubmitting
                   ? t('registration.creatingAccount')
-                  : currentStep === 3 && images.some(img => img.status === 'moderating')
+                  : currentStep === 2 && images.some(img => img.status === 'moderating')
                     ? 'Checking photos…'
                     : currentStep === 1
                       ? t('registration.continue')
-                      : currentStep === 2
-                        ? t('registration.addPhoto')
-                        : t('registration.createAccount')
+                      : t('registration.createAccount')
               }
             </Button>
           </div>

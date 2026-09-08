@@ -1479,7 +1479,11 @@ const ProfileCompletionPage = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                         type="submit"
-                        disabled={isSubmitting || images.some(img => img.status === 'moderating')}
+                        disabled={
+                          isSubmitting ||
+                          images.some(img => img.status === 'moderating') ||
+                          images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length < 2
+                        }
                         className="w-full h-8 text-xs px-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isSubmitting ? (
