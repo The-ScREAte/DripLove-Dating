@@ -150,6 +150,23 @@ function extractNumericPrice(formattedPrice: string): string {
   return '0';
 }
 
+// product.pricing is just a shortcut to offers[0].pricingPhases[0] - now that
+// a free-trial introductory offer is live, that shortcut resolves to the
+// trial phase ("Free"/"$0.00") instead of the real recurring price, which
+// would show a wrong/empty price on the paywall. Walk the offers/phases
+// ourselves and pick the actual recurring (non-FreeTrial) phase to display.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getRecurringPricingPhase(product: any): any {
+  const offers = Array.isArray(product?.offers) ? product.offers : [];
+  for (const offer of offers) {
+    const phases = Array.isArray(offer?.pricingPhases) ? offer.pricingPhases : [];
+    const recurring = phases.find((p: any) => p?.paymentMode !== 'FreeTrial');
+    if (recurring) return recurring;
+  }
+  // Fall back to the plugin's own shortcut if nothing better is found
+  return product?.pricing;
+}
+
 // Get Google Play localized price
 async function getGooglePrice(): Promise<{ price: string; currency: string; formattedPrice: string } | null> {
   // @ts-ignore
@@ -168,14 +185,14 @@ async function getGooglePrice(): Promise<{ price: string; currency: string; form
       
       if (product) {
         // Try different ways to get pricing info
-        const pricing = product.pricing;
-        
+        const pricing = getRecurringPricingPhase(product);
+
         if (pricing) {
           // Get the raw price and currency from Google Play
           const rawPrice = pricing.price || product.price || '';
           const rawCurrency = pricing.currency || product.priceCurrency || 'USD';
           const numericPrice = extractNumericPrice(rawPrice);
-          
+
           // Google Play returns prices in the user's Play Store country currency
           // which is the correct localized price for the user
           return {
@@ -221,8 +238,8 @@ async function getApplePrice(): Promise<{ price: string; currency: string; forma
       
       if (product) {
         // Try different ways to get pricing info
-        const pricing = product.pricing;
-        
+        const pricing = getRecurringPricingPhase(product);
+
         if (pricing) {
           return {
             formattedPrice: pricing.price || product.price || '',
