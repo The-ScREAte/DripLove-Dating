@@ -66,6 +66,41 @@ interface ProductLike {
   getOffer?: () => OfferLike | undefined;
 }
 
+const productHasFreeTrialOffer = (product: ProductLike | null | undefined): boolean => {
+  if (!product) return false;
+  const offers: OfferLike[] = Array.isArray(product.offers) ? product.offers : [];
+  return offers.some((o) => (o.pricingPhases || []).some((p) => p.paymentMode === 'FreeTrial'));
+};
+
+interface PurchasableProductLike extends ProductLike {
+  canPurchase?: boolean;
+}
+
+/**
+ * Single source of truth (both platforms) for "which of our several product
+ * IDs do we actually mean right now" - used identically by the trial/price
+ * display (useFreeTrialOffer, usePricingConfig) and the real purchase calls
+ * (buyMonthly, buyGoogleMonthly), so none of them can ever point at a
+ * different product than the others. Previously the display code picked the
+ * first *registered* product (store.get(id) truthy, regardless of
+ * purchasability) while the purchase calls picked the first *purchasable*
+ * one - on accounts where those differed (most visibly on iOS, which has two
+ * real products at different prices), the app showed a price/trial for one
+ * product and then charged for a completely different one. Only ever
+ * consider purchasable products, and among those prefer whichever one
+ * actually carries a free-trial offer.
+ */
+export const selectPurchasableProduct = <T extends PurchasableProductLike>(
+  getProduct: (id: string) => T | null | undefined,
+  productIds: string[]
+): T | undefined => {
+  const purchasable = productIds
+    .map((id) => getProduct(id))
+    .filter((p): p is T => !!p && !!p.canPurchase);
+  if (purchasable.length === 0) return undefined;
+  return purchasable.find((p) => productHasFreeTrialOffer(p)) ?? purchasable[0];
+};
+
 export const extractFreeTrialOfferInfo = (product: ProductLike | null | undefined): FreeTrialOfferInfo => {
   if (!product) return EMPTY_OFFER_INFO;
 

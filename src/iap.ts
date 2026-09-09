@@ -1,5 +1,7 @@
 import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
+import { selectPurchasableProduct } from '@/utils/iapOfferInfo';
+import { toast } from '@/components/ui/sonner';
 
 const noopLog = (..._args: unknown[]) => {};
 
@@ -214,7 +216,7 @@ async function handleApprovedTransaction(t: any) {
 
     if (!userId) {
       console.error('[IAP] No user identification available');
-      alert('Please log in to complete your purchase.');
+      toast.error('Please log in to complete your purchase.');
       return;
     }
 
@@ -231,7 +233,9 @@ async function handleApprovedTransaction(t: any) {
       // Never grant premium without server-side verification -- the client is
       // untrusted and must not be able to write its own entitlement.
       console.warn('[IAP] No receipt data available; cannot verify purchase');
-      alert('Could not verify your purchase. Please use "Restore Purchases" or contact support.');
+      toast.error('Could not verify your purchase.', {
+        description: 'Please use "Restore Purchases" or contact support.',
+      });
       return;
     }
 
@@ -252,10 +256,19 @@ async function handleApprovedTransaction(t: any) {
       if (message && message.toLowerCase().includes('already linked')) {
         // Tell them the real reason instead of the generic "try again"
         // message - retrying or restoring will never succeed here, since
-        // this specific subscription is tied to a different account.
-        alert(message);
+        // this specific subscription is tied to a different account. This
+        // is the normal, expected outcome when e.g. a friend's phone/Apple
+        // ID already subscribes another DripLove account - each account
+        // needs its own separate purchase.
+        toast.error('This subscription belongs to another account', {
+          description: 'The Apple/Google account on this device already has an active DripLove subscription linked to a different account. To subscribe here, use a different Apple/Google ID for this purchase, or contact support.',
+          duration: 8000,
+        });
       } else {
-        alert('We could not verify your purchase yet. If you were charged, please try "Restore Purchases" in a moment, or contact support.');
+        toast.error('We could not verify your purchase yet.', {
+          description: 'If you were charged, please try "Restore Purchases" in a moment, or contact support.',
+          duration: 6000,
+        });
       }
       return;
     }
@@ -284,7 +297,9 @@ async function handleApprovedTransaction(t: any) {
 
       if (!isPremiumNow) {
         console.warn('[IAP] Validation ok but subscription not yet applied; skipping redirect');
-        alert('Your purchase was verified. It may take a moment to appear -- please reopen the app shortly.');
+        toast('Your purchase was verified.', {
+          description: 'It may take a moment to appear - please reopen the app shortly.',
+        });
         return;
       }
     }
@@ -330,7 +345,7 @@ async function handleApprovedTransaction(t: any) {
     } catch (fallbackError) {
       console.error('[IAP] Fallback error handling failed:', fallbackError);
     }
-    alert('Payment processing failed. Please try again or contact support.');
+    toast.error('Payment processing failed.', { description: 'Please try again or contact support.' });
     if (t.finish && typeof t.finish === 'function') {
       t.finish();
     }
@@ -588,26 +603,27 @@ export const buyMonthly = async () => {
   window.iapPurchaseInitiated = true;
   markIapPending();
 
-  // Try to find the first valid product that can be purchased
-  let product;
+  // Same selection algorithm the trial/price display (useFreeTrialOffer)
+  // uses - only ever consider purchasable products, preferring whichever
+  // one actually carries a free-trial offer. Previously this loop picked
+  // the first purchasable product regardless of trial, while the display
+  // picked the first *registered* product regardless of purchasability -
+  // on accounts where those disagreed, users saw one price/trial promise
+  // and got charged a completely different product. Sharing this exact
+  // selector makes that mismatch structurally impossible.
   for (const id of PRODUCT_IDS) {
-    try {
-      const p = store.get ? store.get(id) : null;
-      noopLog(`[IAP] Checking product ${id}:`, { 
-        exists: !!p, 
-        canPurchase: p?.canPurchase, 
-        owned: p?.owned,
-        title: p?.title,
-        price: p?.pricing?.price
-      });
-      if (p && p.canPurchase) {
-        product = p;
-        noopLog(`[IAP] ✅ Selected product: ${id}`);
-        break;
-      }
-    } catch (err) {
-      console.warn(`[IAP] Could not load product ${id}:`, err);
-    }
+    const p = store.get ? store.get(id) : null;
+    noopLog(`[IAP] Checking product ${id}:`, {
+      exists: !!p,
+      canPurchase: p?.canPurchase,
+      owned: p?.owned,
+      title: p?.title,
+      price: p?.pricing?.price
+    });
+  }
+  const product = selectPurchasableProduct((id) => (store.get ? store.get(id) : null), PRODUCT_IDS);
+  if (product) {
+    noopLog(`[IAP] ✅ Selected product: ${product.id}`);
   }
 
   if (!product) {

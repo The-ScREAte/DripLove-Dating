@@ -1,5 +1,6 @@
 import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
+import { selectPurchasableProduct } from '@/utils/iapOfferInfo';
 
 const noopLog = (..._args: unknown[]) => {};
 
@@ -643,44 +644,34 @@ export const buyGoogleMonthly = async () => {
 
   window.googleIapPurchaseInitiated = true;
 
-  let product = null;
   let offer = null;
 
-  // Try to find a valid product with an offer
+  // Same selection algorithm the trial/price display (useFreeTrialOffer,
+  // usePricingConfig) uses - only ever a purchasable product, preferring
+  // whichever one actually carries a free-trial offer. Sharing this exact
+  // selector keeps what's shown and what's charged structurally in sync.
   for (const id of GOOGLE_PRODUCT_IDS) {
-    try {
-      const p = store.get ? store.get(id) : null;
-      noopLog(`[Google IAP] Checking product ${id}:`, p ? {
-        id: p.id,
-        canPurchase: p.canPurchase,
-        hasOffer: !!p.getOffer?.()
-      } : 'not found');
-      
-      if (p) {
-        // p.getOffer() is a shortcut to offers[0] - explicitly prefer
-        // whichever offer actually carries a FreeTrial phase so the
-        // configured trial can never get silently skipped by picking the
-        // wrong offer (e.g. a base plan with no trial) at purchase time.
-        const offers: Array<{ pricingPhases?: Array<{ paymentMode?: string }>; order?: () => Promise<void> }> =
-          Array.isArray(p.offers) ? p.offers : [];
-        const trialOffer = offers.find((candidate) =>
-          (candidate.pricingPhases || []).some((phase) => phase.paymentMode === 'FreeTrial')
-        );
-        const o = trialOffer ?? p.getOffer?.();
-        if (o && typeof o.order === 'function') {
-          product = p;
-          offer = o;
-          noopLog('[Google IAP] Found valid product with offer:', id, trialOffer ? '(trial offer)' : '(default offer)');
-          break;
-        } else if (p.canPurchase) {
-          // Fallback: product is purchasable but getOffer might work differently
-          product = p;
-          noopLog('[Google IAP] Found purchasable product:', id);
-        }
-      }
-    } catch (err) {
-      console.warn(`[Google IAP] Could not load product ${id}:`, err);
-    }
+    const p = store.get ? store.get(id) : null;
+    noopLog(`[Google IAP] Checking product ${id}:`, p ? {
+      id: p.id,
+      canPurchase: p.canPurchase,
+      hasOffer: !!p.getOffer?.()
+    } : 'not found');
+  }
+  const product = selectPurchasableProduct((id) => (store.get ? store.get(id) : null), GOOGLE_PRODUCT_IDS);
+
+  if (product) {
+    // p.getOffer() is a shortcut to offers[0] - explicitly prefer whichever
+    // offer actually carries a FreeTrial phase so the configured trial can
+    // never get silently skipped by picking the wrong offer (e.g. a base
+    // plan with no trial) at purchase time.
+    const offers: Array<{ pricingPhases?: Array<{ paymentMode?: string }>; order?: () => Promise<void> }> =
+      Array.isArray(product.offers) ? product.offers : [];
+    const trialOffer = offers.find((candidate) =>
+      (candidate.pricingPhases || []).some((phase) => phase.paymentMode === 'FreeTrial')
+    );
+    offer = trialOffer ?? product.getOffer?.();
+    noopLog('[Google IAP] Selected product:', product.id, trialOffer ? '(trial offer)' : '(default offer)');
   }
 
   if (!product) {

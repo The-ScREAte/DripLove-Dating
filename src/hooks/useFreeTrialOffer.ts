@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
-import { extractFreeTrialOfferInfo, FreeTrialOfferInfo } from '@/utils/iapOfferInfo';
+import { extractFreeTrialOfferInfo, selectPurchasableProduct, FreeTrialOfferInfo } from '@/utils/iapOfferInfo';
 import { isIOS, isNativeApp } from '@/utils/iap';
 import { isAndroid } from '@/iap-google';
 import { buyMonthly } from '@/iap';
@@ -15,12 +15,12 @@ const APPLE_PRODUCT_IDS = [
   'com.driplove.dating.premium.monthlysub3',
   'com.driplove.dating.premium.monthlysub2',
 ];
-const GOOGLE_PRODUCT_ID = 'premium_monthly';
+const GOOGLE_PRODUCT_IDS = ['premium_monthly', 'monthly', 'com.driplove.dating.premium.monthly'];
 
 type CdvStoreProduct = {
   owned?: boolean;
   canPurchase?: boolean;
-  offers?: unknown[];
+  offers?: Array<{ pricingPhases?: Array<{ price?: string; billingPeriod?: string; paymentMode?: string }> }>;
   getOffer?: () => unknown;
 };
 type CdvStoreWhen = {
@@ -118,12 +118,14 @@ export const useFreeTrialOffer = (userId: string | undefined): UseFreeTrialOffer
       if (!store?.get) return;
 
       const product = nativeAndroid
-        ? store.get(GOOGLE_PRODUCT_ID)
-        : APPLE_PRODUCT_IDS.map((id) => store.get(id)).find(Boolean);
+        ? selectPurchasableProduct((id) => store.get(id), GOOGLE_PRODUCT_IDS)
+        : selectPurchasableProduct((id) => store.get(id), APPLE_PRODUCT_IDS);
 
+      // Nothing purchasable yet (still loading) - leave prior state alone
+      // rather than clearing it, and let the 1s/3s retries above try again.
       if (!product || cancelled) return;
       setOfferInfo(extractFreeTrialOfferInfo(product));
-      setCanStart(!!product.canPurchase || !!product.getOffer?.());
+      setCanStart(!!product.canPurchase);
     };
 
     readOffer();

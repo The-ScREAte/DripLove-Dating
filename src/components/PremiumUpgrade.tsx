@@ -118,10 +118,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const isAndroidNative = deviceIsAndroid && deviceIsNative;
   const isIosNative = deviceIsIos && deviceIsNative;
   const showRestoreButton = (deviceIsIos || deviceIsAndroid) && deviceIsNative;
-  // Paystack temporarily disabled on the Android app - Google Play Billing
-  // (IAP) is the sole payment path there for now. Web keeps Paystack since
-  // there's no Google Play Billing equivalent outside the native app.
-  const showPaystackOption = !deviceIsNative && !deviceIsIos;
+  // Paystack shows on ALL web (any OS, including an iPhone's mobile
+  // browser - isIOS() matches on user-agent too, not just native platform,
+  // and a browser never has Apple/Google IAP available regardless of OS).
+  // Temporarily disabled on the Android native app only - Google Play
+  // Billing (IAP) is the sole payment path there for now.
+  const showPaystackOption = !deviceIsNative;
   // No payment method matched any of the blocks below at all - a real device
   // reaching this is always a bug (every device falls into exactly one
   // matrix cell above), not a legitimate "nothing to show" state. Root cause

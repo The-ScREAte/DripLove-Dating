@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { convertToGHS } from '@/services/exchangeRateService';
+import { selectPurchasableProduct } from '@/utils/iapOfferInfo';
 
 interface PricingConfig {
   price: string;
@@ -96,6 +97,7 @@ async function loadWebPricingFromDB(): Promise<void> {
 // Google Play product IDs (must match iap-google.ts)
 const GOOGLE_PRODUCT_IDS = [
   'premium_monthly',
+  'monthly',
   'com.driplove.dating.premium.monthly',
 ];
 
@@ -180,37 +182,39 @@ async function getGooglePrice(): Promise<{ price: string; currency: string; form
   await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
-    for (const id of GOOGLE_PRODUCT_IDS) {
-      const product = store.get ? store.get(id) : null;
-      
-      if (product) {
-        // Try different ways to get pricing info
-        const pricing = getRecurringPricingPhase(product);
+    // Same selection as the trial display (useFreeTrialOffer) and the real
+    // purchase call (buyGoogleMonthly) - only ever the product that's
+    // actually purchasable, so this price can never belong to a different
+    // product than the one that gets charged.
+    const product = selectPurchasableProduct((id) => (store.get ? store.get(id) : null), GOOGLE_PRODUCT_IDS);
 
-        if (pricing) {
-          // Get the raw price and currency from Google Play
-          const rawPrice = pricing.price || product.price || '';
-          const rawCurrency = pricing.currency || product.priceCurrency || 'USD';
-          const numericPrice = extractNumericPrice(rawPrice);
+    if (product) {
+      // Try different ways to get pricing info
+      const pricing = getRecurringPricingPhase(product);
 
-          // Google Play returns prices in the user's Play Store country currency
-          // which is the correct localized price for the user
-          return {
-            formattedPrice: rawPrice,
-            price: numericPrice,
-            currency: rawCurrency,
-          };
-        }
-        
-        // Fallback to product.price directly
-        if (product.price) {
-          const rawCurrency = product.priceCurrency || 'USD';
-          return {
-            formattedPrice: product.price,
-            price: extractNumericPrice(product.price),
-            currency: rawCurrency,
-          };
-        }
+      if (pricing) {
+        // Get the raw price and currency from Google Play
+        const rawPrice = pricing.price || product.price || '';
+        const rawCurrency = pricing.currency || product.priceCurrency || 'USD';
+        const numericPrice = extractNumericPrice(rawPrice);
+
+        // Google Play returns prices in the user's Play Store country currency
+        // which is the correct localized price for the user
+        return {
+          formattedPrice: rawPrice,
+          price: numericPrice,
+          currency: rawCurrency,
+        };
+      }
+
+      // Fallback to product.price directly
+      if (product.price) {
+        const rawCurrency = product.priceCurrency || 'USD';
+        return {
+          formattedPrice: product.price,
+          price: extractNumericPrice(product.price),
+          currency: rawCurrency,
+        };
       }
     }
   } catch (error) {
@@ -233,29 +237,31 @@ async function getApplePrice(): Promise<{ price: string; currency: string; forma
   await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
-    for (const id of APPLE_PRODUCT_IDS) {
-      const product = store.get ? store.get(id) : null;
-      
-      if (product) {
-        // Try different ways to get pricing info
-        const pricing = getRecurringPricingPhase(product);
+    // Same selection as the trial display (useFreeTrialOffer) and the real
+    // purchase call (buyMonthly) - only ever the product that's actually
+    // purchasable, so the price shown here can never belong to a different
+    // product than the one that gets charged.
+    const product = selectPurchasableProduct((id) => (store.get ? store.get(id) : null), APPLE_PRODUCT_IDS);
 
-        if (pricing) {
-          return {
-            formattedPrice: pricing.price || product.price || '',
-            price: extractNumericPrice(pricing.price || product.price || ''),
-            currency: pricing.currency || 'USD',
-          };
-        }
-        
-        // Fallback to product.price directly
-        if (product.price) {
-          return {
-            formattedPrice: product.price,
-            price: extractNumericPrice(product.price),
-            currency: product.priceCurrency || 'USD',
-          };
-        }
+    if (product) {
+      // Try different ways to get pricing info
+      const pricing = getRecurringPricingPhase(product);
+
+      if (pricing) {
+        return {
+          formattedPrice: pricing.price || product.price || '',
+          price: extractNumericPrice(pricing.price || product.price || ''),
+          currency: pricing.currency || 'USD',
+        };
+      }
+
+      // Fallback to product.price directly
+      if (product.price) {
+        return {
+          formattedPrice: product.price,
+          price: extractNumericPrice(product.price),
+          currency: product.priceCurrency || 'USD',
+        };
       }
     }
   } catch (error) {
