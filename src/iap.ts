@@ -1,7 +1,7 @@
 import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
 import { selectPurchasableProduct } from '@/utils/iapOfferInfo';
-import { toast } from '@/components/ui/sonner';
+import { toast } from '@/hooks/use-toast';
 
 const noopLog = (..._args: unknown[]) => {};
 
@@ -216,7 +216,7 @@ async function handleApprovedTransaction(t: any) {
 
     if (!userId) {
       console.error('[IAP] No user identification available');
-      toast.error('Please log in to complete your purchase.');
+      toast({ title: 'Please log in to complete your purchase.' });
       return;
     }
 
@@ -233,7 +233,8 @@ async function handleApprovedTransaction(t: any) {
       // Never grant premium without server-side verification -- the client is
       // untrusted and must not be able to write its own entitlement.
       console.warn('[IAP] No receipt data available; cannot verify purchase');
-      toast.error('Could not verify your purchase.', {
+      toast({
+        title: 'Could not verify your purchase.',
         description: 'Please use "Restore Purchases" or contact support.',
       });
       return;
@@ -260,15 +261,25 @@ async function handleApprovedTransaction(t: any) {
         // is the normal, expected outcome when e.g. a friend's phone/Apple
         // ID already subscribes another DripLove account - each account
         // needs its own separate purchase.
-        toast.error('This subscription belongs to another account', {
+        toast({
+          title: 'This subscription belongs to another account',
           description: 'The Apple/Google account on this device already has an active DripLove subscription linked to a different account. To subscribe here, use a different Apple/Google ID for this purchase, or contact support.',
-          duration: 8000,
         });
+        // This transaction can never become valid no matter how many times
+        // it's retried - finish it so Apple's queue stops automatically
+        // redelivering it on every future app launch, which is what was
+        // causing this same toast to silently reappear on every open.
+        if (t.finish && typeof t.finish === 'function') t.finish();
       } else {
-        toast.error('We could not verify your purchase yet.', {
+        toast({
+          title: 'We could not verify your purchase yet.',
           description: 'If you were charged, please try "Restore Purchases" in a moment, or contact support.',
-          duration: 6000,
         });
+        // Ambiguous/possibly-transient failure - still finish it rather than
+        // leave it silently redelivering forever; a genuinely-charged user
+        // can always recover their entitlement via the explicit "Restore
+        // Purchases" action, which re-validates regardless of finish state.
+        if (t.finish && typeof t.finish === 'function') t.finish();
       }
       return;
     }
@@ -297,7 +308,8 @@ async function handleApprovedTransaction(t: any) {
 
       if (!isPremiumNow) {
         console.warn('[IAP] Validation ok but subscription not yet applied; skipping redirect');
-        toast('Your purchase was verified.', {
+        toast({
+          title: 'Your purchase was verified.',
           description: 'It may take a moment to appear - please reopen the app shortly.',
         });
         return;
@@ -345,7 +357,7 @@ async function handleApprovedTransaction(t: any) {
     } catch (fallbackError) {
       console.error('[IAP] Fallback error handling failed:', fallbackError);
     }
-    toast.error('Payment processing failed.', { description: 'Please try again or contact support.' });
+    toast({ title: 'Payment processing failed.', description: 'Please try again or contact support.' });
     if (t.finish && typeof t.finish === 'function') {
       t.finish();
     }
