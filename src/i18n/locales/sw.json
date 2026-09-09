@@ -172,7 +172,6 @@
     "completeProfilePrompt": "Kamilisha wasifu wako ili upate mechi bora:",
     "bioPlaceholder": "Tuambie kuhusu wewe...",
     "yourPhotos": "Picha",
-    "photos": "Picha",
     "locationAndPreferences": "Mahali na Mapendekezo ya Kulinganisha",
     "workAndEducation": "Kazi na Elimu",
     "myAdinkra": "Alama Zangu za Kitamaduni",
@@ -453,7 +452,7 @@
     "features": {
       "unlimitedSwipes": {
         "name": "Swipe za Kila Siku Bila Kikomo",
-        "free": "12 kwa siku",
+        "free": "15-20 per day",
         "premium": "Bila kikomo"
       },
       "reverseDislikes": {

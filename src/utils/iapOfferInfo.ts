@@ -64,10 +64,30 @@ interface OfferLike {
 interface ProductLike {
   offers?: OfferLike[];
   getOffer?: () => OfferLike | undefined;
+  owned?: boolean;
+  /** Apple only: raw StoreKit payload surfaced by cordova-plugin-purchase */
+  raw?: { introPriceEligible?: boolean };
 }
+
+/**
+ * Apple keeps the introductory (free-trial) offer attached to the product
+ * even when the signed-in Apple ID has already used it for that subscription
+ * group - StoreKit only tells you via `isEligibleForIntroOffer`, surfaced by
+ * the plugin as `raw.introPriceEligible`. Without this check the app promised
+ * "7 days free" and then Apple's own sheet correctly said "$6.99 starting
+ * today", which is exactly the mismatch users reported. Google Play only
+ * returns offers the account is eligible for, so there's nothing to strip
+ * there. Owning the product already also rules out a trial.
+ */
+export const isTrialEligible = (product: ProductLike | null | undefined): boolean => {
+  if (!product) return false;
+  if (product.owned) return false;
+  return product.raw?.introPriceEligible !== false;
+};
 
 const productHasFreeTrialOffer = (product: ProductLike | null | undefined): boolean => {
   if (!product) return false;
+  if (!isTrialEligible(product)) return false;
   const offers: OfferLike[] = Array.isArray(product.offers) ? product.offers : [];
   return offers.some((o) => (o.pricingPhases || []).some((p) => p.paymentMode === 'FreeTrial'));
 };
@@ -103,6 +123,9 @@ export const selectPurchasableProduct = <T extends PurchasableProductLike>(
 
 export const extractFreeTrialOfferInfo = (product: ProductLike | null | undefined): FreeTrialOfferInfo => {
   if (!product) return EMPTY_OFFER_INFO;
+  // Never advertise a trial the store won't actually honour for this account.
+  if (!isTrialEligible(product)) return EMPTY_OFFER_INFO;
+
 
   const offers: OfferLike[] = Array.isArray(product.offers) && product.offers.length > 0
     ? product.offers

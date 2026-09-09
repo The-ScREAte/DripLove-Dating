@@ -172,7 +172,6 @@
     "completeProfilePrompt": "أكمل ملفك الشخصي للحصول على تطابقات أفضل:",
     "bioPlaceholder": "أخبرنا عن نفسك...",
     "yourPhotos": "الصور",
-    "photos": "الصور",
     "locationAndPreferences": "الموقع وتفضيلات المطابقة",
     "workAndEducation": "العمل والتعليم",
     "myAdinkra": "علاماتي الثقافية",
@@ -453,7 +452,7 @@
     "features": {
       "unlimitedSwipes": {
         "name": "تمريرات يومية غير محدودة",
-        "free": "12 في اليوم",
+        "free": "15-20 per day",
         "premium": "غير محدود"
       },
       "reverseDislikes": {
