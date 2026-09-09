@@ -2088,7 +2088,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             <div className="flex items-center space-x-1.5 text-yellow-300">
               <Lock className="w-3 h-3" />
               <span className="text-[10px] font-medium">
-                {likedMeTrialEligible ? 'Try for free today to see who liked you and interact with them' : t('matches.upgradeToPremium')}
+                {likedMeTrialEligible ? 'Try Premium now for free to see who liked you and interact with them' : t('matches.upgradeToPremium')}
               </span>
             </div>
           </div>
