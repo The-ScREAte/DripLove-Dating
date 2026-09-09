@@ -47,11 +47,13 @@ const isCancellationError = (err: unknown): boolean => {
 interface UseFreeTrialOfferResult {
   /** True while we don't yet know enough to decide anything - render nothing */
   loading: boolean;
-  /** Not premium, never had a real (Apple/Google) subscription before, and the
-   *  store currently offers a free-trial pricing phase on our product. */
+  /** Not premium, and the store currently offers a free-trial pricing phase
+   *  on our product for this account/device - the same signal the real
+   *  payment sheet is about to act on. */
   eligibleForTrial: boolean;
-  /** Not premium, but previously had a real Apple/Google subscription that's
-   *  since lapsed - i.e. their trial (or paid period) ended. */
+  /** Not premium, the store no longer offers a trial, and this account has a
+   *  real Apple/Google subscription on record - i.e. a trial (or paid
+   *  period) that already ended. */
   trialEnded: boolean;
   offerInfo: FreeTrialOfferInfo;
   /** True once the store has a purchasable product ready to order */
@@ -72,6 +74,11 @@ export const useFreeTrialOffer = (userId: string | undefined): UseFreeTrialOffer
   const [canStart, setCanStart] = useState(false);
   const [starting, setStarting] = useState(false);
   const [hadRealSubscriptionBefore, setHadRealSubscriptionBefore] = useState<boolean | null>(null);
+  // Whether the native store has given us a definitive read yet (either a
+  // product came back, or the retry window below ran out) - lets `loading`
+  // hold off on the trial/no-trial decision for a moment instead of
+  // flashing the no-trial copy while the store is still connecting.
+  const [storeChecked, setStoreChecked] = useState(false);
 
   const refetchRef = useRef(refetchSubscription);
   useEffect(() => {
@@ -108,7 +115,11 @@ export const useFreeTrialOffer = (userId: string | undefined): UseFreeTrialOffer
 
   // Live product/offer info straight from the store - no hardcoded trial length.
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || (!nativeIos && !nativeAndroid)) return;
+    if (!Capacitor.isNativePlatform() || (!nativeIos && !nativeAndroid)) {
+      // No native store to ask (web/PWA) - nothing more to wait for.
+      setStoreChecked(true);
+      return;
+    }
 
     let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -126,11 +137,20 @@ export const useFreeTrialOffer = (userId: string | undefined): UseFreeTrialOffer
       if (!product || cancelled) return;
       setOfferInfo(extractFreeTrialOfferInfo(product));
       setCanStart(!!product.canPurchase);
+      setStoreChecked(true);
     };
 
     readOffer();
     timers.push(setTimeout(readOffer, 1000));
-    timers.push(setTimeout(readOffer, 3000));
+    // Final attempt - whether or not a product ever came back, this is as
+    // long as we wait before deciding one way or the other. Otherwise a
+    // store that never responds (billing genuinely down) would leave the
+    // trial/no-trial decision hanging forever instead of settling on
+    // "no trial" like any other unavailable offer.
+    timers.push(setTimeout(() => {
+      readOffer();
+      setStoreChecked(true);
+    }, 3000));
 
     const store = getCdvStore();
     let whenHandle: CdvStoreWhen | undefined;
@@ -177,18 +197,20 @@ export const useFreeTrialOffer = (userId: string | undefined): UseFreeTrialOffer
     }
   }, [starting, canStart, nativeAndroid]);
 
-  const loading = subscriptionLoading || hadRealSubscriptionBefore === null;
-  // Being on the free plan is the only qualification for showing the offer -
-  // don't additionally require the native store to have already reported a
-  // free-trial pricing phase (offerInfo.hasFreeTrial). That's a live billing
-  // readiness signal, not an eligibility rule, and gating visibility on it
-  // meant free users could go without ever seeing the offer whenever the
-  // store was slow to initialize (or briefly unavailable) on either
-  // platform. The actual charge is still whatever Apple/Google's own
-  // payment sheet says - this only controls whether we invite the user to
-  // start checkout.
-  const eligibleForTrial = !loading && !isPremium && hadRealSubscriptionBefore === false;
-  const trialEnded = !loading && !isPremium && hadRealSubscriptionBefore === true;
+  const loading = subscriptionLoading || hadRealSubscriptionBefore === null || !storeChecked;
+  // The store itself is the source of truth for "is a free trial actually
+  // available right now" - Apple only attaches the intro offer when
+  // isEligibleForIntroOffer is true, and Google simply omits the FreeTrial
+  // pricing phase for accounts that already used it, so offerInfo.hasFreeTrial
+  // already mirrors exactly what the real payment sheet is about to do.
+  // Our own subscription history (hadRealSubscriptionBefore) is a DB record
+  // of past charges, not a live eligibility check - it can disagree with the
+  // store (e.g. a past sandbox/test purchase, or a lapsed subscription that
+  // the store still offers a fresh trial against), and gating on it made the
+  // in-app UI contradict what the user then saw at checkout. It still drives
+  // the "resubscribe" copy for someone the store no longer offers a trial to.
+  const eligibleForTrial = !loading && !isPremium && offerInfo.hasFreeTrial;
+  const trialEnded = !loading && !isPremium && !offerInfo.hasFreeTrial && hadRealSubscriptionBefore === true;
 
   return { loading, eligibleForTrial, trialEnded, offerInfo, canStart, starting, startTrial };
 };
