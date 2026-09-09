@@ -1139,29 +1139,20 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
           {/* Profile Completion Progress Bar with Verified Badge */}
           <div className="mt-2">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-2 transition-all duration-500 rounded-full ${
+                  className={`h-1 transition-all duration-500 rounded-full ${
                     completion >= 90 ? 'bg-pink-600' : 'bg-pink-400'
                   }`}
                   style={{ width: `${completion}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold text-white min-w-[45px] text-right flex items-center justify-end gap-2">
+              <span className="text-xs font-semibold text-white min-w-[32px] text-right flex items-center justify-end gap-2">
                 <span>{completion}%</span>
-                {showVerifiedBadge && (
-                  <img loading="lazy" decoding="async"
-                    src="/images/verified.svg"
-                    alt="Verified profile"
-                    title="Verified profile"
-                    className="w-6 h-6"
-                    aria-hidden="false"
-                  />
-                )}
               </span>
             </div>
-            
+
             {/* Profile completion notice */}
             {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
               <div className="mt-4 bg-blue-950/40 border border-blue-700/50 rounded-lg px-4 py-3 relative">

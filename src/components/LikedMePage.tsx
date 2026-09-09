@@ -16,6 +16,7 @@ import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
 import RatingFunnel from './RatingFunnel';
 import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
+import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
@@ -138,6 +139,9 @@ interface LikedMePageProps {
 const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNavigateToChat }: LikedMePageProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  // Drives the "Try for free today" vs standard upgrade copy below - real
+  // trial eligibility read from the store, never hardcoded.
+  const { eligibleForTrial: likedMeTrialEligible } = useFreeTrialOffer(currentUser?.id);
 
   // ------------------
   // STATE HOOKS (must stay in same order forever)
@@ -2069,7 +2073,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
           {!isPremium && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
-              className="!h-5 !rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-semibold text-[9px] px-1.5 py-0"
+              style={{ height: 20, minHeight: 20, padding: '0 8px' }}
+              className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-semibold text-[10px] leading-none"
             >
               <Crown className="w-2.5 h-2.5 mr-0.5" />
               {t('matches.upgrade')}
@@ -2083,7 +2088,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             <div className="flex items-center space-x-1.5 text-yellow-300">
               <Lock className="w-3 h-3" />
               <span className="text-[10px] font-medium">
-                {t('matches.upgradeToPremium')}
+                {likedMeTrialEligible ? 'Try for free today to see who liked you and interact with them' : t('matches.upgradeToPremium')}
               </span>
             </div>
           </div>

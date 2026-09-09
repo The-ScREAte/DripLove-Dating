@@ -772,14 +772,6 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
         <div className="flex items-center gap-2">
           <Upload className="w-4 h-4 text-pink-500" />
           <span>{userImages.length}/7</span>
-          {isVerified && (
-            <img
-              loading="lazy"
-              src="/images/verified.svg"
-              alt="Verified"
-              className="w-4 h-4"
-            />
-          )}
         </div>
         {!showFaceVerification && (
           <Button
@@ -832,15 +824,6 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
           </div>
         )}
 
-        {/* Verified Badge Display */}
-        {isVerified && (
-          <div className="mb-4 bg-black border border-green-500/30 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
-              <span className="font-medium text-green-400 text-sm">Identity Verified</span>
-            </div>
-          </div>
-        )}
         {/* Always mounted (just hidden) so both "+" (add) and "Replace" can
             reliably trigger it via getElementById - it used to live inside
             the `userImages.length < 5` block below, which meant Replace
