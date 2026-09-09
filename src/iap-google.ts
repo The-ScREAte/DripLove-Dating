@@ -657,11 +657,20 @@ export const buyGoogleMonthly = async () => {
       } : 'not found');
       
       if (p) {
-        const o = p.getOffer?.();
+        // p.getOffer() is a shortcut to offers[0] - explicitly prefer
+        // whichever offer actually carries a FreeTrial phase so the
+        // configured trial can never get silently skipped by picking the
+        // wrong offer (e.g. a base plan with no trial) at purchase time.
+        const offers: Array<{ pricingPhases?: Array<{ paymentMode?: string }>; order?: () => Promise<void> }> =
+          Array.isArray(p.offers) ? p.offers : [];
+        const trialOffer = offers.find((candidate) =>
+          (candidate.pricingPhases || []).some((phase) => phase.paymentMode === 'FreeTrial')
+        );
+        const o = trialOffer ?? p.getOffer?.();
         if (o && typeof o.order === 'function') {
           product = p;
           offer = o;
-          noopLog('[Google IAP] Found valid product with offer:', id);
+          noopLog('[Google IAP] Found valid product with offer:', id, trialOffer ? '(trial offer)' : '(default offer)');
           break;
         } else if (p.canPurchase) {
           // Fallback: product is purchasable but getOffer might work differently

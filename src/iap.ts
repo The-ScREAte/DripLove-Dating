@@ -619,9 +619,20 @@ export const buyMonthly = async () => {
 
   // Continue with existing order logic
   try {
-    const offer = product.getOffer?.();
+    // product.getOffer() is documented as a shortcut to offers[0] - fine
+    // when a product only has one offer, but if it ever has more than one,
+    // offers[0] isn't guaranteed to be the one with the free-trial phase.
+    // Explicitly prefer whichever offer actually has a FreeTrial phase so a
+    // configured trial can never get silently skipped by picking the wrong
+    // offer at purchase time.
+    const offers: Array<{ pricingPhases?: Array<{ paymentMode?: string }>; order?: () => Promise<void> }> =
+      Array.isArray(product.offers) ? product.offers : [];
+    const trialOffer = offers.find((o) =>
+      (o.pricingPhases || []).some((p) => p.paymentMode === 'FreeTrial')
+    );
+    const offer = trialOffer ?? product.getOffer?.();
     if (offer && typeof offer.order === 'function') {
-      noopLog('[IAP] Ordering product:', product.id);
+      noopLog('[IAP] Ordering product:', product.id, trialOffer ? '(trial offer)' : '(default offer)');
       await offer.order();
     } else {
       console.error('[IAP] No valid offer found for product:', product.id);

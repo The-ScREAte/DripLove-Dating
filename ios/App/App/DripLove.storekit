@@ -91,7 +91,12 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "0387B296",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "0387B299",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W",
+            "numberOfPeriods" : 1
+          },
           "localizations" : [
             {
               "description" : "Premium monthly subscription",
@@ -119,7 +124,12 @@
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "0387B297",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "internalID" : "0387B298",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W",
+            "numberOfPeriods" : 1
+          },
           "localizations" : [
             {
               "description" : "Premium monthly subscription v3",

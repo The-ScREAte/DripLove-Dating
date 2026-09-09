@@ -118,6 +118,24 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const isIosNative = deviceIsIos && deviceIsNative;
   const showRestoreButton = (deviceIsIos || deviceIsAndroid) && deviceIsNative;
   const showPaystackOption = (!deviceIsNative || isAndroidNative) && !deviceIsIos;
+  // No payment method matched any of the blocks below at all - a real device
+  // reaching this is always a bug (every device falls into exactly one
+  // matrix cell above), not a legitimate "nothing to show" state. Root cause
+  // seen in practice: Capacitor.isNativePlatform() (isNativeApp() above) can
+  // still read false for a moment while the native bridge finishes setting
+  // up, since it has no async/ready signal to await - deviceIsNative/
+  // isIosNative/isAndroidNative are recomputed fresh every render, so a
+  // forced re-render shortly after mount (below) usually self-corrects it
+  // before this ever gets seen. This stays as a safety net for any other way
+  // that gap could show up, so the modal can never render visibly empty.
+  const noPaymentMethodMatched = !(isIosNative || isAndroidNative || showPaystackOption);
+  const [nativeCheckTick, setNativeCheckTick] = useState(0);
+  React.useEffect(() => {
+    const timer = setTimeout(() => setNativeCheckTick((v) => v + 1), 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  void nativeCheckTick;
 
   React.useEffect(() => {
     const productUpdateTimeouts: TimeoutHandle[] = [];
@@ -884,6 +902,28 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Safety net: every real device matches exactly one of the
+                  blocks above. Reaching here with nothing shown means the
+                  native platform check hasn't resolved yet (or something else
+                  is genuinely off) - never leave this modal looking blank. */}
+              {noPaymentMethodMatched && (
+                <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="text-white text-sm font-semibold mb-1">Getting things ready...</div>
+                  <div className="text-xs text-gray-400 mb-3">
+                    If this doesn't update in a few seconds, close this and try again.
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowPaymentOptions(false);
+                      setTimeout(() => setShowPaymentOptions(true), 50);
+                    }}
+                    className="text-xs text-pink-300 hover:text-pink-200 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
               )}
             </div>
           </div>

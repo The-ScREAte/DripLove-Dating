@@ -69,6 +69,8 @@ import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
 import RatingFunnel from './RatingFunnel';
 import VerifyIdentityPrompt from './VerifyIdentityPrompt';
+import FreeTrialBanner from './FreeTrialBanner';
+import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import HoppingLogo from '@/components/HoppingLogo';
 import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
 import { isVerifyPromptEligible, markVerifyPromptTriggered } from '@/utils/verifyPromptStorage';
@@ -608,7 +610,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const cachedPremium = readCachedPremiumStatus(currentUser?.id);
 
   const premiumActive = Boolean(isPremium) || isPremiumFromSubscription() || (!premiumResolved && cachedPremium === true);
-  
+
+  // Drives the "Try now for free" vs "Unlock More Countries" copy on the
+  // no-more-profiles empty state below - real trial length/eligibility read
+  // from the store, same hook the free trial banner uses, never hardcoded.
+  const { eligibleForTrial: emptyStateTrialEligible } = useFreeTrialOffer(currentUser?.id);
+
   const { preloadImages, cancelImages, getOptimizedUrl, clearCache } = useImagePreloader({
     maxConcurrent: 6, // Slightly higher concurrency for faster swipe experience
     // Cards are full-bleed on modern 2x/3x phones - 500px @ q60 was visibly soft.
@@ -5115,18 +5122,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             <h2 className="text-lg font-semibold mb-1.5 text-white">{emptyTitle}</h2>
             <p className="text-gray-400 text-sm mb-5 max-w-xs">{emptyDescription}</p>
             {!premiumActive && (
-              <div className="w-full mb-2.5 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                <p className="text-xs text-yellow-200/90 mb-2">{t('discover.upgradeForMoreCountries')}</p>
+              <div className="mb-3">
+                <p className="text-yellow-400 text-sm mb-3 max-w-xs mx-auto">{t('discover.upgradeForMoreCountries')}</p>
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
-                  className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+                  className="w-auto h-8 !rounded-full px-3.5 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
                 >
-                  <Crown className="w-4 h-4 mr-2" />
-                  {t('discover.upgradeForMoreCountriesButton')}
+                  <Crown className="w-3.5 h-3.5 mr-1.5" />
+                  {emptyStateTrialEligible ? 'Try now for free' : t('discover.upgradeForMoreCountriesButton')}
                 </Button>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2.5 w-full">
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
               <Button
                 onClick={() => {
                   // Clear all caches and force a complete refresh
@@ -5148,7 +5155,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                     fetchPotentialMatches();
                   }, 100);
                 }}
-                className="w-full bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white"
+                className="w-auto h-8 !rounded-full px-3.5 text-xs bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white"
               >
                 {t('discover.refresh')}
               </Button>
@@ -5156,10 +5163,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               <Button
                 onClick={() => navigate('/games')}
                 variant="outline"
-                className="w-full border border-pink-500/30 text-pink-400 hover:bg-pink-500/10 bg-transparent flex items-center justify-center gap-2"
+                className="w-auto h-8 !rounded-full px-3.5 text-xs border border-pink-500/30 text-pink-400 hover:bg-pink-500/10 bg-transparent flex items-center justify-center gap-1.5"
                 aria-label="Play games"
               >
-                <Gamepad2 className="w-4 h-4" />
+                <Gamepad2 className="w-3.5 h-3.5" />
                 Play Love Games
               </Button>
             </div>
@@ -5595,6 +5602,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         onClose={() => setShowVerifyPrompt(false)}
         onVerifyNow={onNavigateToVerify}
       />
+
+      {/* Free trial offer - fixed overlay, deliberately outside the swipe
+          deck's flex/height flow above (that layout is height-sensitive -
+          see the comments on discover-container / the flex-1 wrapper - a
+          fixed-position element here can never perturb it). Renders nothing
+          itself if the user isn't eligible. */}
+      {!premiumActive && !isOutOfSwipes && (
+        <div
+          className="fixed left-0 right-0 z-[60] px-3 pointer-events-none"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}
+        >
+          <div className="max-w-md mx-auto pointer-events-auto">
+            <FreeTrialBanner userId={currentUser?.id} dismissible />
+          </div>
+        </div>
+      )}
     </>
   );
 }
