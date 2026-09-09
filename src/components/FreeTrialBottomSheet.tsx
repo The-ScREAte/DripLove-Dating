@@ -39,16 +39,12 @@ const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-end justify-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center px-3" role="dialog" aria-modal="true">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={close}
       />
-      <div
-        className="relative w-full max-w-md animate-in slide-in-from-bottom duration-300 px-3 pb-3"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
-      >
-        <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/25" />
+      <div className="relative w-full max-w-md animate-in zoom-in-95 fade-in duration-300">
         <FreeTrialBanner userId={userId} dismissible onDismiss={close} />
       </div>
     </div>
