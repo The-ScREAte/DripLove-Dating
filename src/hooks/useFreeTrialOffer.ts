@@ -178,7 +178,16 @@ export const useFreeTrialOffer = (userId: string | undefined): UseFreeTrialOffer
   }, [starting, canStart, nativeAndroid]);
 
   const loading = subscriptionLoading || hadRealSubscriptionBefore === null;
-  const eligibleForTrial = !loading && !isPremium && hadRealSubscriptionBefore === false && offerInfo.hasFreeTrial;
+  // Being on the free plan is the only qualification for showing the offer -
+  // don't additionally require the native store to have already reported a
+  // free-trial pricing phase (offerInfo.hasFreeTrial). That's a live billing
+  // readiness signal, not an eligibility rule, and gating visibility on it
+  // meant free users could go without ever seeing the offer whenever the
+  // store was slow to initialize (or briefly unavailable) on either
+  // platform. The actual charge is still whatever Apple/Google's own
+  // payment sheet says - this only controls whether we invite the user to
+  // start checkout.
+  const eligibleForTrial = !loading && !isPremium && hadRealSubscriptionBefore === false;
   const trialEnded = !loading && !isPremium && hadRealSubscriptionBefore === true;
 
   return { loading, eligibleForTrial, trialEnded, offerInfo, canStart, starting, startTrial };

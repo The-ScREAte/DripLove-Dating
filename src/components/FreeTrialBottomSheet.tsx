@@ -97,7 +97,12 @@ const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
 
   const close = () => setOpen(false);
 
-  if (!open) return null;
+  // Re-check eligibility at render time, not just when the timer was
+  // scheduled - eligibility can flip false in between (e.g. the store's
+  // free-trial offer disappears), and rendering the backdrop with nothing
+  // inside it (FreeTrialBanner also bails in that case) would otherwise
+  // block the screen with an empty, undismissable-looking overlay.
+  if (!open || loading || (!eligibleForTrial && !trialEnded)) return null;
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center px-3" role="dialog" aria-modal="true">

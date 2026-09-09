@@ -97,7 +97,7 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
           <>
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-pink-300">
               <Sparkles className="h-3 w-3 animate-pulse" />
-              {offerInfo.trialPeriodLabel} free
+              {offerInfo.trialPeriodLabel ? `${offerInfo.trialPeriodLabel} free` : 'Free trial'}
             </div>
             <h3 className="text-lg font-bold text-white">Try DripLove Premium, free</h3>
 
@@ -129,7 +129,7 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
             </button>
 
             <p className="mt-2.5 text-center text-[11px] text-white/45">
-              No charge for {offerInfo.trialPeriodLabel}. Cancel anytime.
+              {offerInfo.trialPeriodLabel ? `No charge for ${offerInfo.trialPeriodLabel}.` : 'No charge during your trial.'} Cancel anytime.
             </p>
           </>
         )}

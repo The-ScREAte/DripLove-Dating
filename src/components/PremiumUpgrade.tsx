@@ -257,10 +257,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     const timeouts: TimeoutHandle[] = [];
 
     const checkGoogleIAP = async () => {
-      const store = getCdvStore();
-
-      const googleProduct = store?.get?.('premium_monthly');
-      const hasOffer = !!googleProduct?.getOffer?.();
+      // Check every candidate product ID (matches the selection logic used
+      // everywhere else - iap-google.ts's buyGoogleMonthly, useFreeTrialOffer)
+      // instead of only 'premium_monthly' - if Play Console's live product
+      // id is one of the other candidates, checking just this one hardcoded
+      // id left canBuyGoogle permanently false and the Subscribe button
+      // permanently disabled, even once billing was actually ready.
+      const hasOffer = canUseGoogleIAP();
       setCanBuyGoogle(hasOffer);
 
       if (hasOffer) {
@@ -597,9 +600,9 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const features = useMemo(() => [
     { name: t('premium.features.unlimitedSwipes.name'), free: t('premium.features.unlimitedSwipes.free'), premium: t('premium.features.unlimitedSwipes.premium'), icon: Heart },
     { name: t('premium.features.reverseDislikes.name'), free: t('premium.features.reverseDislikes.free'), premium: t('premium.features.reverseDislikes.premium'), icon: RotateCcw },
-    { name: t('premium.features.adFrequency.name'), free: t('premium.features.adFrequency.free'), premium: t('premium.features.adFrequency.premium'), icon: X },
     { name: t('premium.features.seeWhoLiked.name'), free: t('premium.features.seeWhoLiked.free'), premium: t('premium.features.seeWhoLiked.premium'), icon: Users },
     { name: t('premium.features.unlockCountries.name'), free: t('premium.features.unlockCountries.free'), premium: t('premium.features.unlockCountries.premium'), icon: Globe },
+    { name: t('premium.features.adFrequency.name'), free: t('premium.features.adFrequency.free'), premium: t('premium.features.adFrequency.premium'), icon: X },
     { name: t('premium.features.prioritySupport.name'), free: t('premium.features.prioritySupport.free'), premium: t('premium.features.prioritySupport.premium'), icon: Crown },
   ], [t]);
 
