@@ -171,7 +171,6 @@
     "selectLanguage": "Selecionar Idioma",
     "preferredLanguage": "Idioma Preferido",
     "yourPhotos": "Fotos",
-    "photos": "Fotos",
     "locationAndPreferences": "Localização e Preferências de Match",
     "workAndEducation": "Trabalho e Educação",
     "myAdinkra": "Meus Signos Culturais",
@@ -452,7 +451,7 @@
     "features": {
       "unlimitedSwipes": {
         "name": "Deslizes Diários Ilimitados",
-        "free": "12 por dia",
+        "free": "15-20 per day",
         "premium": "Ilimitado"
       },
       "reverseDislikes": {

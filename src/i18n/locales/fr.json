@@ -179,7 +179,6 @@
     "selectLanguage": "Sélectionner la langue",
     "preferredLanguage": "Langue préférée",
     "yourPhotos": "Photos",
-    "photos": "Photos",
     "locationAndPreferences": "Localisation et préférences de correspondance",
     "workAndEducation": "Travail et éducation",
     "myAdinkra": "Mes Signes Culturels",
@@ -456,7 +455,7 @@
     "features": {
       "unlimitedSwipes": {
         "name": "Swipes quotidiens illimités",
-        "free": "12 par jour",
+        "free": "15-20 per day",
         "premium": "Illimité"
       },
       "reverseDislikes": {

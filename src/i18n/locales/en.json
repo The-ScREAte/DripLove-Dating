@@ -208,7 +208,6 @@
     "deletePhoto": "Delete Photo",
     "mainPhoto": "Main Photo",
     "yourPhotos": "Photos",
-    "photos": "Photos",
     "matchingPreferences": "Match Preferences",
     "locationPreferences": "Location",
     "locationAndPreferences": "Preferences",
@@ -493,7 +492,7 @@
     "features": {
       "unlimitedSwipes": {
         "name": "Daily Swipes",
-        "free": "16 per day",
+        "free": "15-20 per day",
         "premium": "unlimitted"
       },
       "reverseDislikes": {
@@ -504,7 +503,7 @@
       "adFrequency": {
         "name": "Ad Frequency",
         "free": "Every 5 swipes",
-        "premium": "Every 10 swipes"
+        "premium": "Sometimes"
       },
       "seeWhoLiked": {
         "name": "See All Who Liked You",
@@ -519,7 +518,7 @@
       "unlockCountries": {
         "name": "Unlock Countries",
         "free": "Your country only",
-        "premium": "Up to 3 extra countries"
+        "premium": "Up to 4 extra countries"
       },
       "allFutureFeatures": {
         "name": "All Future Features",
