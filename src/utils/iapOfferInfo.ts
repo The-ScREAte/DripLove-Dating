@@ -123,6 +123,9 @@ export const selectPurchasableProduct = <T extends PurchasableProductLike>(
 
 export const extractFreeTrialOfferInfo = (product: ProductLike | null | undefined): FreeTrialOfferInfo => {
   if (!product) return EMPTY_OFFER_INFO;
+  // Never advertise a trial the store won't actually honour for this account.
+  if (!isTrialEligible(product)) return EMPTY_OFFER_INFO;
+
 
   const offers: OfferLike[] = Array.isArray(product.offers) && product.offers.length > 0
     ? product.offers
