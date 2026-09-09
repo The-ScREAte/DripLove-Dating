@@ -6,7 +6,7 @@ import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
@@ -118,7 +118,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   const isAndroidNative = deviceIsAndroid && deviceIsNative;
   const isIosNative = deviceIsIos && deviceIsNative;
   const showRestoreButton = (deviceIsIos || deviceIsAndroid) && deviceIsNative;
-  const showPaystackOption = (!deviceIsNative || isAndroidNative) && !deviceIsIos;
+  // Paystack temporarily disabled on the Android app - Google Play Billing
+  // (IAP) is the sole payment path there for now. Web keeps Paystack since
+  // there's no Google Play Billing equivalent outside the native app.
+  const showPaystackOption = !deviceIsNative && !deviceIsIos;
   // No payment method matched any of the blocks below at all - a real device
   // reaching this is always a bug (every device falls into exactly one
   // matrix cell above), not a legitimate "nothing to show" state. Root cause
@@ -386,7 +389,16 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       return;
     }
     
-    // Always show payment options - let user choose
+    // iOS has exactly one real purchase path (Apple IAP) - skip the
+    // intermediate "Choose Payment Option" modal and go straight to Apple's
+    // native purchase sheet, which already shows the trial (or charge)
+    // correctly on its own. Android/web still show the modal since those
+    // platforms have a real choice to present (Google Play vs Paystack/card).
+    if (isIosNative && canBuy) {
+      handlePaymentTypeSelection('iap');
+      return;
+    }
+
     setShowPaymentOptions(true);
   };
 
@@ -669,6 +681,12 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
 
               <CardHeader className="text-center pb-3 md:pb-5 pt-4 md:pt-7 px-2 md:px-4">
+                {pageTrialEligible && (
+                  <div className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/40 px-2.5 py-1 text-[10px] md:text-xs font-semibold uppercase tracking-wide text-pink-300">
+                    <Sparkles className="w-3 h-3" />
+                    {pageTrialOfferInfo.trialPeriodLabel || 'Free trial'} free
+                  </div>
+                )}
                 <CardTitle className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold flex items-center justify-center text-white responsive-text">
                   <Crown className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-yellow-400 mr-2 sm:mr-3" />
                   {t('premium.premiumPlan')}
@@ -871,7 +889,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 </div>
               )}
               
-              {/* Paystack/Card Payment Options - show on web AND Android native, NOT on iOS */}
+              {/* Paystack/Card Payment Options - web only for now (temporarily
+                  disabled on the Android app, see showPaystackOption above) */}
               {showPaystackOption && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
@@ -899,6 +918,16 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                           </svg>
                           Processing...
                         </>
+                      ) : pageTrialEligible ? (
+                        <>
+                          <svg className="h-4 w-4" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          Start Free Trial
+                        </>
                       ) : (
                         <>
                           <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -911,7 +940,11 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         </>
                       )}
                     </div>
-                    <div className="text-xs opacity-90 mt-0.5">{googlePrice || `${currencySymbol}${monthlyPrice}`}/month • Google Play</div>
+                    <div className="text-xs opacity-90 mt-0.5">
+                      {pageTrialEligible
+                        ? `Free for ${pageTrialOfferInfo.trialPeriodLabel || 'a limited time'}, then ${pageTrialOfferInfo.priceAfterTrial || googlePrice || `${currencySymbol}${monthlyPrice}`}/month`
+                        : `${googlePrice || `${currencySymbol}${monthlyPrice}`}/month • Google Play`}
+                    </div>
                   </button>
                   
                   {/* Auto-renewal disclosure */}
@@ -922,7 +955,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   {/* Show status message if Google IAP not available */}
                   {!canBuyGoogle && googleIapLoadingTimeout && (
                     <div className="text-center text-xs text-gray-400 -mt-1">
-                      Google Play billing may not be configured. Use Paystack above.
+                      Google Play billing isn't available right now. Please try again shortly.
                     </div>
                   )}
                 </>

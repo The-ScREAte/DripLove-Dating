@@ -30,7 +30,7 @@ const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
       setEverShown(true);
       markFreeTrialSheetShown(userId);
     }, 1200);
-
+ 
     return () => clearTimeout(timer);
   }, [loading, eligibleForTrial, everShown, userId]);
 
