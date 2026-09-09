@@ -391,13 +391,20 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       return;
     }
     
-    // iOS has exactly one real purchase path (Apple IAP) - skip the
-    // intermediate "Choose Payment Option" modal and go straight to Apple's
-    // native purchase sheet, which already shows the trial (or charge)
-    // correctly on its own. Android/web still show the modal since those
-    // platforms have a real choice to present (Google Play vs Paystack/card).
+    // Both iOS and Android native now have exactly one real purchase path
+    // each (Apple IAP; Google Play Billing, since Paystack is disabled on
+    // Android for now) - skip the intermediate "Choose Payment Option"
+    // modal and go straight to the native purchase sheet, which already
+    // shows the trial (or charge) correctly on its own. Only web still
+    // shows the modal, since it has a real choice to present (Paystack/card
+    // being the only option there doesn't change that it's still a
+    // separate, non-native checkout flow worth confirming first).
     if (isIosNative && canBuy) {
       handlePaymentTypeSelection('iap');
+      return;
+    }
+    if (isAndroidNative && canBuyGoogle) {
+      handlePaymentTypeSelection('google_iap');
       return;
     }
 
