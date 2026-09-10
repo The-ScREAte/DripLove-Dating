@@ -540,8 +540,8 @@ const InfluencerManagement = () => {
           <Gift className="w-5 h-5 text-pink-500" />
           Promoter Management
         </h2>
-        <Button onClick={() => setShowCreateModal(true)} size="sm" className="bg-pink-500 hover:bg-pink-600">
-          <Plus className="w-4 h-4 mr-1" /> New Promo Code
+        <Button onClick={() => setShowCreateModal(true)} size="sm" className="h-8 px-2.5 text-xs bg-pink-500 hover:bg-pink-600">
+          <Plus className="w-3.5 h-3.5 mr-1" /> New Promo Code
         </Button>
       </div>
 
@@ -568,6 +568,7 @@ const InfluencerManagement = () => {
               checked={promoCodeToggle}
               onCheckedChange={handleTogglePromoCode}
               disabled={togglingPromoCode || promoCodeLoading}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
             />
           </div>
           {!promoCodeToggle && (
@@ -749,7 +750,7 @@ const InfluencerManagement = () => {
 
       {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent>
+        <DialogContent className="max-w-md w-[calc(100%-3rem)] max-h-[80vh] overflow-y-auto px-5">
           <DialogHeader>
             <DialogTitle>Create New Promo Code</DialogTitle>
           </DialogHeader>
@@ -791,6 +792,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.commissionEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, commissionEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
 
@@ -838,6 +840,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.showLeadsEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showLeadsEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
 
@@ -852,6 +855,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.showSubscribersEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showSubscribersEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
 
@@ -866,6 +870,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.showDemographicsEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showDemographicsEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
           </div>
@@ -920,6 +925,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.commissionEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, commissionEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
 
@@ -967,6 +973,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.showLeadsEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showLeadsEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
 
@@ -981,6 +988,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.showSubscribersEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showSubscribersEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
 
@@ -995,6 +1003,7 @@ const InfluencerManagement = () => {
               <Switch
                 checked={formData.showDemographicsEnabled}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, showDemographicsEnabled: checked }))}
+              className="h-5 w-9 data-[state=checked]:bg-pink-500 [&>span]:h-4 [&>span]:w-4 [&>span]:data-[state=checked]:translate-x-4"
               />
             </div>
           </div>
