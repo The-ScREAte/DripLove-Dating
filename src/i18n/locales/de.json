@@ -299,7 +299,7 @@
       "loadFailed": "Potenzielle Übereinstimmungen konnten nicht geladen werden. Bitte versuche es erneut.",
       "reverseFailed": "Ablehnung konnte nicht rückgängig gemacht werden. Bitte versuche es erneut.",
       "likeFailed": "Like konnte nicht gespeichert werden.",
-      "profileCompletionRequired": "Fast geschafft 💫",
+      "profileCompletionRequired": "",
       "profileCompletionMessage": "Füge 30% mehr Infos zu deinem Profil hinzu, um weiter zu swipen — aus Fairnessgründen.",
       "dailyLimitReached": "Tageslimit erreicht",
       "dailyLimitMessage": "Du hast dein Swipe-Limit erreicht."

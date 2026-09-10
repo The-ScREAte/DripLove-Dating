@@ -75,8 +75,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { t, i18n } = useTranslation();
   const userId = user?.id;
 
+  // Keyed per-user (not a single global key) - otherwise a second account
+  // logging in during the same app session would inherit whatever tab the
+  // previous account last had open.
   const getInitialTab = (): string => {
     try {
+      const savedUserId = sessionStorage.getItem('mainapp_active_tab_user');
+      if (savedUserId !== userId) return 'dripcheck';
       const saved = sessionStorage.getItem('mainapp_active_tab');
       return saved || 'dripcheck';
     } catch {
@@ -132,10 +137,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     try {
       sessionStorage.setItem('mainapp_active_tab', activeTab);
+      if (userId) {
+        sessionStorage.setItem('mainapp_active_tab_user', userId);
+      }
     } catch {
       // Ignore storage errors
     }
-  }, [activeTab]);
+  }, [activeTab, userId]);
 
   // Screenshot/screen-recording protection for the whole logged-in app -
   // OFF everywhere before this (landing, auth, registration, profile

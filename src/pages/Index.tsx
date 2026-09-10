@@ -281,6 +281,17 @@ const Index = ({
     clearAllIapState();
     
     await supabase.auth.signOut();
+
+    // Clear the remembered "last active tab" so the next login/registration
+    // always lands on Discover instead of wherever this account happened to
+    // leave off - it was only ever meant to survive a trip to the mini-games
+    // and back, not a full logout.
+    try {
+      sessionStorage.removeItem('mainapp_active_tab');
+    } catch {
+      // ignore
+    }
+
     // Reset the routing ref so re-auth can properly route again
     didRouteRef.current = false;
     setCurrentView('welcome');

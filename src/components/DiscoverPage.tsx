@@ -69,7 +69,6 @@ import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
 import RatingFunnel from './RatingFunnel';
 import VerifyIdentityPrompt from './VerifyIdentityPrompt';
-import FreeTrialBanner from './FreeTrialBanner';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import HoppingLogo from '@/components/HoppingLogo';
 import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
@@ -663,7 +662,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // updates profile/swipe state, which can re-run this effect (or briefly flip
   // the page into the loading/out-of-swipes/ad render branch) — the old
   // clearTimeout-on-cleanup let exactly that kill the guide mid-display. Only
-  // the 8s timeout itself hides the guide now.
+  // the 12s timeout itself hides the guide now.
   const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Only show for new users - keyed per account (not a single blanket
@@ -678,7 +677,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       setShowSwipeGuide(false);
       localStorage.setItem(shownKey, 'true');
       swipeGuideTimerRef.current = null;
-    }, 8000); // 8 seconds
+    }, 12000); // 12 seconds
   }, [currentUser?.id]);
   // --- END: Swipe Guide Popup State ---
 
@@ -5606,21 +5605,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         onVerifyNow={onNavigateToVerify}
       />
 
-      {/* Free trial offer - fixed overlay, deliberately outside the swipe
-          deck's flex/height flow above (that layout is height-sensitive -
-          see the comments on discover-container / the flex-1 wrapper - a
-          fixed-position element here can never perturb it). Renders nothing
-          itself if the user isn't eligible. */}
-      {!premiumActive && !isOutOfSwipes && (
-        <div
-          className="fixed left-0 right-0 z-[60] px-3 pointer-events-none"
-          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}
-        >
-          <div className="max-w-md mx-auto pointer-events-auto">
-            <FreeTrialBanner userId={currentUser?.id} dismissible />
-          </div>
-        </div>
-      )}
+      {/* The free-trial pitch is shown exactly once, as the centered
+          FreeTrialBottomSheet modal (mounted in MainApp) on its own
+          10-minute-delayed cadence - no separate inline banner here, so
+          users never see two different trial prompts at once. */}
     </>
   );
 }

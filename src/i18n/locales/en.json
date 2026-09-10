@@ -326,8 +326,8 @@
       "loadFailed": "Couldn’t load profiles. Please try again.",
       "reverseFailed": "Couldn’t undo that pass. Try again.",
       "likeFailed": "Couldn’t save your like.",
-      "profileCompletionRequired": "Almost there",
-      "profileCompletionMessage": "Add 30% more info to your profile to keep swiping — for fairness.",
+      "profileCompletionRequired": "",
+      "profileCompletionMessage": "Add 30% more info to your profile to keep swiping — play a fair game here.",
       "dailyLimitReached": "Daily limit reached",
       "dailyLimitMessage": "You’ve reached your swipe limit.",
       "premiumDailyLimitMessage": "You’ve reached today’s swipe limit. Check back soon for more matches."

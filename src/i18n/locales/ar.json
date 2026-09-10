@@ -295,7 +295,7 @@
       "loadFailed": "فشل تحميل التطابقات المحتملة. يرجى المحاولة مرة أخرى.",
       "reverseFailed": "تعذر التراجع عن عدم الإعجاب. يرجى المحاولة مرة أخرى.",
       "likeFailed": "فشل تسجيل الإعجاب.",
-      "profileCompletionRequired": "أنت قريب جدًا 💫",
+      "profileCompletionRequired": "",
       "profileCompletionMessage": "أضف 30٪ من المعلومات إلى ملفك الشخصي لمواصلة التمرير — من أجل العدالة.",
       "dailyLimitReached": "تم الوصول إلى الحد اليومي",
       "dailyLimitMessage": "لقد وصلت إلى حد التمرير الخاص بك."

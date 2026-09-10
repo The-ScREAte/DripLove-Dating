@@ -683,24 +683,32 @@ body.keyboard-open .chat-messages-container {
 
 
 
-  /* Toast and notification safe positioning */
+  /* Toast/notification/"flash message" safe positioning - always below the
+     app's real fixed header (whatever its actual rendered height is, via the
+     --app-header-height var MainApp publishes) and always painted above it,
+     on every screen width, not just <=768px. Before this, a hardcoded 60px
+     top offset could sit *under* a taller header (notch/safe-area devices),
+     so the toast was spatially behind the header despite a higher z-index. */
+  :root {
+    --toast-safe-top: calc(var(--app-header-height, 60px) + env(safe-area-inset-top, 0px) + 8px);
+  }
+  [data-radix-toast-viewport],
+  [data-sonner-toaster],
+  .toast-viewport-safe,
+  .Toastify__toast-container,
+  [class*="toast"],
+  [class*="notification"],
+  [class*="alert"],
+  [class*="flash"] {
+    top: var(--toast-safe-top) !important;
+    position: fixed !important;
+    z-index: 99999 !important;
+    left: 16px !important;
+    right: 16px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+
   @media screen and (max-width: 768px) {
-    /* Force all toasts and notifications down on mobile */
-    [data-radix-toast-viewport],
-    [data-sonner-toaster],
-    .toast-viewport,
-    .Toastify__toast-container,
-    [class*="toast"],
-    [class*="notification"],
-    [class*="alert"],
-    [class*="flash"] {
-      top: 60px !important;
-      position: fixed !important;
-      z-index: 9999 !important;
-      left: 16px !important;
-      right: 16px !important;
-      max-width: calc(100vw - 32px) !important;
-    }
 
     /* Admin page mobile adjustments */
     .admin-page-container {
@@ -719,17 +727,6 @@ body.keyboard-open .chat-messages-container {
   /* iOS specific - more spacing for devices with notch */
   @supports (-webkit-appearance: none) {
     @media screen and (max-width: 768px) {
-      [data-radix-toast-viewport],
-      [data-sonner-toaster],
-      .toast-viewport,
-      .Toastify__toast-container,
-      [class*="toast"],
-      [class*="notification"],
-      [class*="alert"],
-      [class*="flash"] {
-        top: 70px !important;
-      }
-
       .terms-container {
         padding-top: 10px !important;
       }

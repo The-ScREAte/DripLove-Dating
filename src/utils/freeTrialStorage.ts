@@ -2,7 +2,7 @@
 // repeating cadence instead of a single "show once, ever" flag - so it
 // nudges free users toward the trial without ever bugging them:
 //   - The very first appearance waits until the user has been on DripLove
-//     for at least 7 minutes (real wall-clock time since first seen), so it
+//     for at least 10 minutes (real wall-clock time since first seen), so it
 //     never interrupts the first moments of onboarding/browsing.
 //   - While still trial-eligible (hasn't started it, hasn't subscribed),
 //     re-shows every 3 days if they still haven't started it.
@@ -17,7 +17,7 @@
 
 const STORAGE_KEY = 'driplove_free_trial_sheet_v2';
 
-const FIRST_SHOW_DELAY_MS = 7 * 60 * 1000; // 7 minutes
+const FIRST_SHOW_DELAY_MS = 10 * 60 * 1000; // 10 minutes
 const ELIGIBLE_CADENCE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 const TRIAL_ENDED_CADENCE_MS = 21 * 24 * 60 * 60 * 1000; // 3 weeks
 
