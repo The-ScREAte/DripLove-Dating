@@ -45,6 +45,38 @@ const Index = ({
   const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();
   const didRouteRef = React.useRef(false);
+  // Registration creates the auth account (via supabase.auth.signUp) BEFORE
+  // it's actually done - it still has profile fields to save and, above all,
+  // photos to upload. But signUp() firing a SIGNED_IN event is exactly what
+  // the auto-route effect below reacts to, and a DB trigger creates a full
+  // `profiles` row (with terms_accepted defaulting false) in the very same
+  // signUp transaction - so that effect would see a real, terms-not-accepted
+  // profile the instant signUp resolves and immediately switch the whole app
+  // to 'terms-acceptance', unmounting RegistrationForm mid-photo-upload. The
+  // rest of its submit handler keeps running in the background regardless
+  // (unmounting doesn't cancel an in-flight async function), which is why
+  // photos trickled in unpredictably instead of all landing together - the
+  // user was already on a different screen while they were still uploading.
+  // RegistrationForm flips this on the moment signUp succeeds and off right
+  // before it calls onSubmit, so this effect defers to it for that window
+  // instead of racing it. The timeout is a failsafe in case that flow is
+  // ever abandoned mid-way (crash, force-quit) so auto-routing can't get
+  // stuck off forever.
+  const suppressAutoRouteRef = React.useRef(false);
+  const suppressAutoRouteTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setRegistrationInProgress = React.useCallback((inProgress: boolean) => {
+    suppressAutoRouteRef.current = inProgress;
+    if (suppressAutoRouteTimeoutRef.current) {
+      clearTimeout(suppressAutoRouteTimeoutRef.current);
+      suppressAutoRouteTimeoutRef.current = null;
+    }
+    if (inProgress) {
+      suppressAutoRouteTimeoutRef.current = setTimeout(() => {
+        suppressAutoRouteRef.current = false;
+        suppressAutoRouteTimeoutRef.current = null;
+      }, 60_000);
+    }
+  }, []);
 
   const setViewIfChanged = React.useCallback((nextView: typeof currentView) => {
     setCurrentView((prev) => (prev === nextView ? prev : nextView));
@@ -184,6 +216,7 @@ const Index = ({
     }
 
     if (didRouteRef.current) return;
+    if (suppressAutoRouteRef.current) return;
     didRouteRef.current = true;
 
     // If user is authenticated, run app-specific profile routing
@@ -364,9 +397,10 @@ const Index = ({
           <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background - always rendered, loads async */}
             <VideoBackground />
-            <RegistrationForm 
+            <RegistrationForm
               onSubmit={handleRegister}
               onBackToLogin={handleBackToLogin}
+              onRegistrationInProgressChange={setRegistrationInProgress}
             />
           </div>
         )}

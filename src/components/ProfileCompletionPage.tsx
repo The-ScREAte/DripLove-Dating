@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
+import { withRetry } from '@/utils/withRetry';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
 const PhotoCropModal = lazy(() => import('@/components/profile/PhotoCropModal'));
@@ -397,19 +398,33 @@ const ProfileCompletionPage = () => {
           : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const filePath = `${user.id}/${uniqueSuffix}.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('user-photos')
-          .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
-        if (uploadError) throw uploadError;
+        await withRetry(async () => {
+          const { error: uploadError } = await supabase.storage
+            .from('user-photos')
+            .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
+          if (uploadError) throw uploadError;
+        });
 
         const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
 
-        const { data: insertedRow, error: dbError } = await supabase
-          .from('user_images')
-          .insert({ user_id: user.id, image_url: publicUrl, image_order: order })
-          .select('id')
-          .single();
-        if (dbError) throw dbError;
+        const insertedRow = await withRetry(async () => {
+          const { data, error: dbError } = await supabase
+            .from('user_images')
+            .insert({ user_id: user.id, image_url: publicUrl, image_order: order })
+            .select('id')
+            .single();
+          if (!dbError) return data;
+          if (dbError.code === '23505') {
+            const { data: existing, error: fetchError } = await supabase
+              .from('user_images')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('image_order', order)
+              .single();
+            if (!fetchError && existing) return existing;
+          }
+          throw dbError;
+        });
 
         const imageBase64 = await fileToBase64(file);
         const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
@@ -1019,14 +1034,16 @@ const ProfileCompletionPage = () => {
           const fileName = `${uniqueSuffix}.${fileExt}`;
           const filePath = `${user.id}/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('user-photos')
-            .upload(filePath, image.file, {
-              contentType: image.file.type,
-              cacheControl: '3600',
-              upsert: false
-            });
-          if (uploadError) throw uploadError;
+          await withRetry(async () => {
+            const { error: uploadError } = await supabase.storage
+              .from('user-photos')
+              .upload(filePath, image.file as File, {
+                contentType: (image.file as File).type,
+                cacheControl: '3600',
+                upsert: false
+              });
+            if (uploadError) throw uploadError;
+          });
 
           const {
             data: { publicUrl }
@@ -1036,17 +1053,30 @@ const ProfileCompletionPage = () => {
           // is always a fresh insert - only the columns a user is allowed to
           // set (DB grants block is_approved/moderation_status from the
           // client). moderate-image makes the real call right after.
-          const { data: insertedRow, error: dbError } = await supabase
-            .from('user_images')
-            .insert({
-              user_id: user.id,
-              image_url: publicUrl,
-              image_order: index + 1,
-            })
-            .select('id')
-            .single();
+          const thisOrder = index + 1;
+          const insertedRow = await withRetry(async () => {
+            const { data, error: dbError } = await supabase
+              .from('user_images')
+              .insert({
+                user_id: user.id,
+                image_url: publicUrl,
+                image_order: thisOrder,
+              })
+              .select('id')
+              .single();
+            if (!dbError) return data;
+            if (dbError.code === '23505') {
+              const { data: existing, error: fetchError } = await supabase
+                .from('user_images')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('image_order', thisOrder)
+                .single();
+              if (!fetchError && existing) return existing;
+            }
+            throw dbError;
+          });
 
-          if (dbError) throw dbError;
           successfulUploads++;
 
           // invokeImageModeration retries transient invoke failures before
@@ -1057,8 +1087,12 @@ const ProfileCompletionPage = () => {
           const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
           if (modDecision.status === 'rejected') {
             // Only confirmed explicit content is ever removed - everything
-            // else went live already.
+            // else went live already. A rejected photo's row survives (for
+            // the admin audit trail) but is pulled out of the visible order
+            // (image_order -1) - it must NOT count toward the "at least 2
+            // photos" requirement below.
             removedCount++;
+            successfulUploads--;
           } else if (modDecision.status === 'pending') {
             pendingCount++;
           } else if (index === 0 && modDecision.hasFace === false && !showedFaceTip) {

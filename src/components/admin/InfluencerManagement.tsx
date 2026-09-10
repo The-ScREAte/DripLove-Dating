@@ -706,21 +706,33 @@ const InfluencerManagement = () => {
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
                   {promo.status === 'pending_password' && (
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-7 w-7 text-pink-600 border-pink-200"
-                      title="Get setup link"
-                      aria-label="Get setup link"
-                      onClick={() => handleGetSetupLink(promo)}
-                      disabled={fetchingSetupLinkFor === promo.id}
-                    >
-                      {fetchingSetupLinkFor === promo.id ? (
-                        <div className="w-3.5 h-3.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Link className="w-3.5 h-3.5" />
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-7 w-7 text-pink-600 border-pink-200"
+                        title="Get setup link"
+                        aria-label="Get setup link"
+                        onClick={() => handleGetSetupLink(promo)}
+                        disabled={fetchingSetupLinkFor === promo.id}
+                      >
+                        {fetchingSetupLinkFor === promo.id ? (
+                          <div className="w-3.5 h-3.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Link className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-7 w-7 text-green-600"
+                        title="Activate without password (code works right away, they just won't be able to log in to the portal)"
+                        aria-label="Activate without password"
+                        onClick={() => handleStatusChange(promo, 'active')}
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
                   )}
                   {promo.status === 'active' ? (
                     <Button size="icon" variant="outline" className="h-7 w-7" title="Deactivate" aria-label="Deactivate" onClick={() => handleStatusChange(promo, 'inactive')}>

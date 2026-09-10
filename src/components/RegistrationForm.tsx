@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
+import { withRetry } from '@/utils/withRetry';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,11 @@ import { getFaceReferenceCode } from '@/utils/faceReference';
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
   onBackToLogin: () => void;
+  /** Called with true the moment the account is created (signUp succeeds),
+   *  and false right before onSubmit fires. Lets the parent's global
+   *  auth-state routing defer to this form instead of racing it away from
+   *  the screen while profile data / photos are still being saved. */
+  onRegistrationInProgressChange?: (inProgress: boolean) => void;
 }
 
 interface ImageUpload {
@@ -71,7 +77,7 @@ const extractDuplicateFaceDetails = (data: any): DuplicateFaceDetails => {
   };
 };
 
-const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) => {
+const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressChange }: RegistrationFormProps) => {
   const [formData, setFormData] = useState(initialFormData);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -321,19 +327,39 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         const filePath = `${accountUserId}/${uniqueSuffix}.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('user-photos')
-          .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
-        if (uploadError) throw uploadError;
+        await withRetry(async () => {
+          const { error: uploadError } = await supabase.storage
+            .from('user-photos')
+            .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
+          if (uploadError) throw uploadError;
+        });
 
         const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
 
-        const { data: insertedRow, error: dbError } = await supabase
-          .from('user_images')
-          .insert({ user_id: accountUserId, image_url: publicUrl, image_order: order })
-          .select('id')
-          .single();
-        if (dbError) throw dbError;
+        const insertedRow = await withRetry(async () => {
+          const { data, error: dbError } = await supabase
+            .from('user_images')
+            .insert({ user_id: accountUserId, image_url: publicUrl, image_order: order })
+            .select('id')
+            .single();
+          if (!dbError) return data;
+          // A prior attempt's insert may have actually succeeded server-side
+          // even though the response never made it back (network blip) -
+          // the unique(user_id, image_order) constraint means a retry then
+          // sees a conflict rather than a clean insert. Treat that as
+          // success (fetch the row that's already there) instead of
+          // burning through retries on a photo that's already saved.
+          if (dbError.code === '23505') {
+            const { data: existing, error: fetchError } = await supabase
+              .from('user_images')
+              .select('id')
+              .eq('user_id', accountUserId)
+              .eq('image_order', order)
+              .single();
+            if (!fetchError && existing) return existing;
+          }
+          throw dbError;
+        });
 
         const imageBase64 = await fileToBase64(file);
         const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
@@ -732,6 +758,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           setCreatingAccount(false);
           return;
         }
+
+        // The account now exists - signUp's SIGNED_IN event (and the DB
+        // trigger that creates a full `profiles` row in the same
+        // transaction) can make the app's global auth-routing redirect away
+        // from this screen at any moment from here on, before profile data
+        // and photos below are actually saved. Tell the parent to hold off
+        // until this submit handler explicitly hands off via onSubmit.
+        onRegistrationInProgressChange?.(true);
       } catch (err: any) {
         setCreatingAccount(false);
         toast({
@@ -872,16 +906,22 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
     setIsSubmitting(true);
 
     let imageOrder = 1;
+    let successfulUploads = 0;
     for (const image of readyImages) {
       try {
         if (image.imageId) {
           // Already uploaded + moderated live while picking - just fix up
           // its image_order.
-          const { error } = await supabase
-            .from('user_images')
-            .update({ image_order: imageOrder })
-            .eq('id', image.imageId);
+          const { error } = await withRetry(async () => {
+            const result = await supabase
+              .from('user_images')
+              .update({ image_order: imageOrder })
+              .eq('id', image.imageId);
+            if (result.error) throw result.error;
+            return result;
+          });
           if (error) throw error;
+          successfulUploads++;
         } else if (image.file) {
           // Fallback path - live check failed earlier for this one, so
           // upload + moderate it for real now.
@@ -892,23 +932,50 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
           const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
           const filePath = `${userId}/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('user-photos')
-            .upload(filePath, image.file, { contentType: image.file.type, cacheControl: '3600' });
-          if (uploadError) throw uploadError;
+          await withRetry(async () => {
+            const { error: uploadError } = await supabase.storage
+              .from('user-photos')
+              .upload(filePath, image.file as File, { contentType: (image.file as File).type, cacheControl: '3600' });
+            if (uploadError) throw uploadError;
+          });
 
           const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
+          const thisOrder = imageOrder;
 
-          const { data: insertedRow, error: dbError } = await supabase
-            .from('user_images')
-            .insert({ user_id: userId, image_url: publicUrl, image_order: imageOrder })
-            .select('id')
-            .single();
-          if (dbError) throw dbError;
+          const insertedRow = await withRetry(async () => {
+            const { data, error: dbError } = await supabase
+              .from('user_images')
+              .insert({ user_id: userId, image_url: publicUrl, image_order: thisOrder })
+              .select('id')
+              .single();
+            if (!dbError) return data;
+            // Same "did the previous attempt actually land?" recovery as
+            // the live-upload path above.
+            if (dbError.code === '23505') {
+              const { data: existing, error: fetchError } = await supabase
+                .from('user_images')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('image_order', thisOrder)
+                .single();
+              if (!fetchError && existing) return existing;
+            }
+            throw dbError;
+          });
+
+          // Record the row now, before moderation runs - if moderation
+          // throws below, this photo already has a real row (just still
+          // pending review) and must NOT count as failed/be re-uploaded as
+          // a duplicate if the user retries submit.
+          const thisPreview = image.preview;
+          setImages(prev => prev.map(img => img.preview === thisPreview ? { ...img, imageId: insertedRow.id, filePath } : img));
+          successfulUploads++;
 
           const imageBase64 = await fileToBase64(image.file);
           const modDecision = await invokeImageModeration(insertedRow.id, imageBase64);
           if (modDecision.status === 'rejected') {
+            successfulUploads--;
+            setImages(prev => prev.map(img => img.preview === thisPreview ? { ...img, status: 'rejected', moderationMessage: modDecision.message } : img));
             toast({
               title: 'Photo removed',
               description: modDecision.message || 'One of your photos was removed for violating our content guidelines.',
@@ -921,14 +988,34 @@ const RegistrationForm = ({ onSubmit, onBackToLogin }: RegistrationFormProps) =>
       } catch (error) {
         toast({
           title: 'Image Upload Error',
-          description: `Image ${imageOrder} failed to upload. You can add it later from your profile.`,
+          description: `Image ${imageOrder} failed to upload. Please try again.`,
           variant: 'destructive',
         });
       }
     }
 
     setIsSubmitting(false);
+
+    // Never finalize registration with fewer than 2 real, persisted photos -
+    // the account already exists at this point (created above), but leaving
+    // it here (instead of calling onSubmit) means the next submit attempt
+    // takes the live-upload path for whatever photos are left to retry,
+    // instead of silently completing sign-up with missing/no photos.
+    if (successfulUploads < 2) {
+      toast({
+        title: 'Photos failed to upload',
+        description: 'At least 2 photos are required. Please try uploading again before continuing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     localStorage.removeItem('pending_face_verification');
+
+    // Photos are actually saved now - safe to hand routing back to the
+    // parent (it explicitly moves to terms-acceptance in response to
+    // onSubmit below anyway, so this isn't relying on the effect re-running).
+    onRegistrationInProgressChange?.(false);
 
     // Fetch the user from supabase and pass to onSubmit so app state updates
     try {
