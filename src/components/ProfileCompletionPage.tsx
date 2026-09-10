@@ -25,6 +25,7 @@ import FaceVerification from '@/components/FaceVerification';
 import HoppingLogo from '@/components/HoppingLogo';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 import { getFaceReferenceCode } from '@/utils/faceReference';
+import { getCapitalCoordinates } from '@/utils/countryCapitals';
 
 const TermsAcceptance = lazy(() => import('./TermsAcceptance'));
 
@@ -798,6 +799,18 @@ const ProfileCompletionPage = () => {
     try {
       // Clear sessionStorage after successful completion
       sessionStorage.removeItem('profilecompletion_images');
+
+      // A custom-typed city that isn't in our known-city list never gets
+      // geocoded (see LocationInput's handleCityInputChange), which used to
+      // let people finish registration with no coordinates at all - fine
+      // for validation (only the city *text* is required) but it silently
+      // made them undiscoverable in distance-based matching forever after.
+      // Fall back to the country's capital so everyone has at least an
+      // approximate location on day one.
+      const resolvedCoords = (formData.latitude == null || formData.longitude == null)
+        ? getCapitalCoordinates(formData.countryCode)
+        : undefined;
+
       // Save profile data for the already existing user
       const profileData = {
         first_name: formData.firstName,
@@ -824,8 +837,8 @@ const ProfileCompletionPage = () => {
         fun_fact: formData.funFact || '',
         perfect_first_date: formData.perfectFirstDate || '',
         last_googled: formData.lastGoogled || '',
-        latitude: formData.latitude,
-        longitude: formData.longitude,
+        latitude: formData.latitude ?? resolvedCoords?.latitude ?? null,
+        longitude: formData.longitude ?? resolvedCoords?.longitude ?? null,
         is_custom_city: formData.isCustomCity || false,
         max_distance: formData.maxDistance || 250,
         country_code: formData.countryCode || '',

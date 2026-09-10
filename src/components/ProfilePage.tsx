@@ -17,6 +17,7 @@ import { useAllowScreenshots } from '@/hooks/useAllowScreenshots';
 import BasicInfoSection from './profile/BasicInfoSection';
 import ProfileBasicsChips from './profile/ProfileBasicsChips';
 import LocationSection from './profile/LocationSection';
+import { getCapitalCoordinates } from '@/utils/countryCapitals';
 
 import LifestyleSection from './profile/LifestyleSection';
 import WorkEducationSection from './profile/WorkEducationSection';
@@ -691,8 +692,16 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           ? editedProfile.education_level_custom?.trim()
           : editedProfile.education_level) || null,
         zip_code: editedProfile.zip_code?.trim() || null,
-        latitude: editedProfile.latitude || null,
-        longitude: editedProfile.longitude || null,
+        // A custom-typed city that never got geocoded would otherwise save
+        // with no coordinates at all, silently dropping this profile out of
+        // distance-based discover matching - fall back to the country's
+        // capital so there's always at least an approximate location.
+        latitude: editedProfile.latitude
+          || getCapitalCoordinates(editedProfile.country_code)?.latitude
+          || null,
+        longitude: editedProfile.longitude
+          || getCapitalCoordinates(editedProfile.country_code)?.longitude
+          || null,
         is_custom_city: editedProfile.is_custom_city || false,
         unlocked_countries: Array.isArray(editedProfile.unlocked_countries) ? editedProfile.unlocked_countries : [],
         languages: Array.isArray(editedProfile.languages) ? editedProfile.languages : [],
