@@ -737,52 +737,38 @@ const InfluencerPortal = () => {
           every later open via the header button. */}
       <Dialog open={showTerms} onOpenChange={(open) => { if (termsRequired && !open) return; setShowTerms(open); }}>
         <DialogContent
-          className="max-h-[80dvh] w-[calc(100%-2rem)] sm:max-w-md flex flex-col bg-white"
+          className="max-h-[80dvh] w-[calc(100%-2rem)] sm:max-w-md flex flex-col bg-gradient-to-br from-pink-950 via-pink-900 to-black border-pink-800"
           onEscapeKeyDown={(e) => { if (termsRequired) e.preventDefault(); }}
           onPointerDownOutside={(e) => { if (termsRequired) e.preventDefault(); }}
         >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-pink-600">
-              <FileText className="w-5 h-5 text-pink-500 shrink-0" />
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <FileText className="w-5 h-5 text-pink-300 shrink-0" />
               <span>Terms &amp; Conditions</span>
             </DialogTitle>
-            <p className="text-sm text-gray-500">For DripLove promoters — content recording &amp; publishing</p>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 text-sm text-gray-700 leading-relaxed space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 text-sm text-white/90 leading-relaxed space-y-3">
             <p>
-              Every promoter has their own style, and DripLove doesn't dictate how you create — your setup,
-              environment, tone, and format are entirely up to you. If DripLove does give you specific instructions
-              or talking points for a piece of content, you're expected to follow them; outside of that, create
-              however works best for you.
+              Create however works best for you — just don't put yourself or DripLove at legal or reputational
+              risk. Disclose paid content (e.g. <strong>#ad</strong>), don't make false claims about the app,
+              and don't expose anyone's personal information without consent.
             </p>
-
             <p>
-              The one thing we ask is that you don't put yourself or DripLove at legal or reputational risk.
-              Concretely, that means: don't make false, exaggerated, or misleading claims about the app; disclose
-              sponsored or paid content the way the law requires (e.g. <strong>#ad</strong> or a verbal
-              disclosure); don't feature or expose other people's personal information without their consent; and
-              don't post anything that misrepresents DripLove or breaks the rules of the platform you're posting
-              on.
-            </p>
-
-            <p>
-              <strong>Content that creates legal exposure or seriously misrepresents DripLove may be taken down,
-              and serious or repeated violations can result in removal from the program and forfeiture of pending
-              compensation.</strong> Outside of that, we trust you to represent yourself and DripLove well.
+              Violations can result in content removal or removal from the program.
             </p>
           </div>
-          <div className="pt-3 border-t space-y-3">
+          <div className="pt-3 border-t border-white/20 space-y-3">
             {termsRequired ? (
               <>
                 <label className="flex items-start gap-2 text-sm cursor-pointer">
                   <Checkbox checked={termsChecked} onCheckedChange={(checked) => setTermsChecked(checked === true)} className="mt-0.5" />
-                  <span className="text-gray-700">I have read and agree to the Terms &amp; Conditions above.</span>
+                  <span className="text-white/90">I have read and agree to the Terms &amp; Conditions above.</span>
                 </label>
                 <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
                   <Button
                     onClick={handleAcceptTerms}
                     disabled={!termsChecked || acceptingTerms}
-                    className="w-full bg-pink-600 hover:bg-pink-700"
+                    className="w-full bg-white text-pink-700 hover:bg-pink-100"
                   >
                     {acceptingTerms ? 'Saving…' : 'Agree & Continue'}
                   </Button>
@@ -790,11 +776,11 @@ const InfluencerPortal = () => {
               </>
             ) : (
               <>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-pink-200">
                   You agreed to these terms on {session.terms_accepted_at ? new Date(session.terms_accepted_at).toLocaleDateString() : '—'}.
                 </p>
                 <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
-                  <Button variant="outline" className="bg-white" onClick={() => setShowTerms(false)}>Close</Button>
+                  <Button variant="outline" className="bg-white text-pink-700" onClick={() => setShowTerms(false)}>Close</Button>
                 </DialogFooter>
               </>
             )}
