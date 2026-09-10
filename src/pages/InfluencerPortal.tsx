@@ -737,7 +737,7 @@ const InfluencerPortal = () => {
           every later open via the header button. */}
       <Dialog open={showTerms} onOpenChange={(open) => { if (termsRequired && !open) return; setShowTerms(open); }}>
         <DialogContent
-          className="max-h-[80dvh] w-[calc(100%-2rem)] sm:max-w-md flex flex-col bg-gradient-to-br from-pink-950 via-pink-900 to-black border-pink-800"
+          className="max-h-[80dvh] w-[calc(100%-3rem)] sm:max-w-md flex flex-col bg-gradient-to-br from-pink-950 via-pink-900 to-black border-pink-800 px-5"
           onEscapeKeyDown={(e) => { if (termsRequired) e.preventDefault(); }}
           onPointerDownOutside={(e) => { if (termsRequired) e.preventDefault(); }}
         >
@@ -749,12 +749,18 @@ const InfluencerPortal = () => {
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto pr-1 text-sm text-white/90 leading-relaxed space-y-3">
             <p>
-              Create however works best for you — just don't put yourself or DripLove at legal or reputational
-              risk. Disclose paid content (e.g. <strong>#ad</strong>), don't make false claims about the app,
-              and don't expose anyone's personal information without consent.
+              Every promoter has their own style, and DripLove doesn't dictate how you create — your setup,
+              environment, tone, and format are up to you. If we give specific instructions for a piece of
+              content, follow them; otherwise, create however works best for you.
             </p>
             <p>
-              Violations can result in content removal or removal from the program.
+              The one thing we ask is that you don't put yourself or DripLove at legal or reputational risk:
+              disclose sponsored content (e.g. <strong>#ad</strong>), don't make false or misleading claims
+              about the app, and don't expose anyone's personal information without consent.
+            </p>
+            <p>
+              <strong>Content that creates legal exposure may be taken down, and repeated violations can
+              result in removal from the program.</strong>
             </p>
           </div>
           <div className="pt-3 border-t border-white/20 space-y-3">
@@ -775,14 +781,12 @@ const InfluencerPortal = () => {
                 </DialogFooter>
               </>
             ) : (
-              <>
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-pink-200">
-                  You agreed to these terms on {session.terms_accepted_at ? new Date(session.terms_accepted_at).toLocaleDateString() : '—'}.
+                  Agreed on {session.terms_accepted_at ? new Date(session.terms_accepted_at).toLocaleDateString() : '—'}.
                 </p>
-                <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
-                  <Button variant="outline" className="bg-white text-pink-700" onClick={() => setShowTerms(false)}>Close</Button>
-                </DialogFooter>
-              </>
+                <Button variant="outline" className="bg-white text-pink-700" onClick={() => setShowTerms(false)}>Close</Button>
+              </div>
             )}
           </div>
         </DialogContent>
