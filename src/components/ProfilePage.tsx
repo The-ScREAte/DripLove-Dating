@@ -1143,7 +1143,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               <div className="flex-1 h-1 bg-neutral-800 rounded-full overflow-hidden">
                 <div
                   className={`h-1 transition-all duration-500 rounded-full ${
-                    completion >= 90 ? 'bg-pink-600' : 'bg-pink-400'
+                    completion >= 90 ? 'bg-pink-800' : 'bg-pink-600'
                   }`}
                   style={{ width: `${completion}%` }}
                 />

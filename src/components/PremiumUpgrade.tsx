@@ -6,7 +6,7 @@ import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles, ArrowLeft } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
@@ -654,7 +654,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       // Use clamp to respect the device safe-area inset while keeping
       // a reasonable minimum and maximum top padding for notched devices.
       paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
-      marginTop: '24px',
+      marginTop: '4px',
       // Keep the responsive horizontal padding via remaining classes on inner container
       paddingLeft: 'env(safe-area-inset-left, 0px)',
       paddingRight: 'env(safe-area-inset-right, 0px)',
@@ -662,31 +662,24 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       position: 'relative'
     }}
   >
-      <button
-        type="button"
-        onClick={() => (onClose ? onClose() : window.history.back())}
-        aria-label={t('premium.back', 'Back')}
-        className="fixed left-4 z-20 flex items-center justify-center w-9 h-9 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
-        style={{
-          background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-          boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-          top: 'clamp(12px, calc(env(safe-area-inset-top, 8px) + 16px), 44px)'
-        }}
-      >
-        <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
-      </button>
       <div
-        className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-0 sm:px-2 md:px-4 lg:px-6"
+        className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8"
         style={{
-          // Ensure there is enough bottom padding on devices with a home indicator
-          paddingBottom: Capacitor.getPlatform() === 'web'
-            ? '120px'
-            : 'clamp(120px, calc(env(safe-area-inset-bottom, 10px) + 120px), 150px)'
+          paddingBottom: Capacitor.getPlatform() === 'web' ? 0 : 'env(safe-area-inset-bottom, 0px)'
         }}
       >
           {/* Header Section */}
           <div className="text-center mb-4 md:mb-6">
-            <div className="flex items-center justify-center mb-2 md:mb-4">
+            <div className="relative flex items-center justify-center mb-2 md:mb-4">
+              <button
+                type="button"
+                onClick={() => (onClose ? onClose() : window.history.back())}
+                aria-label={t('premium.back', 'Back')}
+                className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center text-white active:opacity-60 transition-opacity"
+                style={{ background: 'none', border: 'none', padding: 0 }}
+              >
+                <ChevronLeft className="w-8 h-8" strokeWidth={3} />
+              </button>
               <div className="relative">
                 <Crown className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 text-yellow-400 drop-shadow-lg" />
                 <div className="absolute -top-1 -right-1 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 bg-yellow-300 rounded-full animate-pulse"></div>

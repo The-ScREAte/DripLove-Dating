@@ -546,7 +546,7 @@ const LocationInput = ({
         
         {/* Show read-only display when country is locked */}
         {isCountryLocked && selectedCountryCode ? (
-          <div className="flex items-center justify-between p-3 bg-white text-black rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between py-1.5 px-3 bg-white text-black rounded-lg border border-gray-200">
             <div className="flex items-center gap-2">
               <span className="font-medium">{country || 'Detecting...'}</span>
               {selectedCountryData?.continent === 'Africa' && (
@@ -589,7 +589,7 @@ const LocationInput = ({
           </div>
         ) : (
           /* Show loading state when detecting */
-          <div className="flex items-center justify-between p-3 bg-white text-black rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between py-1.5 px-3 bg-white text-black rounded-lg border border-gray-200">
             <div className="flex items-center gap-2">
               <span className="font-medium text-black">
                 Detecting your location...

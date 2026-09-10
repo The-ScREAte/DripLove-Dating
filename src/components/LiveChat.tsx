@@ -80,17 +80,17 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Payment error
     if (msg.includes('payment error') || msg.includes('payment fail') || msg.includes('payment issue') || msg.includes('payment problem') || msg.includes('billing error') || msg.includes('card declined') || msg.includes('transaction fail') || msg.includes('payment not going') || msg.includes('payment isn\'t going') || msg.includes('can\'t pay') || msg.includes('cant pay') || msg.includes('payment help') || msg.includes('how to pay') || msg.includes('payment method') || msg.includes('add payment')) {
-      return "💳 PAYMENT SUPPORT\n\nI'm sorry you're experiencing payment issues. Let's get this resolved!\n\n📱 PAYMENT METHODS BY DEVICE:\n\n🍎 iOS Users:\n• Please add your payment method to Apple Pay\n• Go to Settings → Wallet & Apple Pay → Add Card\n\n🤖 Android Users:\n• You can use Google Pay or the Paystack option\n• Go to Settings → Google → Wallet to add a card\n\n💰 ACCEPTED PAYMENTS:\n• Mobile Money\n• Credit/Debit Cards\n\n⚠️ PAYMENT NOT GOING THROUGH?\n• Double-check that your card details are correct\n• Ensure sufficient funds/balance\n• Try a different payment method\n\n📧 Still having issues? Contact: driploveinfo@gmail.com\n\n📝 Please include:\n• Your registered email\n• Screenshot of the error\n• Payment method used\n• Date and time of attempted payment\n\n⏰ Response: Within 24 hours";
+      return "💳 PAYMENT SUPPORT\n\nSorry you're having payment trouble - let's sort it out.\n\n🍎 iOS: billed through Apple Pay. Add or update a card under Settings → Wallet & Apple Pay.\n\n🤖 Android: billed through Google Play. Add or update a card under the Play Store → Payments & subscriptions.\n\n⚠️ NOT GOING THROUGH?\n• Double-check your card details\n• Make sure you have sufficient funds\n• Confirm the Play Store/App Store itself isn't showing its own error\n\n📧 Still stuck? driploveinfo@gmail.com with your registered email, a screenshot, and when it happened. We reply within 24 hours.";
     }
 
     // Premium cost / pricing
     if (msg.includes('price') || msg.includes('cost') || msg.includes('how much') || msg.includes('pricing')) {
-      return "💰 PREMIUM PRICING\n\nTo view current pricing and plans:\n👉 Profile → Upgrade to Premium\n\n💳 ACCEPTED PAYMENTS:\n• Credit/Debit Cards\n• Mobile Money\n• Apple Pay (iOS)\n• Google Pay (Android)\n\n✅ INCLUDES:\n• 7-day money-back guarantee\n• Secure payment processing\n• Instant activation\n\n📧 For payment issues: driploveinfo@gmail.com";
+      return "💰 PREMIUM PRICING\n\nSee the current price for your account (and whether you qualify for a free trial) at:\n👉 Profile → Upgrade to Premium\n\nBilled monthly through Apple Pay (iOS) or Google Play (Android), cancel anytime - you keep premium until the period you paid for ends.\n\n📧 Payment issues: driploveinfo@gmail.com";
     }
 
     // Premium features / what premium includes
     if (msg.includes('premium') || msg.includes('upgrade') || msg.includes('subscription') || msg.includes('what does premium') || msg.includes('membership')) {
-      return "💎 DRIPLOVE PREMIUM\n\nUnlock the full dating experience!\n\n✨ PREMIUM FEATURES:\n• ♾️ Unlimited daily swipes\n• ❤️ See everyone who liked you\n• ↩️ Unlimited undo (reverse passes)\n• 🌍 Explore all countries worldwide\n• ⭐ Priority in discover feed\n• 🚫 Ad-free experience\n• 🎧 Priority customer support\n\n👉 Upgrade: Profile → Upgrade to Premium\n\n💡 TIP: After subscribing, close and reopen the app to activate all features instantly!";
+      return "💎 DRIPLOVE PREMIUM\n\n✨ WHAT YOU GET:\n• ♾️ Unlimited daily swipes\n• ❤️ See everyone who liked you\n• ↩️ Unlimited reverse (undo passes)\n• 🌍 Up to 4 extra countries to match in\n• 🔕 Fewer ads\n• 🎧 Priority support\n\n🎁 New here? If you're eligible, the Premium page will show a free trial before you're charged.\n\n👉 Upgrade: Profile → Upgrade to Premium";
     }
 
     // Cancel subscription
@@ -100,17 +100,17 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Explore more countries
     if (msg.includes('more countries') || msg.includes('other countries') || msg.includes('explore countries') || msg.includes('change country') || msg.includes('location') || msg.includes('international')) {
-      return "🌍 EXPLORE OTHER COUNTRIES\n\n💎 PREMIUM MEMBERS:\n1. Go to Profile\n2. Tap Edit at the top\n3. Find 'Preferences' section\n4. Select your desired countries\n\n✅ You can match in up to 4 countries total (your own + 3 more)!\n\n🆓 FREE USERS:\nMatching is limited to your registered country.\n\n💡 Upgrade to Premium to connect with people worldwide!";
+      return "🌍 EXPLORE OTHER COUNTRIES\n\n🆓 FREE: matching is limited to your own registered country.\n\n💎 PREMIUM: unlock up to 4 extra countries to match in.\n\n📱 TO SET THEM:\nProfile → Edit → Preferences → Countries\n\n👉 Upgrade: Profile → Upgrade to Premium";
     }
 
     // See who liked me
     if (msg.includes('who liked') || msg.includes('see likes') || msg.includes('my likes') || msg.includes('who like me') || msg.includes('people who liked')) {
-      return "❤️ WHO LIKED ME\n\n💎 PREMIUM MEMBERS:\n• Access the Likes tab from bottom navigation\n• See complete profiles of everyone who liked you\n• Match instantly with one tap!\n\n🆓 FREE USERS:\n• See the general location of people who liked you\n• Upgrade to Premium for full access\n\n💡 TIP: Premium users match 3x faster because they can see and respond to likes immediately!";
+      return "❤️ WHO LIKED ME\n\n🆓 FREE: you can see that people liked you, but not their full profile.\n\n💎 PREMIUM: see everyone who liked you on the Liked tab and match instantly with one tap.\n\n👉 Upgrade: Profile → Upgrade to Premium";
     }
 
     // Daily swipes
     if (msg.includes('swipe') || msg.includes('daily limit') || msg.includes('how many') || msg.includes('swipes left') || msg.includes('out of swipes')) {
-      return "👆 DAILY SWIPES\n\n🆓 FREE USERS:\n• 20 swipes per day\n• Resets at midnight (your local time)\n\n💎 PREMIUM MEMBERS:\n• Unlimited swipes - swipe all day!\n• No waiting, no limits\n\n💡 TIP: Make each swipe count! Read profiles carefully for better matches.\n\n👉 Upgrade to Premium for unlimited swipes!";
+      return "👆 DAILY SWIPES\n\n🆓 FREE: about 15-20 swipes per day, resetting daily.\n\n💎 PREMIUM: unlimited swipes, no waiting.\n\n👉 Upgrade: Profile → Upgrade to Premium";
     }
 
     // Reporting users / safety
@@ -140,7 +140,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Features
     if (msg.includes('feature') || msg.includes('can i') || msg.includes('what can') || msg.includes('how does') || msg.includes('app work')) {
-      return "📱 DRIPLOVE FEATURES\n\n🆓 FREE ACCOUNT:\n• Create stunning profile\n• 20 daily swipes\n• Match and chat\n• Video & voice calls\n• Face verification\n• See who liked you (location only)\n\n💎 PREMIUM ACCOUNT:\n• Everything in Free +\n• Unlimited swipes\n• See full profiles of admirers\n• Explore all countries\n• Reverse passes (undo)\n• Priority placement\n• No ads\n• VIP support\n\n👉 Ready to upgrade? Profile → Upgrade to Premium";
+      return "📱 DRIPLOVE FEATURES\n\n🆓 FREE:\n• Build your profile\n• ~15-20 swipes/day\n• Match, chat, video/voice calls\n• Face verification\n\n💎 PREMIUM adds:\n• Unlimited swipes\n• See everyone who liked you\n• Reverse passes (undo)\n• Up to 4 extra countries\n• Fewer ads, priority support\n\n👉 Upgrade: Profile → Upgrade to Premium";
     }
 
     // Match/Dating help
