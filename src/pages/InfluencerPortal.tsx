@@ -476,7 +476,7 @@ const InfluencerPortal = () => {
   // Login Page
   if (!session) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-pink-950 via-pink-900 to-black flex items-center justify-center p-4">
         <Card className="w-full max-w-md bg-white text-black">
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
@@ -550,36 +550,36 @@ const InfluencerPortal = () => {
 
   // Dashboard
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-pink-950 via-pink-900 to-black p-4">
       <div className="max-w-md mx-auto space-y-4 pb-12">
         {/* Header */}
         <Card className="border-t-4 border-t-pink-500 overflow-hidden bg-white text-black">
           <CardContent className="py-4">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-sm text-gray-500">Welcome back,</p>
+                <p className="text-sm text-gray-600">Welcome back,</p>
                 <h1 className="text-xl font-bold text-gray-900">{session.owner_name}</h1>
                 {session.email && (
-                  <p className="text-xs text-gray-500">{session.email}</p>
+                  <p className="text-xs text-gray-600">{session.email}</p>
                 )}
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleLogout}
-                className="bg-white border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                className="bg-white border-gray-400 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
               >
                 <LogOut className="w-4 h-4 mr-1.5" /> Log Out
               </Button>
             </div>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t">
-              <Badge className="font-mono text-xs bg-pink-50 text-pink-700 border border-pink-200 hover:bg-pink-50">{session.code}</Badge>
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-300">
+              <Badge className="font-mono text-xs bg-pink-100 text-pink-800 border border-pink-300 hover:bg-pink-100">{session.code}</Badge>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowTerms(true)}
-                  className="h-8 text-xs bg-white border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  className="h-8 text-xs bg-white border-gray-400 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 >
                   <FileText className="w-3.5 h-3.5 mr-1.5" />
                   Terms
@@ -589,7 +589,7 @@ const InfluencerPortal = () => {
                   size="sm"
                   onClick={refreshStats}
                   disabled={refreshing}
-                  className="h-8 text-xs bg-white border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  className="h-8 text-xs bg-white border-gray-400 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
                   {refreshing ? 'Refreshing…' : 'Refresh'}
@@ -603,7 +603,7 @@ const InfluencerPortal = () => {
         {showPerformance && (
           <Card className="bg-white text-black">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">Your Performance</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-800">Your Performance</CardTitle>
             </CardHeader>
             <CardContent>
               <div className={`grid gap-3 ${session.show_leads_enabled && session.show_subscribers_enabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -613,7 +613,7 @@ const InfluencerPortal = () => {
                       <Users className="w-4 h-4 text-blue-600" />
                     </div>
                     <p className="text-2xl font-bold text-gray-900">{session.total_signups}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Leads</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Leads</p>
                   </div>
                 )}
                 {session.show_subscribers_enabled && (
@@ -622,7 +622,7 @@ const InfluencerPortal = () => {
                       <Crown className="w-4 h-4 text-amber-600" />
                     </div>
                     <p className="text-2xl font-bold text-gray-900">{session.total_subscribers}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Subscribers</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Subscribers</p>
                   </div>
                 )}
               </div>
@@ -637,7 +637,7 @@ const InfluencerPortal = () => {
         {session.show_demographics_enabled && (
           <Card className="bg-white text-black">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700">Lead Demographics</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-800">Lead Demographics</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingDemographics ? (
@@ -645,7 +645,7 @@ const InfluencerPortal = () => {
                   <div className="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : session.total_signups === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-2">
+                <p className="text-sm text-gray-600 text-center py-2">
                   No signups yet. Share your code to get started.
                 </p>
               ) : (
@@ -663,30 +663,30 @@ const InfluencerPortal = () => {
         {session.commission_enabled && (
           <Card className="bg-white text-black">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-700 flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-gray-800 flex items-center justify-between">
                 <span>Earnings</span>
-                <span className="text-xs font-normal text-gray-500">
+                <span className="text-xs font-normal text-gray-600">
                   {session.percentage_cut}% for {session.commission_duration} month{session.commission_duration === 1 ? '' : 's'} per user
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-1.5">
-                <div className="flex justify-between text-sm py-1.5 border-b">
-                  <span className="text-gray-500">Total earned</span>
+                <div className="flex justify-between text-sm py-1.5 border-b border-gray-300">
+                  <span className="text-gray-600">Total earned</span>
                   <span className="font-semibold text-gray-900">${session.total_commission_usd.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-sm py-1.5 border-b">
-                  <span className="text-gray-500">Paid out</span>
+                <div className="flex justify-between text-sm py-1.5 border-b border-gray-300">
+                  <span className="text-gray-600">Paid out</span>
                   <span className="font-medium text-gray-700">${session.total_paid_usd.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm py-1.5">
-                  <span className="text-gray-500">Available</span>
+                  <span className="text-gray-600">Available</span>
                   <span className="font-bold text-green-600">${session.outstanding_usd.toFixed(2)}</span>
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t">
+              <div className="mt-4 pt-4 border-t border-gray-300">
                 {session.has_pending_payout ? (
                   <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <Clock className="w-4 h-4 text-amber-600 shrink-0" />
@@ -713,10 +713,10 @@ const InfluencerPortal = () => {
                         {requestingPayout ? 'Submitting…' : 'Request Payout'}
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-500">Up to ${session.outstanding_usd.toFixed(2)} available</p>
+                    <p className="text-xs text-gray-600">Up to ${session.outstanding_usd.toFixed(2)} available</p>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 text-center">No earnings available for payout yet</p>
+                  <p className="text-sm text-gray-600 text-center">No earnings available for payout yet</p>
                 )}
               </div>
             </CardContent>
@@ -725,7 +725,7 @@ const InfluencerPortal = () => {
 
         {nothingToShow && (
           <Card className="bg-white text-black">
-            <CardContent className="py-6 text-center text-sm text-gray-500">
+            <CardContent className="py-6 text-center text-sm text-gray-600">
               Your code is active and your referrals are being tracked. Reach out to the DripLove team for more details.
             </CardContent>
           </Card>
@@ -737,18 +737,18 @@ const InfluencerPortal = () => {
           every later open via the header button. */}
       <Dialog open={showTerms} onOpenChange={(open) => { if (termsRequired && !open) return; setShowTerms(open); }}>
         <DialogContent
-          className="max-h-[80dvh] flex flex-col"
+          className="max-h-[80dvh] w-[calc(100%-2rem)] sm:max-w-md flex flex-col bg-white"
           onEscapeKeyDown={(e) => { if (termsRequired) e.preventDefault(); }}
           onPointerDownOutside={(e) => { if (termsRequired) e.preventDefault(); }}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-pink-600">
               <FileText className="w-5 h-5 text-pink-500 shrink-0" />
-              <span>DripLove — Content Recording &amp; Publishing</span>
+              <span>Terms &amp; Conditions</span>
             </DialogTitle>
-            <p className="text-sm text-gray-500">Terms &amp; Conditions for Promoters</p>
+            <p className="text-sm text-gray-500">For DripLove promoters — content recording &amp; publishing</p>
           </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 text-sm text-gray-700 space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 text-sm text-gray-700 leading-relaxed space-y-4">
             <p>
               Every promoter has their own style, and DripLove doesn't dictate how you create — your setup,
               environment, tone, and format are entirely up to you. If DripLove does give you specific instructions
@@ -769,11 +769,6 @@ const InfluencerPortal = () => {
               <strong>Content that creates legal exposure or seriously misrepresents DripLove may be taken down,
               and serious or repeated violations can result in removal from the program and forfeiture of pending
               compensation.</strong> Outside of that, we trust you to represent yourself and DripLove well.
-            </p>
-
-            <p className="text-xs text-gray-500 pt-2 border-t">
-              These Terms &amp; Conditions are incorporated by reference into your Promoter Agreement with Screate
-              LLC.
             </p>
           </div>
           <div className="pt-3 border-t space-y-3">

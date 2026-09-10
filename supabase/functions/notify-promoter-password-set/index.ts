@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import nodemailer from 'npm:nodemailer@6.9.14';
+import { buildDripLoveHtml } from '../_shared/email-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,19 +54,23 @@ serve(async (req: Request) => {
     }
 
     const loginLink = `${appUrl}/influencer`;
-    const html = `
-      <h2>You're all set, ${escapeHtml(promoCode.owner_name)}!</h2>
-      <p>Your password has been set and your DripLove Promoter account is ready to go.</p>
-      <p>Log in any time with your promo code <strong>${escapeHtml(promoCode.code)}</strong> and your new password:</p>
-      <p><a href="${loginLink}" style="display:inline-block;padding:10px 20px;background:#ec4899;color:#fff;border-radius:6px;text-decoration:none;">Log In to Your Promoter Portal</a></p>
-      <p style="font-size:13px;color:#666;">Or copy this link into your browser:<br/>${escapeHtml(loginLink)}</p>
+    const subject = 'Your DripLove Promoter account is ready';
+    const bodyContent = `
+      <h2 style="margin:0 0 12px 0;font-size:19px;color:#111827;">You're all set, ${escapeHtml(promoCode.owner_name)}!</h2>
+      <p style="margin:0 0 14px 0;">Your password has been set and your DripLove Promoter account is ready to go.</p>
+      <p style="margin:0 0 18px 0;">Log in any time with your promo code <strong>${escapeHtml(promoCode.code)}</strong> and your new password:</p>
+      <p style="margin:0 0 14px 0;">
+        <a href="${loginLink}" style="display:inline-block;padding:12px 24px;background:#db2777;color:#ffffff;border-radius:8px;text-decoration:none;font-weight:600;">Log In to Your Promoter Portal</a>
+      </p>
+      <p style="margin:0;font-size:13px;color:#6b7280;">Or copy this link into your browser:<br/>${escapeHtml(loginLink)}</p>
     `;
+    const html = buildDripLoveHtml(subject, bodyContent);
 
     const transporter = nodemailer.createTransport({ host, port, secure, auth: { user: smtpUser, pass: smtpPass } });
     await transporter.sendMail({
       from: `${fromName} <${smtpUser}>`,
       to: promoCode.email,
-      subject: 'Your DripLove Promoter account is ready',
+      subject,
       html,
     });
 

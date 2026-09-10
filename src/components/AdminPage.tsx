@@ -1496,15 +1496,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   
   if (isAdmin === null) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-500">Checking admin permissions...</p>
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-pink-950 via-pink-900 to-black">
+        <p className="text-gray-300">Checking admin permissions...</p>
       </div>
     );
   }
-  
+
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-pink-950 via-pink-900 to-black">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <Shield className="w-16 h-16 mx-auto mb-4 text-red-500" />
@@ -1517,16 +1517,16 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   }
   
   return (
-    <div className="admin-page-container w-full min-h-screen bg-gray-100 overflow-y-auto">
-      <div className="w-full max-w-[390px] sm:max-w-3xl lg:max-w-6xl mx-auto bg-white min-h-screen">
+    <div className="admin-page-container w-full min-h-screen bg-gradient-to-br from-pink-950 via-pink-900 to-black overflow-y-auto">
+      <div className="w-full max-w-[390px] sm:max-w-3xl lg:max-w-6xl mx-auto bg-gradient-to-br from-pink-950 via-pink-900 to-black min-h-screen">
         {/* Fixed Header with Safe Area */}
-        <div className="sticky top-0 z-50 bg-white border-b border-gray-200">
-          <div className="p-4">
+        <div className="sticky top-0 z-50">
+          <div className="px-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+            <div className="flex items-center justify-between">
+              <h1 className="text-lg font-bold text-white">Admin Dashboard</h1>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="px-3 py-1">
+                <Badge variant="outline" className="px-3 py-1 text-white border-white/40 bg-white/10">
                   <Shield className="w-4 h-4 mr-1" />
                   Admin
                 </Badge>
@@ -1534,7 +1534,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="text-red-600 hover:text-red-700"
+                  className="bg-white text-red-600 hover:text-red-700"
                 >
                   <LogOut className="w-4 h-4" />
                 </Button>
@@ -1542,15 +1542,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             </div>
           </div>
         </div>
-        
+
         {/* Scrollable Content */}
-        <div className="p-4 pb-20">
+        <div>
 
           {/* Tabbed Interface with Error Boundaries for 1000+ users */}
           <AdminErrorBoundary>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div className="mb-3">
-                {/* Tabs in 2 rows on desktop */}
+              <div className="sticky top-12 z-40 mb-3 py-2 bg-gradient-to-br from-pink-950 via-pink-900 to-black">
+                {/* Tabs in 2 rows on desktop - pinned in place under the header so it never scrolls out of view */}
                 <TabsList className="grid w-full grid-cols-5 h-auto gap-1">
                   <TabsTrigger value="dashboard" className="w-full text-xs flex flex-col gap-1 py-2">
                     <BarChart3 className="w-4 h-4" />
