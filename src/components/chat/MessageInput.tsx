@@ -118,14 +118,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
       
       <div className="p-2">
         <div className="flex items-center space-x-2">
-          <div className="flex-1 flex items-center space-x-2 bg-black rounded-full px-4 py-2 border-2 border-pink-600 shadow-sm">
+          <div className="flex-1 flex items-center space-x-2 bg-black rounded-full px-4 py-1 border-2 border-pink-600 shadow-sm">
             <Input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={t('chat.typeMessage')}
-              className="flex-1 h-10 rounded-md border border-input text-base text-white ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm flex-1 border-none bg-transparent focus:ring-0 p-0"
+              className="flex-1 h-8 rounded-md border-none text-base text-white file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-gray-400 outline-none ring-0 ring-offset-0 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent p-0"
               disabled={disabled}
               style={{ fontSize: '16px' }}
             />
@@ -133,7 +133,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <button
             onClick={handleSend}
             disabled={!draft.trim() || disabled}
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-pink-600 border-2 border-pink-600 text-white hover:bg-pink-700 rounded-full w-12 h-12 p-0"
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-pink-600 border-2 border-pink-600 text-white hover:bg-pink-700 rounded-full w-11 h-11 p-0"
             aria-label={t('chat.sendMessage')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-send w-4 h-4" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg>

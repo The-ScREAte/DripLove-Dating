@@ -2073,10 +2073,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
           {!isPremium && (
             <Button
               onClick={() => setShowPremiumUpgrade(true)}
-              style={{ height: 20, minHeight: 20, padding: '0 8px' }}
-              className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-semibold text-[10px] leading-none"
+              style={{ height: 28, minHeight: 28, padding: '0 12px' }}
+              className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-semibold text-xs leading-none shadow-sm"
             >
-              <Crown className="w-2.5 h-2.5 mr-0.5" />
+              <Crown className="w-3.5 h-3.5 mr-1" />
               {t('matches.upgrade')}
             </Button>
           )}

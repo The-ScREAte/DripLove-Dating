@@ -6,7 +6,7 @@ import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
@@ -662,6 +662,19 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
       position: 'relative'
     }}
   >
+      <button
+        type="button"
+        onClick={() => (onClose ? onClose() : window.history.back())}
+        aria-label={t('premium.back', 'Back')}
+        className="fixed left-4 z-20 flex items-center justify-center w-9 h-9 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
+        style={{
+          background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+          boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+          top: 'clamp(12px, calc(env(safe-area-inset-top, 8px) + 16px), 44px)'
+        }}
+      >
+        <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
+      </button>
       <div
         className="max-w-3xl md:max-w-4xl lg:max-w-5xl mx-auto px-0 sm:px-2 md:px-4 lg:px-6"
         style={{
@@ -758,7 +771,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 <div className="pt-2 md:pt-4 text-center">
                   <Button
                     onClick={handleUpgrade}
-                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2 md:py-3 px-3 md:px-6 rounded-lg text-sm md:text-base shadow-lg transition-all duration-200"
+                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2 md:py-3 px-3 md:px-6 rounded-full text-sm md:text-base shadow-lg transition-all duration-200"
                   >
                     <Crown className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" />
                     {pageTrialEligible ? 'Start Free Trial' : t('premium.upgradeButton')}

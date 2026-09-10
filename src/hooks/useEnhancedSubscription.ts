@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { Capacitor } from '@capacitor/core'
-import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache'
+import { readCachedPremiumStatus, writeCachedPremiumStatus, clearCachedPremiumStatus } from '@/utils/premiumStatusCache'
 
 interface SubscriptionStatus {
   plan_name: string
@@ -154,7 +154,7 @@ export function useEnhancedSubscription() {
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id)
-          
+
           setSubscriptionStatus({
             plan_name: 'free',
             status: 'expired',
@@ -162,6 +162,9 @@ export function useEnhancedSubscription() {
             is_active: false,
             payment_method: quickCheck.payment_method
           })
+          // Just moved off premium - drop the cached "premium" answer so
+          // nothing on this device optimistically re-shows it again.
+          clearCachedPremiumStatus(user.id)
         } else {
           // Not expired yet - user keeps premium access even if cancelled
           // Verify with native store if on mobile AND status is active
@@ -177,6 +180,7 @@ export function useEnhancedSubscription() {
               is_active: false,
               payment_method: quickCheck.payment_method
             })
+            clearCachedPremiumStatus(user.id)
           } else {
             // Premium access active until expires_at (even if cancelled)
             setSubscriptionStatus({
@@ -211,8 +215,14 @@ export function useEnhancedSubscription() {
         const status = data[0]
         // Update with the comprehensive result
         setSubscriptionStatus(status)
-        // Confirmed answer - remember it for the optimistic seed above.
-        writeCachedPremiumStatus(user.id, status.plan_name === 'premium' && !!status.is_active)
+        // Confirmed answer - remember it for the optimistic seed above, or
+        // drop it entirely the moment it's no longer premium.
+        const isPremiumNow = status.plan_name === 'premium' && !!status.is_active
+        if (isPremiumNow) {
+          writeCachedPremiumStatus(user.id, true)
+        } else {
+          clearCachedPremiumStatus(user.id)
+        }
       } else {
         // Comprehensive check found no subscription, confirm free status
         // (but don't change if quick check already set premium - avoid flicker)
@@ -224,7 +234,7 @@ export function useEnhancedSubscription() {
             is_active: false,
             payment_method: undefined
           })
-          writeCachedPremiumStatus(user.id, false)
+          clearCachedPremiumStatus(user.id)
         }
       }
     } catch (error) {

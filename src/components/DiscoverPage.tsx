@@ -666,14 +666,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // the 8s timeout itself hides the guide now.
   const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    // Only show for new users (e.g., if localStorage flag not set)
+    // Only show for new users - keyed per account (not a single blanket
+    // flag), so a fresh signup on a device that's already seen this for a
+    // previous account still gets to see it once for their own account.
     if (!currentUser?.id) return;
-    if (localStorage.getItem('driplove_swipe_guide_shown')) return;
+    const shownKey = `driplove_swipe_guide_shown_${currentUser.id}`;
+    if (localStorage.getItem(shownKey)) return;
     if (swipeGuideTimerRef.current) return; // timer already running — don't restart
     setShowSwipeGuide(true);
     swipeGuideTimerRef.current = setTimeout(() => {
       setShowSwipeGuide(false);
-      localStorage.setItem('driplove_swipe_guide_shown', 'true');
+      localStorage.setItem(shownKey, 'true');
       swipeGuideTimerRef.current = null;
     }, 8000); // 8 seconds
   }, [currentUser?.id]);

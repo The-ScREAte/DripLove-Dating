@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import FreeTrialBanner from '@/components/FreeTrialBanner';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
-import { msUntilNextFreeTrialSheet, markFreeTrialSheetShown, FreeTrialSheetCadenceState } from '@/utils/freeTrialStorage';
+import { msUntilNextFreeTrialSheet, markFreeTrialSheetShown } from '@/utils/freeTrialStorage';
 
 interface FreeTrialBottomSheetProps {
   userId: string | undefined;
@@ -20,16 +20,11 @@ const MAX_SCHEDULE_MS = 15 * 60 * 1000; // 15 minutes
  *  - First ever appearance waits until the user has been on DripLove for at
  *    least 7 minutes.
  *  - While still trial-eligible and not yet started, re-shows every 3 days.
- *  - Once their trial is used/cancelled (no longer eligible, not premium),
- *    backs off to every 3 weeks - the normal pay-to-use pitch, not a free
- *    one, since useFreeTrialOffer's trialEnded state already switches
- *    FreeTrialBanner's own copy/CTA to "Resubscribe" for this case.
- *  - Stops entirely once premium - useFreeTrialOffer's eligibleForTrial/
- *    trialEnded are both false for a premium user, so this component simply
- *    never schedules anything for them.
+ *  - Stops entirely once premium, or once the store no longer offers this
+ *    account a trial - no "resubscribe" pitch here, only the fresh-trial one.
  */
 const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
-  const { loading, eligibleForTrial, trialEnded } = useFreeTrialOffer(userId);
+  const { loading, eligibleForTrial } = useFreeTrialOffer(userId);
   const [open, setOpen] = useState(false);
   const openRef = useRef(open);
   useEffect(() => {
@@ -38,10 +33,9 @@ const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
 
   const checkAndSchedule = useCallback(() => {
     if (loading || !userId || openRef.current) return undefined;
-    if (!eligibleForTrial && !trialEnded) return undefined;
+    if (!eligibleForTrial) return undefined;
 
-    const cadenceState: FreeTrialSheetCadenceState = eligibleForTrial ? 'eligible' : 'trialEnded';
-    const msUntilDue = msUntilNextFreeTrialSheet(userId, cadenceState);
+    const msUntilDue = msUntilNextFreeTrialSheet(userId, 'eligible');
 
     if (msUntilDue > MAX_SCHEDULE_MS) {
       // Not due for a long while - don't hold a timer open for that; the
@@ -56,7 +50,7 @@ const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [loading, eligibleForTrial, trialEnded, userId]);
+  }, [loading, eligibleForTrial, userId]);
 
   // Check on mount / whenever eligibility state changes.
   useEffect(() => {
@@ -102,7 +96,7 @@ const FreeTrialBottomSheet = ({ userId }: FreeTrialBottomSheetProps) => {
   // free-trial offer disappears), and rendering the backdrop with nothing
   // inside it (FreeTrialBanner also bails in that case) would otherwise
   // block the screen with an empty, undismissable-looking overlay.
-  if (!open || loading || (!eligibleForTrial && !trialEnded)) return null;
+  if (!open || loading || !eligibleForTrial) return null;
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center px-3" role="dialog" aria-modal="true">

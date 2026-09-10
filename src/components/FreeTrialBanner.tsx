@@ -22,7 +22,7 @@ interface FreeTrialBannerProps {
 const DISMISS_KEY = 'driplove_trial_banner_dismissed';
 
 const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: FreeTrialBannerProps) => {
-  const { loading, eligibleForTrial, trialEnded, offerInfo, canStart, starting, startTrial } = useFreeTrialOffer(userId);
+  const { loading, eligibleForTrial, offerInfo, canStart, starting, startTrial } = useFreeTrialOffer(userId);
   const [hiddenThisSession, setHiddenThisSession] = useState(() => {
     try {
       return sessionStorage.getItem(DISMISS_KEY) === '1';
@@ -31,7 +31,9 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
     }
   });
 
-  if (loading || hiddenThisSession || (!eligibleForTrial && !trialEnded)) return null;
+  // Only the fresh-trial pitch - no "your trial has ended, resubscribe"
+  // variant, so this stays silent once the store no longer offers a trial.
+  if (loading || hiddenThisSession || !eligibleForTrial) return null;
 
   const hide = () => {
     try {
@@ -73,66 +75,42 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
       )}
 
       <div className="relative px-5 py-5">
-        {trialEnded ? (
-          <>
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-pink-300">
-              <Sparkles className="h-3 w-3" />
-              Your trial has ended
-            </div>
-            <h3 className="text-lg font-bold text-white">Keep the love going</h3>
-            <p className="mt-1 text-sm text-white/60">
-              Resubscribe to DripLove Premium to keep matching, chatting, and swiping without limits.
-            </p>
-            <button
-              type="button"
-              onClick={handleTap}
-              disabled={starting || !canStart}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 py-3 text-sm font-bold text-white shadow-lg transition active:scale-[0.98] disabled:opacity-60"
-            >
-              {(starting || !canStart) ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {starting ? 'Processing...' : !canStart ? 'Preparing...' : 'Resubscribe to Premium'}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-pink-300">
-              <Sparkles className="h-3 w-3 animate-pulse" />
-              {offerInfo.trialPeriodLabel ? `${offerInfo.trialPeriodLabel} free` : 'Free trial'}
-            </div>
-            <h3 className="text-lg font-bold text-white">Try DripLove Premium, free</h3>
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-pink-300">
+          <Sparkles className="h-3 w-3 animate-pulse" />
+          {offerInfo.trialPeriodLabel ? `${offerInfo.trialPeriodLabel} free` : 'Free trial'}
+        </div>
+        <h3 className="text-lg font-bold text-white">Try DripLove Premium, free</h3>
 
-            <div className="mt-3 space-y-2">
-              {FEATURES.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2.5">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500/25 to-purple-500/25">
-                    <Icon className="h-3.5 w-3.5 text-pink-300" />
-                  </div>
-                  <span className="text-sm text-white/85">{label}</span>
-                </div>
-              ))}
+        <div className="mt-3 space-y-2">
+          {FEATURES.map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center gap-2.5">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500/25 to-purple-500/25">
+                <Icon className="h-3.5 w-3.5 text-pink-300" />
+              </div>
+              <span className="text-sm text-white/85">{label}</span>
             </div>
+          ))}
+        </div>
 
-            <button
-              type="button"
-              onClick={handleTap}
-              disabled={starting || !canStart}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-pink-900/40 transition active:scale-[0.98] disabled:opacity-60"
-            >
-              {(starting || !canStart) ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {starting ? 'Processing...' : 'Preparing...'}
-                </>
-              ) : (
-                'Start Free Trial →'
-              )}
-            </button>
+        <button
+          type="button"
+          onClick={handleTap}
+          disabled={starting || !canStart}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-pink-900/40 transition active:scale-[0.98] disabled:opacity-60"
+        >
+          {(starting || !canStart) ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {starting ? 'Processing...' : 'Preparing...'}
+            </>
+          ) : (
+            'Start Free Trial →'
+          )}
+        </button>
 
-            <p className="mt-2.5 text-center text-[11px] text-white/45">
-              {offerInfo.trialPeriodLabel ? `No charge for ${offerInfo.trialPeriodLabel}.` : 'No charge during your trial.'} Cancel anytime.
-            </p>
-          </>
-        )}
+        <p className="mt-2.5 text-center text-[11px] text-white/45">
+          {offerInfo.trialPeriodLabel ? `No charge for ${offerInfo.trialPeriodLabel}.` : 'No charge during your trial.'} Cancel anytime.
+        </p>
       </div>
     </div>
   );

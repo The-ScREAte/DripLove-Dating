@@ -47,3 +47,20 @@ export const writeCachedPremiumStatus = (userId?: string | null, premium?: boole
     // storage full / disabled - the cache is best-effort
   }
 };
+
+/**
+ * Drop the cached answer for this user entirely, rather than overwriting it
+ * with `false` - used the moment a downgrade from premium is confirmed, so
+ * nothing on this device can read back a stale "premium" value for them
+ * again (a plain `false` write would do the same for reads, but an explicit
+ * clear is the honest representation of "we no longer trust any cached
+ * answer here" and can't itself go stale).
+ */
+export const clearCachedPremiumStatus = (userId?: string | null): void => {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(keyFor(userId));
+  } catch {
+    // storage full / disabled - the cache is best-effort
+  }
+};
