@@ -5,7 +5,6 @@ import { MessageCircle, Users, User } from 'lucide-react';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { isAndroidPlatform, isIOSPlatform, getPlatformSafe } from '@/utils/platformUtils';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
-import RatingDialog from '@/components/RatingDialog';
 import AppUpdatePopup from '@/components/AppUpdatePopup';
 import FreeTrialBottomSheet from '@/components/FreeTrialBottomSheet';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';

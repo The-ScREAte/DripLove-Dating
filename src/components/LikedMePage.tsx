@@ -15,7 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import PremiumUpgrade from './PremiumUpgrade';
 import MatchAnimation from './MatchAnimation';
 import RatingFunnel from './RatingFunnel';
-import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
+import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb } from '@/utils/ratingFunnelStorage';
+import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -200,8 +201,24 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // ------------------
   // REFS
   // ------------------
-  const isFirstEverMatchRef = useRef(false);
+  const pendingMatchForRatingRef = useRef(false);
   const backgroundFetchingRef = useRef(false);
+
+  // See DiscoverPage's identical effect - the account's has_rated_app flag
+  // is the source of truth, synced into the local cache so this page's own
+  // isRatingFunnelEligible() check stays correct even if this page mounts
+  // before Discover's own copy of this sync has run.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    fetchHasRatedAppFromDb(currentUser.id).then((hasRated) => {
+      if (!cancelled) syncRatingFunnelFromDb(hasRated);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const preloadAbortRef = useRef<AbortController | null>(null);
   const fullImageAbortRef = useRef<AbortController | null>(null);
@@ -914,11 +931,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // and only after the match banner itself has been dismissed - same sequencing
   // Discover uses (see DiscoverPage's maybeTriggerRatingFunnel).
   const maybeTriggerRatingFunnel = useCallback(() => {
-    if (!isFirstEverMatchRef.current) return;
-    isFirstEverMatchRef.current = false;
+    if (!pendingMatchForRatingRef.current) return;
+    pendingMatchForRatingRef.current = false;
     if (!isRatingFunnelEligible()) return;
     setTimeout(() => {
-      markRatingFunnelTriggered();
+      markRatingFunnelShown();
       setShowRatingFunnel(true);
     }, 3000);
   }, []);
@@ -981,9 +998,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       // one-time rating funnel fire after the banner is dismissed.
       const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
       if (madeMatch) {
-        if (registerMatchAndCheckIsFirst()) {
-          isFirstEverMatchRef.current = true;
-        }
+        pendingMatchForRatingRef.current = true;
         if (profileToRemove) {
           setMatchedProfile(profileToRemove);
           setShowMatchAnimation(true);
@@ -2204,6 +2219,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       <RatingFunnel
         open={showRatingFunnel}
         onClose={() => setShowRatingFunnel(false)}
+        userId={currentUser?.id}
       />
     </div>
   );

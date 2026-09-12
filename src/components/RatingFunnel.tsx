@@ -1,9 +1,15 @@
 /**
- * Rating funnel
- * Shown once, ever, 3s after the user closes their first-ever match screen.
+ * Rating funnel - shown 3s after a match screen closes (see
+ * ratingFunnelStorage.ts for the full eligibility/cooldown rules).
  *
- * Step 1 (prompt): "Enjoying DripLove?" -> Not Really / Yes! (Yes! opens the
- *   native review prompt directly and grants the 24h 1.5x visibility boost)
+ * Step 1 (prompt): "Enjoying DripLove?" -> Not Really / Yes!
+ *   - Yes!: calls the native review prompt immediately (no delay), grants
+ *     the 24h 1.5x visibility boost, and permanently records on the account
+ *     (profiles.has_rated_app) that this user has responded - the funnel
+ *     never shows again on any device from that point on.
+ *   - Not Really: shows the feedback step below; NOT permanent - the funnel
+ *     is eligible to ask again after a cooldown, since a single "not now"
+ *     shouldn't be the only chance a user ever gets.
  * Step 2 (feedback): internal feedback card shown when the user picks "Not Really"
  */
 
@@ -14,16 +20,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Sparkles, MessageSquareHeart } from 'lucide-react';
-import { openRatingInterface, activateVisibilityBoost } from '@/utils/ratingPlatform';
+import { openRatingInterface, activateVisibilityBoost, markHasRatedAppInDb } from '@/utils/ratingPlatform';
+import { markRatingFunnelNotNow, markRatingFunnelRespondedYes } from '@/utils/ratingFunnelStorage';
 
 type FunnelStep = 'prompt' | 'feedback';
 
 interface RatingFunnelProps {
   open: boolean;
   onClose: () => void;
+  userId: string | undefined;
 }
 
-const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
+const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose, userId }) => {
   const [step, setStep] = useState<FunnelStep>('prompt');
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,19 +49,39 @@ const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
     }
   };
 
-  const handleNotReally = () => setStep('feedback');
+  const handleNotReally = () => {
+    // Not a permanent no - just backs off for a while. The user's mind can
+    // change, and a single "not now" shouldn't be the only chance they ever
+    // get to be asked again.
+    markRatingFunnelNotNow();
+    setStep('feedback');
+  };
 
-  const handleYes = async () => {
-    try {
-      await openRatingInterface(5);
-    } catch (error) {
+  const handleYes = () => {
+    // Everything below is fired off in the background, not awaited - on
+    // Android in particular, the underlying Play Core call the native plugin
+    // makes (requestReviewFlow -> launchReviewFlow) doesn't resolve until
+    // the ENTIRE native review flow has finished, which can take a moment.
+    // Awaiting that here would leave OUR OWN "Enjoying DripLove?" dialog
+    // sitting on screen the whole time. Instead: close our dialog the
+    // instant "Yes" is tapped (no perceptible delay in our own UI), then
+    // fire the native call - the OS's own review sheet, if it decides to
+    // show one, is a separate system-level layer that appears independently
+    // of whatever our React dialog is doing.
+    handleOpenChange(false);
+
+    openRatingInterface(5).catch((error) => {
       console.error('[RatingFunnel] Native review error:', error);
-    } finally {
-      // Neither iOS nor Android report whether the user actually rated -
-      // the boost rewards engaging with the prompt, per product spec.
-      activateVisibilityBoost(24, 1.5);
-      handleOpenChange(false);
+    });
+
+    // "Yes" is the one real, permanent signal we get - record it on the
+    // account itself (not just this device) so no other device or a
+    // reinstall ever asks again, and apply the visibility boost reward.
+    markRatingFunnelRespondedYes();
+    if (userId) {
+      void markHasRatedAppInDb(userId);
     }
+    void activateVisibilityBoost(24, 1.5);
   };
 
   const handleSubmitFeedback = async () => {
@@ -80,7 +108,7 @@ const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="sm:max-w-sm bg-neutral-950 border border-white/10 text-white rounded-2xl shadow-2xl shadow-black/50 p-6"
+        className="w-[calc(100%-2.5rem)] sm:max-w-sm bg-neutral-950 border border-white/10 text-white rounded-2xl shadow-2xl shadow-black/50 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {step === 'prompt' && (
@@ -100,14 +128,16 @@ const RatingFunnel: React.FC<RatingFunnelProps> = ({ open, onClose }) => {
             <div className="pt-5 flex gap-3">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={handleNotReally}
-                className="flex-1 bg-transparent border-white/15 text-gray-200 hover:bg-white/5 hover:text-white"
+                className="flex-1 rounded-full bg-transparent border-white/15 text-gray-200 hover:bg-white/5 hover:text-white"
               >
                 Not Really
               </Button>
               <Button
+                size="sm"
                 onClick={handleYes}
-                className="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold hover:opacity-90"
+                className="flex-1 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold hover:opacity-90"
               >
                 Yes!
               </Button>

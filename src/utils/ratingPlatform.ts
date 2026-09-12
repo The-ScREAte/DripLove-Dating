@@ -114,6 +114,48 @@ export const activateVisibilityBoost = async (
 };
 
 /**
+ * Fetch this account's authoritative "has rated" flag from the DB - checked
+ * once per session so a different device (or a reinstall, which wipes
+ * localStorage) also stops asking once it's already been answered "Yes"
+ * anywhere.
+ */
+export const fetchHasRatedAppFromDb = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('has_rated_app')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) return false;
+    return Boolean((data as { has_rated_app?: boolean }).has_rated_app);
+  } catch (error) {
+    console.error('[Rating] Error fetching has_rated_app:', error);
+    return false;
+  }
+};
+
+/**
+ * Permanently record, on the account itself (not just this device), that
+ * the user tapped "Yes" on the rating prompt and the native review sheet was
+ * invoked - the only real signal either store gives us, and the only thing
+ * that should ever stop us from asking again.
+ */
+export const markHasRatedAppInDb = async (userId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        has_rated_app: true,
+        rated_app_at: new Date().toISOString(),
+      } as any)
+      .eq('id', userId);
+    if (error) throw error;
+  } catch (error) {
+    console.error('[Rating] Error saving has_rated_app:', error);
+  }
+};
+
+/**
  * Check if the rating plugin is available
  */
 export const isRatingAvailable = (): boolean => {

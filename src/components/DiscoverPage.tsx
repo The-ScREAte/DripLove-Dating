@@ -71,7 +71,8 @@ import RatingFunnel from './RatingFunnel';
 import VerifyIdentityPrompt from './VerifyIdentityPrompt';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import HoppingLogo from '@/components/HoppingLogo';
-import { registerMatchAndCheckIsFirst, isRatingFunnelEligible, markRatingFunnelTriggered } from '@/utils/ratingFunnelStorage';
+import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb } from '@/utils/ratingFunnelStorage';
+import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
 import { isVerifyPromptEligible, markVerifyPromptTriggered } from '@/utils/verifyPromptStorage';
 import { CurrentUser, PotentialMatch } from '@/types';
 
@@ -385,7 +386,28 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
   const [showRatingFunnel, setShowRatingFunnel] = useState(false);
   const [showVerifyPrompt, setShowVerifyPrompt] = useState(false);
-  const isFirstEverMatchRef = useRef(false);
+  // A match just happened and its screen is about to close - the rating
+  // funnel may fire once that settles, subject to isRatingFunnelEligible()
+  // (DB has_rated_app + local cooldown), not just on the user's first-ever
+  // match - a single missed shot at a brand-new, OS-quota-throttled review
+  // prompt should never be the only chance a user ever gets to be asked.
+  const pendingMatchForRatingRef = useRef(false);
+
+  // The account's has_rated_app flag is the source of truth (survives a
+  // reinstall or a different device, unlike localStorage) - synced into the
+  // local cache once per load so isRatingFunnelEligible()'s synchronous
+  // check (needed at the exact moment a match closes) stays correct.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    fetchHasRatedAppFromDb(currentUser.id).then((hasRated) => {
+      if (!cancelled) syncRatingFunnelFromDb(hasRated);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
   // Store users who liked the current user (for "they liked you" notification)
   const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
   // New: Store images by userId for instant access
@@ -4080,10 +4102,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               reportLikedYouOutcome('like', true);
               setMatchedUser(prevMatch);
               setShowMatchAnimation(true);
-
-              if (registerMatchAndCheckIsFirst()) {
-                isFirstEverMatchRef.current = true;
-              }
+              pendingMatchForRatingRef.current = true;
 
               // Clear chat cache to force refresh when user opens ChatPage
               if (typeof window !== 'undefined') {
@@ -4139,10 +4158,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
             setMatchedUser(prevMatch);
             setShowMatchAnimation(true);
-
-            if (registerMatchAndCheckIsFirst()) {
-              isFirstEverMatchRef.current = true;
-            }
+            pendingMatchForRatingRef.current = true;
 
             // Clear chat cache to force refresh when user opens ChatPage
             if (typeof window !== 'undefined') {
@@ -4768,11 +4784,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, [currentIndex, potentialMatches.length]);
 
   const maybeTriggerRatingFunnel = () => {
-    if (!isFirstEverMatchRef.current) return;
-    isFirstEverMatchRef.current = false;
+    if (!pendingMatchForRatingRef.current) return;
+    pendingMatchForRatingRef.current = false;
     if (!isRatingFunnelEligible()) return;
     setTimeout(() => {
-      markRatingFunnelTriggered();
+      // Marked "shown" only now, right as it actually appears - not when we
+      // merely decided to schedule it, so a dismissed/never-displayed prompt
+      // doesn't burn the only chance to ask again.
+      markRatingFunnelShown();
       setShowRatingFunnel(true);
     }, 3000);
   };
@@ -5594,10 +5613,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       </div>
       </div>
       
-      {/* One-time rating funnel - 3s after the user's first-ever match screen closes */}
+      {/* Rating funnel - 3s after a match screen closes, subject to
+          isRatingFunnelEligible() (stops for good only once the user has
+          actually tapped "Yes", tracked on the account itself). */}
       <RatingFunnel
         open={showRatingFunnel}
         onClose={() => setShowRatingFunnel(false)}
+        userId={currentUser?.id}
       />
       <VerifyIdentityPrompt
         open={showVerifyPrompt}
