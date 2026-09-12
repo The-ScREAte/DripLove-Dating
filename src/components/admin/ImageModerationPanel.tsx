@@ -105,7 +105,7 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
   
   // Get current admin user for push notifications
   const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
-  const { sendAdminNotification } = usePushNotifications(currentAdminId || undefined);
+  const { sendAdminNotification, sendNotification } = usePushNotifications(currentAdminId || undefined);
 
   useEffect(() => {
     const getCurrentAdmin = async () => {
@@ -343,15 +343,20 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
 
       if (error) throw error;
 
-      // Send push notification to user
+      // Send push notification to user - type 'image_rejected' (not the
+      // generic 'admin' sendAdminNotification sends) so tapping it routes to
+      // Profile instead of Discover; sendAdminNotification's global cooldown
+      // is also meant for broadcast-style announcements, not a per-rejection
+      // notice that could otherwise get silently suppressed if another admin
+      // notification just fired for a different user.
       if (imageToReject?.user_id) {
         try {
-          await sendAdminNotification(
-            '⚠️ Photo Rejected',
-            'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
-            imageToReject.user_id
-          );
-          void 0;
+          await sendNotification({
+            title: '⚠️ Photo Rejected',
+            body: 'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
+            userId: imageToReject.user_id,
+            type: 'image_rejected',
+          });
         } catch (notifError) {
           console.error('📤 Failed to send rejection notification:', notifError);
           // Don't fail the rejection if notification fails
@@ -469,14 +474,16 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
         }
       }
 
-      // Send push notification to user about image deletion
+      // Send push notification to user about image deletion - see the
+      // matching comment in handleRejectImage above for why this uses
+      // sendNotification/'image_rejected' rather than sendAdminNotification.
       try {
-        await sendAdminNotification(
-          '⚠️ Photo Rejected',
-          'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
-          reportedUserId
-        );
-        void 0;
+        await sendNotification({
+          title: '⚠️ Photo Rejected',
+          body: 'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
+          userId: reportedUserId,
+          type: 'image_rejected',
+        });
       } catch (notifError) {
         console.error('📤 Failed to send deletion notification:', notifError);
         // Don't fail the deletion if notification fails

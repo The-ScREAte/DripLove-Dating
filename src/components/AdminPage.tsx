@@ -87,21 +87,6 @@ interface UserProfile {
   is_archived?: boolean;
 }
 
-interface PendingImage {
-  id: string;
-  user_id: string;
-  image_url: string;
-  is_approved: boolean;
-  moderation_status: string;
-  moderation_notes?: string;
-  created_at: string;
-  profile?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-}
-
 interface PaymentConfigData {
   payment_methods: unknown;
   default_international_price?: number | string | null;
@@ -250,10 +235,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [loadingPendingImages, setLoadingPendingImages] = useState(false);
-  const [approvingImages, setApprovingImages] = useState<Record<string, boolean>>({});
-  const [rejectingImages, setRejectingImages] = useState<Record<string, boolean>>({});
   const [reportedChats, setReportedChats] = useState<ReportedChatItem[]>([]);
   const [loadingReportedChats, setLoadingReportedChats] = useState(false);
   const [processingReportIds, setProcessingReportIds] = useState<Record<string, boolean>>({});
@@ -599,91 +580,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     checkAdminStatus();
   }, [currentUser]);
 
-  const fetchPendingImages = useCallback(async () => {
-    try {
-      setLoadingPendingImages(true);
-
-      // Check cache first for performance
-      const cacheKey = 'pending_images';
-      const cachedImages = userDataCache.get(cacheKey);
-      if (cachedImages) {
-        setPendingImages(cachedImages);
-        setLoadingPendingImages(false);
-        return;
-      }
-
-      // Fetch images that need approval with pagination for performance
-      const { data, error } = await supabase
-        .from('user_images')
-        .select(`
-          id,
-          image_url,
-          is_approved,
-          moderation_status,
-          moderation_notes,
-          created_at,
-          user_id
-        `)
-        .or('is_approved.eq.false,moderation_status.eq.pending')
-        .order('created_at', { ascending: false })
-        .limit(50); // Limit for performance
-
-      if (error) {
-        console.error('❌ Error fetching pending images:', error);
-        setPendingImages([]);
-        toast({
-          title: 'Error',
-          description: 'Failed to load pending images',
-          variant: 'destructive'
-        });
-        return;
-      }
-      
-      if (!data || data.length === 0) {
-        setPendingImages([]);
-        userDataCache.set(cacheKey, []);
-        return;
-      }
-
-      // Batch fetch user profiles for better performance
-      const userIds = [...new Set(data.map(img => img.user_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', userIds);
-
-      // Transform the data to match expected format
-      const transformedData = data.map(img => ({
-        id: img.id,
-        user_id: img.user_id,
-        image_url: img.image_url,
-        is_approved: img.is_approved ?? false,
-        moderation_status: img.moderation_status ?? 'pending',
-        moderation_notes: img.moderation_notes,
-        created_at: img.created_at,
-        profile: profiles?.find(p => p.id === img.user_id) || {
-          first_name: 'Unknown',
-          last_name: 'User',
-          email: 'unknown@example.com'
-        }
-      }));
-
-      setPendingImages(transformedData);
-      // Cache for 2 minutes (shorter for pending content)
-      userDataCache.set(cacheKey, transformedData);
-    } catch (error) {
-      console.error('Error fetching pending images:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load pending images',
-        variant: 'destructive'
-      });
-      setPendingImages([]);
-    } finally {
-      setLoadingPendingImages(false);
-    }
-  }, [toast]);
-
   const fetchReportedChats = useCallback(async (force = false) => {
     try {
       setLoadingReportedChats(true);
@@ -910,114 +806,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     // open user's default mail client
     window.open(mailto, '_blank');
     closeEmailModal();
-  };
-
-  const approveImage = async (imageId: string) => {
-    try {
-      setApprovingImages(prev => ({ ...prev, [imageId]: true }));
-
-      // Use the approve_image function if available, otherwise direct update
-      const { data, error } = await supabase.rpc('approve_image', {
-        image_id: imageId,
-        admin_notes: 'Approved by admin'
-      });
-
-      if (error) {
-        if (error.message.includes('function') && error.message.includes('does not exist')) {
-          // Fallback to direct update if function doesn't exist
-          const { error: updateError } = await supabase
-            .from('user_images')
-            .update({
-              is_approved: true,
-              moderation_status: 'approved',
-              moderated_at: new Date().toISOString(),
-              moderated_by: currentUser.id
-            })
-            .eq('id', imageId);
-
-          if (updateError) throw updateError;
-        } else {
-          throw error;
-        }
-      }
-
-      // Remove from pending list
-      setPendingImages(prev => prev.filter(img => img.id !== imageId));
-      
-      toast({
-        title: 'Success',
-        description: 'Image approved successfully'
-      });
-
-      // Refresh stats and pending images
-      await Promise.all([fetchAppStats(), fetchPendingImages()]);
-
-    } catch (error) {
-      console.error('Error approving image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to approve image',
-        variant: 'destructive'
-      });
-    } finally {
-      setApprovingImages(prev => ({ ...prev, [imageId]: false }));
-    }
-  };
-
-  const rejectImage = async (imageId: string) => {
-    try {
-      setRejectingImages(prev => ({ ...prev, [imageId]: true }));
-
-      // reject_image() has admin privileges and marks the row rejected
-      // (keeping it, and its storage file, for the audit trail) rather than
-      // deleting it - it's just hidden from other users from then on.
-      const { error } = await supabase.rpc('reject_image', {
-        image_id: imageId,
-        admin_notes: 'Rejected by admin'
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Let the affected user know a slot opened up - same "notify after a
-      // successful admin action" pattern as updateUserStatus/
-      // blockUserFromReport below. Routes to Profile on tap (see
-      // resolveNotificationRoute in pushNotifications.ts).
-      const rejectedImage = pendingImages.find(img => img.id === imageId);
-      if (rejectedImage?.user_id) {
-        try {
-          await supabase.functions.invoke('send-push-notification', {
-            body: {
-              title: 'Photo Removed',
-              body: "One of your photos didn't meet our guidelines and was removed. You can upload a new one anytime.",
-              userId: rejectedImage.user_id,
-              type: 'image_rejected',
-            },
-          });
-        } catch (notifyError) {
-          console.error('Failed to send image-rejection notification:', notifyError);
-        }
-      }
-
-      // Remove from pending list immediately
-      setPendingImages(prev => prev.filter(img => img.id !== imageId));
-
-      toast({
-        title: 'Image rejected',
-        description: 'Image rejected and hidden from other users'
-      });
-
-    } catch (error) {
-      console.error('❌ Error rejecting image:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to reject image. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setRejectingImages(prev => ({ ...prev, [imageId]: false }));
-    }
   };
 
   const fetchAppStats = useCallback(async () => {
@@ -1342,7 +1130,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // Lazy load content when content tab is accessed
   useEffect(() => {
     if (isAdmin && activeTab === 'content') {
-      if (pendingImages.length === 0) fetchPendingImages();
       if (reportedChats.length === 0) fetchReportedChats();
     }
   }, [isAdmin, activeTab]);

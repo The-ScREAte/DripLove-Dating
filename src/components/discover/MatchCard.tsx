@@ -24,6 +24,19 @@ import {
   traitLabel,
 } from '@/constants/profileTraits';
 
+// Supabase/Postgrest errors are plain objects, not real Error instances, so
+// `err instanceof Error` misses them and silently falls back to a generic
+// message - masking the actual reason a query failed (RLS denial, a unique
+// constraint, etc.) right when it's most useful to see it.
+const getSupabaseErrorMessage = (err: unknown): string | undefined => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return undefined;
+};
+
 const formatHeightLabel = (cm: number) => {
   const totalInches = Math.round(cm / 2.54);
   const feet = Math.floor(totalInches / 12);
@@ -58,6 +71,7 @@ interface MatchCardProps {
   isActiveTab?: boolean; // Whether the Discover/DripCheck tab is the one currently visible — gates the portaled overlays below so they don't leak onto other tabs
   onReportModalOpenChange?: (isOpen: boolean) => void; // Lets the parent suspend swipe/drag gestures while the report modal is up
   currentUserAdinkraSymbols?: string[]; // Used to prefer a sign this profile shares with the viewer for the collapsed sign chip
+  onUserBlocked?: (userId: string) => void; // Fired once the block is finalized (undo window expired/dismissed) so the parent deck can advance past this profile
 }
 
 const MatchCard: React.FC<MatchCardProps> = ({
@@ -87,6 +101,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   , isActiveTab = true
   , onReportModalOpenChange
   , currentUserAdinkraSymbols
+  , onUserBlocked
 }) => {
   const { t } = useTranslation();
 
@@ -319,6 +334,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const [isBlocking, setIsBlocking] = useState(false);
   const [blockReason, setBlockReason] = useState("");
   const [isBlockSuccess, setIsBlockSuccess] = useState(false);
+  // The block row is already live in the DB the moment it's inserted - this
+  // just tracks it so a same-spot "Undo" can delete that exact row within
+  // the confirmation window, before the deck is told to move on.
+  const [lastBlockedUserId, setLastBlockedUserId] = useState<string | null>(null);
+  const [isUndoingBlock, setIsUndoingBlock] = useState(false);
+  const blockCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reportReasons = [
     t('reportModal.reasons.inappropriate'),
@@ -416,25 +437,44 @@ const MatchCard: React.FC<MatchCardProps> = ({
         setSelectedReason("");
       }, 1500);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : undefined
-      setReportError(message || t('reportModal.error'));
+      setReportError(getSupabaseErrorMessage(err) || t('reportModal.error'));
     } finally {
       setReporting(false);
     }
   };
 
-  // Reset modal state when closing
+  // Reset modal state when closing. Closing early while a block is still in
+  // its undo window (see handleBlockUser) finalizes it right away instead of
+  // leaving a timer running after the modal's already gone.
   const closeReportModal = () => {
+    if (blockCommitTimerRef.current) {
+      clearTimeout(blockCommitTimerRef.current);
+      blockCommitTimerRef.current = null;
+      if (isBlockSuccess) {
+        onUserBlocked?.(match.id);
+      }
+    }
     setShowReportModal(false);
     setSelectedReason("");
     setReportError("");
     setBlockReason("");
     setIsBlockSuccess(false);
+    setLastBlockedUserId(null);
   };
 
-  // Handle block user
+  // Handle block user - requires a reason picked above or a note typed here
+  // (also enforced by the Block button's disabled state; checked again here
+  // as defense in depth) so nobody can one-tap block with zero context.
+  // The block itself is written immediately - it's real and enforced right
+  // away - but telling the parent deck to move past this profile is
+  // deferred a few seconds so the "Undo" button below can delete the row
+  // again first if this was a mistake.
   const handleBlockUser = async () => {
     if (!match.id) return;
+    if (!selectedReason && !blockReason.trim()) {
+      setReportError(t('reportModal.selectReason'));
+      return;
+    }
 
     setIsBlocking(true);
     try {
@@ -444,32 +484,87 @@ const MatchCard: React.FC<MatchCardProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      // Insert block record
+      // Insert block record - plain insert, no .select() chained after it.
+      // blocker_id+blocked_id is already unique, so Undo can delete by that
+      // pair directly without needing the row's own id back from the insert.
       const { error } = await supabase
         .from('blocks')
         .insert({
           blocker_id: user.id,
           blocked_id: match.id,
-          reason: blockReason.trim() || null
+          reason: blockReason.trim() || selectedReason || null
         });
 
-      if (error) throw error;
+      // A duplicate-key conflict (23505) means this person is already
+      // blocked from an earlier attempt - the end state the user wants is
+      // already true, so treat it as success instead of surfacing a raw DB
+      // constraint error for something that isn't actually a failure.
+      const isAlreadyBlocked = (error as { code?: string } | null)?.code === '23505';
+      if (error && !isAlreadyBlocked) throw error;
 
+      setLastBlockedUserId(match.id);
       setIsBlockSuccess(true);
-      setTimeout(() => {
+      const blockedUserId = match.id;
+      blockCommitTimerRef.current = setTimeout(() => {
+        blockCommitTimerRef.current = null;
         setShowReportModal(false);
         setReportSuccess(false);
         setIsBlockSuccess(false);
         setSelectedReason("");
         setBlockReason("");
-      }, 3000); // Give more time to read the block message
+        setLastBlockedUserId(null);
+        onUserBlocked?.(blockedUserId);
+      }, 5000); // Undo window - give real time to notice and react
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : undefined
-      setReportError(message || "Failed to block user");
+      setReportError(getSupabaseErrorMessage(err) || "Failed to block user");
     } finally {
       setIsBlocking(false);
     }
   };
+
+  // Reverse a block made by mistake, while still inside the undo window.
+  const handleUndoBlock = async () => {
+    if (blockCommitTimerRef.current) {
+      clearTimeout(blockCommitTimerRef.current);
+      blockCommitTimerRef.current = null;
+    }
+    setIsUndoingBlock(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && lastBlockedUserId) {
+        const { error } = await supabase
+          .from('blocks')
+          .delete()
+          .eq('blocker_id', user.id)
+          .eq('blocked_id', lastBlockedUserId);
+        if (error) throw error;
+      }
+      setShowReportModal(false);
+      setIsBlockSuccess(false);
+      setSelectedReason("");
+      setBlockReason("");
+      setLastBlockedUserId(null);
+      // Deliberately no onUserBlocked() call - the deck is untouched, exactly
+      // as if the block had never happened.
+    } catch (err: unknown) {
+      setReportError(getSupabaseErrorMessage(err) || "Failed to undo block");
+    } finally {
+      setIsUndoingBlock(false);
+    }
+  };
+
+  // Clear any pending block-commit timer if the card unmounts mid-window
+  // (e.g. the deck advances for an unrelated reason) so it can't fire
+  // against a profile that's no longer the one showing.
+  useEffect(() => {
+    return () => {
+      if (blockCommitTimerRef.current) {
+        clearTimeout(blockCommitTimerRef.current);
+        blockCommitTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle split rendering modes
   if (isSwipeAreaOnly) {
@@ -755,10 +850,19 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
                   >
                     {isBlockSuccess ? (
-                      <div className="text-green-400 font-semibold text-center py-8">
-                        <div className="mb-2 text-3xl">🚫</div>
-                        <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
-                        <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
+                      <div className="text-center py-6">
+                        <div className="text-green-400 font-semibold">
+                          <div className="mb-2 text-3xl">🚫</div>
+                          <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
+                          <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
+                        </div>
+                        <button
+                          className="mt-4 h-9 px-5 bg-white/10 hover:bg-white/20 text-white font-semibold text-sm rounded-lg border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                          onClick={handleUndoBlock}
+                          disabled={isUndoingBlock}
+                        >
+                          {isUndoingBlock ? t('reportModal.blockSuccess.undoing') : t('reportModal.blockSuccess.undo')}
+                        </button>
                       </div>
                     ) : reportSuccess ? (
                       <div className="text-green-400 font-semibold text-center py-8">
@@ -793,7 +897,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           })}
                         </div>
 
-                        {/* Block section */}
+                        {/* Block section - just the optional note now; the actual
+                            action moved down to sit next to Report (below) so
+                            there's one clear pair of outcomes instead of three
+                            competing buttons. */}
                         <div className="mb-3 p-2.5 bg-black/60 rounded-lg border border-pink-500/20">
                           <p className="text-gray-200 mb-1.5 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
                           <textarea
@@ -804,13 +911,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
                             className="w-full p-2 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                             rows={2}
                           />
-                          <button
-                            className="w-full mt-1.5 h-8 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 text-xs"
-                            onClick={handleBlockUser}
-                            disabled={isBlocking || reporting}
-                          >
-                            {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
-                          </button>
                         </div>
 
                         {/* Action buttons with stable height */}
@@ -824,11 +924,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           </button>
 
                           <button
-                            className="w-full h-9 bg-black hover:bg-white/5 text-gray-200 font-semibold text-sm rounded-lg border border-pink-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                            onClick={closeReportModal}
-                            disabled={reporting || isBlocking}
+                            className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            onClick={handleBlockUser}
+                            disabled={isBlocking || reporting || (!selectedReason && !blockReason.trim())}
                           >
-                            {t('reportModal.cancel')}
+                            {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
                           </button>
                         </div>
 

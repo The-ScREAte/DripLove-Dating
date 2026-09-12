@@ -51,6 +51,19 @@ const formatHeightLabel = (cm: number) => {
   return `${feet}'${inches}" (${cm} cm)`;
 };
 
+// Supabase/Postgrest errors are plain objects, not real Error instances, so
+// `err instanceof Error` misses them and silently falls back to a generic
+// message - masking the actual reason a query failed (RLS denial, a unique
+// constraint, etc.) right when it's most useful to see it.
+const getSupabaseErrorMessage = (err: unknown): string | undefined => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return undefined;
+};
+
 // =========================================================
 // GLOBAL CACHES
 // =========================================================
@@ -174,6 +187,12 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const [isBlocking, setIsBlocking] = useState(false);
   const [blockReason, setBlockReason] = useState('');
   const [isBlockSuccess, setIsBlockSuccess] = useState(false);
+  // Same "Undo" window as Discover's report/block modal - the block row is
+  // real in the DB immediately, but removing the liker from this list waits
+  // a few seconds so a mistaken block can be reversed at the same spot.
+  const [lastBlockedUserId, setLastBlockedUserId] = useState<string | null>(null);
+  const [isUndoingBlock, setIsUndoingBlock] = useState(false);
+  const blockCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   // Swipe-to-pass/like-back on the photo card, same gesture as Discover's swipe
@@ -1172,13 +1191,26 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     }
   }, [swipeDragX, selectedProfile, handleLikeBack, handlePass, handleNavigationClick]);
 
+  // Closing early while a block is still in its undo window (see
+  // handleBlockUser) finalizes it right away instead of leaving a timer
+  // running after the modal's already gone.
   const closeReportModal = useCallback(() => {
+    if (blockCommitTimerRef.current) {
+      clearTimeout(blockCommitTimerRef.current);
+      blockCommitTimerRef.current = null;
+      if (isBlockSuccess && selectedProfile) {
+        const blockedId = selectedProfile.id;
+        setLikers(prev => prev.filter(liker => liker.id !== blockedId));
+        setSelectedProfile(null);
+      }
+    }
     setShowReportModal(false);
     setSelectedReportReason('');
     setReportError('');
     setBlockReason('');
     setIsBlockSuccess(false);
-  }, []);
+    setLastBlockedUserId(null);
+  }, [isBlockSuccess, selectedProfile]);
 
   // Reports whichever photo is currently on screen - same semantics as Discover's
   // swipe card, which is why the trigger only shows up while viewing a photo slide.
@@ -1212,43 +1244,105 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         setSelectedReportReason('');
       }, 1500);
     } catch (error) {
-      setReportError(error instanceof Error ? error.message : t('reportModal.error'));
+      setReportError(getSupabaseErrorMessage(error) || t('reportModal.error'));
     } finally {
       setReporting(false);
     }
   }, [selectedProfile, slides, currentSlide, currentUser?.id, selectedReportReason, t]);
 
+  // Requires a reason picked above or a note typed here (also enforced by
+  // the Block button's disabled state; checked again as defense in depth).
+  // The block itself is written immediately - real and enforced right away
+  // - but removing this liker from the list is deferred a few seconds so
+  // "Undo" below can delete the row again first if this was a mistake.
   const handleBlockUser = useCallback(async () => {
     if (!selectedProfile || !currentUser?.id) return;
+    if (!selectedReportReason && !blockReason.trim()) {
+      setReportError(t('reportModal.selectReason'));
+      return;
+    }
 
     setIsBlocking(true);
     try {
+      // Plain insert, no .select() chained after it - blocker_id+blocked_id
+      // is already unique, so Undo can delete by that pair directly without
+      // needing the row's own id back from the insert.
       const { error } = await supabase
         .from('blocks')
         .insert({
           blocker_id: currentUser.id,
           blocked_id: selectedProfile.id,
-          reason: blockReason.trim() || null,
+          reason: blockReason.trim() || selectedReportReason || null,
         });
-      if (error) throw error;
 
+      // A duplicate-key conflict (23505) means this person is already
+      // blocked from an earlier attempt - the end state the user wants is
+      // already true, so treat it as success instead of surfacing a raw DB
+      // constraint error for something that isn't actually a failure.
+      const isAlreadyBlocked = (error as { code?: string } | null)?.code === '23505';
+      if (error && !isAlreadyBlocked) throw error;
+
+      setLastBlockedUserId(selectedProfile.id);
       setIsBlockSuccess(true);
       const blockedId = selectedProfile.id;
-      setTimeout(() => {
+      blockCommitTimerRef.current = setTimeout(() => {
+        blockCommitTimerRef.current = null;
         setShowReportModal(false);
         setReportSuccess(false);
         setIsBlockSuccess(false);
         setSelectedReportReason('');
         setBlockReason('');
+        setLastBlockedUserId(null);
         setLikers(prev => prev.filter(liker => liker.id !== blockedId));
         setSelectedProfile(null);
-      }, 3000);
+      }, 5000); // Undo window - give real time to notice and react
     } catch (error) {
-      setReportError(error instanceof Error ? error.message : 'Failed to block user');
+      setReportError(getSupabaseErrorMessage(error) || 'Failed to block user');
     } finally {
       setIsBlocking(false);
     }
-  }, [selectedProfile, currentUser?.id, blockReason]);
+  }, [selectedProfile, currentUser?.id, blockReason, selectedReportReason, t]);
+
+  // Reverse a block made by mistake, while still inside the undo window.
+  const handleUndoBlock = useCallback(async () => {
+    if (blockCommitTimerRef.current) {
+      clearTimeout(blockCommitTimerRef.current);
+      blockCommitTimerRef.current = null;
+    }
+    setIsUndoingBlock(true);
+    try {
+      if (currentUser?.id && lastBlockedUserId) {
+        const { error } = await supabase
+          .from('blocks')
+          .delete()
+          .eq('blocker_id', currentUser.id)
+          .eq('blocked_id', lastBlockedUserId);
+        if (error) throw error;
+      }
+      setShowReportModal(false);
+      setIsBlockSuccess(false);
+      setSelectedReportReason('');
+      setBlockReason('');
+      setLastBlockedUserId(null);
+      // Deliberately no list filtering here - the liker stays exactly as
+      // they were, as if the block had never happened.
+    } catch (error) {
+      setReportError(getSupabaseErrorMessage(error) || 'Failed to undo block');
+    } finally {
+      setIsUndoingBlock(false);
+    }
+  }, [lastBlockedUserId, currentUser?.id]);
+
+  // Clear any pending block-commit timer on unmount so it can't fire once
+  // this page is gone.
+  useEffect(() => {
+    return () => {
+      if (blockCommitTimerRef.current) {
+        clearTimeout(blockCommitTimerRef.current);
+        blockCommitTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleProfileClick = (liker: LikerProfile, index: number) => {
     // For free users, only allow clicking if they're premium
@@ -1858,10 +1952,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
               <div className="px-3 pb-3 pt-2 overflow-y-auto flex-1 min-h-0">
                 {isBlockSuccess ? (
-                  <div className="text-green-400 font-semibold text-center py-8">
-                    <div className="mb-2 text-3xl">🚫</div>
-                    <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
-                    <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
+                  <div className="text-center py-6">
+                    <div className="text-green-400 font-semibold">
+                      <div className="mb-2 text-3xl">🚫</div>
+                      <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
+                      <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
+                    </div>
+                    <button
+                      className="mt-4 h-9 px-5 bg-white/10 hover:bg-white/20 text-white font-semibold text-sm rounded-lg border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      onClick={handleUndoBlock}
+                      disabled={isUndoingBlock}
+                    >
+                      {isUndoingBlock ? t('reportModal.blockSuccess.undoing') : t('reportModal.blockSuccess.undo')}
+                    </button>
                   </div>
                 ) : reportSuccess ? (
                   <div className="text-green-400 font-semibold text-center py-8">
@@ -1894,6 +1997,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                       ))}
                     </div>
 
+                    {/* Block section - just the optional note now; the actual
+                        action moved down to sit next to Report (below) so
+                        there's one clear pair of outcomes instead of three
+                        competing buttons. */}
                     <div className="mb-3 p-2.5 bg-black/60 rounded-lg border border-pink-500/20">
                       <p className="text-gray-200 mb-1.5 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
                       <textarea
@@ -1904,13 +2011,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                         className="w-full p-2 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50"
                         rows={2}
                       />
-                      <button
-                        className="w-full mt-1.5 h-8 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded-lg disabled:opacity-50 transition-colors duration-200 text-xs"
-                        onClick={handleBlockUser}
-                        disabled={isBlocking || reporting}
-                      >
-                        {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
-                      </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-1.5">
@@ -1922,11 +2022,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                         {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
                       </button>
                       <button
-                        className="w-full h-9 bg-black hover:bg-white/5 text-gray-200 font-semibold text-sm rounded-lg border border-pink-500/30 disabled:opacity-50 transition-colors duration-200"
-                        onClick={closeReportModal}
-                        disabled={reporting || isBlocking}
+                        className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors duration-200"
+                        onClick={handleBlockUser}
+                        disabled={isBlocking || reporting || (!selectedReportReason && !blockReason.trim())}
                       >
-                        {t('reportModal.cancel')}
+                        {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
                       </button>
                     </div>
 
@@ -1943,7 +2043,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, closeReportModal, handleReportImage, handleBlockUser, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
+  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showMatchAnimation && matchedProfile) {

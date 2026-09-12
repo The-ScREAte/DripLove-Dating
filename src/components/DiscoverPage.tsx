@@ -5598,6 +5598,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 preCalculatedDistance={userDistances[currentMatch.id]}
                 isActiveTab={isActiveTab}
                 onReportModalOpenChange={(isOpen) => { isReportModalOpenRef.current = isOpen; }}
+                onUserBlocked={(blockedId) => {
+                  // Defensive: prefer looking the blocked profile up fresh in
+                  // the deck rather than assuming currentMatch is still the
+                  // same one (the report modal pauses swiping while open, so
+                  // in practice it always is, but this doesn't depend on it).
+                  const blockedMatch = potentialMatches.find((m) => !isAd(m) && m.id === blockedId) as PotentialMatch | undefined;
+                  moveToNext(blockedMatch || currentMatch);
+                }}
               />
             )}
           </div>

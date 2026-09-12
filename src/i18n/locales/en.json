@@ -697,10 +697,10 @@
     "blockSection": {
       "title": "Also block this person (optional)",
       "placeholder": "Optional note for this block",
-      "blockButton": "Block user now",
+      "blockButton": "Block",
       "blocking": "Blocking..."
     },
-    "reportButton": "Send report",
+    "reportButton": "Report",
     "reporting": "Sending...",
     "cancel": "Not now",
     "selectReason": "Select a reason to continue",
@@ -708,7 +708,9 @@
     "success": "Report sent. Thank you.",
     "blockSuccess": {
       "title": "User blocked",
-      "message": "They will no longer appear in your Discover feed."
+      "message": "They will no longer appear in your Discover feed.",
+      "undo": "Undo",
+      "undoing": "Undoing..."
     }
   },
   "userProfileModal": {
