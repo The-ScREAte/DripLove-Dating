@@ -5679,7 +5679,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               now open to the exact same proportion. */}
           {showMoreInfo && (
             <div
-              className="discover-info-area relative z-20 flex-1 overflow-y-auto bg-black"
+              className="discover-info-area relative z-20 flex-1 overflow-y-auto bg-black scrollbar-hide"
               style={{
                 minHeight: 0,
                 // Overlaps the photo by a hair as extra insurance against subpixel

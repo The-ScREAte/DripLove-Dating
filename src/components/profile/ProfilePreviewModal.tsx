@@ -268,12 +268,14 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
 
   return (
     <div
-      className="h-full w-full bg-black flex flex-col overflow-hidden"
+      className="w-full bg-black flex flex-col overflow-hidden"
       style={{
-        // Small breathing room below the card's rounded bottom edge and the
-        // floating nav pill under it, matching Discover's own gap, so they
-        // read as two distinct surfaces instead of touching.
-        paddingBottom: 'clamp(6px, 2vw, 10px)',
+        // h-full minus the gap below (not h-full + padding-bottom) - padding
+        // would sit INSIDE the bordered box, so the border would still touch
+        // the nav with no visible gap between them. A margin on a shorter box
+        // actually leaves the gap outside the border, matching Discover's.
+        height: 'calc(100% - clamp(6px, 2vw, 10px))',
+        marginBottom: 'clamp(6px, 2vw, 10px)',
         // Border + rounded bottom corners live on this OUTER wrapper (not the
         // inner photo box) so they enclose the expanded details panel too,
         // not just the photo - previously the border only ringed the photo,
@@ -521,7 +523,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 </p>
               ) : (
                 !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
-                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
                     {previewHighlights.map((highlight, index) => (
                       <span
                         key={index}
@@ -546,17 +548,22 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             {/* Expandable info button - same style/behavior as Discover's MatchCard toggle. */}
             <button
               onClick={() => setShowMoreInfo(prev => !prev)}
-              className="text-white rounded-full p-[clamp(0.2rem,1vw,0.3rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+              className="flex items-center justify-center text-white rounded-full transition-colors duration-200 shrink-0 backdrop-blur-md -mt-1.5"
               style={{
+                width: 30,
+                height: 30,
+                minWidth: 30,
+                minHeight: 30,
+                padding: 0,
                 background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
                 boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
               }}
               aria-label={showMoreInfo ? t('discover.matchCard.hideDetails', 'Hide details') : t('discover.matchCard.showDetails', 'Show details')}
             >
               {showMoreInfo ? (
-                <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                <ArrowUp size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
               ) : (
-                <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                <ArrowDown size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
               )}
             </button>
           </div>
@@ -572,7 +579,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
       {showMoreInfo && (
         <div
           ref={expandedDetailsRef}
-          className="bg-black px-4 pt-1 space-y-3 flex-1 overflow-y-auto"
+          className="bg-black px-4 pt-1 space-y-3 flex-1 overflow-y-auto scrollbar-hide"
           style={{
             paddingBottom: '10px',
             WebkitOverflowScrolling: 'touch',

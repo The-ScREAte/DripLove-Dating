@@ -1642,7 +1642,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     </p>
                   ) : (
                     !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
                         {previewHighlights.map((highlight, index) => (
                           <span
                             key={index}
@@ -1669,16 +1669,21 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowMoreInfo(!showMoreInfo); }}
                   aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
-                  className="text-white rounded-full p-[clamp(0.2rem,1vw,0.3rem)] transition-colors duration-200 shrink-0 backdrop-blur-md"
+                  className="flex items-center justify-center text-white rounded-full transition-colors duration-200 shrink-0 backdrop-blur-md -mt-1.5"
                   style={{
+                    width: 30,
+                    height: 30,
+                    minWidth: 30,
+                    minHeight: 30,
+                    padding: 0,
                     background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
                     boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
                   }}
                 >
                   {showMoreInfo ? (
-                    <ArrowUp className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                    <ArrowUp size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
                   ) : (
-                    <ArrowDown className="w-[clamp(14px,3.8vw,17px)] h-[clamp(14px,3.8vw,17px)]" strokeWidth={2.5} />
+                    <ArrowDown size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
                   )}
                 </button>
               </div>
@@ -1749,7 +1754,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             photo either. */}
         {showMoreInfo && (
         <div
-          className="relative z-20 flex-1 overflow-y-auto bg-black"
+          className="relative z-20 flex-1 overflow-y-auto bg-black scrollbar-hide"
           style={{
             minHeight: 0,
             WebkitOverflowScrolling: 'touch',
