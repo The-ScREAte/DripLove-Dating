@@ -157,12 +157,44 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
     }
 
     setLoading(true);
-    
+
     try {
+      // Check whether this email belongs to a Google/Apple account before
+      // sending a reset email that account has no password to reset. Fails
+      // open on any error (network hiccup, function down) - worst case is
+      // the old behavior of just sending the reset email regardless.
+      try {
+        const { data: providerCheck } = await supabase.functions.invoke('check-auth-provider', {
+          body: { email: formData.email },
+        });
+        const providers: string[] = providerCheck?.providers || [];
+        const hasPassword = providers.includes('email');
+
+        if (!hasPassword && providers.includes('google')) {
+          toast({
+            title: "This account uses Google",
+            description: "You signed up with Google, so there's no password to reset. Please sign in with Google instead.",
+          });
+          setLoading(false);
+          return;
+        }
+
+        if (!hasPassword && providers.includes('apple')) {
+          toast({
+            title: "This account uses Apple",
+            description: "You signed up with Apple, so there's no password to reset. Please sign in with Apple instead.",
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (providerCheckError) {
+        console.error('check-auth-provider error (continuing with password reset):', providerCheckError);
+      }
+
       // Clear any cached session data that might affect URL generation
-      
+
       const redirectUri = getPasswordResetRedirectUri();
-      
+
       // Double-check the URI before sending
       if (window.location.hostname === 'localhost' && !redirectUri.includes('localhost')) {
         // Localhost redirect mismatch detected
@@ -199,6 +231,10 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         }
       }
 
+      toast({
+        title: "Check your email",
+        description: "If an account exists for that email, we've sent a link to reset your password.",
+      });
       setShowForgotPassword(false);
       setLoading(false);
     } catch (error: any) {

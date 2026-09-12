@@ -14,7 +14,6 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
-import ProfilePage from '@/components/ProfilePage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
@@ -32,6 +31,13 @@ const ChatPage = lazy(() => import('@/components/ChatPage'));
 const LikedMePage = lazy(() => import('@/components/LikedMePage'));
 const TermsOfService = lazy(() => import('@/components/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('@/components/PrivacyPolicy'));
+// Was statically imported (forcing it, plus ImageManagement and
+// ProfilePreviewModal, into the main startup bundle for every user even if
+// they never open Profile) despite the "warm secondary tab bundles" effect
+// below already treating it as a separate lazy chunk to prefetch - that
+// prefetch was a no-op the whole time since the static import already
+// pulled it in. Now it's a real lazy chunk like the others.
+const ProfilePage = lazy(() => import('@/components/ProfilePage'));
 
 // Tab loading fallback
 const TabLoader = () => (
