@@ -1317,6 +1317,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             // top edge, on any device, with no measurement involved at all.
             minHeight: 0,
             position: 'relative',
+            // Small breathing room between the discover card's rounded bottom edge and the
+            // floating nav pill below it, so they read as two distinct surfaces instead of
+            // touching. Other tabs don't need this gap.
+            paddingBottom: activeTab === 'dripcheck' ? 'clamp(6px, 2vw, 10px)' : undefined,
           }}
         >
           {showTerms ? (
@@ -1425,7 +1429,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // the top. Page content stops above it on its own now (a real flex
               // sibling, not an overlay), so there's nothing behind this bar that
               // would ever need to show through it.
-              background: '#000',
+              background: 'linear-gradient(180deg, #0a0d16, #05060b)',
               border: '1px solid rgba(236,72,153,0.55)',
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
               // Without this, the border-radius above only paints a rounded

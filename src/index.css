@@ -521,7 +521,7 @@ body.keyboard-open .chat-messages-container {
     margin: 0;
     display: flex;
     justify-content: center;
-    background-color: #ffffff;
+    background-color: #000;
     overflow-x: hidden;
   }
 

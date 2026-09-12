@@ -5318,10 +5318,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     return 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
   })();
 
-  // Flush/square while resting so the photo fills the frame edge-to-edge; the moment the card
-  // is picked up (dragging) or flung away, its corners round in like a card lifting off the stack.
+  // Bottom corners stay rounded at all times for a clean, finished edge against the nav below;
+  // the top stays flush with the header while resting, and the moment the card is picked up
+  // (dragging) or flung away, all four corners round in like a card lifting off the stack.
   const cardIsLifted = swipeUI.isDragging || exitingCard;
-  const cardCornerRadius = cardIsLifted ? '26px' : '0px';
+  const cardCornerRadius = cardIsLifted ? '26px' : '0px 0px 22px 22px';
 
 
 
@@ -5446,7 +5447,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 </span>
               </div>
             ) : null}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+            {/* Grounds the peeking next-card preview in solid black at the bottom edge -
+                stronger and taller than before so the blurred photo underneath reads as
+                a deliberate dark backdrop instead of a messy blur blob peeking out. */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to top, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.85) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0) 65%)',
+              }}
+            />
           </DominantColorImageBg>
         )}
 
@@ -5472,17 +5481,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 : '0 2px 8px rgba(0,0,0,0.08)'
           }}
         >
-          {/* Drag-state outline. The card itself no longer has any internal top gap to work
-              around — that offset now happens one level up, at discover-container's own `top`
-              (see below), before this card even starts — so this can just be a normal complete
-              border around the whole card, top edge included. */}
+          {/* Pink outline — a subtle version always shows at rest (matching the nav pill's
+              border below), and brightens to full strength while dragging. */}
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none transition-opacity duration-200"
             style={{
-              border: '1.5px solid rgba(236,72,153,0.95)',
+              border: swipeUI.isDragging
+                ? '1.5px solid rgba(236,72,153,0.95)'
+                : '1px solid rgba(236,72,153,0.55)',
               borderRadius: cardCornerRadius,
-              opacity: swipeUI.isDragging ? 1 : 0,
               zIndex: 30,
             }}
           />

@@ -163,7 +163,10 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
   // ⭐ PHASE 1.3: Move heavy logic OUTSIDE + use memoized buildSlides
   const slides = useMemo(() => buildSlides(stableMatch, memoUserImages), [stableMatch, memoUserImages]);
-  const previewHighlights = useMemo(() => getPreviewHighlights(stableMatch), [stableMatch]);
+  const previewHighlights = useMemo(
+    () => getPreviewHighlights(stableMatch, currentSlide),
+    [stableMatch, currentSlide]
+  );
 
   // Same "earned" verified badge shown on the user's own profile page (>=85%
   // profile completion) - not the face-verification `isVerified` prop, which
@@ -173,15 +176,20 @@ const MatchCard: React.FC<MatchCardProps> = ({
     [stableMatch, memoUserImages]
   );
 
-  // One cultural sign to surface as its own chip: whichever sign this profile
-  // shares with the current user if they have one in common, otherwise just
-  // one of the profile's own signs.
+  // One cultural sign to surface as its own chip, cycling through ALL of this
+  // profile's signs (not just the first) as the user taps through photos -
+  // shared signs with the current user are moved to the front so the first
+  // photo leads with common ground, then the rest of the profile's own signs
+  // follow in order across later photos.
   const signHighlight = useMemo(() => {
     const theirs = stableMatch.adinkra_symbols;
     if (!theirs || theirs.length === 0) return null;
     const mine = currentUserAdinkraSymbols || [];
-    return theirs.find(symbol => mine.includes(symbol)) || theirs[0];
-  }, [stableMatch, currentUserAdinkraSymbols]);
+    const shared = theirs.filter(symbol => mine.includes(symbol));
+    const rest = theirs.filter(symbol => !mine.includes(symbol));
+    const ordered = [...shared, ...rest];
+    return ordered[currentSlide % ordered.length];
+  }, [stableMatch, currentUserAdinkraSymbols, currentSlide]);
 
   // A favorite carrying a share link (e.g. a music track/album) surfaces as
   // its own circular badge in the compact preview row, mirroring signHighlight.
@@ -709,38 +717,53 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   )}
                 </div>
 
-                {match.city && (
-                  <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-gray-300">
-                    <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                    <span>
-                      {match.city}, {match.country}
-                      {match.distance !== undefined && match.distance < 999 ? (
-                        <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km away</span>
-                      ) : preCalculatedDistance !== undefined && preCalculatedDistance < 999 ? (
-                        <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km away</span>
-                      ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
-                        <span className="ml-2">
-                          • {Math.max(1, Math.round(calculateDistance(
-                            currentUserLatitude,
-                            currentUserLongitude,
-                            match.latitude,
-                            match.longitude
-                          )))} km away
-                        </span>
-                      ))}
-                      {typeof match.height_cm === 'number' && match.height_cm > 0 && (
-                        <span className="ml-2">• {formatHeightLabel(match.height_cm)}</span>
-                      )}
-                    </span>
-                  </div>
-                )}
+                {/* Location and "looking for" alternate by photo, one at a time, instead
+                    of always stacking both - keeps the collapsed card from feeling static
+                    as the highlight chips below it are already rotating per photo. Falls
+                    back to whichever one exists if only one of the two is available. */}
+                {(() => {
+                  const hasLocation = !!match.city;
+                  const hasIntent = !!match.relationship_intent;
+                  const showLocation = hasLocation && (!hasIntent || currentSlide % 2 === 0);
+                  const showIntent = hasIntent && (!hasLocation || currentSlide % 2 === 1);
 
-                {match.relationship_intent && (
-                  <div className="flex items-center mt-2 text-[clamp(11px,3.2vw,13px)] font-medium text-gray-300">
-                    <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                    <span>{formatRelationshipIntent(match.relationship_intent)}</span>
-                  </div>
-                )}
+                  return (
+                    <>
+                      {showLocation && (
+                        <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-gray-300">
+                          <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                          <span>
+                            {match.city}, {match.country}
+                            {match.distance !== undefined && match.distance < 999 ? (
+                              <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km away</span>
+                            ) : preCalculatedDistance !== undefined && preCalculatedDistance < 999 ? (
+                              <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km away</span>
+                            ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
+                              <span className="ml-2">
+                                • {Math.max(1, Math.round(calculateDistance(
+                                  currentUserLatitude,
+                                  currentUserLongitude,
+                                  match.latitude,
+                                  match.longitude
+                                )))} km away
+                              </span>
+                            ))}
+                            {typeof match.height_cm === 'number' && match.height_cm > 0 && (
+                              <span className="ml-2">• {formatHeightLabel(match.height_cm)}</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {showIntent && (
+                        <div className="flex items-center mt-2 text-[clamp(11px,3.2vw,13px)] font-medium text-gray-300">
+                          <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                          <span>{formatRelationshipIntent(match.relationship_intent)}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {!showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
                   <div className="flex items-center gap-1.5 flex-wrap mt-2">
