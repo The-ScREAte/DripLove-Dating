@@ -4559,6 +4559,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         }
       }
 
+      // The card's actual photos come from the separate `userImages` map
+      // (keyed by profile id), not from the match object's own .images
+      // field - reinserting the profile above doesn't populate that map.
+      // Right after a normal pass this "just worked" because the profile's
+      // entry was still sitting in that map from when it was first shown;
+      // after a refresh rebuilds potentialMatches/userImages from scratch,
+      // nothing repopulates it here, so the reversed-back card showed no
+      // photos at all. Fetch fresh whenever we don't already have them.
+      if (!userImagesRef.current[lastPassedUser.user_id]?.length) {
+        loadAllImagesForProfile(lastPassedUser.user_id).then(imgs => {
+          if (imgs && imgs.length > 0) {
+            setUserImages(prevImgs => ({ ...prevImgs, [lastPassedUser.user_id]: imgs }));
+            preloadImages(imgs.slice(0, 3), 'high');
+            if (imgs.length > 3) preloadImages(imgs.slice(3), 'low');
+          }
+        });
+      }
+
       // Remove from passed users list
       setPassedUsers(prev => prev.slice(1));
       

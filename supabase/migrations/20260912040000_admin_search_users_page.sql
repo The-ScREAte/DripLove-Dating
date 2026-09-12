@@ -70,7 +70,13 @@ BEGIN
   RETURN QUERY
   SELECT
     p.id, p.first_name, p.last_name, p.email, p.account_status, p.created_at,
-    p.city, p.country, p.date_of_birth, p.is_admin, p.gender, p.preference,
+    -- profiles.city is varchar(100) live, while every other text-ish column
+    -- here is a plain text column - RETURN QUERY requires an exact type
+    -- match against the RETURNS TABLE list (unlike a normal SELECT, which
+    -- treats varchar/text as interchangeable), so this needs an explicit
+    -- cast or the whole function throws "structure of query does not match
+    -- function result type" at call time.
+    p.city::text, p.country, p.date_of_birth, p.is_admin, p.gender, p.preference,
     p.relationship_intent, p.last_login_at, p.login_count, p.is_archived,
     EXISTS (
       SELECT 1 FROM public.user_subscriptions us
