@@ -58,6 +58,9 @@ const formatHeightLabel = (cm: number) => {
 
 const LIKED_ME_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const LIKED_ME_STORAGE_KEY_PREFIX = 'likedMe_v1_';
+// Likers are fetched a page at a time via get_likers_page - this is both
+// the initial page size and the size of each subsequent "Load More" page.
+const LIKERS_PAGE_SIZE = 500;
 
 type CurrentUser = AppUser;
 
@@ -149,6 +152,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // ------------------
   const [likers, setLikers] = useState<LikerProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  // True infinite-scroll beyond the base LIKERS_PAGE_SIZE cap - only matters
+  // for an account with more likers than that, which is rare today, but a
+  // "Load More" tap should never silently do nothing once it happens.
+  const [hasMoreLikers, setHasMoreLikers] = useState(true);
+  const [loadingMoreLikers, setLoadingMoreLikers] = useState(false);
+  // Once extra pages are loaded, the periodic background refresh (which
+  // only ever re-fetches the first page) must not overwrite `likers` with
+  // just that first page again - it would silently discard everything the
+  // user scrolled past the cap to load. Simpler and safer than trying to
+  // merge partial/paged results back into a diff-and-replace cache design
+  // built around a single full snapshot.
+  const extraLikersLoadedRef = useRef(false);
   const [selectedProfile, setSelectedProfile] = useState<LikerProfile | null>(null);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
   // Report/block modal - same shape and fields as Discover's swipe card modal.
@@ -398,56 +413,30 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     []
   );
 
-  // Shared data fetching logic
-  const fetchLikersData = useCallback(async (userId: string) => {
-    // 1. Get all likes for this user
-    const { data: likes, error: likesError } = await supabase
-      .from('likes')
-      .select('liker_id, created_at')
-      .eq('liked_id', userId);
-    
-    if (likesError) throw likesError;
-    if (!likes || likes.length === 0) {
-      return { likers: [], userImages: {} };
+  // Shared data fetching logic - one page at a time. `offset` defaults to 0
+  // for the normal/cached/background-refresh path; loadMoreLikers (below)
+  // is the only caller that passes a non-zero offset, for real
+  // infinite-scroll past the first page.
+  const fetchLikersData = useCallback(async (userId: string, offset: number = 0) => {
+    // Who liked this user, with blocks/matches already excluded server-side
+    // (get_likers_page does the exclusion in SQL) - this used to be three
+    // separate unbounded queries (every like, every block, every match for
+    // this account) joined and filtered in JS.
+    const { data: likerRows, error: likersError } = await supabaseRpc('get_likers_page', {
+      p_user_id: userId,
+      p_limit: LIKERS_PAGE_SIZE,
+      p_offset: offset,
+    });
+
+    if (likersError) throw likersError;
+    const likes = (likerRows || []) as { liker_id: string; liked_at: string }[];
+    if (likes.length === 0) {
+      return { likers: [], userImages: {}, hasMore: false };
     }
-
-    // 2. Get block relationships (both directions)
-    const blocksRes = await supabase
-      .from('blocks')
-      .select('blocked_id, blocker_id')
-      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
-
-    if (blocksRes.error) throw blocksRes.error;
-
-    const blockedUsers = blocksRes.data || [];
-    const blockedIds = new Set(
-      blockedUsers
-        .map((block) => (block.blocker_id === userId ? block.blocked_id : block.blocker_id))
-        .filter(Boolean)
-    );
-
-    // 3. Get existing matches - we should NOT show matched users in "liked me" page
-    const { data: matches, error: matchesError } = await supabase
-      .from('matches')
-      .select('user1_id, user2_id')
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
-
-    if (matchesError) throw matchesError;
-
-    const matchedIds = new Set(
-      (matches || [])
-        .map((m) => (m.user1_id === userId ? m.user2_id : m.user1_id))
-        .filter(Boolean)
-    );
-
-    // 4. Build likerIds - exclude blocked users and matched users
-    const likerIds = uniqUuids(likes.map((like) => like.liker_id).filter(Boolean))
-      .filter((id) => id !== userId)
-      .filter((id) => !blockedIds.has(id))
-      .filter((id) => !matchedIds.has(id));
+    const likerIds = uniqUuids(likes.map((like) => like.liker_id).filter(Boolean));
 
     if (likerIds.length === 0) {
-      return { likers: [], userImages: {} };
+      return { likers: [], userImages: {}, hasMore: likes.length === LIKERS_PAGE_SIZE };
     }
 
     // 5. Fetch all profiles in one go
@@ -471,7 +460,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     for (const like of likes) {
       const likerId = like?.liker_id;
       if (!likerId) continue;
-      const ts = Date.parse(String((like as any).created_at || ''));
+      const ts = Date.parse(String(like.liked_at || ''));
       const t = Number.isFinite(ts) ? ts : 0;
       const prev = latestLikeAtByLiker.get(likerId) ?? 0;
       if (t > prev) latestLikeAtByLiker.set(likerId, t);
@@ -531,19 +520,24 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       }
     }
 
-    return { likers, userImages: imageMap };
-  }, []);
+    return { likers, userImages: imageMap, hasMore: likes.length === LIKERS_PAGE_SIZE };
+  }, [supabaseRpc]);
 
   // Background fetching function
   const fetchLikersInBackground = useCallback(async () => {
     if (!currentUser?.id || backgroundFetchingRef.current) return;
+    // This only ever re-fetches the first page - once the user has loaded
+    // pages beyond it via "Load More", letting this proceed would silently
+    // discard everything past page 1 the moment it runs.
+    if (extraLikersLoadedRef.current) return;
     backgroundFetchingRef.current = true;
     likedMeLastBackgroundFetchAt.set(currentUser.id, Date.now());
 
     try {
       const result = await fetchLikersData(currentUser.id);
       if (result) {
-        const { likers: newLikers, userImages: newUserImages } = result;
+        const { likers: newLikers, userImages: newUserImages, hasMore } = result;
+        setHasMoreLikers(hasMore);
         const cached = likedMeCache.get(currentUser.id);
         const shouldUpdate = hasListChanged(cached?.likers || [], newLikers);
 
@@ -652,8 +646,13 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
       const result = await fetchLikersData(currentUser.id);
       if (result) {
-        const { likers: newLikers, userImages: newUserImages } = result;
-        
+        const { likers: newLikers, userImages: newUserImages, hasMore } = result;
+        // A manual/pull-to-refresh reload starts over from page 1 - any
+        // previously loaded extra pages are intentionally dropped here,
+        // same as any other "refresh" action would.
+        extraLikersLoadedRef.current = false;
+        setHasMoreLikers(hasMore);
+
         const cacheValue: LikedMeCacheValue = {
           likers: newLikers,
           userImages: newUserImages,
@@ -690,6 +689,37 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       }
     }
   }, [currentUser?.id, toast, t, fetchLikersData, preloadFirstProfilesWithBlobs]);
+
+  // Fetches the next page beyond what's already loaded and appends it -
+  // real pagination, not just a bigger cap. Only relevant once an account
+  // has more likers than LIKERS_PAGE_SIZE, which is rare today; this is
+  // what stops that from being a silent, permanent truncation once it does
+  // happen. Deliberately does not touch the cache/background-refresh
+  // machinery (see extraLikersLoadedRef) - appended pages are session-local
+  // until the next full refresh.
+  const loadMoreLikers = useCallback(async () => {
+    if (!currentUser?.id || loadingMoreLikers || !hasMoreLikers) return;
+    setLoadingMoreLikers(true);
+    try {
+      const result = await fetchLikersData(currentUser.id, likers.length);
+      if (result) {
+        const { likers: newLikers, userImages: newUserImages, hasMore } = result;
+        extraLikersLoadedRef.current = true;
+        setHasMoreLikers(hasMore);
+        if (newLikers.length > 0) {
+          setLikers(prev => {
+            const existingIds = new Set(prev.map(p => p.id));
+            return [...prev, ...newLikers.filter(l => !existingIds.has(l.id))];
+          });
+          setUserImages(prev => ({ ...prev, ...newUserImages }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading more likers:', error);
+    } finally {
+      setLoadingMoreLikers(false);
+    }
+  }, [currentUser?.id, loadingMoreLikers, hasMoreLikers, likers.length, fetchLikersData]);
 
   // Load additional images when profile is selected - only approved onesclicked
   const loadFullImages = useCallback(async (profileId: string) => {
@@ -2212,6 +2242,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {hasMoreLikers && likers.length > 0 && (
+          <div className="flex justify-center pt-4">
+            <Button
+              onClick={loadMoreLikers}
+              disabled={loadingMoreLikers}
+              variant="outline"
+              className="rounded-full text-xs px-4 h-8 border-pink-500/40 text-pink-300 hover:bg-pink-500/10"
+            >
+              {loadingMoreLikers ? 'Loading...' : 'Load More'}
+            </Button>
           </div>
         )}
       </div>

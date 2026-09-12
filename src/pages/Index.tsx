@@ -1,9 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthDialog from '@/components/AuthDialog';
-import AuthForm from '@/components/AuthForm';
-import RegistrationForm from '@/components/RegistrationForm';
-import AboutUs from '@/components/AboutUs';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import HoppingLogo from '@/components/HoppingLogo';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +18,14 @@ const TermsAcceptance = lazy(() => import('@/components/TermsAcceptance'));
 const MainApp = lazy(() => import('@/components/MainApp'));
 const TermsOfService = lazy(() => import('@/components/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('@/components/PrivacyPolicy'));
+// AuthForm/RegistrationForm/AboutUs (~2,250 lines combined) used to load
+// eagerly as part of the very first bundle, on every cold start, for every
+// user, even though none of them are needed until the user actually taps
+// past the welcome screen. Only WelcomeScreen (the one screen genuinely
+// needed instantly) and the tiny AuthDialog stay eager.
+const AuthForm = lazy(() => import('@/components/AuthForm'));
+const RegistrationForm = lazy(() => import('@/components/RegistrationForm'));
+const AboutUs = lazy(() => import('@/components/AboutUs'));
 
 // Loading component for lazy-loaded pages - minimal spinner
 const PageLoader = () => null;
@@ -366,7 +371,9 @@ const Index = ({
         )}
 
         {currentView === 'about' && (
-          <AboutUs onBack={handleBackToWelcome} />
+          <Suspense fallback={<PageLoader />}>
+            <AboutUs onBack={handleBackToWelcome} />
+          </Suspense>
         )}
 
         {currentView === 'terms' && (
@@ -385,11 +392,13 @@ const Index = ({
           <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background */}
             <VideoBackground />
-            <AuthForm 
-              isLogin={true}
-              onToggle={handleShowRegister}
-              onBack={handleBackToWelcome}
-            />
+            <Suspense fallback={<PageLoader />}>
+              <AuthForm
+                isLogin={true}
+                onToggle={handleShowRegister}
+                onBack={handleBackToWelcome}
+              />
+            </Suspense>
           </div>
         )}
 
@@ -397,11 +406,13 @@ const Index = ({
           <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background - always rendered, loads async */}
             <VideoBackground />
-            <RegistrationForm
-              onSubmit={handleRegister}
-              onBackToLogin={handleBackToLogin}
-              onRegistrationInProgressChange={setRegistrationInProgress}
-            />
+            <Suspense fallback={<PageLoader />}>
+              <RegistrationForm
+                onSubmit={handleRegister}
+                onBackToLogin={handleBackToLogin}
+                onRegistrationInProgressChange={setRegistrationInProgress}
+              />
+            </Suspense>
           </div>
         )}
 

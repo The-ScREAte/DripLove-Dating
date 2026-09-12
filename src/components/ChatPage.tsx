@@ -58,8 +58,49 @@ const isAutoDeletableDormantChat = (match: ChatMatch) => {
 // Global cache for chat matches - persists across component mounts
 const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
 
+// A user with many matches who opens many distinct conversations in one
+// session used to accumulate all of them here forever (each capped at 500
+// messages via MAX_CACHED_MESSAGES below, but the *number* of cached
+// conversations itself was unbounded) - only explicit events like unmatch
+// ever removed a whole conversation's entry. This drop-in Map replacement
+// (same get/set/delete/clear surface every existing call site already uses)
+// evicts the least-recently-used conversation once the cache holds more
+// than MAX_CACHED_CONVERSATIONS, so total memory stays bounded regardless
+// of how many chats get opened in one sitting.
+const MAX_CACHED_CONVERSATIONS = 30;
+class ChatMessagesLRUCache<V> {
+  private map = new Map<string, V>();
+  get(key: string): V | undefined {
+    const value = this.map.get(key);
+    if (value !== undefined) {
+      // Bump recency by re-inserting - Map preserves insertion order, so
+      // the least-recently-used entry is always the one at the front.
+      this.map.delete(key);
+      this.map.set(key, value);
+    }
+    return value;
+  }
+  set(key: string, value: V): void {
+    if (this.map.has(key)) this.map.delete(key);
+    this.map.set(key, value);
+    if (this.map.size > MAX_CACHED_CONVERSATIONS) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey !== undefined) this.map.delete(oldestKey);
+    }
+  }
+  delete(key: string): boolean {
+    return this.map.delete(key);
+  }
+  has(key: string): boolean {
+    return this.map.has(key);
+  }
+  clear(): void {
+    this.map.clear();
+  }
+}
+
 // Global cache for individual chat messages - NEVER expire, only update
-const chatMessagesCache = new Map<string, { messages: ChatMessage[], timestamp: number }>();
+const chatMessagesCache = new ChatMessagesLRUCache<{ messages: ChatMessage[], timestamp: number }>();
 const MESSAGE_CACHE_DURATION = Infinity; // Never expire - always show cached messages instantly (capped by MAX_CACHED_MESSAGES)
 
 // Hard cap to prevent WebView/Android memory blowups
@@ -254,6 +295,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   useEffect(() => {
     if (!currentUser?.id) return;
 
+    // Filtered server-side by recipient_id (see the chats.recipient_id
+    // migration) - subscribing to every INSERT on the whole table and
+    // filtering client-side broadcasts every message any user sends to
+    // every connected client, which doesn't scale.
     const channel = supabase
       .channel(`unread-chats:${currentUser.id}`)
       .on(
@@ -262,6 +307,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           event: 'INSERT',
           schema: 'public',
           table: 'chats',
+          filter: `recipient_id=eq.${currentUser.id}`,
         },
         (payload) => {
           const newMsg = payload.new as { match_id?: string; sender_id?: string; is_read?: boolean | null; message?: string; created_at?: string };
@@ -1115,6 +1161,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
 
     try {
+      // Bounded to the most recent messages (same cap the in-memory cache
+      // already trims to via trimCachedMessages/MAX_CACHED_MESSAGES) - a
+      // cold chat open used to pull a conversation's ENTIRE history with no
+      // limit, which for a long-running match becomes a large, slow fetch
+      // on every fresh open. Fetching most-recent-first then reversing
+      // preserves the expected ascending render order.
       const { data, error } = await supabase
         .from('chats')
         .select(`
@@ -1122,12 +1174,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           sender:profiles!chats_sender_id_fkey(first_name, last_name)
         `)
         .eq('match_id', selectedMatch.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(MAX_CACHED_MESSAGES);
 
       if (error) {
         throw error;
       }
 
+      data?.reverse();
 
       const mappedMessages = data?.map(msg => ({
         ...msg,

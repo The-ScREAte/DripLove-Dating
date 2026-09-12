@@ -527,10 +527,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     locallySwipedProfileIds.current = stored;
   }, [currentUser?.id, getStoredSwipedIds]);
   
+  // Hard cap on how many swiped-profile entries this ever holds. `pass`
+  // entries already get pruned after 30 days (pruneExpiredPassedSwipes), but
+  // `like` entries never did - a long-time power user's likes accumulated
+  // here forever, so every single swipe re-serialized an ever-growing
+  // object to localStorage. The server-side query is the real source of
+  // truth for "already liked" (this is only a client-side fast-path to
+  // avoid a flash of already-swiped profiles), so trimming the oldest
+  // entries once past this cap is safe.
+  const MAX_LOCAL_SWIPED_ENTRIES = 5000;
+
   // Persist swiped IDs to BOTH localStorage and sessionStorage whenever they change
   // This ensures swipes survive page refresh, app restart, and navigation
   const persistSwipedIds = useCallback(() => {
     if (!currentUser?.id) return;
+    if (locallySwipedProfileIds.current.size > MAX_LOCAL_SWIPED_ENTRIES) {
+      const entries = Array.from(locallySwipedProfileIds.current.entries())
+        .sort((a, b) => b[1].timestamp - a[1].timestamp)
+        .slice(0, MAX_LOCAL_SWIPED_ENTRIES);
+      locallySwipedProfileIds.current = new Map(entries);
+    }
     const obj = Object.fromEntries(locallySwipedProfileIds.current);
     const key = `swiped_profiles_${currentUser.id}`;
     const payload = JSON.stringify(obj);
@@ -605,7 +621,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       return updated;
     });
   }, []);
-  
+
+  // Full-cache version of the above - used wherever the whole deck resets
+  // (preference changes, "no more profiles" retry) rather than just one
+  // profile advancing. Without this, every reset left the outstanding blob
+  // URLs from before it un-revoked, leaking memory for the rest of the
+  // session (iOS/Web only - Android skips blob preloading entirely).
+  const revokeAllBlobUrls = useCallback(() => {
+    setPreloadedBlobImages(prev => {
+      for (const profileBlobs of Object.values(prev)) {
+        for (const blobUrl of Object.values(profileBlobs)) {
+          try {
+            if (blobUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(blobUrl);
+            }
+          } catch {
+            // ignore revoke errors
+          }
+        }
+      }
+      return {};
+    });
+  }, []);
+
   const { toast } = useToast();
   const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
   const {
@@ -2484,12 +2522,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // Force refresh function for preference changes
   const forceRefresh = useCallback(() => {
     if (!currentUser?.id) return;
-    
+
     // Reset the initialized ref to force re-initialization
     initializedUserRef.current = null;
-    
+
     // Reset deck state
     fetchSequenceRef.current += 1;
+    revokeAllBlobUrls();
     setPotentialMatches([]);
     setCurrentIndex(0);
     setImageIndex(0);
@@ -2503,7 +2542,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Trigger re-initialization by updating a state that's in the dependency array
     // The main useEffect will pick this up and re-run
     setIsLoading(true);
-  }, [currentUser?.id]);
+  }, [currentUser?.id, revokeAllBlobUrls]);
 
   // Self-heal when client cache/pagination gets stuck on a false empty
   // state. Cooldown-gated, not one-shot: it used to permanently disable
@@ -5158,6 +5197,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               <Button
                 onClick={() => {
                   // Clear all caches and force a complete refresh
+                  revokeAllBlobUrls();
                   setPotentialMatches([]);
                   setUserImages({});
                   setUserDistances({});

@@ -185,6 +185,24 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [matchUser1, setMatchUser1] = useState('');
   const [matchUser2, setMatchUser2] = useState('');
+  // Manual-match user pickers used to render one <SelectItem> per user with
+  // no limit - at a few thousand users that alone could freeze the admin's
+  // browser tab. A simple name/ID filter plus a hard cap on rendered rows
+  // keeps the dropdown responsive at any user-base size while still letting
+  // an admin find a specific person.
+  const [matchUser1Search, setMatchUser1Search] = useState('');
+  const [matchUser2Search, setMatchUser2Search] = useState('');
+  const MATCH_USER_OPTIONS_CAP = 100;
+  const filterMatchUserOptions = useCallback((search: string) => {
+    const query = search.trim().toLowerCase();
+    const filtered = query
+      ? users.filter((u) =>
+          `${u.first_name} ${u.last_name}`.toLowerCase().includes(query) ||
+          u.id.toLowerCase().includes(query)
+        )
+      : users;
+    return filtered.slice(0, MATCH_USER_OPTIONS_CAP);
+  }, [users]);
   const matchUser1Ref = useRef('');
   const matchUser2Ref = useRef('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -1612,36 +1630,54 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-2">
-                    <Select value={matchUser1} onValueChange={(value) => {
-                      matchUser1Ref.current = value;
-                      setMatchUser1(value);
-                    }}>
-                      <SelectTrigger className="text-xs">
-                        <SelectValue placeholder="Select User 1" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user, index) => (
-                          <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
-                            {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={matchUser2} onValueChange={(value) => {
-                      matchUser2Ref.current = value;
-                      setMatchUser2(value);
-                    }}>
-                      <SelectTrigger className="text-xs">
-                        <SelectValue placeholder="Select User 2" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user, index) => (
-                          <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
-                            {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        value={matchUser1Search}
+                        onChange={(e) => setMatchUser1Search(e.target.value)}
+                        placeholder="Filter by name or ID..."
+                        className="w-full text-xs px-2 py-1 rounded border border-input bg-background"
+                      />
+                      <Select value={matchUser1} onValueChange={(value) => {
+                        matchUser1Ref.current = value;
+                        setMatchUser1(value);
+                      }}>
+                        <SelectTrigger className="text-xs">
+                          <SelectValue placeholder="Select User 1" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterMatchUserOptions(matchUser1Search).map((user, index) => (
+                            <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
+                              {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <input
+                        type="text"
+                        value={matchUser2Search}
+                        onChange={(e) => setMatchUser2Search(e.target.value)}
+                        placeholder="Filter by name or ID..."
+                        className="w-full text-xs px-2 py-1 rounded border border-input bg-background"
+                      />
+                      <Select value={matchUser2} onValueChange={(value) => {
+                        matchUser2Ref.current = value;
+                        setMatchUser2(value);
+                      }}>
+                        <SelectTrigger className="text-xs">
+                          <SelectValue placeholder="Select User 2" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterMatchUserOptions(matchUser2Search).map((user, index) => (
+                            <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
+                              {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <Button onClick={createManualMatch} className="w-full text-xs h-8" size="sm">
                     Create Match
