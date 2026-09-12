@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Ruler, Briefcase, GraduationCap, User, Heart, Compass, Wine, Plus, Languages, Baby, MessageCircle, Gift, PawPrint, Share2, Sparkles, Star, Lightbulb } from 'lucide-react';
+import { Home, Ruler, Briefcase, GraduationCap, User, Heart, Compass, Wine, Plus, Languages, Baby, MessageCircle, Gift, PawPrint, Share2, Sparkles, Star, Lightbulb, FileText } from 'lucide-react';
 import { FAMILY_PLANS_OPTIONS, COMMUNICATION_STYLE_OPTIONS, LOVE_STYLE_OPTIONS, PETS_OPTIONS, SOCIAL_MEDIA_OPTIONS } from '@/constants/profileTraits';
 
 interface ProfileBasicsChipsProps {
@@ -30,6 +30,16 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
   // label is '' when nothing's set yet - the chip then renders icon + a bare "+"
   // (an add-it prompt) instead of a placeholder word, keeping it tiny.
   const chips: { key: string; icon: React.ReactNode; label: string; section: string; border: string }[] = [
+    // Bio is the one Basic Info field not already collected at signup (name/DOB
+    // are), and it's the whole 15pts or nothing - most profiles that are stuck
+    // below 100% are missing just this, so it gets its own chip to flag that.
+    {
+      key: 'bio',
+      icon: <FileText className="w-3 h-3" />,
+      label: editedProfile.bio?.trim() ? '✓' : '',
+      section: 'basicInfo',
+      border: 'border-green-500/50',
+    },
     {
       key: 'location',
       icon: <Home className="w-3 h-3" />,
@@ -128,10 +138,12 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
       section: 'socialMedia',
       border: 'border-violet-500/50',
     },
+    // Completion needs 3+ interests, not just 1 - "2" alone reads as done when
+    // it isn't, so this shows "2/3" until the threshold is actually met.
     {
       key: 'interests',
       icon: <Sparkles className="w-3 h-3" />,
-      label: interests.length > 0 ? String(interests.length) : '',
+      label: interests.length === 0 ? '' : interests.length < 3 ? `${interests.length}/3` : String(interests.length),
       section: 'interests',
       border: 'border-lime-500/50',
     },

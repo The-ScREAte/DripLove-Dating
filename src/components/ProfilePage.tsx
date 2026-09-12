@@ -53,6 +53,8 @@ type UserImageRow = {
   image_url: string | null
   is_approved: boolean | null
   moderation_status: string | null
+  label?: string | null
+  caption?: string | null
 }
 
 // Default preference age range used whenever a profile is missing min_age/
@@ -902,7 +904,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         // preview/completion count without appearing in the real Photos tab.
         const { data: images, error } = await supabase
           .from('user_images')
-          .select('image_url, is_approved, moderation_status')
+          .select('image_url, is_approved, moderation_status, label, caption')
           .eq('user_id', currentUser.id)
           .neq('image_order', -1)
           .order('image_order', { ascending: true });
@@ -936,6 +938,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     () => userImages.filter(img => img.is_approved && img.image_url).map(img => img.image_url as string),
     [userImages]
   );
+  const previewImageCaptions = useMemo(() => {
+    const map: Record<string, { label?: string | null; caption?: string | null }> = {};
+    for (const img of userImages) {
+      if (img.image_url && (img.label || img.caption)) {
+        map[img.image_url] = { label: img.label ?? null, caption: img.caption ?? null };
+      }
+    }
+    return map;
+  }, [userImages]);
   const previewMatch = useMemo<(PotentialMatch & { preferred_language?: string }) | null>(() => {
     if (!profile) return null;
     return {
@@ -977,8 +988,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       love_style: Array.isArray(profile.love_style) ? profile.love_style : [],
       pets: Array.isArray(profile.pets) ? profile.pets : [],
       social_media: profile.social_media || undefined,
+      imageCaptions: previewImageCaptions,
     };
-  }, [profile, previewImages]);
+  }, [profile, previewImages, previewImageCaptions]);
 
   if (showPremiumUpgrade) {
     return (

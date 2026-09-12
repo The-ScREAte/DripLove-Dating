@@ -105,7 +105,7 @@ const PREMIUM_USER_MAX_DISTANCE_KM = 1020;
 // has already had a few free look-arounds. Was hardcoded as "70" and "5"
 // independently in both handleLike and handlePass.
 const PROFILE_COMPLETION_REQUIRED_PERCENT = 70;
-const PROFILE_COMPLETION_GRACE_SWIPES = 5;
+const PROFILE_COMPLETION_GRACE_SWIPES = 8;
 
 // Fallback age range used whenever a user hasn't set min_age/max_age -
 // was independently re-typed as "18"/"99" in three separate places.
@@ -418,6 +418,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   useEffect(() => {
     userImagesRef.current = userImages;
   }, [userImages]);
+  // Optional per-photo label/caption (set in ImageManagement.tsx), keyed by the
+  // photo's own image_url - global across every profile fetched rather than
+  // per-profile, since image_url is already unique and this is simpler to
+  // merge as new profiles/images stream in from the several fetch paths below.
+  const [imageCaptions, setImageCaptions] = useState<Record<string, { label?: string | null; caption?: string | null }>>({});
+  const mergeImageCaptions = useCallback((rows: Array<{ image_url: string; label?: string | null; caption?: string | null }>) => {
+    const withContent = rows.filter((r) => r.label || r.caption);
+    if (withContent.length === 0) return;
+    setImageCaptions((prev) => {
+      const next = { ...prev };
+      for (const row of withContent) {
+        next[row.image_url] = { label: row.label ?? null, caption: row.caption ?? null };
+      }
+      return next;
+    });
+  }, []);
+  // Merges in the global (image_url-keyed) captions map so MatchCard can look
+  // up the currently-shown photo's caption off match.imageCaptions without
+  // every profile-construction site elsewhere needing to know about captions.
+  // Declared here (unconditionally, alongside the other top-level hooks) -
+  // not further down near where it's used - because several early returns
+  // between here and there (out of swipes, premium upsell, match animation)
+  // would otherwise make this hook run conditionally, which React's rules of
+  // hooks forbid and can crash the component when those states toggle.
+  const currentMatchWithCaptions = useMemo(() => {
+    const current = potentialMatches[currentIndex];
+    if (!current || isAd(current)) return current;
+    return { ...current, imageCaptions } as PotentialMatch;
+  }, [potentialMatches, currentIndex, imageCaptions]);
   // Store distances from location service
   const [userDistances, setUserDistances] = useState<{ [key: string]: number }>({});
   // Store preloaded blob URLs for instant image rendering
@@ -1032,11 +1061,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       try {
         const { data: images } = await supabase
           .from('user_images')
-          .select('image_url, image_order')
+          .select('image_url, image_order, label, caption')
           .eq('user_id', profileId)
           .eq('is_approved', true)
           .neq('image_order', -1)
           .order('image_order', { ascending: true });
+
+        if (images) mergeImageCaptions(images);
 
         return images?.map(img => img.image_url) || [];
       } catch {
@@ -1049,7 +1080,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     inFlightProfileImageFetchesRef.current.set(profileId, fetchPromise);
 
     return fetchPromise;
-  }, []);
+  }, [mergeImageCaptions]);
 
   // Fetch profiles from unlocked countries (premium)
   const fetchUnlockedCountryProfiles = useCallback(async ({
@@ -2004,7 +2035,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // Get ALL approved images for the first 8 profiles
       const { data: imageRows, error: imgError } = await supabase
         .from('user_images')
-        .select('user_id, image_url, image_order')
+        .select('user_id, image_url, image_order, label, caption')
         .in('user_id', firstEightIds)
         .eq('is_approved', true)
           .neq('image_order', -1)
@@ -2012,6 +2043,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         .order('image_order', { ascending: true });
 
       if (!imgError && imageRows) {
+        mergeImageCaptions(imageRows);
         // Group by user_id
         const byUser: Record<string, string[]> = {};
         for (const row of imageRows) {
@@ -2057,7 +2089,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       index: startIndex,
       asyncActivityDeck,
     };
-  }, [premiumActive, currentUser, fetchUnlockedCountryProfiles]);
+  }, [premiumActive, currentUser, fetchUnlockedCountryProfiles, mergeImageCaptions]);
 
   // Batch language fetch (avoid per-card calls)
   const batchFetchLanguages = useCallback(async (profileIds: string[]) => {
@@ -2457,17 +2489,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Load in background - don't await
     (async () => {
       try {
-        type UserImageRow = { user_id: string; image_url: string; image_order: number | null };
+        type UserImageRow = { user_id: string; image_url: string; image_order: number | null; label?: string | null; caption?: string | null };
 
         const { data: imageRows } = await supabase
           .from('user_images')
-          .select('user_id, image_url, image_order')
+          .select('user_id, image_url, image_order, label, caption')
           .in('user_id', idsToLoad)
           .eq('is_approved', true)
           .neq('image_order', -1)
           .order('user_id', { ascending: true })
           .order('image_order', { ascending: true })
           .returns<UserImageRow[]>();
+
+        if (imageRows) mergeImageCaptions(imageRows);
 
         const byUser: Record<string, string[]> = {};
         const allowedUserIds = new Set(idsToLoad);
@@ -2527,7 +2561,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         idsToLoad.forEach((id) => requestedImageProfileIds.current.delete(id));
       }
     })();
-  }, []);
+  }, [mergeImageCaptions]);
 
   // Force refresh function for preference changes
   const forceRefresh = useCallback(() => {
@@ -5586,7 +5620,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             {/* Render MatchCard for image/swipe area */}
             {currentMatch && !isAd(currentMatch) && (
               <MatchCard
-                match={currentMatch}
+                match={currentMatchWithCaptions || currentMatch}
                 imageIndex={imageIndex}
                 showMoreInfo={showMoreInfo}
                 isPremium={premiumActive}
@@ -5659,7 +5693,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 {/* Render MatchCard details area */}
                 {currentMatch && !isAd(currentMatch) && (
                   <MatchCard
-                    match={currentMatch}
+                    match={currentMatchWithCaptions || currentMatch}
                     imageIndex={imageIndex}
                     showMoreInfo={showMoreInfo}
                     isPremium={premiumActive}

@@ -696,7 +696,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword" className="text-sm font-medium text-black">{t('auth.confirmPassword')}</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       id="confirmPassword"
                       name="confirmPassword"
@@ -716,7 +716,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>

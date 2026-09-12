@@ -3,11 +3,16 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
-import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock, ImageOff, Plus, X } from 'lucide-react';
+import { Upload, Trash2, Shield, CheckCircle, RefreshCw, Camera, Pencil, Clock, ImageOff, Plus, X, Tag, Check } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { PHOTO_LABEL_OPTIONS } from '@/constants/photoLabels';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/utils/imageCompression';
@@ -44,6 +49,8 @@ interface UserImage {
   image_url: string;
   is_approved?: boolean;
   moderation_status?: string;
+  label?: string | null;
+  caption?: string | null;
 }
 
 interface ModerationDecision {
@@ -190,6 +197,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
   // Which photo's action overlay (crop/replace/delete) is open - tap-to-reveal
   // since hover doesn't exist on touch devices.
   const [activeImageUrl, setActiveImageUrl] = useState<string | null>(null);
+  // Optional per-photo label/caption editor popup (opened from the preview
+  // overlay's left-side tag button). Local draft state only - nothing is
+  // saved until handleSaveLabelCaption runs.
+  const [labelPopupUrl, setLabelPopupUrl] = useState<string | null>(null);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [captionDraft, setCaptionDraft] = useState('');
+  const [savingLabelCaption, setSavingLabelCaption] = useState(false);
   const { toast } = useToast();
 
   // Drag-to-reorder via dnd-kit: mouse activates on a small drag distance,
@@ -393,7 +407,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
       // slot, so it's excluded here.
       const { data: images, error } = await supabase
         .from('user_images')
-        .select('id, image_url, is_approved, moderation_status')
+        .select('id, image_url, is_approved, moderation_status, label, caption')
         .eq('user_id', currentUser.id)
         .neq('image_order', -1)
         .order('image_order', { ascending: true });
@@ -404,7 +418,9 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
         id: img.id,
         image_url: img.image_url,
         is_approved: img.is_approved ?? true,
-        moderation_status: img.moderation_status ?? 'approved'
+        moderation_status: img.moderation_status ?? 'approved',
+        label: img.label ?? null,
+        caption: img.caption ?? null,
       })));
     } catch (error) {
       console.error('Error fetching user images:', error);
@@ -702,6 +718,42 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
     }
   };
 
+  const handleSaveLabelCaption = async (imageUrl: string, label: string | null, caption: string | null) => {
+    const image = userImages.find((img) => img.image_url === imageUrl);
+    if (!image) return;
+
+    setSavingLabelCaption(true);
+    try {
+      const { error } = await supabase
+        .from('user_images')
+        .update({ label, caption })
+        .eq('id', image.id);
+
+      if (error) throw error;
+
+      setUserImages((prev) => prev.map((img) =>
+        img.id === image.id ? { ...img, label, caption } : img
+      ));
+      setLabelPopupUrl(null);
+      // Refreshes ProfilePage's own separate user_images fetch (which feeds the
+      // Profile Preview's captions) so the change shows immediately there too,
+      // instead of only in this component's local state until a page reload.
+      onProfileUpdate?.();
+    } catch (error) {
+      console.error('Error saving photo label/caption:', error);
+      const message = error && typeof error === 'object' && 'message' in error
+        ? String((error as { message?: unknown }).message)
+        : "Something went wrong saving the photo description. Try again.";
+      toast({
+        title: "Couldn't save",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setSavingLabelCaption(false);
+    }
+  };
+
   const handleDeleteImage = async (imageUrl: string) => {
     // Check if only 2 images remain - prevent deletion
     if (userImages.length <= 2) {
@@ -925,11 +977,11 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
         return (
           <div
             className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4"
-            onClick={() => setActiveImageUrl(null)}
+            onClick={() => { setActiveImageUrl(null); setLabelPopupUrl(null); }}
           >
             <button
               type="button"
-              onClick={() => setActiveImageUrl(null)}
+              onClick={() => { setActiveImageUrl(null); setLabelPopupUrl(null); }}
               className="absolute top-4 right-4 text-white/80 hover:text-white"
               aria-label="Close"
             >
@@ -942,6 +994,102 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                 alt="Photo preview"
                 className="max-w-[92vw] max-h-[70vh] object-contain rounded-xl block"
               />
+
+              {/* Optional per-photo description - mirrors the crop/replace/delete
+                  cluster on the right, but on the left since it's a separate,
+                  optional concern rather than another destructive/edit action. */}
+              <div className="absolute top-3 left-3 flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    const img = userImages.find((u) => u.image_url === previewUrl);
+                    setLabelDraft(img?.label || '');
+                    setCaptionDraft(img?.caption || '');
+                    setLabelPopupUrl(previewUrl);
+                  }}
+                  style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                  className={`shrink-0 backdrop-blur-sm border rounded-full shadow-sm transition-colors ${
+                    userImages.find((u) => u.image_url === previewUrl)?.caption
+                      ? 'bg-pink-500/80 hover:bg-pink-500 border-pink-300/40 text-white'
+                      : 'bg-black/60 hover:bg-black/80 border-white/15 text-white'
+                  }`}
+                  title="Add description"
+                >
+                  <Tag size={15} style={{ width: 15, height: 15 }} />
+                </Button>
+              </div>
+
+              {labelPopupUrl === previewUrl && (() => {
+                const img = userImages.find((u) => u.image_url === previewUrl);
+                return (
+                  <div
+                    className="absolute top-11 left-3 z-10 w-64 max-w-[80vw] rounded-2xl bg-black/95 border border-pink-500/30 shadow-lg px-2.5 pb-2 space-y-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="space-y-0.5">
+                      <label className="text-[11px] font-medium text-white/60">What's this photo?</label>
+                      <Select value={labelDraft || undefined} onValueChange={setLabelDraft}>
+                        <SelectTrigger className="h-7 py-0 bg-white/5 border-white/15 text-white text-sm">
+                          <SelectValue placeholder="Pick a vibe (optional)" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-black border-pink-500/30 text-white">
+                          {PHOTO_LABEL_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option} className="text-sm">
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <label className="text-[11px] font-medium text-white/60">Caption (optional)</label>
+                      {/* Textarea, not Input - a single-line input just scrolls
+                          horizontally past its own width instead of wrapping,
+                          which hides the end of anything past a few words. */}
+                      <Textarea
+                        value={captionDraft}
+                        onChange={(e) => setCaptionDraft(e.target.value.slice(0, 50))}
+                        placeholder="Say something short..."
+                        maxLength={50}
+                        rows={2}
+                        className="resize-none bg-white/5 border-white/15 text-white text-sm placeholder:text-white/40 min-h-0 py-1.5"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      {(img?.label || img?.caption) ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLabelCaption(previewUrl, null, null)}
+                          disabled={savingLabelCaption}
+                          className="text-[11px] text-white/50 hover:text-white/80 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      ) : <span />}
+                      <div className="flex items-center gap-2 ml-auto">
+                        <Button
+                          onClick={() => handleSaveLabelCaption(previewUrl, labelDraft || null, captionDraft.trim() || null)}
+                          disabled={savingLabelCaption}
+                          style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                          className="shrink-0 bg-emerald-600/90 hover:bg-emerald-600 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                          title="Save"
+                        >
+                          <Check size={15} style={{ width: 15, height: 15 }} />
+                        </Button>
+                        <Button
+                          onClick={() => setLabelPopupUrl(null)}
+                          style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
+                          className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                          title="Cancel"
+                        >
+                          <X size={15} style={{ width: 15, height: 15 }} />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="absolute top-3 right-3 flex items-center gap-2">
                 <Button

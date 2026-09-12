@@ -30,7 +30,7 @@ import type { PotentialMatch } from '@/types';
 // Reuse Discover's exact slide-building/rendering so the "view a liker" screen
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './discover/MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from './discover/MatchCardHelpers';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink, parseFavorites } from '@/constants/favorites';
 import MusicLinkBadge from './discover/MusicLinkBadge';
 import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
@@ -73,6 +73,14 @@ const LIKED_ME_STORAGE_KEY_PREFIX = 'likedMe_v1_';
 // Likers are fetched a page at a time via get_likers_page - this is both
 // the initial page size and the size of each subsequent "Load More" page.
 const LIKERS_PAGE_SIZE = 500;
+// Where the second captioned photo call-out can land in the expanded details
+// panel - always above Personality. Module-level (not per-render) since it's
+// a fixed constant, not something that needs recreating on every render.
+const PHOTO_ANCHORS = ['lifestyle', 'workEducation'] as const;
+// Caption text is capped at 50 characters, matching the limit enforced when
+// saving it in ImageManagement.tsx, so this should rarely ever truncate -
+// it's just a safety net for older captions saved before that cap existed.
+const truncateCaption = (text: string) => (text.length > 50 ? `${text.slice(0, 50).trimEnd()}…` : text);
 
 type CurrentUser = AppUser;
 
@@ -195,6 +203,20 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const blockCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  // Optional per-photo label/caption (ImageManagement.tsx), keyed by the
+  // photo's own image_url - same pattern as DiscoverPage.tsx's imageCaptions.
+  const [imageCaptions, setImageCaptions] = useState<Record<string, { label?: string | null; caption?: string | null }>>({});
+  const mergeImageCaptions = useCallback((rows: Array<{ image_url: string; label?: string | null; caption?: string | null }>) => {
+    const withContent = rows.filter((r) => r.label || r.caption);
+    if (withContent.length === 0) return;
+    setImageCaptions((prev) => {
+      const next = { ...prev };
+      for (const row of withContent) {
+        next[row.image_url] = { label: row.label ?? null, caption: row.caption ?? null };
+      }
+      return next;
+    });
+  }, []);
   // Swipe-to-pass/like-back on the photo card, same gesture as Discover's swipe
   // card, replacing the old dedicated X/heart button row.
   const [swipeDragX, setSwipeDragX] = useState(0);
@@ -683,7 +705,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       // Try to fetch approved images first
       const { data: initialImages, error } = await supabase
         .from('user_images')
-        .select('image_url')
+        .select('image_url, label, caption')
         .eq('user_id', profileId)
         .eq('is_approved', true)
           .neq('image_order', -1) // Only show approved images
@@ -698,7 +720,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       if (error && error.message.includes('does not exist')) {
         const { data: fallbackImages, error: fallbackError } = await supabase
           .from('user_images')
-          .select('image_url')
+          .select('image_url, label, caption')
           .eq('user_id', profileId)
           .order('image_order')
           .abortSignal(controller.signal);
@@ -710,6 +732,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       }
 
       if (images?.length && !controller.signal.aborted) {
+        mergeImageCaptions(images);
         const imageUrls = images.map(img => img.image_url);
         
         // ⭐ FIX #1: Preload all images as blobs for instant flipping
@@ -731,7 +754,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         fullImageAbortRef.current = null;
       }
     }
-  }, [userImages]); // Removed platform dependency - it's stable via useMemo
+  }, [userImages, mergeImageCaptions]); // Removed platform dependency - it's stable via useMemo
 
   useEffect(() => {
     if (!currentUser?.id) {
@@ -813,12 +836,78 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return buildSlides(selectedProfile as unknown as PotentialMatch, profileImages);
   }, [selectedProfile, userImages]);
 
-  // Same "one interest + up to 2 lifestyle attributes" chip line Discover's
-  // swipe card shows when collapsed, via the shared helper.
+  // Same rotating highlight-chip pool Discover's swipe card uses, paging
+  // through a fresh set of profile attributes as the viewer taps through
+  // photos instead of always showing the same handful.
   const previewHighlights = useMemo(() => {
     if (!selectedProfile) return [];
-    return getPreviewHighlights(selectedProfile as unknown as PotentialMatch);
+    return getPreviewHighlights(selectedProfile as unknown as PotentialMatch, currentSlide);
+  }, [selectedProfile, currentSlide]);
+
+  // Up to 2 of this profile's photos that have a caption set (ImageManagement.tsx),
+  // picked once via a seeded shuffle so the same 1-2 photos surface consistently
+  // for this profile rather than a different random pick every render.
+  const captionedPhotos = useMemo(() => {
+    if (!selectedProfile) return [];
+    const entries = Object.entries(imageCaptions)
+      .filter(([url, v]) => v?.caption && (userImages[selectedProfile.id] || []).includes(url))
+      .map(([url, v]) => ({ url, caption: v!.caption as string, label: v!.label || null }));
+    if (entries.length === 0) return [];
+    const seed = seedFromString(`${selectedProfile.id || ''}_photocaption`);
+    const rand = mulberry32(seed);
+    const shuffled = [...entries];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 2);
+  }, [selectedProfile, imageCaptions, userImages]);
+
+  // Both captioned photos show in the expanded panel, but scattered rather
+  // than back-to-back: the first sits right after About, and the second
+  // lands after a randomly chosen later section (seeded per profile, so it's
+  // consistent rather than jumping around on every re-render).
+  const secondPhotoAnchor = useMemo(() => {
+    if (captionedPhotos.length < 2 || !selectedProfile) return null;
+    const seed = seedFromString(`${selectedProfile.id || ''}_photo2anchor`);
+    const rand = mulberry32(seed);
+    return PHOTO_ANCHORS[Math.floor(rand() * PHOTO_ANCHORS.length)];
+  }, [captionedPhotos.length, selectedProfile]);
+
+  // useCallback (stable reference, no closures over changing state - purely a
+  // function of its argument) so it can safely sit in other memos' dependency
+  // arrays without forcing them to recompute every render.
+  const renderPhotoCaptionCard = useCallback((photo: { url: string; caption: string; label?: string | null }) => (
+    <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
+      <img
+        src={optimizeImageUrl(photo.url, { width: 400, quality: 70 })}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 px-3 pt-8 pb-2.5"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))' }}
+      >
+        {photo.label && (
+          <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wide truncate">{photo.label}</p>
+        )}
+        <p className="text-white text-sm leading-snug break-words">{truncateCaption(photo.caption)}</p>
+      </div>
+    </div>
+  ), []);
+
+  // The collapsed card's "body" rotates through chips and a bio excerpt as
+  // the viewer taps through photos, mirroring Discover's MatchCard -
+  // captioned photos are surfaced separately, in the expanded "Photos"
+  // section below, not here in the collapsed call-out.
+  const infoSlotSequence = useMemo(() => {
+    const seq: Array<'chips' | 'about'> = ['chips', 'chips'];
+    if (selectedProfile?.bio?.trim()) seq.push('about');
+    return seq;
   }, [selectedProfile]);
+
+  const activeInfoSlot = infoSlotSequence[currentSlide % infoSlotSequence.length];
+  const showAbout = activeInfoSlot === 'about';
 
   // Same "earned" verified badge shown on the user's own profile page (>=85%
   // profile completion), not a face-verification flag.
@@ -828,16 +917,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return calculateProfileCompletion(selectedProfile, profileImages).showVerifiedBadge;
   }, [selectedProfile, userImages]);
 
-  // One cultural sign to surface as its own chip: whichever sign this profile
-  // shares with the current user if they have one in common, otherwise just
-  // one of the profile's own signs (deterministic, so it doesn't change on
-  // every re-render).
+  // One cultural sign to surface as its own chip, cycling through ALL of this
+  // profile's signs (not just the first) as the viewer taps through photos -
+  // shared signs with the current user come first, then the rest follow in
+  // order across later photos, mirroring Discover's MatchCard.
   const signHighlight = useMemo(() => {
     const theirs = selectedProfile?.adinkra_symbols;
     if (!theirs || theirs.length === 0) return null;
     const mine = (currentUser as unknown as { adinkra_symbols?: string[] | null })?.adinkra_symbols || [];
-    return theirs.find(symbol => mine.includes(symbol)) || theirs[0];
-  }, [selectedProfile, currentUser]);
+    const shared = theirs.filter(symbol => mine.includes(symbol));
+    const rest = theirs.filter(symbol => !mine.includes(symbol));
+    const ordered = [...shared, ...rest];
+    return ordered[currentSlide % ordered.length];
+  }, [selectedProfile, currentUser, currentSlide]);
 
   // Structured favorites (jsonb) - parsed once so both the compact preview
   // row and the expanded panel can read plain FavoriteEntry objects.
@@ -1509,36 +1601,66 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                       <Calendar className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
                       <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
                     </div>
-                    <div className="flex items-center">
-                      <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                      <span>
-                        {selectedProfile.city}, {selectedProfile.country}
-                        {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
-                          <span className="ml-2">• {formatHeightLabel(selectedProfile.height_cm)}</span>
-                        )}
-                      </span>
-                    </div>
+                    {/* Location and "looking for" alternate by photo, one at a time, matching
+                        Discover's MatchCard - falls back to whichever exists if only one is set. */}
+                    {(() => {
+                      const hasLocation = !!selectedProfile.city;
+                      const hasIntent = !!selectedProfile.relationship_intent;
+                      const showLocation = hasLocation && (!hasIntent || currentSlide % 2 === 0);
+                      // Never alongside About - a bio excerpt already speaks for the
+                      // person, so pairing it with "looking for" felt redundant.
+                      const showIntent = !showAbout && hasIntent && (!hasLocation || currentSlide % 2 === 1);
+
+                      if (showLocation) {
+                        return (
+                          <div className="flex items-center">
+                            <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                            <span>
+                              {selectedProfile.city}, {selectedProfile.country}
+                              {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
+                                <span className="ml-2">• {formatHeightLabel(selectedProfile.height_cm)}</span>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (showIntent) {
+                        return (
+                          <div className="flex items-center">
+                            <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                            <span>{selectedProfile.relationship_intent}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
-                  {!showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
-                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                      {previewHighlights.map((highlight, index) => (
-                        <span
-                          key={index}
-                          className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
-                        >
-                          {truncateChipLabel(highlight)}
-                        </span>
-                      ))}
-                      {signHighlight && (
-                        <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
-                          <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
-                        </span>
-                      )}
-                      {musicHighlight?.link && (
-                        <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
-                      )}
-                    </div>
+                  {!showMoreInfo && showAbout ? (
+                    <p className="mt-2 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
+                      {selectedProfile.bio}
+                    </p>
+                  ) : (
+                    !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                        {previewHighlights.map((highlight, index) => (
+                          <span
+                            key={index}
+                            className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                          >
+                            {truncateChipLabel(highlight)}
+                          </span>
+                        ))}
+                        {signHighlight && (
+                          <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
+                            <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                          </span>
+                        )}
+                        {musicHighlight?.link && (
+                          <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
+                        )}
+                      </div>
+                    )
                   )}
                 </div>
 
@@ -1642,6 +1764,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {/* First captioned photo (ImageManagement.tsx) - no section heading, just
+                  the photo, its preset label (what it's about), and the full caption
+                  (capped at 50 chars) pinned to the image's own bottom edge. */}
+              {captionedPhotos[0] && renderPhotoCaptionCard(captionedPhotos[0])}
+
               {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Height</h4>
@@ -1688,6 +1815,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {secondPhotoAnchor === 'lifestyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
+
               {selectedProfile.family_plans && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2">Family Plans</h4>
@@ -1723,6 +1852,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                   </div>
                 </div>
               )}
+
+              {secondPhotoAnchor === 'workEducation' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
 
               {(typeof selectedProfile.introvert_extrovert === 'number' || typeof selectedProfile.spontaneous_planner === 'number' || typeof selectedProfile.messy_organized === 'number') && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -1772,6 +1903,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 </div>
               )}
 
+              {secondPhotoAnchor === 'personality' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
+
               {selectedProfile.communication_style && selectedProfile.communication_style.length > 0 && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
                   <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
@@ -1787,6 +1920,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                   </div>
                 </div>
               )}
+
+              {secondPhotoAnchor === 'communicationStyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
 
               {selectedProfile.love_style && selectedProfile.love_style.length > 0 && (
                 <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -2043,7 +2178,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp]);
+  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, captionedPhotos, secondPhotoAnchor, renderPhotoCaptionCard, showAbout, showVerifiedBadge]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showMatchAnimation && matchedProfile) {

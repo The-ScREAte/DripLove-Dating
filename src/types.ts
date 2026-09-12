@@ -61,6 +61,12 @@ export interface PotentialMatch {
   // attribute a swipe outcome back to the mechanism that surfaced it for
   // telemetry. Never sent to the server as part of the profile itself.
   likedYouMechanism?: 'A' | 'B';
+  // Optional per-photo label/caption (see ImageManagement.tsx), keyed by the
+  // photo's own image_url. Populated separately from the rest of this object
+  // (see DiscoverPage.tsx's imageCaptions state) since it comes from
+  // user_images columns not otherwise fetched alongside a profile's core
+  // fields.
+  imageCaptions?: Record<string, { label?: string | null; caption?: string | null }>;
 }
 
 export interface ChatMatch {

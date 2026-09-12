@@ -2011,6 +2011,7 @@ export type Database = {
       }
       user_images: {
         Row: {
+          caption: string | null
           confidence_score: number | null
           created_at: string | null
           face_similarity: number | null
@@ -2019,6 +2020,7 @@ export type Database = {
           image_order: number
           image_url: string
           is_approved: boolean | null
+          label: string | null
           moderated_at: string | null
           moderated_by: string | null
           moderation_labels: Json | null
@@ -2028,6 +2030,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          caption?: string | null
           confidence_score?: number | null
           created_at?: string | null
           face_similarity?: number | null
@@ -2036,6 +2039,7 @@ export type Database = {
           image_order: number
           image_url: string
           is_approved?: boolean | null
+          label?: string | null
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_labels?: Json | null
@@ -2045,6 +2049,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          caption?: string | null
           confidence_score?: number | null
           created_at?: string | null
           face_similarity?: number | null
@@ -2053,6 +2058,7 @@ export type Database = {
           image_order?: number
           image_url?: string
           is_approved?: boolean | null
+          label?: string | null
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_labels?: Json | null

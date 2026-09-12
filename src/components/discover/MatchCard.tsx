@@ -9,7 +9,7 @@ import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from './MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
@@ -43,6 +43,11 @@ const formatHeightLabel = (cm: number) => {
   const inches = totalInches % 12;
   return `${feet}'${inches}" (${cm} cm)`;
 };
+
+// Where the second captioned photo call-out can land in the expanded details
+// panel - always above Personality. Module-level (not per-render) since it's
+// a fixed constant, not something that needs recreating on every render.
+const PHOTO_ANCHORS = ['lifestyle', 'workEducation'] as const;
 
 interface MatchCardProps {
   match: PotentialMatch;
@@ -167,6 +172,72 @@ const MatchCard: React.FC<MatchCardProps> = ({
     () => getPreviewHighlights(stableMatch, currentSlide),
     [stableMatch, currentSlide]
   );
+
+  // Up to 2 of this profile's photos that have a caption set (ImageManagement.tsx),
+  // picked once via a seeded shuffle so the same 1-2 photos surface consistently
+  // for this profile rather than a different random pick every render.
+  const captionedPhotos = useMemo(() => {
+    const entries = Object.entries(match.imageCaptions || {})
+      .filter(([, v]) => v?.caption)
+      .map(([url, v]) => ({ url, caption: v!.caption as string, label: v!.label || null }));
+    if (entries.length === 0) return [];
+    const seed = seedFromString(`${match.id || match.first_name || ''}_photocaption`);
+    const rand = mulberry32(seed);
+    const shuffled = [...entries];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 2);
+  }, [match.imageCaptions, match.id, match.first_name]);
+
+  // Both captioned photos show in the expanded panel, but scattered rather
+  // than back-to-back: the first sits right after About, and the second
+  // lands after a randomly chosen later section (seeded per profile, so it's
+  // consistent rather than jumping around on every re-render).
+  const secondPhotoAnchor = useMemo(() => {
+    if (captionedPhotos.length < 2) return null;
+    const seed = seedFromString(`${match.id || match.first_name || ''}_photo2anchor`);
+    const rand = mulberry32(seed);
+    return PHOTO_ANCHORS[Math.floor(rand() * PHOTO_ANCHORS.length)];
+  }, [captionedPhotos.length, match.id, match.first_name]);
+
+  // Caption text is capped at 50 characters, matching the limit enforced when
+  // saving it in ImageManagement.tsx, so this should rarely ever truncate -
+  // it's just a safety net for older captions saved before that cap existed.
+  const truncateCaption = (text: string) => (text.length > 50 ? `${text.slice(0, 50).trimEnd()}…` : text);
+
+  const renderPhotoCaptionCard = (photo: { url: string; caption: string; label?: string | null }) => (
+    <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
+      <img
+        src={optimizeImageUrl(photo.url, { width: 400, quality: 70 })}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 px-3 pt-8 pb-2.5"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))' }}
+      >
+        {photo.label && (
+          <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wide truncate">{photo.label}</p>
+        )}
+        <p className="text-white text-sm leading-snug break-words">{truncateCaption(photo.caption)}</p>
+      </div>
+    </div>
+  );
+
+  // The collapsed card's "body" (below name/location) rotates through chips
+  // and a bio excerpt as the viewer taps through photos - captioned photos
+  // are surfaced separately, in the expanded "Photos" section below, not
+  // here in the collapsed call-out.
+  const infoSlotSequence = useMemo(() => {
+    const seq: Array<'chips' | 'about'> = ['chips', 'chips'];
+    if (stableMatch.bio?.trim()) seq.push('about');
+    return seq;
+  }, [stableMatch.bio]);
+
+  const activeInfoSlot = infoSlotSequence[currentSlide % infoSlotSequence.length];
+  const showAbout = activeInfoSlot === 'about';
 
   // Same "earned" verified badge shown on the user's own profile page (>=85%
   // profile completion) - not the face-verification `isVerified` prop, which
@@ -725,7 +796,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   const hasLocation = !!match.city;
                   const hasIntent = !!match.relationship_intent;
                   const showLocation = hasLocation && (!hasIntent || currentSlide % 2 === 0);
-                  const showIntent = hasIntent && (!hasLocation || currentSlide % 2 === 1);
+                  // Never alongside About - a bio excerpt already speaks for the
+                  // person, so pairing it with "looking for" felt redundant.
+                  const showIntent = !showAbout && hasIntent && (!hasLocation || currentSlide % 2 === 1);
 
                   return (
                     <>
@@ -765,25 +838,31 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   );
                 })()}
 
-                {!showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
-                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                    {previewHighlights.map((highlight, index) => (
-                      <span
-                        key={index}
-                        className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
-                      >
-                        {truncateChipLabel(highlight)}
-                      </span>
-                    ))}
-                    {signHighlight && (
-                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-6 h-6 shrink-0">
-                        <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
-                      </span>
-                    )}
-                    {musicHighlight?.link && (
-                      <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
-                    )}
-                  </div>
+                {!showMoreInfo && showAbout ? (
+                  <p className="mt-2 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
+                    {stableMatch.bio}
+                  </p>
+                ) : (
+                  !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                      {previewHighlights.map((highlight, index) => (
+                        <span
+                          key={index}
+                          className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                        >
+                          {truncateChipLabel(highlight)}
+                        </span>
+                      ))}
+                      {signHighlight && (
+                        <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-6 h-6 shrink-0">
+                          <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                        </span>
+                      )}
+                      {musicHighlight?.link && (
+                        <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
+                      )}
+                    </div>
+                  )
                 )}
               </div>
 
@@ -995,6 +1074,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </div>
             )}
 
+            {/* First captioned photo (ImageManagement.tsx) - no section heading, just
+                the photo, its preset label (what it's about), and the full caption
+                (capped at 50 chars) pinned to the image's own bottom edge. */}
+            {captionedPhotos[0] && renderPhotoCaptionCard(captionedPhotos[0])}
+
             {/* Height */}
             {typeof match.height_cm === 'number' && match.height_cm > 0 && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -1048,6 +1132,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </div>
             )}
 
+            {secondPhotoAnchor === 'lifestyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
+
             {/* Family Plans */}
             {match.family_plans && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -1079,6 +1165,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               </div>
             )}
+
+            {secondPhotoAnchor === 'workEducation' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
 
             {/* Personality */}
             {(typeof match.introvert_extrovert === 'number' || typeof match.spontaneous_planner === 'number' || typeof match.messy_organized === 'number') && (
@@ -1135,6 +1223,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
               </div>
             )}
 
+            {secondPhotoAnchor === 'personality' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
+
             {/* Communication Style */}
             {match.communication_style && match.communication_style.length > 0 && (
               <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -1151,6 +1241,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 </div>
               </div>
             )}
+
+            {secondPhotoAnchor === 'communicationStyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
 
             {/* Love Style */}
             {match.love_style && match.love_style.length > 0 && (
@@ -1331,6 +1423,13 @@ const areImageStatusMapsEqual = (
 export default React.memo(MatchCard, (prev, next) => {
   return (
     prev.match.id === next.match.id &&
+    // Reference check only (cheap) - DiscoverPage.tsx only produces a new
+    // imageCaptions object when a fetch actually merges in new label/caption
+    // content, so this rarely changes and never during a swipe. Without it,
+    // a caption that finishes loading after the card is already mounted
+    // would silently never appear until something else (like flipping
+    // photos) forced a re-render anyway.
+    prev.match.imageCaptions === next.match.imageCaptions &&
     prev.isActiveTab === next.isActiveTab &&
     areStringArraysEqual(prev.userImages, next.userImages) &&
     areStringMapsEqual(prev.preloadedBlobImages, next.preloadedBlobImages) &&

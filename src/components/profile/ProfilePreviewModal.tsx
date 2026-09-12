@@ -20,7 +20,7 @@ import { PotentialMatch } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
-import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from '../discover/MatchCardHelpers';
+import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from '../discover/MatchCardHelpers';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import {
   FAMILY_PLANS_OPTIONS,
@@ -66,6 +66,11 @@ const BACKGROUND_COLORS = [
   'bg-gradient-to-br from-rose-600 to-pink-900',
   'bg-gradient-to-br from-fuchsia-600 to-purple-900',
 ];
+
+// Where the second captioned photo call-out can land in the expanded details
+// panel - always above Personality. Module-level (not per-render) since it's
+// a fixed constant, not something that needs recreating on every render.
+const PHOTO_ANCHORS = ['lifestyle', 'workEducation'] as const;
 
 const formatRelationshipIntent = (intent?: string | null) => {
   if (!intent) return '';
@@ -153,7 +158,82 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   const expandedDetailsRef = useRef<HTMLDivElement>(null);
 
   const slides = useMemo(() => buildSlides(profile, images), [profile, images]);
-  const previewHighlights = useMemo(() => getPreviewHighlights(profile), [profile]);
+  const previewHighlights = useMemo(
+    () => getPreviewHighlights(profile, currentSlide),
+    [profile, currentSlide]
+  );
+  // Cycles through ALL of this profile's signs (not just the first) as the
+  // viewer taps through photos, mirroring MatchCard's rotation.
+  const signHighlight = useMemo(() => {
+    const theirs = profile.adinkra_symbols;
+    if (!theirs || theirs.length === 0) return null;
+    return theirs[currentSlide % theirs.length];
+  }, [profile.adinkra_symbols, currentSlide]);
+  // Up to 2 of this profile's photos that have a caption set (ImageManagement.tsx),
+  // picked once via a seeded shuffle so the same 1-2 photos surface consistently
+  // rather than a different random pick every render.
+  const captionedPhotos = useMemo(() => {
+    const entries = Object.entries(profile.imageCaptions || {})
+      .filter(([, v]) => v?.caption)
+      .map(([url, v]) => ({ url, caption: v!.caption as string, label: v!.label || null }));
+    if (entries.length === 0) return [];
+    const seed = seedFromString(`${profile.id || profile.first_name || ''}_photocaption`);
+    const rand = mulberry32(seed);
+    const shuffled = [...entries];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 2);
+  }, [profile.imageCaptions, profile.id, profile.first_name]);
+
+  // Both captioned photos show in the expanded panel, but scattered rather
+  // than back-to-back: the first sits right after About, and the second
+  // lands after a randomly chosen later section (seeded per profile, so it's
+  // consistent rather than jumping around on every re-render).
+  const secondPhotoAnchor = useMemo(() => {
+    if (captionedPhotos.length < 2) return null;
+    const seed = seedFromString(`${profile.id || profile.first_name || ''}_photo2anchor`);
+    const rand = mulberry32(seed);
+    return PHOTO_ANCHORS[Math.floor(rand() * PHOTO_ANCHORS.length)];
+  }, [captionedPhotos.length, profile.id, profile.first_name]);
+
+  // Caption text is capped at 50 characters, matching the limit enforced when
+  // saving it in ImageManagement.tsx, so this should rarely ever truncate -
+  // it's just a safety net for older captions saved before that cap existed.
+  const truncateCaption = (text: string) => (text.length > 50 ? `${text.slice(0, 50).trimEnd()}…` : text);
+
+  const renderPhotoCaptionCard = (photo: { url: string; caption: string; label?: string | null }) => (
+    <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
+      <img
+        src={optimizeImageUrl(photo.url, { width: 400, quality: 70 })}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 px-3 pt-8 pb-2.5"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))' }}
+      >
+        {photo.label && (
+          <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wide truncate">{photo.label}</p>
+        )}
+        <p className="text-white text-sm leading-snug break-words">{truncateCaption(photo.caption)}</p>
+      </div>
+    </div>
+  );
+
+  // The collapsed card's "body" rotates through chips and a bio excerpt as
+  // the viewer taps through photos, mirroring Discover's MatchCard -
+  // captioned photos are surfaced separately, in the expanded "Photos"
+  // section below, not here in the collapsed call-out.
+  const infoSlotSequence = useMemo(() => {
+    const seq: Array<'chips' | 'about'> = ['chips', 'chips'];
+    if (profile.bio?.trim()) seq.push('about');
+    return seq;
+  }, [profile.bio]);
+
+  const activeInfoSlot = infoSlotSequence[currentSlide % infoSlotSequence.length];
+  const showAbout = activeInfoSlot === 'about';
   // Same "earned" verified badge shown on the user's own profile page (>=85%
   // profile completion), not a face-verification flag.
   const showVerifiedBadge = useMemo(
@@ -187,7 +267,21 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   const hasLifestyle = lifestyleFields.some(val => val && val !== 'not_specified');
 
   return (
-    <div className="h-full w-full bg-black flex flex-col overflow-hidden">
+    <div
+      className="h-full w-full bg-black flex flex-col overflow-hidden"
+      style={{
+        // Small breathing room below the card's rounded bottom edge and the
+        // floating nav pill under it, matching Discover's own gap, so they
+        // read as two distinct surfaces instead of touching.
+        paddingBottom: 'clamp(6px, 2vw, 10px)',
+        // Border + rounded bottom corners live on this OUTER wrapper (not the
+        // inner photo box) so they enclose the expanded details panel too,
+        // not just the photo - previously the border only ringed the photo,
+        // leaving the expanded info panel visually "outside" it once opened.
+        borderRadius: '0px 0px 22px 22px',
+        border: '1px solid rgba(236,72,153,0.55)',
+      }}
+    >
       {/* Photo area - sized close to Discover's near-full-bleed swipe card
           (a viewport-relative height rather than a fixed aspect ratio, so it
           fills the screen the same way) with a sensible floor for short
@@ -197,7 +291,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           black between the photo's own bottom (where the caption/feathering
           is pinned) and the screen's real bottom edge; flex:1 fills that
           instead so the feathering actually reaches the bottom of the
-          screen. */}
+          screen. Bottom corners stay rounded and a subtle pink border rings
+          the whole box, matching Discover's swipe card at rest. */}
       <div
         className="relative w-full overflow-hidden"
         style={{
@@ -387,37 +482,64 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                   />
                 )}
               </div>
-              {!showMoreInfo && profile.city && (
-                <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-white/80">
-                  <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                  <span>
-                    {profile.city}, {profile.country}
-                    {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
-                      <span className="ml-2">• {formatHeightLabel(profile.height_cm)}</span>
-                    )}
-                  </span>
-                </div>
-              )}
+              {/* Location and "looking for" alternate by photo, one at a time, matching
+                  Discover's MatchCard - falls back to whichever exists if only one is set. */}
+              {!showMoreInfo && (() => {
+                const hasLocation = !!profile.city;
+                const hasIntent = !!profile.relationship_intent;
+                const showLocation = hasLocation && (!hasIntent || currentSlide % 2 === 0);
+                // Never alongside About - a bio excerpt already speaks for the
+                // person, so pairing it with "looking for" felt redundant.
+                const showIntent = !showAbout && hasIntent && (!hasLocation || currentSlide % 2 === 1);
 
-              {!showMoreInfo && (previewHighlights.length > 0 || (profile.adinkra_symbols && profile.adinkra_symbols.length > 0) || musicHighlight) && (
-                <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                  {previewHighlights.map((highlight, index) => (
-                    <span
-                      key={index}
-                      className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
-                    >
-                      {truncateChipLabel(highlight)}
-                    </span>
-                  ))}
-                  {profile.adinkra_symbols && profile.adinkra_symbols.length > 0 && (
-                    <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
-                      <UserAdinkraDisplay adinkraSymbols={[profile.adinkra_symbols[0]]} />
-                    </span>
-                  )}
-                  {musicHighlight?.link && (
-                    <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
-                  )}
-                </div>
+                return (
+                  <>
+                    {showLocation && (
+                      <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-white/80">
+                        <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                        <span>
+                          {profile.city}, {profile.country}
+                          {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
+                            <span className="ml-2">• {formatHeightLabel(profile.height_cm)}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {showIntent && (
+                      <div className="flex items-center text-[clamp(11px,3.2vw,13px)] font-medium text-white/80">
+                        <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
+                        <span>{formatRelationshipIntent(profile.relationship_intent)}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {!showMoreInfo && showAbout ? (
+                <p className="mt-2 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
+                  {profile.bio}
+                </p>
+              ) : (
+                !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                    {previewHighlights.map((highlight, index) => (
+                      <span
+                        key={index}
+                        className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
+                      >
+                        {truncateChipLabel(highlight)}
+                      </span>
+                    ))}
+                    {signHighlight && (
+                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
+                        <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                      </span>
+                    )}
+                    {musicHighlight?.link && (
+                      <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
+                    )}
+                  </div>
+                )
               )}
             </div>
 
@@ -474,6 +596,11 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             </div>
           )}
 
+          {/* First captioned photo (ImageManagement.tsx) - no section heading, just
+              the photo, its preset label (what it's about), and the full caption
+              (capped at 50 chars) pinned to the image's own bottom edge. */}
+          {captionedPhotos[0] && renderPhotoCaptionCard(captionedPhotos[0])}
+
           {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
               <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.height', 'Height')}</h4>
@@ -520,6 +647,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             </div>
           )}
 
+          {secondPhotoAnchor === 'lifestyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
+
           {profile.family_plans && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
               <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.familyPlans', 'Family Plans')}</h4>
@@ -549,6 +678,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               </div>
             </div>
           )}
+
+          {secondPhotoAnchor === 'workEducation' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
 
           {(typeof profile.introvert_extrovert === 'number' || typeof profile.spontaneous_planner === 'number' || typeof profile.messy_organized === 'number') && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
@@ -604,6 +735,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             </div>
           )}
 
+          {secondPhotoAnchor === 'personality' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
+
           {profile.communication_style && profile.communication_style.length > 0 && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
               <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
@@ -619,6 +752,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               </div>
             </div>
           )}
+
+          {secondPhotoAnchor === 'communicationStyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
 
           {profile.love_style && profile.love_style.length > 0 && (
             <div className="bg-black border border-pink-500/20 rounded-lg p-3">
