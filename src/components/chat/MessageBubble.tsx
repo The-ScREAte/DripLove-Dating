@@ -284,14 +284,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           })()}
 
           {/* Message Content */}
-          <div className={`px-3.5 ${repliedMessage ? 'pt-1.5' : 'pt-2.5'} pb-1`}>
-            <p className={`text-[15px] leading-[1.45] whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-60' : ''}`}>
+          <div className="px-2.5 pt-0 pb-0">
+            <p className={`text-[15px] leading-[1.3] whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-60' : ''}`}>
               {isDeletedForMe ? t('chat.deleted', 'This message was deleted') : message.message}
             </p>
           </div>
 
           {/* Timestamp & Read Status */}
-          <div className={`flex items-center justify-end gap-1 px-3.5 pb-2 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'}`}>
+          <div className={`flex items-center justify-end gap-1 px-2.5 pb-0 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'}`}>
             <span className="text-[11px]">
               {formatTime(message.sent_at || message.created_at)}
             </span>

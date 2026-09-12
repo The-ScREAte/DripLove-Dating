@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_actions: {
@@ -41,6 +66,21 @@ export type Database = {
           id?: string
           target_user_id?: string | null
           target_user_id_2?: string | null
+        }
+        Relationships: []
+      }
+      admin_stats_counters: {
+        Row: {
+          count: number
+          metric: string
+        }
+        Insert: {
+          count?: number
+          metric: string
+        }
+        Update: {
+          count?: number
+          metric?: string
         }
         Relationships: []
       }
@@ -214,6 +254,38 @@ export type Database = {
           {
             foreignKeyName: "advertiser_profiles_reviewed_by_fkey"
             columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      app_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          source?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_feedback_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -446,6 +518,7 @@ export type Database = {
           is_read: boolean | null
           match_id: string
           message: string
+          recipient_id: string | null
           reply_to: string | null
           sender_id: string
         }
@@ -456,6 +529,7 @@ export type Database = {
           is_read?: boolean | null
           match_id: string
           message: string
+          recipient_id?: string | null
           reply_to?: string | null
           sender_id: string
         }
@@ -466,6 +540,7 @@ export type Database = {
           is_read?: boolean | null
           match_id?: string
           message?: string
+          recipient_id?: string | null
           reply_to?: string | null
           sender_id?: string
         }
@@ -475,6 +550,13 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: false
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chats_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1274,9 +1356,11 @@ export type Database = {
           face_descriptor: string | null
           family_plans: string | null
           favorites: Json
+          feed_random_weight: number
           first_name: string
           fun_fact: string | null
           gender: string | null
+          has_rated_app: boolean
           height_cm: number | null
           id: string
           industry: string | null
@@ -1306,6 +1390,7 @@ export type Database = {
           preferred_language: string | null
           profile_completion: number
           promo_code_used: string | null
+          rated_app_at: string | null
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
@@ -1316,6 +1401,8 @@ export type Database = {
           total_swipe_count: number
           unlocked_countries: string[] | null
           updated_at: string | null
+          visibility_boost_multiplier: number | null
+          visibility_boost_until: string | null
           zip_code: string | null
         }
         Insert: {
@@ -1336,9 +1423,11 @@ export type Database = {
           face_descriptor?: string | null
           family_plans?: string | null
           favorites?: Json
+          feed_random_weight?: number
           first_name: string
           fun_fact?: string | null
           gender?: string | null
+          has_rated_app?: boolean
           height_cm?: number | null
           id: string
           industry?: string | null
@@ -1368,6 +1457,7 @@ export type Database = {
           preferred_language?: string | null
           profile_completion?: number
           promo_code_used?: string | null
+          rated_app_at?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -1378,6 +1468,8 @@ export type Database = {
           total_swipe_count?: number
           unlocked_countries?: string[] | null
           updated_at?: string | null
+          visibility_boost_multiplier?: number | null
+          visibility_boost_until?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -1398,9 +1490,11 @@ export type Database = {
           face_descriptor?: string | null
           family_plans?: string | null
           favorites?: Json
+          feed_random_weight?: number
           first_name?: string
           fun_fact?: string | null
           gender?: string | null
+          has_rated_app?: boolean
           height_cm?: number | null
           id?: string
           industry?: string | null
@@ -1430,6 +1524,7 @@ export type Database = {
           preferred_language?: string | null
           profile_completion?: number
           promo_code_used?: string | null
+          rated_app_at?: string | null
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -1440,6 +1535,8 @@ export type Database = {
           total_swipe_count?: number
           unlocked_countries?: string[] | null
           updated_at?: string | null
+          visibility_boost_multiplier?: number | null
+          visibility_boost_until?: string | null
           zip_code?: string | null
         }
         Relationships: []
@@ -2223,6 +2320,41 @@ export type Database = {
           status: string
         }[]
       }
+      admin_search_users_page: {
+        Args: {
+          p_activity?: string
+          p_archive?: string
+          p_country?: string
+          p_gender?: string
+          p_limit?: number
+          p_offset?: number
+          p_preference?: string
+          p_premium?: string
+          p_relationship_intent?: string
+          p_search?: string
+          p_status?: string
+        }
+        Returns: {
+          account_status: string
+          city: string
+          country: string
+          created_at: string
+          date_of_birth: string
+          email: string
+          first_name: string
+          gender: string
+          id: string
+          is_admin: boolean
+          is_archived: boolean
+          is_premium: boolean
+          last_login_at: string
+          last_name: string
+          login_count: number
+          preference: string
+          relationship_intent: string
+          total_count: number
+        }[]
+      }
       admin_set_influencer_password: {
         Args: { p_new_password: string; p_promo_code_id: string }
         Returns: Json
@@ -2240,6 +2372,10 @@ export type Database = {
         Returns: boolean
       }
       auto_archive_inactive_users: { Args: never; Returns: undefined }
+      bump_admin_stat: {
+        Args: { p_delta: number; p_metric: string }
+        Returns: undefined
+      }
       calculate_distance: {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
@@ -2348,6 +2484,13 @@ export type Database = {
         Args: { p_promo_code_id: string }
         Returns: Json
       }
+      get_likers_page: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          liked_at: string
+          liker_id: string
+        }[]
+      }
       get_my_profile_broadcast_messages: {
         Args: { p_limit?: number; p_offset?: number }
         Returns: {
@@ -2391,9 +2534,11 @@ export type Database = {
           face_descriptor: string | null
           family_plans: string | null
           favorites: Json
+          feed_random_weight: number
           first_name: string
           fun_fact: string | null
           gender: string | null
+          has_rated_app: boolean
           height_cm: number | null
           id: string
           industry: string | null
@@ -2423,6 +2568,7 @@ export type Database = {
           preferred_language: string | null
           profile_completion: number
           promo_code_used: string | null
+          rated_app_at: string | null
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
@@ -2433,6 +2579,8 @@ export type Database = {
           total_swipe_count: number
           unlocked_countries: string[] | null
           updated_at: string | null
+          visibility_boost_multiplier: number | null
+          visibility_boost_until: string | null
           zip_code: string | null
         }[]
         SetofOptions: {
@@ -2698,6 +2846,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

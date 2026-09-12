@@ -192,11 +192,14 @@ export default defineConfig(({ mode }) => ({
             return 'liked-page';
           }
           
-          // Admin components in separate chunk
-          if (id.includes('/src/components/admin/')) {
-            return 'admin-tools';
-          }
-          
+          // Each admin/* sub-panel is individually lazy() + Suspense'd per
+          // tab in AdminPage.tsx now (only AdminErrorBoundary stays static).
+          // Forcing all of them into one 'admin-tools' bucket here would
+          // undo that - every tab's dynamic import would still pull in one
+          // shared 220KB blob containing every OTHER tab's code too. Leaving
+          // this unassigned lets Rollup split each lazy import into its own
+          // chunk, so opening one admin tab loads only that tab's code.
+
           // PhotoCropModal is now lazy-imported from RegistrationForm/
           // ProfileCompletionPage, which aren't otherwise chunked (they load
           // eagerly, pre-auth). Lumping it into 'profile-tools' pulled that

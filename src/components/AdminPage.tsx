@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import type { Json } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,23 +12,27 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import UserProfileModal from '@/components/UserProfileModal';
-import StatsCard from './admin/StatsCard';
-import UserModerationPanel from './admin/UserModerationPanel';
 import AdminErrorBoundary from './admin/AdminErrorBoundary';
-import UserPoolDebugger from './admin/UserPoolDebugger';
-import CountryManagement from './admin/CountryManagement';
-import ImageModerationPanel from './admin/ImageModerationPanel';
-import FaceManagement from './admin/FaceManagement';
-import AppUpdateSettings from './admin/AppUpdateSettings';
-import PaystackSettings from './admin/PaystackSettings';
-
-import ManualPremiumManager from './admin/ManualPremiumManager';
-import AdsManagement from './admin/AdsManagement';
-import RedirectLinkCreator from './admin/RedirectLinkCreator';
-import BroadcastNotifications from './admin/BroadcastNotifications';
-import InfluencerManagement from './admin/InfluencerManagement';
-import SmartMatchSuggestions from './admin/SmartMatchSuggestions';
-import SmartLikeGiving from './admin/SmartLikeGiving';
+// Every admin sub-panel below is lazy-loaded per tab: AdminPage itself is
+// already its own chunk (vite.config.ts), but until now every one of these
+// ~15 panels was statically bundled into that single chunk regardless of
+// which tab (if any) the admin actually opens. Splitting them individually
+// means visiting, say, just the Dashboard tab no longer pulls in the code
+// for Faces/Ads/Broadcast/Redirects/Influencers/Settings/etc.
+const StatsCard = lazy(() => import('./admin/StatsCard'));
+const UserPoolDebugger = lazy(() => import('./admin/UserPoolDebugger'));
+const CountryManagement = lazy(() => import('./admin/CountryManagement'));
+const ImageModerationPanel = lazy(() => import('./admin/ImageModerationPanel'));
+const FaceManagement = lazy(() => import('./admin/FaceManagement'));
+const AppUpdateSettings = lazy(() => import('./admin/AppUpdateSettings'));
+const PaystackSettings = lazy(() => import('./admin/PaystackSettings'));
+const ManualPremiumManager = lazy(() => import('./admin/ManualPremiumManager'));
+const AdsManagement = lazy(() => import('./admin/AdsManagement'));
+const RedirectLinkCreator = lazy(() => import('./admin/RedirectLinkCreator'));
+const BroadcastNotifications = lazy(() => import('./admin/BroadcastNotifications'));
+const InfluencerManagement = lazy(() => import('./admin/InfluencerManagement'));
+const SmartMatchSuggestions = lazy(() => import('./admin/SmartMatchSuggestions'));
+const SmartLikeGiving = lazy(() => import('./admin/SmartLikeGiving'));
 import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
 import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
 import { CurrentUser, AdminStats } from '@/types';
@@ -183,26 +187,63 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [archiveFilter, setArchiveFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  // Users-tab table now paginates on the server (admin_search_users_page RPC)
+  // instead of fetching every non-admin profile in batches just to slice 20
+  // rows client-side - see fetchUsersPage below.
+  const [tableUsers, setTableUsers] = useState<UserProfile[]>([]);
+  const [tableTotalCount, setTableTotalCount] = useState(0);
+  const [tableLoading, setTableLoading] = useState(true);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [matchUser1, setMatchUser1] = useState('');
   const [matchUser2, setMatchUser2] = useState('');
   // Manual-match user pickers used to render one <SelectItem> per user with
   // no limit - at a few thousand users that alone could freeze the admin's
-  // browser tab. A simple name/ID filter plus a hard cap on rendered rows
-  // keeps the dropdown responsive at any user-base size while still letting
-  // an admin find a specific person.
+  // browser tab. Originally a client-side filter over the full `users`
+  // array (itself an expensive bulk fetch); now a debounced server-side
+  // search via admin_search_users_page, so opening this picker no longer
+  // depends on that bulk fetch having already run.
   const [matchUser1Search, setMatchUser1Search] = useState('');
   const [matchUser2Search, setMatchUser2Search] = useState('');
+  const [matchUser1Options, setMatchUser1Options] = useState<UserProfile[]>([]);
+  const [matchUser2Options, setMatchUser2Options] = useState<UserProfile[]>([]);
   const MATCH_USER_OPTIONS_CAP = 100;
-  const filterMatchUserOptions = useCallback((search: string) => {
-    const query = search.trim().toLowerCase();
-    const filtered = query
-      ? users.filter((u) =>
-          `${u.first_name} ${u.last_name}`.toLowerCase().includes(query) ||
-          u.id.toLowerCase().includes(query)
-        )
-      : users;
-    return filtered.slice(0, MATCH_USER_OPTIONS_CAP);
-  }, [users]);
+
+  const searchMatchUsers = useCallback(async (search: string): Promise<UserProfile[]> => {
+    const { data, error } = await supabase.rpc('admin_search_users_page', {
+      p_search: search.trim() || null,
+      p_status: 'all',
+      p_gender: 'all',
+      p_preference: 'all',
+      p_country: 'all',
+      p_relationship_intent: 'all',
+      p_premium: 'all',
+      p_activity: 'all',
+      p_archive: 'all',
+      p_limit: MATCH_USER_OPTIONS_CAP,
+      p_offset: 0,
+    });
+    if (error) {
+      console.error('Error searching users for match picker:', error);
+      return [];
+    }
+    const rows = (data || []) as Array<RawUserProfile & { is_premium: boolean; total_count: number }>;
+    return rows.map(({ total_count, ...row }) => ({ ...row, age: calculateAge(row.date_of_birth) }));
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchMatchUsers(matchUser1Search).then(setMatchUser1Options);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [matchUser1Search, searchMatchUsers]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchMatchUsers(matchUser2Search).then(setMatchUser2Options);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [matchUser2Search, searchMatchUsers]);
+
   const matchUser1Ref = useRef('');
   const matchUser2Ref = useRef('');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -508,19 +549,29 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       {/* Country Management Section */}
       <div className="mt-8">
-        <CountryManagement />
+        <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+          <CountryManagement />
+        </Suspense>
       </div>
     </>
   );
 
-  // Debounced search for better performance
-  const debouncedSearch = useCallback(
-    debounce((term: string) => {
-      setSearchTerm(term);
-      setCurrentPage(1); // Reset to first page on search
-    }, 300),
-    []
-  );
+  // Debounce the raw search input before it drives the server-side query -
+  // an RPC round-trip per keystroke would be worse than the old client-side
+  // filter it's replacing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 whenever a filter changes so the pager doesn't end up
+  // pointing past the end of a now-smaller result set.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, archiveFilter]);
 
   // Check if current user is admin - useEffect for admin status
   useEffect(() => {
@@ -1167,6 +1218,73 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     return age;
   };
 
+  // Fetches exactly one page of the Users-tab table via the server-side
+  // admin_search_users_page RPC - replaces the old "fetch every non-admin
+  // profile in batches, then filter/slice client-side" approach for this
+  // table. The bulk `users` array (fetchUsers above) is left in place only
+  // for the Dashboard-tab tools below that genuinely need the full list.
+  const fetchUsersPage = useCallback(async () => {
+    try {
+      setTableLoading(true);
+      const { data, error } = await supabase.rpc('admin_search_users_page', {
+        p_search: debouncedSearchTerm || null,
+        p_status: statusFilter,
+        p_gender: genderFilter,
+        p_preference: interestedInFilter,
+        p_country: countryFilter,
+        p_relationship_intent: relationshipIntentFilter,
+        p_premium: premiumFilter,
+        p_activity: activityFilter,
+        p_archive: archiveFilter,
+        p_limit: usersPerPage,
+        p_offset: (currentPage - 1) * usersPerPage,
+      });
+
+      if (error) throw error;
+
+      const rows = (data || []) as Array<RawUserProfile & { is_premium: boolean; total_count: number }>;
+      setTableUsers(rows.map(({ total_count, ...row }) => ({
+        ...row,
+        age: calculateAge(row.date_of_birth),
+      })));
+      setTableTotalCount(rows[0]?.total_count ?? 0);
+    } catch (error) {
+      console.error('Error fetching users page:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users',
+        variant: 'destructive'
+      });
+      setTableUsers([]);
+      setTableTotalCount(0);
+    } finally {
+      setTableLoading(false);
+    }
+  }, [toast, debouncedSearchTerm, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, archiveFilter, currentPage]);
+
+  // Small standalone fetch for the "Admin Users" card on the Users tab -
+  // kept separate from fetchUsers' heavy bulk query since that one now only
+  // runs when Dashboard is opened, and this list is normally just a handful
+  // of rows (is_admin = true).
+  const fetchAdminUsersList = useCallback(async () => {
+    try {
+      const { data: adminData, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent')
+        .eq('is_admin', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setAdminUsers((adminData || []).map(user => ({
+        ...user,
+        age: calculateAge(user.date_of_birth)
+      })));
+    } catch (error) {
+      console.error('Error fetching admin users list:', error);
+    }
+  }, []);
+
   // Second useEffect for fetching data after admin status is confirmed
   // OPTIMIZED: Only fetch stats immediately, lazy load other data when tabs are accessed
   useEffect(() => {
@@ -1177,10 +1295,25 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   }, [isAdmin, fetchAppStats]);
 
-  // Lazy load users when users tab is accessed
+  // Lazy load the full user list when Dashboard is accessed - it's the tab
+  // that actually needs it (SmartMatchSuggestions/SmartLikeGiving/
+  // ManualPremiumManager/manual-match pickers), not the Users tab anymore.
   useEffect(() => {
-    if (isAdmin && activeTab === 'users' && users.length === 0) {
+    if (isAdmin && activeTab === 'dashboard' && users.length === 0) {
       fetchUsers();
+    }
+  }, [isAdmin, activeTab]);
+
+  // Lazy load (and refetch on filter/search/page change) the Users-tab table
+  useEffect(() => {
+    if (isAdmin && activeTab === 'users') {
+      fetchUsersPage();
+    }
+  }, [isAdmin, activeTab, fetchUsersPage]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === 'users' && adminUsers.length === 0) {
+      fetchAdminUsersList();
     }
   }, [isAdmin, activeTab]);
 
@@ -1228,7 +1361,10 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       }
 
       // Optimistic update for better UX
-      setUsers(users.map(user => 
+      setUsers(users.map(user =>
+        user.id === userId ? { ...user, account_status: newStatus } : user
+      ));
+      setTableUsers(prev => prev.map(user =>
         user.id === userId ? { ...user, account_status: newStatus } : user
       ));
 
@@ -1253,6 +1389,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       console.error('Error updating user status:', error);
       // Revert optimistic update on error
       fetchUsers();
+      fetchUsersPage();
       toast({
         title: 'Error',
         description: 'Failed to update user status',
@@ -1297,6 +1434,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       if (error) throw error;
 
       setUsers(users.filter(user => user.id !== userId));
+      setTableUsers(prev => prev.filter(user => user.id !== userId));
+      setTableTotalCount(prev => Math.max(0, prev - 1));
       await fetchAppStats();
 
       toast({
@@ -1420,75 +1559,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     setIsProfileModalOpen(true);
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (user.city && user.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         (user.country && user.country.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = statusFilter === 'all' || user.account_status === statusFilter;
-    const matchesGender = genderFilter === 'all' || user.gender === genderFilter;
-    const matchesInterestedIn = interestedInFilter === 'all' || user.preference === interestedInFilter;
-    const matchesCountry = countryFilter === 'all' || user.country === countryFilter;
-    const matchesRelationshipIntent = relationshipIntentFilter === 'all' || user.relationship_intent === relationshipIntentFilter;
-    const matchesPremium = premiumFilter === 'all' || 
-      (premiumFilter === 'premium' && user.is_premium) || 
-      (premiumFilter === 'free' && !user.is_premium);
-    
-    // Activity filter logic - use last_login_at or created_at (account creation = first login)
-    let matchesActivity = true;
-    if (activityFilter !== 'all') {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      // Use last_login_at if available, otherwise use created_at (account creation = first login)
-      const lastActive = user.last_login_at ? new Date(user.last_login_at) : new Date(user.created_at);
-      
-      switch (activityFilter) {
-        case 'today':
-          matchesActivity = lastActive >= today;
-          break;
-        case '3_days':
-          matchesActivity = lastActive >= threeDaysAgo;
-          break;
-        case '1_week':
-          matchesActivity = lastActive >= oneWeekAgo;
-          break;
-        case '2_weeks':
-          matchesActivity = lastActive >= twoWeeksAgo;
-          break;
-        case '1_month':
-          matchesActivity = lastActive >= oneMonthAgo;
-          break;
-        case '3_months':
-          matchesActivity = lastActive >= threeMonthsAgo;
-          break;
-        case 'inactive_month':
-          matchesActivity = lastActive < oneMonthAgo;
-          break;
-      }
-    }
-    
-    // Archive filter logic
-    let matchesArchive = true;
-    if (archiveFilter === 'archived') {
-      matchesArchive = user.is_archived === true;
-    } else if (archiveFilter === 'active') {
-      matchesArchive = user.is_archived !== true;
-    }
-    
-    return matchesSearch && matchesStatus && matchesGender && matchesInterestedIn && matchesCountry && matchesRelationshipIntent && matchesPremium && matchesActivity && matchesArchive;
-  });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-  const startIndex = (currentPage - 1) * usersPerPage;
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + usersPerPage);
+  // All 9 filters (search, status, gender, preference, country,
+  // relationship_intent, premium, activity, archive) now run server-side in
+  // admin_search_users_page (fetchUsersPage above) - tableUsers is already
+  // exactly the current page.
+  const paginatedUsers = tableUsers;
+  const totalPages = Math.max(1, Math.ceil(tableTotalCount / usersPerPage));
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -1617,7 +1693,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
             <TabsContent value="dashboard" className="space-y-4">
               {/* Stats Overview */}
               {stats && (
-                <StatsCard stats={stats} />
+                <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                  <StatsCard stats={stats} />
+                </Suspense>
               )}
 
               {/* Manual Match Creation */}
@@ -1646,7 +1724,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectValue placeholder="Select User 1" />
                         </SelectTrigger>
                         <SelectContent>
-                          {filterMatchUserOptions(matchUser1Search).map((user, index) => (
+                          {matchUser1Options.map((user, index) => (
                             <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
                               {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
                             </SelectItem>
@@ -1670,7 +1748,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           <SelectValue placeholder="Select User 2" />
                         </SelectTrigger>
                         <SelectContent>
-                          {filterMatchUserOptions(matchUser2Search).map((user, index) => (
+                          {matchUser2Options.map((user, index) => (
                             <SelectItem key={`${user.id}-${index}`} value={user.id} className="text-xs">
                               {user.first_name} {user.last_name} (ID: {user.id.substring(0, 8)}...)
                             </SelectItem>
@@ -1685,7 +1763,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   
                   {/* Smart Match Suggestions */}
                   <div className="pt-3 border-t">
-                    <SmartMatchSuggestions users={users} onMatchCreated={fetchAppStats} />
+                    <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                      <SmartMatchSuggestions users={users} onMatchCreated={fetchAppStats} />
+                    </Suspense>
                   </div>
                   
                   {/* Smart Like Giving */}
@@ -1694,7 +1774,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       <Heart className="w-3 h-3 text-pink-500" />
                       Smart Like Giving
                     </h4>
-                    <SmartLikeGiving users={users} onLikesCreated={fetchAppStats} />
+                    <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                      <SmartLikeGiving users={users} onLikesCreated={fetchAppStats} />
+                    </Suspense>
                   </div>
                 </CardContent>
               </Card>
@@ -1708,14 +1790,18 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <ManualPremiumManager users={users} onRefreshStats={fetchAppStats} />
+                  <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                    <ManualPremiumManager users={users} onRefreshStats={fetchAppStats} />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Broadcast Notifications Tab */}
             <TabsContent value="broadcast" className="space-y-4">
-              <BroadcastNotifications />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                <BroadcastNotifications />
+              </Suspense>
             </TabsContent>
 
             {/* Users Tab */}
@@ -1764,7 +1850,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-sm">
                       <Users className="w-4 h-4" />
-                      User Management ({filteredUsers.length})
+                      User Management ({tableTotalCount})
                     </CardTitle>
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
                       countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || archiveFilter !== 'all') && (
@@ -1910,7 +1996,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
                   {/* Users List Container */}
                   <div className="border rounded-lg bg-white">
-                    {loading ? (
+                    {tableLoading ? (
                       <div className="flex justify-center py-6">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-600"></div>
                       </div>
@@ -2036,7 +2122,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           </div>
                         ))}
                         
-                        {filteredUsers.length === 0 && (
+                        {!tableLoading && paginatedUsers.length === 0 && (
                           <div className="text-center py-8 text-gray-500 text-sm">
                             No users found matching your criteria.
                           </div>
@@ -2075,7 +2161,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
             {/* Content Tab - Image Moderation */}
             <TabsContent value="content" className="space-y-4">
-              <ImageModerationPanel onViewProfile={handleViewProfile} />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                <ImageModerationPanel onViewProfile={handleViewProfile} />
+              </Suspense>
 
               {/* Reported Chats Section */}
               <div className="bg-white border rounded-lg p-3">
@@ -2139,44 +2227,54 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <AdsManagement />
+                  <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                    <AdsManagement />
+                  </Suspense>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Debugger Tab */}
             <TabsContent value="debugger" className="space-y-4">
-              <UserPoolDebugger 
-                currentUserId={currentUser?.id || ''}
-                userPreferences={{
-                  min_age: 18,
-                  max_age: 99,
-                  max_distance: 100,
-                  preference: 'both',
-                  latitude: null,
-                  longitude: null
-                }}
-                onViewProfile={handleViewProfile}
-              />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                <UserPoolDebugger
+                  currentUserId={currentUser?.id || ''}
+                  userPreferences={{
+                    min_age: 18,
+                    max_age: 99,
+                    max_distance: 100,
+                    preference: 'both',
+                    latitude: null,
+                    longitude: null
+                  }}
+                  onViewProfile={handleViewProfile}
+                />
+              </Suspense>
             </TabsContent>
 
             {/* Redirects Tab */}
             <TabsContent value="redirects" className="space-y-4">
-              <RedirectLinkCreator />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                <RedirectLinkCreator />
+              </Suspense>
             </TabsContent>
 
             {/* Promoters Tab */}
             <TabsContent value="influencers" className="space-y-4">
-              <InfluencerManagement />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                <InfluencerManagement />
+              </Suspense>
             </TabsContent>
 
             {/* Settings Tab */}
             <TabsContent value="settings" className="space-y-4">
-              {/* App Update Settings */}
-              <AppUpdateSettings />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                {/* App Update Settings */}
+                <AppUpdateSettings />
 
-              {/* Paystack Settings */}
-              <PaystackSettings />
+                {/* Paystack Settings */}
+                <PaystackSettings />
+              </Suspense>
 
               {/* Payment Configuration */}
               <Card>
@@ -2195,7 +2293,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
             {/* Faces Tab */}
             <TabsContent value="faces" className="space-y-4">
-              <FaceManagement />
+              <Suspense fallback={<div className="text-center py-4 text-xs text-gray-400">Loading...</div>}>
+                <FaceManagement />
+              </Suspense>
             </TabsContent>
           </Tabs>
           </AdminErrorBoundary>

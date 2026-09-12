@@ -2284,9 +2284,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-black chat-messages-container"
-        style={{ 
+        style={{
           WebkitOverflowScrolling: 'touch',
-          paddingTop: '0px'
+          paddingTop: '10px'
         }}
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}

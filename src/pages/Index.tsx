@@ -6,13 +6,15 @@ import HoppingLogo from '@/components/HoppingLogo';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { transformFormDataForSubmission } from '@/utils/formValidation';
-import VideoBackground from '@/components/VideoBackground';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 import { preloadExchangeRates } from '@/services/exchangeRateService';
 import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
+// Only needed on the login/register/profile-completion screens, never on
+// the very first paint (WelcomeScreen) - was eagerly bundled before this.
+const VideoBackground = lazy(() => import('@/components/VideoBackground'));
 const ProfileCompletionPage = lazy(() => import('@/components/ProfileCompletionPage'));
 const TermsAcceptance = lazy(() => import('@/components/TermsAcceptance'));
 const MainApp = lazy(() => import('@/components/MainApp'));
@@ -391,7 +393,9 @@ const Index = ({
         {currentView === 'login' && (
           <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background */}
-            <VideoBackground />
+            <Suspense fallback={null}>
+              <VideoBackground />
+            </Suspense>
             <Suspense fallback={<PageLoader />}>
               <AuthForm
                 isLogin={true}
@@ -405,7 +409,9 @@ const Index = ({
         {currentView === 'register' && (
           <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background - always rendered, loads async */}
-            <VideoBackground />
+            <Suspense fallback={null}>
+              <VideoBackground />
+            </Suspense>
             <Suspense fallback={<PageLoader />}>
               <RegistrationForm
                 onSubmit={handleRegister}
@@ -418,7 +424,9 @@ const Index = ({
 
         {currentView === 'profile-completion' && user && (
           <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
-            <VideoBackground />
+            <Suspense fallback={null}>
+              <VideoBackground />
+            </Suspense>
             <Suspense fallback={<PageLoader />}>
               <ProfileCompletionPage />
             </Suspense>

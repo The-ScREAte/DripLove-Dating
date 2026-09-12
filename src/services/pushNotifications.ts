@@ -249,58 +249,85 @@ class SupabasePushNotificationService {
     });
   }
 
+  // Single source of truth for "where does tapping/clicking this
+  // notification go" - shared by both the real OS notification tap
+  // (handleNotificationAction, below) and the in-app foreground toast's own
+  // click handler (showInAppNotification), which used to duplicate this
+  // logic and had drifted out of sync with it.
+  //   message -> the specific conversation in Chat
+  //   match   -> Chat (the list, not a specific conversation)
+  //   like    -> Liked Me
+  //   image_rejected -> Profile (no sender wires this type up yet - see the
+  //     reject_image DB function / moderate-image edge function, neither of
+  //     which currently creates a notification at all - this is here so the
+  //     route is already correct the moment one does)
+  //   system/admin/anything unrecognized -> Discover, never Chat by default
+  private resolveNotificationRoute(type: string | undefined, data: Record<string, unknown> | undefined): string {
+    if (data?.action === 'open_discover') {
+      return '/';
+    }
+
+    if (type === 'message' && data?.chatId) {
+      return `/?tab=chat&matchId=${data.chatId}`;
+    }
+
+    if (type === 'match') {
+      return '/?tab=chat';
+    }
+
+    if (type === 'like') {
+      return '/?tab=liked';
+    }
+
+    if (type === 'image_rejected') {
+      return '/?tab=profile';
+    }
+
+    // system, admin, and anything else (including a message notification
+    // that's missing its chatId) fall through to Discover.
+    return '/';
+  }
+
   private handleNotificationAction(notification: ActionPerformed): void {
     // Handle notification tap/action
-    const data = notification.notification.data;
-    
-    // Check for specific action first
-    if (data?.action === 'open_discover') {
-      window.location.href = '/';
-      return;
-    }
-    
-    if (data?.type === 'message' && data?.chatId) {
-      // Navigate to specific chat conversation
-      // Navigate to chat page with the matchId query parameter
-      window.location.href = `/?tab=chat&matchId=${data.chatId}`;
-      return;
-    }
-    
-    if (data?.type === 'match') {
-      // Navigate to chat page (matches tab) 
-      window.location.href = '/?tab=chat';
-      return;
-    }
-    
-    if (data?.type === 'like') {
-      // Navigate to liked me page
-      window.location.href = '/?tab=liked';
-      return;
-    }
-    
-    if (data?.type === 'system' || data?.type === 'admin') {
-      // System/admin notifications go to discover page
-      window.location.href = '/';
-      return;
-    }
-    
-    // Default: go to chat page
-    window.location.href = '/?tab=chat';
+    const data = notification.notification.data as Record<string, unknown> | undefined;
+    window.location.href = this.resolveNotificationRoute(data?.type as string | undefined, data);
   }
 
   private showInAppNotification(payload: NotificationPayload): void {
-    // Create and show in-app notification toast
+    // Compact, native-notification-style card (small, dark, title + body
+    // only) instead of the previous full-width bright-purple "flash" banner
+    // with a raw "• type" debug footer.
     const toast = document.createElement('div');
-    toast.className = 'fixed top-4 right-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm cursor-pointer transition-all hover:bg-purple-700';
-    toast.style.transform = 'translateX(0)';
+    toast.className = 'fixed top-3 inset-x-3 sm:left-auto sm:right-3 sm:w-80 bg-neutral-900/95 text-white rounded-xl shadow-lg border border-white/10 z-50 cursor-pointer transition-all';
+    toast.style.transform = 'translateY(0)';
     toast.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
-    
-    toast.innerHTML = `
-      <div class="font-semibold">${payload.title}</div>
-      <div class="text-sm opacity-90">${payload.body}</div>
-      <div class="text-xs opacity-70 mt-1">${payload.type ? `• ${payload.type}` : ''}</div>
-    `;
-    
+
+    // Built via DOM nodes (not innerHTML) so a title/body containing another
+    // user's display name or message text can never be interpreted as HTML.
+    const content = document.createElement('div');
+    content.className = 'flex items-start gap-2.5 px-3 py-2.5';
+
+    const dot = document.createElement('div');
+    dot.className = 'mt-1 w-2 h-2 rounded-full bg-pink-500 shrink-0';
+    content.appendChild(dot);
+
+    const text = document.createElement('div');
+    text.className = 'min-w-0 flex-1';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'text-[13px] font-semibold leading-tight truncate';
+    titleEl.textContent = payload.title;
+    text.appendChild(titleEl);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'text-[12px] text-white/70 leading-snug mt-0.5 line-clamp-2';
+    bodyEl.textContent = payload.body;
+    text.appendChild(bodyEl);
+
+    content.appendChild(text);
+    toast.appendChild(content);
+
     document.body.appendChild(toast);
     
     // Auto-remove after 5 seconds
@@ -371,18 +398,16 @@ class SupabasePushNotificationService {
     // Add click handler to dismiss and potentially navigate
     toast.addEventListener('click', () => {
       if (isSwiping) return; // Don't navigate if user was swiping
-      
+
       clearTimeout(timeout);
       this.removeToast(toast);
-      
-      // Handle navigation based on notification type
-      if (payload.data?.chatId) {
-        window.location.href = `/?tab=chat&matchId=${payload.data.chatId}`;
-      } else if (payload.type === 'match') {
-        window.location.href = '/?tab=chat';
-      } else if (payload.type === 'like') {
-        window.location.href = '/?tab=liked';
-      }
+
+      // A native foreground push's own `type` lives inside payload.data.type
+      // (that's how the FCM data payload is shaped), not payload.type - only
+      // the realtime/web path sets payload.type directly. Checking both here
+      // is what makes match/like taps on this toast actually navigate.
+      const type = payload.type || (payload.data?.type as string | undefined);
+      window.location.href = this.resolveNotificationRoute(type, payload.data);
     });
   }
 
