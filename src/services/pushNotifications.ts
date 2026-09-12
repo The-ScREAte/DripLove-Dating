@@ -9,7 +9,7 @@ export interface NotificationPayload {
   body: string;
   data?: Record<string, string | number | boolean>;
   userId?: string;
-  type?: 'match' | 'message' | 'like' | 'system' | 'admin';
+  type?: 'match' | 'message' | 'like' | 'system' | 'admin' | 'image_rejected';
 }
 
 interface RealtimeNotification {

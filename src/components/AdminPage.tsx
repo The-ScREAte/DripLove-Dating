@@ -89,6 +89,7 @@ interface UserProfile {
 
 interface PendingImage {
   id: string;
+  user_id: string;
   image_url: string;
   is_approved: boolean;
   moderation_status: string;
@@ -654,6 +655,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // Transform the data to match expected format
       const transformedData = data.map(img => ({
         id: img.id,
+        user_id: img.user_id,
         image_url: img.image_url,
         is_approved: img.is_approved ?? false,
         moderation_status: img.moderation_status ?? 'pending',
@@ -976,6 +978,26 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
       if (error) {
         throw error;
+      }
+
+      // Let the affected user know a slot opened up - same "notify after a
+      // successful admin action" pattern as updateUserStatus/
+      // blockUserFromReport below. Routes to Profile on tap (see
+      // resolveNotificationRoute in pushNotifications.ts).
+      const rejectedImage = pendingImages.find(img => img.id === imageId);
+      if (rejectedImage?.user_id) {
+        try {
+          await supabase.functions.invoke('send-push-notification', {
+            body: {
+              title: 'Photo Removed',
+              body: "One of your photos didn't meet our guidelines and was removed. You can upload a new one anytime.",
+              userId: rejectedImage.user_id,
+              type: 'image_rejected',
+            },
+          });
+        } catch (notifyError) {
+          console.error('Failed to send image-rejection notification:', notifyError);
+        }
       }
 
       // Remove from pending list immediately

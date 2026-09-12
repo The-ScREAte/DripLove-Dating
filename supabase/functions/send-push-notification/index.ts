@@ -15,7 +15,7 @@ interface NotificationPayload {
   title: string
   body: string
   userId: string
-  type?: 'message' | 'match' | 'like' | 'system'
+  type?: 'message' | 'match' | 'like' | 'system' | 'admin' | 'image_rejected'
   data?: Record<string, any>
 }
 

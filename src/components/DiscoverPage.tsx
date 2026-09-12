@@ -1290,7 +1290,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // restricts *inclusion* here.)
       localProfiles = baseCountryCode
         ? await (async () => {
-            // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+            // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
+            // indexed column reshuffled once nightly via pg_cron, not a
+            // fresh random() per call) - see get_random_discover_profiles.
             // RPC params travel in the POST body, not the URL, so the excluded-ids
             // list no longer needs the ~90-UUID URL-length workaround either.
             const { data: profiles, error } = await supabase.rpc('get_random_discover_profiles', {
@@ -1404,8 +1406,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // Free user with no country set - return empty feed (fail closed)
         filteredProfiles = [];
       } else if (locationProfileIdsForQuery.length > 0) {
-        // ⭐ FAIRNESS: server-side ORDER BY random() within the location
-        // service's candidate set - see get_random_discover_profiles. RPC
+        // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
+        // indexed column reshuffled nightly, not a fresh random() per call)
+        // within the location service's candidate set - see
+        // get_random_discover_profiles. RPC
         // params travel in the POST body, so the full excluded-ids list is
         // always usable (no more ~90-UUID URL-length workaround).
         const { data: profiles, error } = await supabase.rpc('get_random_discover_profiles', {
@@ -1426,7 +1430,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const userLon = currentUserData?.longitude;
         const radiusInDegrees = (userLat && userLon) ? safeUserMaxDistance / 111.32 : null;
 
-        // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+        // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
+        // indexed column reshuffled once nightly via pg_cron, not a fresh
+        // random() per call) - see get_random_discover_profiles.
         const { data: profiles, error } = await supabase.rpc('get_random_discover_profiles', {
           p_country_codes: [baseCountryCode],
           p_allowed_genders: allowedGenders,
@@ -1523,7 +1529,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // (much tighter than the 15s used for the critical-path queries
       // earlier in this function) means a slow/flaky connection just skips
       // the archived mix-in for this cycle instead of delaying every card.
-      // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+      // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
+      // indexed column reshuffled once nightly via pg_cron, not a fresh
+      // random() per call) - see get_random_discover_profiles.
       let archivedProfiles: unknown[] | null = null;
       let archivedError: unknown = null;
       if (archivedCountryCodes.length > 0) {
@@ -1718,7 +1726,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         ? safeUserMaxDistance / 111.32
         : null;
 
-      // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+      // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
+      // indexed column reshuffled once nightly via pg_cron, not a fresh
+      // random() per call) - see get_random_discover_profiles.
       const { data: archivedRetryRows, error: archivedRetryError } = archivedRetryCountryCodes.length > 0
         ? await supabase.rpc('get_random_discover_profiles', {
             p_country_codes: archivedRetryCountryCodes,
@@ -2667,7 +2677,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               ? maxDistance / 111.32
               : null;
 
-            // ⭐ FAIRNESS: server-side ORDER BY random() - see get_random_discover_profiles.
+            // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
+            // indexed column reshuffled once nightly via pg_cron, not a
+            // fresh random() per call) - see get_random_discover_profiles.
             // RPC params travel in the POST body, so the full exclusion set is
             // always usable here too (no more ~90-id URL-length cap).
             const { data: rows } = await supabase.rpc('get_random_discover_profiles', {

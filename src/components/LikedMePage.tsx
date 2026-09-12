@@ -19,7 +19,6 @@ import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb }
 import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
-import { useVirtualizer } from '@tanstack/react-virtual';
 
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
@@ -266,91 +265,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   );
 
 
-  // ⭐ ANDROID OPTIMIZATION: Single debounced resize handler
-  const [columnsPerRow, setColumnsPerRow] = useState(() => {
-    const width = typeof window !== 'undefined' ? window.innerWidth : 375;
-    if (width >= 1024) return 4;
-    if (width >= 768) return 3;
-    return 2;
-  });
-   
-  useEffect(() => {
-    let rafId: number | null = null;
-    
-    const updateColumns = () => {
-      if (rafId) return; // Skip if already scheduled
-      
-      rafId = requestAnimationFrame(() => {
-        const width = window.innerWidth;
-        const newColumns = width >= 1024 ? 4 : width >= 768 ? 3 : 2;
-        setColumnsPerRow(prev => prev !== newColumns ? newColumns : prev);
-        rafId = null;
-      });
-    };
-    
-    window.addEventListener('resize', updateColumns, { passive: true });
-    return () => {
-      window.removeEventListener('resize', updateColumns);
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-  }, []);
-  
-  // Ensure virtualizer count is always stable (never undefined)
-  const virtualizerCount = useMemo(() => {
-    return likers.length > 0 ? Math.ceil(likers.length / columnsPerRow) : 0;
-  }, [likers.length, columnsPerRow]);
-  
-  // ⭐ ANDROID OPTIMIZATION: Memoized row config calculation (replaces 4 separate useStates + useEffect)
-  const rowConfig = useMemo(() => {
-    const maxWidth = 1400;
-    const containerWidth = scrollContainerRef.current 
-      ? Math.min(scrollContainerRef.current.clientWidth, maxWidth) 
-      : Math.min(typeof window !== 'undefined' ? window.innerWidth : 375, maxWidth);
-
-    // Responsive padding based on columns
-    const paddingMap: Record<number, number> = { 2: 8, 3: 32, 4: 48 };
-    const gapMap: Record<number, number> = { 2: 12, 3: 40, 4: 56 };
-    const vGapMap: Record<number, number> = { 2: 100, 3: 175, 4: 220 };
-
-    const rowPadding = paddingMap[columnsPerRow] ?? 8;
-    const horizontalGap = gapMap[columnsPerRow] ?? 12;
-    const verticalGap = vGapMap[columnsPerRow] ?? 180;
-
-    const innerWidth = Math.max(0, containerWidth - rowPadding * 2);
-    const totalGaps = horizontalGap * (columnsPerRow - 1);
-    const cardWidth = (innerWidth - totalGaps) / Math.max(1, columnsPerRow);
-
-    const imageHeight = Math.round(cardWidth * 3 / 4);
-    const contentHeight = 56;
-    const extra = 8;
-    const cardHeight = imageHeight + contentHeight + extra;
-
-    return {
-      estimatedRowHeight: Math.max(200, cardHeight),
-      rowVerticalGap: verticalGap,
-      rowPaddingHorizontal: rowPadding,
-      rowColumnGap: horizontalGap
-    };
-  }, [columnsPerRow]);
-
-  // Destructure for backwards compatibility
-  const { estimatedRowHeight, rowVerticalGap, rowPaddingHorizontal, rowColumnGap } = rowConfig;
-
-  // ⭐ CRITICAL FIX: Create stable callbacks OUTSIDE useVirtualizer (hooks can't be nested)
-  const getScrollElement = useCallback(() => scrollContainerRef.current, []);
-  // Include vertical gap in the virtualizer size so we don't have to manually offset `top` or container height.
-  const getEstimateSize = useCallback(
-    () => estimatedRowHeight + rowVerticalGap,
-    [estimatedRowHeight, rowVerticalGap]
-  );
-
-  // ⭐ Always create virtualizer - don't conditionally enable/disable based on state
-  const rowVirtualizer = useVirtualizer({
-    count: virtualizerCount,
-    getScrollElement,
-    estimateSize: getEstimateSize,
-    overscan: 5
-  });
+  // Card sizing/positioning used to be hand-computed in JS (a manually
+  // row-virtualized grid with pixel heights precomputed from
+  // scrollContainerRef.current.clientWidth) so it could stay in sync with
+  // Tailwind's responsive grid-cols breakpoints. That JS math kept
+  // drifting out of sync with what the CSS grid actually rendered
+  // (stale widths after a resize, wrong row heights) and caused the
+  // repeated overlapping/cropped-card bugs on tablet-width screens. A
+  // plain, un-virtualized responsive CSS grid can't drift like that - the
+  // browser lays every card out itself from the real rendered width, always
+  // correct at any size with zero JS involved. With the like list capped at
+  // LIKERS_PAGE_SIZE (500) and images lazy-loaded, rendering all cards at
+  // once here is not a real performance concern.
 
   const calculateAge = useCallback((dateOfBirth: string) => {
     const today = new Date();
@@ -2150,96 +2076,63 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             </div>
           </div>
         ) : (
-          <div
-            style={{
-              position: 'relative',
-              // Subtract the final gap so we don't end with extra whitespace after the last row.
-              height: `${Math.max(0, rowVirtualizer.getTotalSize() - rowVerticalGap)}px`
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map(row => {
-              const startIndex = row.index * columnsPerRow;
-              const rowLikers = likers.slice(startIndex, startIndex + columnsPerRow);
+          <div className="grid grid-cols-2 gap-3 px-2 md:grid-cols-3 md:gap-8 md:px-8 lg:grid-cols-4 lg:gap-14 lg:px-12 max-w-[1400px] mx-auto">
+            {likers.map((liker, likerIndex) => {
               const isLocked = !isPremium;
-              
+              const isFirstThree = likerIndex < 3;
               return (
-                <div
-                  key={row.index}
-                  style={{
-                    position: 'absolute',
-                    top: `${row.start}px`,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    maxWidth: '1400px',
-                    width: '100%',
-                    height: `${Math.max(0, row.size - rowVerticalGap)}px`,
-                    paddingLeft: `${rowPaddingHorizontal}px`,
-                    paddingRight: `${rowPaddingHorizontal}px`,
-                    columnGap: `${rowColumnGap}px`,
-                    rowGap: `${rowVerticalGap}px`,
-                    boxSizing: 'border-box'
-                  }}
-                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+                <Card
+                  key={liker.id}
+                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col h-full bg-black border-pink-500/30 ${isLocked ? 'opacity-75' : ''}`}
+                  onClick={() => handleProfileClick(liker, likerIndex)}
                 >
-                  {rowLikers.map((liker, colIndex) => {
-                    const likerIndex = startIndex + colIndex;
-                    const isFirstThree = likerIndex < 3;
-                    return (
-                    <Card
-                      key={liker.id}
-                      className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col h-full bg-black border-pink-500/30 ${isLocked ? 'opacity-75' : ''}`}
-                      onClick={() => handleProfileClick(liker, likerIndex)}
-                    >
-                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
-                        {(() => {
-                          const profileImages = userImages[liker.id] || [];
-                          return profileImages.length > 0 ? (
-                            <img
-                              loading={isFirstThree ? "eager" : "lazy"}
-                              decoding="async"
-                              src={getSafeImageSrc(profileImages[0], true)}
-                              alt={`${liker.first_name}'s photo`}
-                              className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
-                              style={{
-                                height: '100%',
-                                width: '100%',
-                                objectFit: 'cover',
-                                objectPosition: 'center',
-                                display: 'block',
-                                minHeight: '100%',
-                                minWidth: '100%',
-                                WebkitTransform: 'translateZ(0)',
-                                transform: 'translateZ(0)'
-                              }}
-                            />
-                          ) : (
-                            <div className={`w-full h-full bg-gradient-to-br from-pink-950 to-purple-950 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
-                              <span className="text-2xl font-bold text-pink-200">
-                                {liker.first_name?.[0]}{liker.last_name?.[0]}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                        {isLocked && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <div className="bg-black/80 border border-pink-500/40 backdrop-blur-sm rounded-full p-3">
-                              <Lock className="w-6 h-6 text-pink-300" />
-                            </div>
-                          </div>
-                        )}
+                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                    {(() => {
+                      const profileImages = userImages[liker.id] || [];
+                      return profileImages.length > 0 ? (
+                        <img
+                          loading={isFirstThree ? "eager" : "lazy"}
+                          decoding="async"
+                          src={getSafeImageSrc(profileImages[0], true)}
+                          alt={`${liker.first_name}'s photo`}
+                          className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
+                          style={{
+                            height: '100%',
+                            width: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center',
+                            display: 'block',
+                            minHeight: '100%',
+                            minWidth: '100%',
+                            WebkitTransform: 'translateZ(0)',
+                            transform: 'translateZ(0)'
+                          }}
+                        />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-br from-pink-950 to-purple-950 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
+                          <span className="text-2xl font-bold text-pink-200">
+                            {liker.first_name?.[0]}{liker.last_name?.[0]}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    {isLocked && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <div className="bg-black/80 border border-pink-500/40 backdrop-blur-sm rounded-full p-3">
+                          <Lock className="w-6 h-6 text-pink-300" />
+                        </div>
                       </div>
-                      <CardContent className="p-3 flex-1 bg-black">
-                        <h3 className={`font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                          {liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}
-                        </h3>
-                        <p className="text-xs text-gray-400 truncate">
-                          {liker.country}, {liker.city}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  );
-                  })}
-                </div>
+                    )}
+                  </div>
+                  <CardContent className="p-3 flex-1 bg-black">
+                    <h3 className={`font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
+                      {liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}
+                    </h3>
+                    <p className="text-xs text-gray-400 truncate">
+                      {liker.country}, {liker.city}
+                    </p>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>

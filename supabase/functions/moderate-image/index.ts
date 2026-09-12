@@ -422,6 +422,24 @@ serve(async (req: Request) => {
       return json({ success: false, error: 'Failed to save moderation result' }, 500);
     }
 
+    // Rejected is the one outcome that actually hides a live photo from the
+    // user with no action on their part - worth a real notification so they
+    // know a slot opened up, rather than silently discovering it later.
+    // Routes to Profile on tap (see resolveNotificationRoute in
+    // pushNotifications.ts).
+    if (decision.status === 'rejected' && adminClient) {
+      adminClient.functions.invoke('send-push-notification', {
+        body: {
+          title: 'Photo Removed',
+          body: "One of your photos didn't meet our guidelines and was removed. You can upload a new one anytime.",
+          userId,
+          type: 'image_rejected',
+        },
+      }).catch((notifyError: unknown) => {
+        console.error('Failed to send image-rejection notification:', notifyError);
+      });
+    }
+
     return json({
       success: true,
       status: decision.status,
