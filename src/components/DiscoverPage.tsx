@@ -2281,7 +2281,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           deckForCache = merged;
           return merged;
         });
-        setUserImages(images);
+        // Merge (not replace) userImages: this fetch's `images` map only covers
+        // its OWN freshly-shuffled top-4 profiles. On a background cache-refresh
+        // (opts?.background === true, fired right after a cold-start cache
+        // restore), the resumed/current profile almost never lands in that
+        // top-4, so a full replace here was wiping out image data the
+        // cache-restore preload effect had just loaded for it - leaving the
+        // resumed card's photos blank until the user swiped away (at which
+        // point a different preload path takes over). Merging preserves
+        // already-loaded images for every other profile while still applying
+        // this fetch's own results; on a true first load `prev` is empty so
+        // merge and replace are equivalent.
+        setUserImages(prev => ({ ...prev, ...images }));
         setUserDistances(distances);
         setCurrentIndex(0);
 
