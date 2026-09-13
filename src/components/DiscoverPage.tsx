@@ -752,6 +752,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
   // Track in-flight image load requests to avoid duplicate DB calls
   const requestedImageProfileIds = useRef<Set<string>>(new Set());
+  // Tracks which profiles have their COMPLETE approved image set in
+  // `userImages`, as opposed to merely having *an* entry there. The initial
+  // fast-paint batch (fetchPotentialMatchesData) deliberately truncates to
+  // 3/2/1 images per profile to keep first paint light, and callers used to
+  // treat "has an entry" as "fully loaded" and skip ever revisiting it - so
+  // a profile with more photos than that cap stayed stuck below their real
+  // count for the rest of the session. Only a fetch with no per-profile cap
+  // (loadAllImagesForProfile, preloadProfileImages) may add to this set.
+  const fullyLoadedProfileImageIds = useRef<Set<string>>(new Set());
 
   // ⭐ LIKE-BACK INJECTION: 25% injection of users who liked the current user
   // ⭐ FIX: Store blocked IDs in state (populated from fetchPotentialMatchesData)
@@ -1165,8 +1174,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const loadAllImagesForProfile = useCallback(async (profileId: string) => {
     if (!profileId) return [];
 
-    const cached = userImagesRef.current[profileId];
-    if (Array.isArray(cached) && cached.length > 0) return cached;
+    // Only trust the cache once it's known to hold the COMPLETE set - an
+    // entry from the initial capped batch (3/2/1 images) would otherwise
+    // look "loaded" here forever and this would never fetch the rest.
+    if (fullyLoadedProfileImageIds.current.has(profileId)) {
+      return userImagesRef.current[profileId] || [];
+    }
 
     const inFlight = inFlightProfileImageFetchesRef.current.get(profileId);
     if (inFlight) return inFlight;
@@ -1182,6 +1195,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           .order('image_order', { ascending: true });
 
         if (images) mergeImageCaptions(images);
+        fullyLoadedProfileImageIds.current.add(profileId);
 
         return images?.map(img => img.image_url) || [];
       } catch {
@@ -2423,17 +2437,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           return merged;
         });
         // Merge (not replace) userImages: this fetch's `images` map only covers
-        // its OWN freshly-shuffled top-4 profiles. On a background cache-refresh
-        // (opts?.background === true, fired right after a cold-start cache
-        // restore), the resumed/current profile almost never lands in that
-        // top-4, so a full replace here was wiping out image data the
-        // cache-restore preload effect had just loaded for it - leaving the
-        // resumed card's photos blank until the user swiped away (at which
-        // point a different preload path takes over). Merging preserves
-        // already-loaded images for every other profile while still applying
-        // this fetch's own results; on a true first load `prev` is empty so
-        // merge and replace are equivalent.
-        setUserImages(prev => ({ ...prev, ...images }));
+        // its OWN freshly-shuffled top-4 profiles, deliberately capped to
+        // 3/2/1 images each for a fast first paint. On a background
+        // cache-refresh (opts?.background === true, fired right after a
+        // cold-start cache restore), the resumed/current profile almost
+        // never lands in that top-4, so a full replace here was wiping out
+        // image data the cache-restore preload effect had just loaded for
+        // it. Skipping any id already known to hold its COMPLETE set here
+        // additionally stops this capped batch from *re*-truncating a
+        // profile the other preloaders already topped up to its real count
+        // (e.g. someone with 5 photos getting clobbered back down to 3).
+        setUserImages(prev => {
+          const filteredImages = Object.fromEntries(
+            Object.entries(images).filter(([id]) => !fullyLoadedProfileImageIds.current.has(id))
+          );
+          return { ...prev, ...filteredImages };
+        });
         setUserDistances(distances);
         setCurrentIndex(0);
 
@@ -2625,10 +2644,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     const batchSize = isAndroid ? 5 : 10;
     const profilesToLoad = profiles.slice(startIndex, startIndex + batchSize);
     
-    // Filter out profiles that are already loaded or currently loading
+    // Filter out profiles whose COMPLETE image set is already loaded, or
+    // that are currently loading. Checking `fullyLoadedProfileImageIds`
+    // instead of just "has an entry" is what lets this actually top up a
+    // profile the initial capped batch only gave 1-3 images to - a plain
+    // length check treated that partial entry as done and never revisited it.
     const profilesNeedingImages = profilesToLoad.filter((user) => {
       if (!user?.id) return false;
-      if (userImagesRef.current[user.id]?.length > 0) return false; // Already loaded
+      if (fullyLoadedProfileImageIds.current.has(user.id)) return false; // Already have the full set
       if (requestedImageProfileIds.current.has(user.id)) return false; // Already loading
       return true;
     });
@@ -2668,8 +2691,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const usersWithImages: PotentialMatch[] = [];
 
         // Build updates first, then apply in one state update to reduce re-renders.
+        // This query has no per-user row cap, so whatever comes back (even
+        // zero rows) is the true complete set - safe to mark fully-loaded
+        // either way, so a genuinely photo-less profile isn't re-queried
+        // every time this window slides forward.
         for (const user of profilesNeedingImages) {
           const imageUrls = byUser[user.id] || [];
+          fullyLoadedProfileImageIds.current.add(user.id);
           if (imageUrls.length === 0) {
             requestedImageProfileIds.current.delete(user.id);
             continue;
