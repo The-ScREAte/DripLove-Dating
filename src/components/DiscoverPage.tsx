@@ -3848,6 +3848,49 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
   }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
+  // Re-warm the CURRENT card's blob preview whenever the user returns to this
+  // tab. `preloadProfileImages` above only fires on `currentIndex`/`potentialMatches`
+  // changes (i.e. on swipe) and, even then, skips any profile whose image URLs
+  // are already known - it never re-checks whether the blob preview itself is
+  // still around. If the webview discards blob: object URLs while this tab
+  // sits hidden (display:none) behind another bottom-nav tab, the profile the
+  // user left on comes back with its URLs still known but no blob - so the
+  // photo falls back to a differently-sized, never-before-fetched optimized
+  // URL (a real cache miss, unlike the raw blob-sourced URL) and shows blank
+  // for a few seconds until something re-preloads it. Previously nothing did
+  // that until the *next* swipe warmed the *next* card - hence "requires
+  // swiping" to bring the current photo back. This re-warms the current card
+  // specifically, right when the tab becomes visible again.
+  useEffect(() => {
+    if (!isActiveTab) return;
+    if (isAndroidPlatform()) return; // Android intentionally skips blob preloading entirely
+    const current = potentialMatches[currentIndex];
+    if (!current || isAd(current)) return;
+    if (preloadedBlobImages[current.id]) return; // already warm
+    const urls = userImagesRef.current[current.id];
+    if (!urls || urls.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const blobMap: { [url: string]: string } = {};
+      await Promise.all(
+        urls.map(async (originalUrl) => {
+          try {
+            blobMap[originalUrl] = await preloadImageToBlob(originalUrl);
+          } catch {
+            blobMap[originalUrl] = originalUrl;
+          }
+        })
+      );
+      if (cancelled) return;
+      setPreloadedBlobImages((prev) => ({ ...prev, [current.id]: blobMap }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isActiveTab, currentIndex, potentialMatches, preloadedBlobImages]);
+
   // Helper to persist swipe count to database using the proper RPC.
   // Returns the server's authoritative usage figures whenever we actually
   // get an answer back, so callers can reconcile the optimistic local
