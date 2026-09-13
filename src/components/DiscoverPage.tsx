@@ -112,6 +112,14 @@ const PROFILE_COMPLETION_GRACE_SWIPES = 8;
 const DEFAULT_MIN_AGE = 18;
 const DEFAULT_MAX_AGE = 99;
 
+// How long a PASS keeps a profile excluded from the deck before it's
+// eligible to reappear - a like is excluded permanently (no time window at
+// all) and is intentionally not part of this constant. Was independently
+// re-computed as `30 * 24 * 60 * 60 * 1000` in eight separate places in this
+// file (matching the server's own `passes` query window in
+// fetchPotentialMatchesData) - the same drift risk as the constants above.
+const PASS_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
 // Fallback distance (km) used whenever a user hasn't set max_distance or
 // distance_preference - was independently re-typed as a raw "50" in eight
 // separate places across this file.
@@ -313,7 +321,7 @@ const mergeDecksWithoutProfileDupes = (prev: MatchOrAd[], incoming: MatchOrAd[],
   const swipedIds = new Set<string>();
   if (localSwipedIds) {
     const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = PASS_EXPIRY_MS;
     for (const [id, data] of localSwipedIds.entries()) {
       // Always exclude liked profiles, only exclude passed profiles if less than 30 days old
       if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
@@ -751,8 +759,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // updates profile/swipe state, which can re-run this effect (or briefly flip
   // the page into the loading/out-of-swipes/ad render branch) — the old
   // clearTimeout-on-cleanup let exactly that kill the guide mid-display. Only
-  // the 12s timeout itself hides the guide now.
+  // the 10s timeout (or an explicit dismiss below) hides the guide now.
   const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Dismisses the guide immediately (used when the user actually swipes it,
+  // instead of only auto-hiding after the timer) and permanently marks it
+  // seen either way, same as the timeout path.
+  const dismissSwipeGuide = useCallback(() => {
+    if (swipeGuideTimerRef.current) {
+      clearTimeout(swipeGuideTimerRef.current);
+      swipeGuideTimerRef.current = null;
+    }
+    setShowSwipeGuide(false);
+    if (currentUser?.id) {
+      try {
+        localStorage.setItem(`driplove_swipe_guide_shown_${currentUser.id}`, 'true');
+      } catch {
+        // ignore
+      }
+    }
+  }, [currentUser?.id]);
   useEffect(() => {
     // Only show for new users - keyed per account (not a single blanket
     // flag), so a fresh signup on a device that's already seen this for a
@@ -763,11 +788,81 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     if (swipeGuideTimerRef.current) return; // timer already running — don't restart
     setShowSwipeGuide(true);
     swipeGuideTimerRef.current = setTimeout(() => {
-      setShowSwipeGuide(false);
-      localStorage.setItem(shownKey, 'true');
-      swipeGuideTimerRef.current = null;
-    }, 12000); // 12 seconds
-  }, [currentUser?.id]);
+      dismissSwipeGuide();
+    }, 10000); // 10 seconds
+  }, [currentUser?.id, dismissSwipeGuide]);
+
+  // The guide overlay is swipeable, but ONLY itself - it has its own fully
+  // separate drag state/handlers here, completely decoupled from the real
+  // card's cardElRef/swipeUI/handleLike/handlePass. Swiping the guide slides
+  // the guide's own tagline+icons off screen and dismisses it; the real card
+  // underneath is never touched, dragged, or swiped for real, so there's no
+  // way for this to ever count as an actual like/pass no matter how it's used.
+  const [guideDrag, setGuideDrag] = useState({ x: 0, y: 0 });
+  const [guideExitDir, setGuideExitDir] = useState<'left' | 'right' | null>(null);
+  const guideDragActiveRef = useRef(false);
+  const guideDragXRef = useRef(0);
+  const guideStartRef = useRef({ x: 0, y: 0 });
+  const GUIDE_SWIPE_THRESHOLD = 80;
+
+  const finishGuideDrag = useCallback((finalX: number) => {
+    guideDragActiveRef.current = false;
+    if (Math.abs(finalX) > GUIDE_SWIPE_THRESHOLD) {
+      const dir: 'left' | 'right' = finalX > 0 ? 'right' : 'left';
+      setGuideExitDir(dir);
+      // Let the CSS transition play the fly-off before actually dismissing/
+      // unmounting - matches the same 300ms feel as the real card's own exit.
+      setTimeout(() => {
+        dismissSwipeGuide();
+        setGuideExitDir(null);
+        setGuideDrag({ x: 0, y: 0 });
+      }, 300);
+    } else {
+      setGuideDrag({ x: 0, y: 0 });
+    }
+  }, [dismissSwipeGuide]);
+
+  const handleGuideTouchStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0];
+    guideStartRef.current = { x: t.clientX, y: t.clientY };
+    guideDragXRef.current = 0;
+    guideDragActiveRef.current = true;
+  }, []);
+
+  const handleGuideTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!guideDragActiveRef.current) return;
+    const t = e.touches[0];
+    const x = t.clientX - guideStartRef.current.x;
+    const y = t.clientY - guideStartRef.current.y;
+    guideDragXRef.current = x;
+    setGuideDrag({ x, y });
+  }, []);
+
+  const handleGuideTouchEnd = useCallback(() => {
+    if (!guideDragActiveRef.current) return;
+    finishGuideDrag(guideDragXRef.current);
+  }, [finishGuideDrag]);
+
+  const handleGuideMouseDown = useCallback((e: React.MouseEvent) => {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    guideDragActiveRef.current = true;
+    guideDragXRef.current = 0;
+
+    const onMove = (ev: MouseEvent) => {
+      const x = ev.clientX - startX;
+      const y = ev.clientY - startY;
+      guideDragXRef.current = x;
+      setGuideDrag({ x, y });
+    };
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      finishGuideDrag(ev.clientX - startX);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [finishGuideDrag]);
   // --- END: Swipe Guide Popup State ---
 
   // Check for premium activation from payment success (run once on mount)
@@ -990,17 +1085,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     dragOffsetY: number;
   }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 });
 
-  // Dismiss the swipe guide once the user actually starts a real swipe - the
-  // overlay itself no longer blocks touches (see its pointerEvents below), so a
-  // genuine first swipe goes straight through to the card and counts for real
-  // (a real like/pass), instead of being trapped behind a demo the user has to
-  // dismiss first. Gated on swipeDistance crossing a real movement threshold,
-  // not just isDragging - that flips true on plain touchdown, before any actual
-  // movement, which was dismissing the guide on a tap alone rather than a swipe.
-  // NOTE: the guide is no longer dismissed by the first touch/swipe — it stays up
-  // for its full 5 seconds so the user actually gets to read it, while real swipes
-  // underneath still count (the overlay is pointer-events: none).
-
   const isDraggingRef = useRef(false);
   // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
   // MatchCard) is up — otherwise a touch/drag on the card behind the modal both moves the card
@@ -1178,7 +1262,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       { data: matches },
       { data: blockedUsers },
       { data: recentPasses },
-      { data: usersWhoLikedMe }
+      { data: usersWhoLikedMe },
+      { data: activeCooldowns }
     ] = await queryTimeout(Promise.all([
       supabase
         .from('profiles')
@@ -1210,7 +1295,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         .select('liker_id, created_at')
         .eq('liked_id', userId)
         .order('created_at', { ascending: false })
-        .limit(50) // Get up to 50 recent likers
+        .limit(50), // Get up to 50 recent likers
+      // A dissolved match places both people on a 14-day cooldown (separate
+      // from the 30-day pass window) - see dissolve_matches/match_cooldowns.
+      supabase
+        .from('match_cooldowns')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .gt('expires_at', new Date().toISOString())
     ]));
 
     const likedUserIds = uniqUuids((likedUsers || []).map(like => like.liked_id));
@@ -1219,6 +1311,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       .filter(Boolean));
     const blockedUserIds = uniqUuids(blockedUsers?.flatMap(block => [block.blocked_id, block.blocker_id]) || []);
     const passedUserIds = uniqUuids(recentPasses?.map(p => p.passed_id) || []);
+    const cooldownUserIds = uniqUuids((activeCooldowns || [])
+      .map((c) => (c.user1_id === userId ? c.user2_id : c.user1_id))
+      .filter(Boolean));
     
     const usersWhoLikedMeIds = uniqUuids((usersWhoLikedMe || [])
       .map(like => like.liker_id)
@@ -1240,7 +1335,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     });
     
     const now = Date.now();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = PASS_EXPIRY_MS;
     const locallySwipedIds = uniqUuids(Array.from(locallySwipedProfileIds.current.entries())
       .filter(([_, data]) => {
         // Always exclude liked profiles
@@ -1249,7 +1344,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         return (now - data.timestamp) < thirtyDaysMs;
       })
       .map(([id, _]) => id));
-    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...locallySwipedIds, userId]);
+    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, userId]);
     
     const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
     const userMaxDistance = Number(userMaxDistanceRaw);
@@ -2262,7 +2357,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           // ⭐ CRITICAL: Always filter against locally swiped profiles to prevent repetition
           const swipedIds = locallySwipedProfileIds.current;
           const now = Date.now();
-          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const thirtyDaysMs = PASS_EXPIRY_MS;
 
           const filterSwiped = (deck: MatchOrAd[]): MatchOrAd[] => {
             return deck.filter(item => {
@@ -2640,7 +2735,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         const userPref = currentUser.preference || 'everyone';
         const allowedGendersForRecovery = getGenderFilter(userPref);
 
-        const [{ data: currentUserData }, likesRes, matchesRes, blocksRes, passesRes] = await Promise.all([
+        const [{ data: currentUserData }, likesRes, matchesRes, blocksRes, passesRes, cooldownsRes] = await Promise.all([
           supabase
             .from('profiles')
             .select('max_distance, distance_preference, country, country_code, min_age, max_age, latitude, longitude, unlocked_countries')
@@ -2654,6 +2749,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             .select('passed_id,passed_at')
             .eq('passer_id', userId)
             .gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+          supabase
+            .from('match_cooldowns')
+            .select('user1_id, user2_id')
+            .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+            .gt('expires_at', new Date().toISOString()),
         ]);
 
         if (!isCancelled && currentUserData) {
@@ -2694,6 +2794,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             if (b?.blocker_id) excluded.add(b.blocker_id);
           });
           (passesRes.data || []).forEach((p) => p?.passed_id && excluded.add(p.passed_id));
+          (cooldownsRes.data || []).forEach((c) => {
+            const other = c.user1_id === userId ? c.user2_id : c.user1_id;
+            if (other) excluded.add(other);
+          });
 
           // Swipes are optimistic: the deck removes a card immediately and persists
           // the like/pass to the DB in the background afterward. This query only
@@ -2702,7 +2806,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           // landed yet) would get pulled right back into the deck it was just
           // removed from - showing up as if the swipe never happened.
           const now = Date.now();
-          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const thirtyDaysMs = PASS_EXPIRY_MS;
           const locallyExcluded = new Set<string>();
           for (const [id, data] of locallySwipedProfileIds.current.entries()) {
             if (data.action === 'like' || (now - data.timestamp) < thirtyDaysMs) {
@@ -3029,7 +3133,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     const pruneExpiredPassedSwipes = () => {
       const now = Date.now();
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = PASS_EXPIRY_MS;
       let needsUpdate = false;
 
       for (const [id, data] of locallySwipedProfileIds.current.entries()) {
@@ -3114,7 +3218,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       if (cachedDeck && cachedDeck.length > 0) {
         // ⭐ CRITICAL: Filter cached deck against locally swiped profiles to prevent repetition
         const now = Date.now();
-        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        const thirtyDaysMs = PASS_EXPIRY_MS;
         const swipedToExclude = new Set<string>();
         
         for (const [id, data] of locallySwipedProfileIds.current.entries()) {
@@ -3734,7 +3838,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (missingLikerIds.length > 0 && rescueAllowedCountryCodes.length > 0) {
           const nowTs = Date.now();
-          const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+          const thirtyDaysMs = PASS_EXPIRY_MS;
           const locallyExcluded = new Set<string>();
           for (const [id, data] of locallySwipedProfileIds.current.entries()) {
             if (data.action === 'like' || (nowTs - data.timestamp) < thirtyDaysMs) locallyExcluded.add(id);
@@ -4727,7 +4831,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       if (prev.length === 0) return prev;
 
       const now = Date.now();
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = PASS_EXPIRY_MS;
 
       const fallback = prev[0];
       const swipedItem = swiped ?? fallback;
@@ -4981,18 +5085,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // underneath, but the user can't read its message or see its buttons
   // during that window, which reads as the message not showing at all).
   const swipeGuideOverlay = showSwipeGuide && !isOutOfSwipes ? (
-    // pointerEvents: 'none' throughout - this is a purely visual demo overlay,
-    // not a modal to dismiss first, and never blocks the real card underneath.
+    // Interactive, and fully self-contained: dragging this overlay moves ONLY
+    // its own tagline+icons card (guideDrag/guideExitDir below), never the
+    // real card underneath (no cardElRef, no handleLike/handlePass involved
+    // anywhere in this). Swiping it far enough sends it flying off screen and
+    // dismisses the guide for good; a short drag just snaps it back to
+    // center. Either way the real card is never touched, so this can never
+    // count as an actual like/pass.
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{
-        pointerEvents: 'none',
-        // Dark, softly blurred scrim: the card behind stays visible through it
-        // while the tagline / Nope / Yep icons read cleanly on top.
-        background: 'rgba(0,0,0,0.62)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)'
-      }}
+      className="fixed inset-0 z-[9999]"
+      onTouchStart={handleGuideTouchStart}
+      onTouchMove={handleGuideTouchMove}
+      onTouchEnd={handleGuideTouchEnd}
+      onMouseDown={handleGuideMouseDown}
     >
       <style>{`
         @keyframes swipeGuideIn {
@@ -5029,6 +5134,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         .swipe-guide-arrow-left { animation: arrowNudgeLeft 1.2s ease-in-out infinite; }
         .swipe-guide-arrow-right { animation: arrowNudgeRight 1.2s ease-in-out infinite; }
       `}</style>
+      {/* This is the whole "card" being swiped - the dark blurred scrim itself,
+          with a visible border around it, not just the tagline/icons floating
+          on a static backdrop. It carries the drag transform, so the entire
+          blurred surface follows the finger and flies off screen together,
+          the same way the real photo card does. */}
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{
+          background: 'rgba(0,0,0,0.62)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: '2px solid rgba(236,72,153,0.65)',
+          borderRadius: 24,
+          ...(guideExitDir
+            ? {
+                transform: `translate3d(${guideExitDir === 'right' ? window.innerWidth * 1.2 : -window.innerWidth * 1.2}px, ${guideDrag.y}px, 0) rotate(${guideExitDir === 'right' ? 24 : -24}deg)`,
+                transition: 'transform 0.3s ease-out, opacity 0.3s ease-out',
+                opacity: 0,
+              }
+            : {
+                transform: `translate3d(${guideDrag.x}px, ${guideDrag.y}px, 0) rotate(${guideDrag.x * 0.06}deg)`,
+                transition: guideDrag.x === 0 && guideDrag.y === 0 ? 'transform 0.2s ease-out' : 'none',
+              }),
+        }}
+      >
       <div className="swipe-guide-card flex flex-col items-center gap-6">
         <p
           className="font-brush text-center text-white font-bold px-8"
@@ -5067,6 +5197,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           </div>
           <ChevronRight className="swipe-guide-arrow-right w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
         </div>
+      </div>
       </div>
     </div>
   ) : null;

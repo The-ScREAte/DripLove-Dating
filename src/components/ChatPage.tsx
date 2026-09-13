@@ -1117,21 +1117,36 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
     }
     
-    // Delete all expired matches in one batch
+    // Dissolve all expired matches in one batch. This also destroys the two
+    // mutual `likes` rows behind the match and starts a 14-day cooldown for
+    // the pair (see dissolve_matches / match_cooldowns) so they aren't stuck
+    // permanently excluded from each other's Discover deck with no match to
+    // show for it - a plain matches delete used to leave that dead end.
     if (expiredMatchIds.length > 0) {
       try {
-        const { error } = await supabase
-          .from('matches')
-          .delete()
-          .in('id', expiredMatchIds);
+        const { error } = await (supabase as unknown as {
+          rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+        }).rpc('dissolve_matches', { match_ids: expiredMatchIds });
 
         if (!error) {
           // Clear cache so next fetch gets fresh data without expired matches
           chatMatchesCache.delete(currentUser.id);
+          // A matched person is already excluded from "who liked you" while
+          // matched, so this doesn't reveal anyone new - but the underlying
+          // like row is now gone too, so force a clean refetch instead of
+          // letting the liked-me cache coast on its normal TTL.
+          if (typeof window !== 'undefined') {
+            window.likedMeCache?.delete(currentUser.id);
+            try {
+              sessionStorage.removeItem(`likedMe_v1_${currentUser.id}`);
+            } catch {
+              // sessionStorage can be unavailable (private mode) - safe to skip
+            }
+          }
           // Refresh the matches list
           fetchMatches();
         } else {
-          console.error('[ChatPage] Error deleting expired matches:', error);
+          console.error('[ChatPage] Error dissolving expired matches:', error);
         }
       } catch (error) {
         console.error('[ChatPage] Error in checkExpiredMatches:', error);

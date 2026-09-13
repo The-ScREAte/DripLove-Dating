@@ -1637,7 +1637,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                   </div>
 
                   {!showMoreInfo && showAbout ? (
-                    <p className="mt-2 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
+                    <p className="mt-2 pr-8 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
                       {selectedProfile.bio}
                     </p>
                   ) : (
