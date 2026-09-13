@@ -426,6 +426,36 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   useEffect(() => {
     userImagesRef.current = userImages;
   }, [userImages]);
+
+  // Persist just the current + next card's own photo URLs (not the whole
+  // `userImages` map - this only needs to survive long enough to paint the
+  // very first frame after a relaunch). The deck itself is cached, but a
+  // deck entry always has `images: []` by construction (see toPotentialMatch
+  // callers) - actual URLs only ever live in `userImages`, which starts empty
+  // on every fresh mount, so restoring the deck from cache still needed one
+  // live query before any photo could render. Caching these two profiles'
+  // URLs lets that first paint happen with zero network wait instead.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const current = potentialMatches[currentIndex];
+    const next = potentialMatches[currentIndex + 1];
+    const toCache: { [key: string]: string[] } = {};
+    if (current && !isAd(current) && userImages[current.id]?.length) {
+      toCache[current.id] = userImages[current.id];
+    }
+    if (next && !isAd(next) && userImages[next.id]?.length) {
+      toCache[next.id] = userImages[next.id];
+    }
+    if (Object.keys(toCache).length === 0) return;
+    try {
+      localStorage.setItem(
+        `driplove_last_card_images_${currentUser.id}`,
+        JSON.stringify({ ts: Date.now(), images: toCache })
+      );
+    } catch {
+      // ignore (private mode / storage full)
+    }
+  }, [userImages, potentialMatches, currentIndex, currentUser?.id]);
   // Optional per-photo label/caption (set in ImageManagement.tsx), keyed by the
   // photo's own image_url - global across every profile fetched rather than
   // per-profile, since image_url is already unique and this is simpler to
@@ -2268,6 +2298,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     deckMemoryCacheRef.current.set(key, { ts: Date.now(), deck });
   }, []);
 
+  // Companion to the effect above that writes `driplove_last_card_images_*` -
+  // read back on the cache-restore path so the very first paint after a
+  // relaunch doesn't have to wait on a network round trip for photo URLs.
+  const readLastCardImagesCache = useCallback((userId: string): { [key: string]: string[] } | null => {
+    try {
+      const raw = localStorage.getItem(`driplove_last_card_images_${userId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { ts: number; images: { [key: string]: string[] } };
+      if (!parsed?.ts || !parsed?.images) return null;
+      if (Date.now() - parsed.ts > DISCOVER_DECK_CACHE_TTL_MS) return null;
+      return parsed.images;
+    } catch {
+      return null;
+    }
+  }, [DISCOVER_DECK_CACHE_TTL_MS]);
+
   // Reorder an existing deck using a weighted profile list while keeping ad positions stable.
   const reorderDeckWithWeightedProfiles = useCallback(
     (deck: MatchOrAd[], weightedProfiles: PotentialMatch[], preserveRealHead = 5): MatchOrAd[] => {
@@ -3283,6 +3329,50 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           setIsLoading(false);
           setHasCompletedInitialFetch(true);
 
+          // The deck itself is cached, but `userImages` never is - it starts
+          // empty on every fresh mount (cold app restart, most reliably).
+          // The background refresh below fetches its OWN random top-4
+          // profiles' images, which essentially never happens to include
+          // the resumed card, so waiting on it left the resumed photo blank
+          // for however long that whole re-fetch pipeline took (~5s), then
+          // often landing outside its top-2 anyway and getting capped at a
+          // single image instead of the full set.
+          //
+          // First, paint instantly with zero network wait from the small
+          // last-seen-cards cache (written by the effect near userImagesRef)
+          // if it has these exact profiles - then still fetch live in the
+          // background afterward so a since-changed photo set self-corrects.
+          const lastCardImages = readLastCardImagesCache(currentUser.id);
+          if (lastCardImages) {
+            const instant: { [key: string]: string[] } = {};
+            for (const p of resumedDeck.slice(0, 2)) {
+              if (!isAd(p) && lastCardImages[p.id]?.length) instant[p.id] = lastCardImages[p.id];
+            }
+            if (Object.keys(instant).length > 0) {
+              setUserImages(prev => ({ ...instant, ...prev }));
+            }
+          }
+
+          const resumedProfile = resumedDeck[0];
+          const upNextProfile = resumedDeck[1];
+          if (resumedProfile && !isAd(resumedProfile) && !userImagesRef.current[resumedProfile.id]?.length) {
+            loadAllImagesForProfile(resumedProfile.id).then(imgs => {
+              if (imgs && imgs.length > 0) {
+                setUserImages(prev => ({ ...prev, [resumedProfile.id]: imgs }));
+                preloadImages(imgs.slice(0, 3), 'high');
+                if (imgs.length > 3) preloadImages(imgs.slice(3), 'low');
+              }
+            });
+          }
+          if (upNextProfile && !isAd(upNextProfile) && !userImagesRef.current[upNextProfile.id]?.length) {
+            loadAllImagesForProfile(upNextProfile.id).then(imgs => {
+              if (imgs && imgs.length > 0) {
+                setUserImages(prev => ({ ...prev, [upNextProfile.id]: imgs }));
+                preloadImages(imgs.slice(0, 2), 'medium');
+              }
+            });
+          }
+
           // Refresh silently in background to apply new swipes / new users
           void fetchPotentialMatches({ background: true, cacheKey });
           return;
@@ -3321,6 +3411,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     persistSwipedIds,
     getStoredSwipedIds,
     readDeckCache,
+    loadAllImagesForProfile,
+    preloadImages,
+    readLastCardImagesCache,
   ]);
 
 
