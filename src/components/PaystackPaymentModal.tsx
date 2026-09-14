@@ -114,16 +114,22 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'momo' | 'iap'>(paymentMethod);
   const [paystackPublicKey, setPaystackPublicKey] = useState<string>('');
 
+  // Prefetch on mount rather than waiting for `isOpen` - this component is
+  // already mounted (just hidden) as soon as the premium page itself opens,
+  // well before the user reaches the actual payment step. Gating on `isOpen`
+  // meant the external Paystack script and the public-key lookup only
+  // started at the exact moment the user tapped "Pay", making that tap feel
+  // slow. Both are safe to run once eagerly: loadPaystackScript() no-ops if
+  // the script/global is already present, and the public key never depended
+  // on isOneTime in the first place.
   useEffect(() => {
-    if (isOpen) {
-      loadPaystackScript()
-        .then(() => undefined)
-        .catch(err => console.error('[PaystackModal] Failed to load Paystack script:', err));
-      
-      // Fetch the appropriate public key based on database mode
-      getPaystackPublicKey().then(setPaystackPublicKey);
-    }
-  }, [isOpen, isOneTime]);
+    loadPaystackScript()
+      .then(() => undefined)
+      .catch(err => console.error('[PaystackModal] Failed to load Paystack script:', err));
+
+    // Fetch the appropriate public key based on database mode
+    getPaystackPublicKey().then(setPaystackPublicKey);
+  }, []);
 
   const handlePay = async () => {
     if (selectedPaymentMethod === 'iap') {

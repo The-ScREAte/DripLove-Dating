@@ -370,7 +370,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     potentialMatchesRef.current = potentialMatches;
   }, [potentialMatches]);
   const [noMoreProfiles, setNoMoreProfiles] = useState(false); // Track when truly no more profiles available
-  const [emptyStateMode, setEmptyStateMode] = useState<'exhausted' | 'transient-error' | 'no-new'>('exhausted');
+  const [emptyStateMode, setEmptyStateMode] = useState<'exhausted' | 'transient-error'>('exhausted');
 
   // Premium-only: avoid showing the empty card when the local pool ends.
   // We auto-retry once; only show the empty card if that retry also yields nothing.
@@ -1272,7 +1272,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, []);
 
   // Shared data fetching logic - optimized for speed
-  const fetchPotentialMatchesData = useCallback(async (userId: string, allowedGenders: string[]) => {
+  const fetchPotentialMatchesData = useCallback(async (userId: string, allowedGenders: string[], opts?: { isRefill?: boolean }) => {
+    // A background top-up (loadMoreMatches) must see the FULL eligible pool
+    // this call found - the "fast first paint" caps below exist only for the
+    // very first screen, but were being applied here too, silently discarding
+    // every candidate past the cap on every single refill. Combined with the
+    // "retry once" duplicate check re-asking with the exact same exclusions
+    // (so it got the exact same capped slice back), a real pool of 100+
+    // eligible people could show "no more profiles" the moment the visible
+    // top 30-60 (by feed weight) had all been swiped - even though the rest
+    // of that same pool was sitting right there, one rank below the cutoff.
+    const isRefill = opts?.isRefill === true;
     // Create timeout wrapper for all database queries (15 second timeout)
     // Accepts any thenable so Supabase query builders (which are PromiseLike,
     // not real Promises) can be passed directly.
@@ -1546,8 +1556,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // STEP 6: For Premium multi-country, preserve the country rotation
       // Stratified sampling would re-group by account age and destroy the alternation
       // Premium users pay for the best experience → keep pure round-robin mixing
-      const premiumInitialCap = isAndroid ? 30 : 60;
-      filteredProfiles = activityWeightedMixed.slice(0, premiumInitialCap);
+      // Only cap the very first paint - a refill needs the whole pool this
+      // call actually found, not a re-truncated slice of it.
+      filteredProfiles = isRefill
+        ? activityWeightedMixed
+        : activityWeightedMixed.slice(0, isAndroid ? 30 : 60);
 
 
       // (dev-only logging removed)
@@ -1837,8 +1850,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       
       // ⭐ PER-USER RANDOMIZATION: Use user-specific seed for free users too
       const freeUserSeed = getUserFeedSeed(userId);
-      // Apply stratified sampling for free users
-      filteredProfiles = getStratifiedBatches(filteredProfiles, 15, 4, freeUserSeed);
+      // Stratified sampling caps at 15*4=60 for a nice first paint - a
+      // refill needs everyone this call actually found, same reasoning as
+      // the premium cap above (otherwise a local pool bigger than 60 could
+      // hit a false "no more profiles" the same way).
+      filteredProfiles = isRefill
+        ? filteredProfiles
+        : getStratifiedBatches(filteredProfiles, 15, 4, freeUserSeed);
 
       // ⭐ ACTIVITY WEIGHTING (Free): keep first paint fast, then boost actives
       // Android: show unweighted first, apply light head weighting async.
@@ -3734,7 +3752,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
       // ✅ Refill should use the *same* eligibility rules as the initial fetch.
       // We call the shared fetch routine, then append only *new* profiles (deduped).
-      const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders);
+      const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true });
       if (!result) return;
 
       const { matches, images, distances } = result;
@@ -3784,9 +3802,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
       if (refillChunk.length === 0) {
         // Duplicate-heavy result set: retry once immediately to avoid a confusing no-op.
-        const retryResult = await fetchPotentialMatchesData(currentUser.id, allowedGenders);
+        const retryResult = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true });
         if (!retryResult || retryResult.matches.length === 0) {
-          setEmptyStateMode('no-new');
+          setEmptyStateMode('exhausted');
           return;
         }
 
@@ -3794,7 +3812,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         refillChunk = retryNewProfiles.slice(0, refillChunkSize);
 
         if (refillChunk.length === 0) {
-          setEmptyStateMode('no-new');
+          setEmptyStateMode('exhausted');
           return;
         }
       }
@@ -5512,15 +5530,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   if (potentialMatches.length === 0 && hasCompletedInitialFetch) {
     const emptyTitle = emptyStateMode === 'transient-error'
       ? 'Refresh didn\'t work'
-      : emptyStateMode === 'no-new'
-        ? 'No new profiles yet'
-        : t('discover.noMoreProfiles');
+      : t('discover.noMoreProfiles');
 
     const emptyDescription = emptyStateMode === 'transient-error'
       ? 'We hit a quick connection issue. Tap refresh to retry.'
-      : emptyStateMode === 'no-new'
-        ? 'You\'re all caught up for now. Tap refresh to check again.'
-        : t('discover.noProfilesDescription');
+      : t('discover.noProfilesDescription');
 
     // Show empty state - user can manually refresh
     // Background loading will continue silently without showing spinner

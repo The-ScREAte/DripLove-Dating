@@ -248,7 +248,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         p_offset: 0,
       });
       if (error) throw error;
-      setBroadcastMessages(((data as any) || []) as ProfileBroadcastMessage[]);
+      setBroadcastMessages((data || []) as ProfileBroadcastMessage[]);
     } catch (err) {
       console.error('[ProfilePage] Failed to load broadcast messages:', err);
     } finally {
@@ -574,13 +574,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   // Toggles a single-select field: tapping the already-selected option clears it.
   const handleSingleToggleChange = (name: string, value: string) => {
-    setEditedProfile(prev => ({ ...prev, [name]: (prev as any)[name] === value ? '' : value }));
+    setEditedProfile(prev => ({ ...prev, [name]: (prev as Record<string, unknown>)[name] === value ? '' : value }));
   };
 
   // Toggles a value in/out of an array field (multi-select chips).
   const handleArrayToggleChange = (name: string, value: string) => {
     setEditedProfile(prev => {
-      const current: string[] = Array.isArray((prev as any)[name]) ? (prev as any)[name] : [];
+      const currentValue = (prev as Record<string, unknown>)[name];
+      const current: string[] = Array.isArray(currentValue) ? currentValue : [];
       const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
       return { ...prev, [name]: next };
     });

@@ -5,7 +5,14 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
 import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -13,6 +20,9 @@ import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Map;
 
 public class CustomFirebaseMessagingService extends FirebaseMessagingService {
@@ -101,6 +111,19 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
                 .setLights(Color.MAGENTA, 1000, 300)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(0); // Don't use defaults, we set custom sound
+
+        // Match/message notifications carry the other person's photo (see
+        // send-push-notification edge function) - show it as the rounded
+        // avatar on the right, same as any messaging app. onMessageReceived
+        // already runs off the main thread, so a blocking download here is
+        // safe; a missing/failed image just falls back to the plain layout.
+        String imageUrl = data != null ? data.get("imageUrl") : null;
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            Bitmap avatar = downloadAndRoundBitmap(imageUrl);
+            if (avatar != null) {
+                notificationBuilder.setLargeIcon(avatar);
+            }
+        }
         
         // For heads-up notifications (Android 5.0+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -121,7 +144,47 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
         // Show notification
         notificationManager.notify((int) System.currentTimeMillis(), notificationBuilder.build());
     }
-    
+
+    // Downloads the given image URL and crops it to a circle, matching how
+    // every profile photo already displays elsewhere in the app. Returns
+    // null (never throws) on any network/decode failure, so a bad URL just
+    // means no avatar rather than a dropped notification.
+    private Bitmap downloadAndRoundBitmap(String imageUrl) {
+        try {
+            URL url = new URL(imageUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            connection.setDoInput(true);
+            connection.connect();
+
+            InputStream input = connection.getInputStream();
+            Bitmap source = BitmapFactory.decodeStream(input);
+            input.close();
+            connection.disconnect();
+
+            if (source == null) return null;
+
+            int size = Math.min(source.getWidth(), source.getHeight());
+            int x = (source.getWidth() - size) / 2;
+            int y = (source.getHeight() - size) / 2;
+            Bitmap squared = Bitmap.createBitmap(source, x, y, size, size);
+
+            Bitmap rounded = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(rounded);
+            Paint paint = new Paint();
+            paint.setAntiAlias(true);
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+            paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+            canvas.drawBitmap(squared, new Rect(0, 0, size, size), new Rect(0, 0, size, size), paint);
+
+            return rounded;
+        } catch (Exception e) {
+            android.util.Log.w(TAG, "Failed to download/round notification avatar: " + e.getMessage());
+            return null;
+        }
+    }
+
     private void createNotificationChannel(NotificationManager manager, String channelId) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             CharSequence channelName = "DripLove Notifications";

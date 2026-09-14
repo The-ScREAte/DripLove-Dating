@@ -150,6 +150,37 @@ const AppWrapper = () => {
         // Show the app immediately for faster perceived performance
         setIsInitialized(true);
 
+        // ⭐ ANDROID OPTIMIZATION: Defer heavy background operations more on Android
+        // Android WebView initialization is slower - prioritize visible UI first
+        const initDelay = /Android/i.test(navigator.userAgent) ? 300 : 100;
+
+        // Start IAP (StoreKit/Google Play Billing) warming up now, in parallel
+        // with auth bootstrap below, instead of waiting for it to finish first.
+        // The billing connection setup is a real native round trip with its
+        // own latency we can't shorten - but it doesn't depend on auth being
+        // resolved, so chaining it after auth's own (variable) latency was
+        // pure added delay. This is exactly what made navigating straight to
+        // the premium page right after launch (before auth + this were both
+        // done) catch IAP still not ready - starting it here instead gives it
+        // a head start of however long auth bootstrap takes.
+        setTimeout(async () => {
+          try {
+            const { Capacitor } = await import('@capacitor/core');
+            const platform = Capacitor.getPlatform();
+
+            if (platform === 'ios') {
+              const { initIAP } = await import('./iap');
+              await initIAP();
+            } else if (platform === 'android') {
+              const { initGoogleIAP } = await import('./iap-google');
+              await initGoogleIAP();
+            }
+          } catch (error) {
+            console.error('[App] Failed to initialize In-App Purchase:', error);
+            // Log but don't crash - IAP is optional feature
+          }
+        }, initDelay);
+
         // Auth bootstrap MUST happen before rendering routes (prevents Welcome/Login flash)
         try {
           // Get existing session from storage first
@@ -241,30 +272,9 @@ const AppWrapper = () => {
           setAuthChecked(true);
         }
 
-        // ⭐ ANDROID OPTIMIZATION: Defer heavy background operations more on Android
-        // Android WebView initialization is slower - prioritize visible UI first
-        const initDelay = /Android/i.test(navigator.userAgent) ? 300 : 100;
-        
+        // IAP init now starts above, in parallel with auth bootstrap - this
+        // timer only covers the remaining (non-IAP) background plugin setup.
         setTimeout(async () => {
-          try {
-            // Initialize in-app purchase systems (background)
-            const { Capacitor } = await import('@capacitor/core');
-            const platform = Capacitor.getPlatform();
-            
-            if (platform === 'ios') {
-              // Apple IAP for iOS
-              const { initIAP } = await import('./iap');
-              await initIAP();
-            } else if (platform === 'android') {
-              // Google IAP for Android
-              const { initGoogleIAP } = await import('./iap-google');
-              await initGoogleIAP();
-            }
-          } catch (error) {
-            console.error('[App] Failed to initialize In-App Purchase:', error);
-            // Log but don't crash - IAP is optional feature
-          }
-
           // Initialize Capacitor plugins (background)
           const { Capacitor } = await import('@capacitor/core');
           if (Capacitor.isNativePlatform()) {

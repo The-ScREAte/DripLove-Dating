@@ -160,6 +160,28 @@ serve(async (req) => {
 
     console.log(`📤 Processing notification for user ${userId}:`, { title, body, type })
 
+    // Resolve the other person's photo here, once, server-side - rather than
+    // requiring every call site (match, message, like) to look this up and
+    // thread an image URL through itself. A caller just passes `senderId`
+    // (whoever the notification is "from") and this fills in `imageUrl` for
+    // the native notification's rounded avatar, same way every other client
+    // already gets a person's photo from `user_images`.
+    let resolvedImageUrl: string | undefined
+    const senderId = (data as Record<string, unknown>).senderId
+    if (typeof senderId === 'string' && senderId) {
+      const { data: senderImage } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', senderId)
+        .eq('is_approved', true)
+        .neq('image_order', -1)
+        .order('image_order', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      resolvedImageUrl = senderImage?.image_url
+    }
+    const notificationData = resolvedImageUrl ? { ...data, imageUrl: resolvedImageUrl } : data
+
     // Get user's push tokens
     const { data: tokens, error: tokensError } = await supabase
       .from('push_tokens')
@@ -218,7 +240,7 @@ serve(async (req) => {
                 body,
               },
               data: {
-                ...data,
+                ...notificationData,
                 type,
               },
               android: {
@@ -245,7 +267,7 @@ serve(async (req) => {
                     'mutable-content': 0,  // Disable notification service extension
                   },
                   // Put custom data at payload level, not inside aps
-                  ...data,
+                  ...notificationData,
                   type,
                 },
                 headers: {

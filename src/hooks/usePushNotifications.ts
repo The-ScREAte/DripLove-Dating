@@ -147,7 +147,9 @@ export const usePushNotifications = (userId?: string) => {
       body: `You and ${matchedUserName} liked each other. Say hello!`,
       userId: targetUserId,
       type: 'match',
-      data: { matchedUserName }
+      // senderId lets the edge function resolve this device's own photo
+      // server-side, once, for the recipient's notification avatar.
+      data: { matchedUserName, senderId: userId }
     });
 
     if (success) {
@@ -177,7 +179,9 @@ export const usePushNotifications = (userId?: string) => {
       body: message.length > 100 ? message.substring(0, 100) + '...' : message,
       userId: targetUserId,
       type: 'message',
-      data: { senderName, chatId }
+      // senderId lets the edge function resolve this device's own photo
+      // server-side, once, for the recipient's notification avatar.
+      data: { senderName, chatId, senderId: userId }
     });
 
     if (success) {
