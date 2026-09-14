@@ -99,7 +99,7 @@ const InfluencerSetPassword = () => {
 
       // Best-effort confirmation email - doesn't block the success screen/redirect.
       supabase.functions.invoke('notify-promoter-password-set', {
-        body: { promoCodeId, appUrl: window.location.origin },
+        body: { promoCodeId },
       }).then(({ error: emailError }) => {
         if (emailError) console.error('Failed to send password-set confirmation email:', emailError);
       });

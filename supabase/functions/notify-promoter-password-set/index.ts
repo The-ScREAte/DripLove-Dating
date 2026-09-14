@@ -28,8 +28,12 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { promoCodeId, appUrl } = await req.json();
-    if (!promoCodeId || !appUrl) throw new Error('promoCodeId and appUrl are required');
+    const { promoCodeId } = await req.json();
+    if (!promoCodeId) throw new Error('promoCodeId is required');
+
+    // Always the real production domain - see notify-promoter-created for
+    // why this is never taken from the caller.
+    const appUrl = 'https://www.driplove.love';
 
     const { data: promoCode, error: promoError } = await supabase
       .from('promo_codes')

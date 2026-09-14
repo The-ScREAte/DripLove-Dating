@@ -31,6 +31,15 @@ import {
   Wallet
 } from 'lucide-react';
 
+// Promoter setup links always point at the real production domain,
+// regardless of where the admin happens to be running this page from
+// (localhost, a preview deploy, etc). Using window.location.origin here
+// used to bake in whatever the admin was browsing on at that moment -
+// a promoter opening that link on their own phone or laptop would get
+// "invalid link" (or nothing at all) since localhost/preview URLs mean
+// nothing off the admin's own machine.
+const PRODUCTION_APP_URL = 'https://www.driplove.love';
+
 interface PromoCode {
   id: string;
   code: string;
@@ -252,7 +261,7 @@ const InfluencerManagement = () => {
       if (error) throw error;
 
       // Generate the password setup link for the admin to share
-      const appUrl = window.location.origin;
+      const appUrl = PRODUCTION_APP_URL;
       const setupLink = `${appUrl}/influencer/set-password?id=${newPromoCode.id}&token=${encodeURIComponent(token)}`;
       setPasswordSetupLink(setupLink);
 
@@ -260,7 +269,7 @@ const InfluencerManagement = () => {
       // link later via the "Setup Link" button while the promoter is still
       // pending_password, so a failure here isn't fatal to the creation flow.
       supabase.functions.invoke('notify-promoter-created', {
-        body: { promoCodeId: newPromoCode.id, appUrl },
+        body: { promoCodeId: newPromoCode.id },
       }).then(({ error: emailError }) => {
         if (emailError) console.error('Failed to email promoter setup link:', emailError);
       });
@@ -290,13 +299,13 @@ const InfluencerManagement = () => {
         throw new Error(result.error || 'Failed to generate setup link');
       }
 
-      const appUrl = window.location.origin;
+      const appUrl = PRODUCTION_APP_URL;
       setPasswordSetupLink(`${appUrl}/influencer/set-password?id=${promoCode.id}&token=${encodeURIComponent(result.token)}`);
 
       // Best-effort resend - the new token above was already regenerated
       // regardless of whether the email succeeds.
       supabase.functions.invoke('notify-promoter-created', {
-        body: { promoCodeId: promoCode.id, appUrl },
+        body: { promoCodeId: promoCode.id },
       }).then(({ error: emailError }) => {
         if (emailError) console.error('Failed to email promoter setup link:', emailError);
       });
@@ -711,8 +720,8 @@ const InfluencerManagement = () => {
                         size="icon"
                         variant="outline"
                         className="h-7 w-7 text-pink-600 border-pink-200"
-                        title="Get setup link"
-                        aria-label="Get setup link"
+                        title="Resend password setup invite"
+                        aria-label="Resend password setup invite"
                         onClick={() => handleGetSetupLink(promo)}
                         disabled={fetchingSetupLinkFor === promo.id}
                       >

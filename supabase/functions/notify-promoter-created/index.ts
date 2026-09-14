@@ -42,8 +42,14 @@ serve(async (req: Request) => {
       .single();
     if (!adminProfile?.is_admin) throw new Error('Forbidden: Admin access required');
 
-    const { promoCodeId, appUrl } = await req.json();
-    if (!promoCodeId || !appUrl) throw new Error('promoCodeId and appUrl are required');
+    const { promoCodeId } = await req.json();
+    if (!promoCodeId) throw new Error('promoCodeId is required');
+
+    // Always the real production domain, regardless of whatever origin the
+    // caller happens to be running from (localhost, a preview deploy, a
+    // native app's dev server, etc). A promoter's setup link is meaningless
+    // off the production site, so this is intentionally not caller-supplied.
+    const appUrl = 'https://www.driplove.love';
 
     const { data: promoCode, error: promoError } = await supabase
       .from('promo_codes')
