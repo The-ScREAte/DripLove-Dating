@@ -76,7 +76,7 @@ const LIKERS_PAGE_SIZE = 500;
 // Where the second captioned photo call-out can land in the expanded details
 // panel - always above Personality. Module-level (not per-render) since it's
 // a fixed constant, not something that needs recreating on every render.
-const PHOTO_ANCHORS = ['lifestyle', 'workEducation'] as const;
+const PHOTO_ANCHORS = ['lifestyle', 'workEducation', 'personality', 'communicationStyle'] as const;
 // Caption text is capped at 50 characters, matching the limit enforced when
 // saving it in ImageManagement.tsx, so this should rarely ever truncate -
 // it's just a safety net for older captions saved before that cap existed.
@@ -1514,8 +1514,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             space instead of stopping at a fixed height and leaving a dead gap -
             exactly how Discover's own collapsed card behaves. */}
         <div
-          className="relative flex-shrink-0 w-full overflow-hidden"
-          style={{ height: showMoreInfo ? '58%' : '100%', minHeight: '220px' }}
+          className={`relative w-full overflow-hidden transition-all duration-300 ${showMoreInfo ? 'flex-1' : ''}`}
+          style={
+            showMoreInfo
+              ? { flex: '0 0 58%', minHeight: '180px', maxHeight: '58%' }
+              // Collapsed: absolutely positioned to the parent's exact box
+              // (inset 0), same technique Discover/the profile preview use -
+              // a flex-shrink-0 child sized by a plain height percentage with
+              // no transition at all (the previous approach here) snapped
+              // instantly with no animation, and reportedly still looked like
+              // a jump/glitch on toggle. This is the one technique proven to
+              // animate cleanly across the app now.
+              : { position: 'absolute', inset: 0 }
+          }
         >
           {/* Swipeable unit - photo, swipe hint, AND the name/caption all live in
               this one box and move together as a single card on drag, the same
@@ -1703,7 +1714,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               <div
                 key={idx}
                 className={`h-1.5 rounded-full transition-all duration-200 ${
-                  idx === currentSlide ? 'bg-white w-6' : 'bg-white/50 w-1.5'
+                  idx === currentSlide ? 'bg-pink-500 w-6' : 'bg-pink-500/30 w-1.5'
                 }`}
               />
             ))}

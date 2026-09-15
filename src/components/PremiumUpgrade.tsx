@@ -994,7 +994,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                       setShowPaymentOptions(false);
                       setTimeout(() => setShowPaymentOptions(true), 50);
                     }}
-                    className="text-xs text-pink-300 hover:text-pink-200 underline"
+                    className="text-xs text-pink-400 hover:text-pink-300 underline"
                   >
                     Try again
                   </button>

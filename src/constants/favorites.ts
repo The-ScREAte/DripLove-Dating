@@ -7,8 +7,12 @@
 
 export interface FavoriteEntry {
   category: string;
-  // Sports: which sport. Music: artist or album. Other categories: unused.
+  // Sports: which sport. Music: favorite artist or album. Other categories: unused.
   detail?: string;
+  // Music only: up to 3 top/most-listened artists, separate from the
+  // artist-or-album pick above (someone's top artists aren't always the
+  // same as their single favorite album/song).
+  topArtists?: string[];
   // Optional share link - currently only offered for Music (e.g. a Spotify/
   // Apple Music/YouTube link), but the shape allows any category to carry one.
   link?: string;
@@ -151,9 +155,23 @@ export const CATEGORY_SUB_QUESTION: Record<string, string> = {
 };
 
 // A one-line, human-readable label for a favorite entry - "Sports: Basketball",
-// "Music: Drake - Scorpion", or just "Movies" when there's no detail.
-export const formatFavoriteLabel = (favorite: FavoriteEntry): string =>
-  favorite.detail ? `${favorite.category}: ${favorite.detail}` : favorite.category;
+// "Music: Drake - Scorpion", or just "Movies" when there's no detail. Music
+// entries with top artists set append them too - "Music: Scorpion (album) •
+// Top Artist: Kendrick Lamar" (or "Top Artists: X, Y, Z" for more than one) -
+// so it shows up everywhere this label is used (the expanded info card on
+// Discover/Circle/Liked Me/profile preview, the Favorites editor's own
+// selected chips, the music player's title) without each of those needing
+// its own separate rendering for it.
+export const formatFavoriteLabel = (favorite: FavoriteEntry): string => {
+  const base = favorite.detail ? `${favorite.category}: ${favorite.detail}` : favorite.category;
+  if (favorite.category === 'Music' && favorite.topArtists && favorite.topArtists.length > 0) {
+    const suffix = favorite.topArtists.length === 1
+      ? `Top Artist: ${favorite.topArtists[0]}`
+      : `Top Artists: ${favorite.topArtists.join(', ')}`;
+    return `${base} • ${suffix}`;
+  }
+  return base;
+};
 
 // Loosely validates and coerces whatever the DB/cache handed back (jsonb ->
 // unknown at the type level) into FavoriteEntry[], dropping anything
@@ -163,10 +181,19 @@ export const parseFavorites = (value: unknown): FavoriteEntry[] => {
   const out: FavoriteEntry[] = [];
   for (const item of value) {
     if (item && typeof item === 'object' && typeof (item as { category?: unknown }).category === 'string') {
-      const entry = item as { category: string; detail?: unknown; link?: unknown };
+      const entry = item as { category: string; detail?: unknown; topArtists?: unknown; topArtist?: unknown; link?: unknown };
+      // topArtists is the current shape (up to 3); topArtist (singular) is a
+      // short-lived earlier shape from before multiple artists were
+      // supported - migrated on read so any already-saved rows still show.
+      const topArtists = Array.isArray(entry.topArtists)
+        ? entry.topArtists.filter((a): a is string => typeof a === 'string' && a.trim().length > 0).map((a) => a.trim()).slice(0, 3)
+        : typeof entry.topArtist === 'string' && entry.topArtist.trim()
+          ? [entry.topArtist.trim()]
+          : undefined;
       out.push({
         category: entry.category,
         detail: typeof entry.detail === 'string' && entry.detail.trim() ? entry.detail.trim() : undefined,
+        topArtists: topArtists && topArtists.length > 0 ? topArtists : undefined,
         link: typeof entry.link === 'string' && entry.link.trim() ? entry.link.trim() : undefined,
       });
     }

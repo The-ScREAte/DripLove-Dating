@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Users, User } from 'lucide-react';
+import { MessageCircle, Users, User, Circle } from 'lucide-react';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { isAndroidPlatform, isIOSPlatform, getPlatformSafe } from '@/utils/platformUtils';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
@@ -13,7 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
-import type { ChatMatchesCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
+import type { ChatMatchesCacheValue, CircleCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
+import { fetchCirclePool } from '@/utils/circlePoolFetch';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
@@ -27,6 +28,7 @@ type UserImageRow = Database['public']['Tables']['user_images']['Row'];
 // Lazy load tab components - reduces initial bundle by ~700KB
 // Each component only loads when user navigates to that tab
 const DiscoverPage = lazy(() => import('@/components/DiscoverPage'));
+const CirclePage = lazy(() => import('@/components/CirclePage'));
 const ChatPage = lazy(() => import('@/components/ChatPage'));
 const LikedMePage = lazy(() => import('@/components/LikedMePage'));
 const TermsOfService = lazy(() => import('@/components/TermsOfService'));
@@ -664,7 +666,25 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (!window.chatMatchesCache) {
       window.chatMatchesCache = new Map<string, ChatMatchesCacheValue>();
     }
+    if (!window.circleCache) {
+      window.circleCache = new Map<string, CircleCacheValue>();
+    }
   }, []);
+
+  // Global Circle preloader - mirrors preloadChatMatches/preloadLikedMeData
+  // below so Circle gets the same "already warm by the time you tap the tab"
+  // treatment instead of always starting from a blank loading spinner.
+  const preloadCircleData = useCallback(async (targetUserId: string) => {
+    ensureWindowCaches();
+    if (!profile) return;
+    try {
+      const pool = await fetchCirclePool(profile, isPremium);
+      window.circleCache?.set(targetUserId, { pool, timestamp: Date.now() });
+    } catch {
+      // Silently handle preload errors - CirclePage falls back to its own
+      // live fetch if no cache ends up populated.
+    }
+  }, [ensureWindowCaches, profile, isPremium]);
 
   // Global liked me preloader function
   const preloadLikedMeData = useCallback(async (targetUserId: string) => {
@@ -911,6 +931,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       void preloadChatMatches(userId);
     } else if (activeTab === 'liked') {
       void preloadLikedMeData(userId);
+    } else if (activeTab === 'circle') {
+      void preloadCircleData(userId);
     }
 
     const timeout = setTimeout(() => {
@@ -919,6 +941,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       }
       if (activeTab !== 'liked') {
         void preloadLikedMeData(userId);
+      }
+      if (activeTab !== 'circle') {
+        void preloadCircleData(userId);
       }
     }, 1000);
 
@@ -929,13 +954,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       if (activeTab !== 'liked') {
         void preloadLikedMeData(userId);
       }
+      if (activeTab !== 'circle') {
+        void preloadCircleData(userId);
+      }
     }, 60000);
 
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
     };
-  }, [activeTab, preloadChatMatches, preloadLikedMeData, userId]);
+  }, [activeTab, preloadChatMatches, preloadLikedMeData, preloadCircleData, userId]);
 
   // Listen for new match events to refresh chat data
   useEffect(() => {
@@ -981,6 +1009,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       void import('@/components/ChatPage');
       void import('@/components/LikedMePage');
       void import('@/components/ProfilePage');
+      void import('@/components/CirclePage');
     };
 
     const warmDelayMs = isAndroidPlatform() ? 2200 : 1500;
@@ -1006,8 +1035,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       void preloadChatMatches(userId);
     } else if (activeTab === 'liked') {
       void preloadLikedMeData(userId);
+    } else if (activeTab === 'circle') {
+      void preloadCircleData(userId);
     }
-  }, [activeTab, preloadChatMatches, preloadLikedMeData, userId]);
+  }, [activeTab, preloadChatMatches, preloadLikedMeData, preloadCircleData, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -1352,6 +1383,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             </Suspense>
           )}
 
+          {visitedTabs.has('circle') && (
+            <Suspense fallback={<TabLoader />}>
+              <div
+                className="w-full h-full"
+                style={{ display: activeTab === 'circle' ? 'block' : 'none' }}
+              >
+                <CirclePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'circle'} />
+              </div>
+            </Suspense>
+          )}
+
           {visitedTabs.has('chat') && (
             <Suspense fallback={<TabLoader />}>
               <div 
@@ -1459,12 +1501,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 // horizontal padding here + justify-between gives direct
                 // control over the edge inset instead, independent of and
                 // tighter than the between-items spacing.
-                paddingLeft: 'clamp(10px, 3vw, 18px)',
-                paddingRight: 'clamp(10px, 3vw, 18px)',
+                paddingLeft: 'clamp(6px, 2vw, 12px)',
+                paddingRight: 'clamp(6px, 2vw, 12px)',
               }}
             >
               {[
                 { label: t('discover.title'), value: 'dripcheck', icon: DripCoupleIcon },
+                { label: 'Circle', value: 'circle', icon: Circle },
                 { label: t('chat.title'), value: 'chat', icon: MessageCircle },
                 { label: t('matches.liked'), value: 'liked', icon: Users },
                 { label: t('profile.title'), value: 'profile', icon: User }
@@ -1472,31 +1515,49 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <button
                   key={value}
                   onClick={() => handleTabChange(value)}
-                  className={`flex flex-col items-center gap-0.5 rounded-full transition-all duration-200 relative ${
-                    activeTab === value ? 'text-pink-500 scale-105' : 'text-gray-400'
+                  className={`flex flex-col items-center gap-0.5 transition-all duration-200 relative ${
+                    activeTab === value ? 'text-pink-500' : 'text-gray-400'
                   }`}
                   style={{
                     // Scales down on narrow screens instead of a fixed py-1.5 px-4,
                     // which is what made the whole pill read as oversized on a
                     // small phone.
-                    paddingTop: 'clamp(3px, 1.1vw, 5px)',
-                    paddingBottom: 'clamp(3px, 1.1vw, 5px)',
-                    paddingLeft: 'clamp(7px, 3vw, 14px)',
-                    paddingRight: 'clamp(7px, 3vw, 14px)',
+                    paddingTop: 'clamp(2px, 0.8vw, 4px)',
+                    paddingBottom: 'clamp(2px, 0.8vw, 4px)',
+                    paddingLeft: 'clamp(6px, 2.5vw, 12px)',
+                    paddingRight: 'clamp(6px, 2.5vw, 12px)',
                     ...(activeTab === value ? {
-                      background: 'linear-gradient(to bottom, rgba(244,114,182,0.22), rgba(244,114,182,0.12))',
-                      boxShadow: 'inset 0 0 0 1px rgba(236,72,153,0.25)',
-                      // rounded-full alone can read more like a rounded rect than a
-                      // true pill once the button's own height shrinks (border-radius
-                      // needs to be at least half the box's height to look like a full
-                      // pill) - pinning it explicitly guarantees the highlight always
-                      // reads as a clean, fully rounded pill regardless of size.
+                      // Subtle flat fill, no border/scale - a tight rounded
+                      // rectangle that hugs the icon+label, not an oval pill.
+                      // Own fixed vertical padding + negative margin (not the
+                      // button's own clamp) so the pill stays compact and snug
+                      // instead of inheriting the button's taller base padding.
+                      background: 'rgba(236,72,153,0.18)',
+                      // Now that the box itself is tight (fixed 5px vertical
+                      // padding, not the button's taller clamp), a full pill
+                      // radius reads as a proper rounded capsule instead of
+                      // an oval - the earlier oval came from a big radius on
+                      // an oversized box, not the radius value itself.
                       borderRadius: '9999px',
+                      marginTop: '-2px',
+                      marginBottom: '-2px',
+                      // Slightly wider than tall - a touch more horizontal
+                      // breathing room around the label than the vertical
+                      // gap above/below the icon, so it reads as a proper
+                      // pill instead of a perfectly square-ish blob. Top/
+                      // bottom trimmed down further and handed straight to
+                      // the icon/label below (see their bigger clamp()s) -
+                      // same overall pill height, just less empty padding
+                      // and a bigger, cleaner icon+text.
+                      paddingTop: '3px',
+                      paddingBottom: '3px',
+                      paddingLeft: '18px',
+                      paddingRight: '18px',
                     } : undefined),
                   }}
                 >
-                  <Icon style={{ width: 'clamp(13px, 3.8vw, 16px)', height: 'clamp(13px, 3.8vw, 16px)' }} className="shrink-0" />
-                  <span className="font-medium" style={{ fontSize: 'clamp(8px, 2.3vw, 9px)' }}>{label}</span>
+                  <Icon style={{ width: 'clamp(15px, 4.2vw, 18px)', height: 'clamp(15px, 4.2vw, 18px)' }} className="shrink-0" />
+                  <span className="font-medium" style={{ fontSize: 'clamp(9px, 2.6vw, 10px)' }}>{label}</span>
                    {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute top-0 right-0.5 h-4 w-4 rounded-full bg-red-500 border border-white z-10 flex items-center justify-center">
                        <span className="text-[9px] text-white font-bold leading-none">

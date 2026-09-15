@@ -187,7 +187,7 @@ const AdinkraBar: React.FC<AdinkraBarProps> = ({ userCountry }) => {
       {tooltip !== null && tooltip.idx < symbolPool.length && (
         <div
           ref={tooltipRef}
-          className="absolute bottom-full mb-2 z-[120] px-4 py-3 rounded-xl shadow-lg border border-pink-300 text-xs text-gray-800 animate-fade-in flex flex-col items-center bg-pink-100/70 backdrop-blur-md"
+          className="absolute bottom-full mb-2 z-[120] px-4 py-3 rounded-xl shadow-lg border border-pink-500/40 text-xs text-white animate-fade-in flex flex-col items-center bg-neutral-900/95 backdrop-blur-md"
           style={{ left: tooltip.x, transform: 'translateX(-50%)', minWidth: 180, maxWidth: 260 }}
         >
           <strong className="text-base mb-1">{symbolPool[tooltip.idx].name}</strong>

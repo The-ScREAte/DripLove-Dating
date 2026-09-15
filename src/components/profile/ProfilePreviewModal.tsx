@@ -8,12 +8,14 @@ import {
   Languages,
   ArrowDown,
   ArrowUp,
+  ArrowLeft as ArrowLeftIcon,
   Ruler,
   Baby,
   MessageCircle,
   Gift,
   PawPrint,
   Share2,
+  X as XIcon,
 } from 'lucide-react';
 import { Pencil } from 'lucide-react';
 import { PotentialMatch } from '@/types';
@@ -58,6 +60,36 @@ interface ProfilePreviewModalProps {
    * effects), which unmounts this component and loses the unsaved crop
    * outright, so the warning has to come from the parent. */
   onPendingCropChange?: (hasPending: boolean) => void;
+  /** True when previewing someone else's profile (e.g. Circle) rather than
+   * your own (ProfilePage's "Preview" button, the default/only use case this
+   * component originally had) - hides the crop/edit button, which would
+   * otherwise let a viewer open PhotoCropModal against a stranger's photo. */
+  readOnly?: boolean;
+  /** Shows a back button, top-left of the photo. Separate from onClose (which
+   * every caller already has to provide) because most existing callers rely
+   * on an outer tab/nav to leave instead of an in-component control - this
+   * only renders the button when a caller actually wants one (Circle does). */
+  onBack?: () => void;
+  /** Providing BOTH onLike and onPass turns the photo area into a real
+   * swipeable card (drag right to like, left to pass - same feel as
+   * Discover/Liked Me's own swipe gestures), on top of the existing
+   * tap-left-half/tap-right-half slide navigation. Neither fires without the
+   * other; a caller that only wants read-only browsing (the original,
+   * still-default behavior) simply omits both. */
+  onLike?: () => void;
+  onPass?: () => void;
+  /** A small pill centered at the top of the photo, naming what's currently
+   * being browsed (e.g. "Travel") - lets Circle's filtered category decks
+   * make clear which filter is active while swiping through it. */
+  topLabel?: string;
+  /** The next profile's first photo, when swiping is enabled and there's a
+   * next card queued up (e.g. Circle's category browse deck) - shown as a
+   * blurred, dimmed backdrop behind the current card, same as Discover's own
+   * swipe deck, so the next photo is already loaded and there's a sense of
+   * depth instead of the current card floating over plain black. Blurred/
+   * dimmed until the swipe actually commits (mirrors Discover: don't reveal
+   * who's next until the user has actually swiped past this one). */
+  nextPreviewImageUrl?: string;
 }
 
 const BACKGROUND_COLORS = [
@@ -70,7 +102,7 @@ const BACKGROUND_COLORS = [
 // Where the second captioned photo call-out can land in the expanded details
 // panel - always above Personality. Module-level (not per-render) since it's
 // a fixed constant, not something that needs recreating on every render.
-const PHOTO_ANCHORS = ['lifestyle', 'workEducation'] as const;
+const PHOTO_ANCHORS = ['lifestyle', 'workEducation', 'personality', 'communicationStyle'] as const;
 
 const formatRelationshipIntent = (intent?: string | null) => {
   if (!intent) return '';
@@ -99,7 +131,7 @@ const getSafeImageSrc = (url?: string): string | undefined => {
 // instead of covering the screen; leaving the tab (including tapping the
 // Profile nav icon again) drops back to the real profile page, handled by
 // ProfilePage via onClose/isActiveTab.
-const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange }) => {
+const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange, readOnly = false, onBack, onLike, onPass, topLabel, nextPreviewImageUrl }) => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -263,12 +295,173 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
     }
   }, [slides.length]);
 
+  // Swipe-to-like/pass - only active when the caller supplies both handlers
+  // (Circle does; ProfilePage's own "preview my profile" use case doesn't).
+  // Ported to match Discover's OWN gesture exactly (native touch/mouse
+  // events, not Pointer Events - Discover deliberately uses the former, and
+  // that's the version proven reliable across real devices) rather than the
+  // previous Pointer-Events port, which tracked X only and reportedly didn't
+  // reliably register as a real swipe. Tap-to-navigate-slides is a plain,
+  // separate onClick below (see handleNavigationClick) - exactly like
+  // Discover's own MatchCard, which relies on the browser's native behavior
+  // of suppressing the synthetic "click" after a real drag, instead of a
+  // hand-rolled dragging flag.
+  const swipeEnabled = Boolean(onLike && onPass);
+  const [swipeDragX, setSwipeDragX] = useState(0);
+  const [swipeDragY, setSwipeDragY] = useState(0);
+  const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+  const [swipeExitDirection, setSwipeExitDirection] = useState<'left' | 'right' | null>(null);
+  const swipeCardElRef = useRef<HTMLDivElement>(null);
+  const swipeIsDraggingRef = useRef(false);
+  const swipeStartXRef = useRef(0);
+  const swipeStartYRef = useRef(0);
+  const swipeLatestDeltaXRef = useRef(0);
+  const swipeLatestDeltaYRef = useRef(0);
+  const swipeRafScheduledRef = useRef(false);
+  const swipeRafIdRef = useRef<number | null>(null);
+  // Discover's own threshold: whichever is smaller of 25% of the screen or a
+  // flat 120px, so a swipe commits at a normal, easy drag distance on wide
+  // screens/tablets instead of requiring a much longer drag.
+  const SWIPE_THRESHOLD = () => Math.min(window.innerWidth * 0.25, 120);
+  // Next-card backdrop reveal - fully hidden the entire drag (no matter how
+  // far), only clearing once the swipe actually commits (swipeExitDirection
+  // fires), same "hidden until it goes completely through" behavior as
+  // Discover's own next-card peek.
+  const NEXT_CARD_MAX_BLUR_PX = 12;
+  const NEXT_CARD_MAX_DARK_OPACITY = 0.3;
+  const nextCardRevealProgress = swipeExitDirection ? 1 : 0;
+
+  const swipeDragStart = useCallback((x: number, y: number) => {
+    if (!swipeEnabled || swipeExitDirection) return;
+    swipeStartXRef.current = x;
+    swipeStartYRef.current = y;
+    swipeIsDraggingRef.current = true;
+    setIsSwipeDragging(true);
+  }, [swipeEnabled, swipeExitDirection]);
+
+  const swipeDragMove = useCallback((x: number, y: number) => {
+    if (!swipeIsDraggingRef.current) return;
+    const deltaX = x - swipeStartXRef.current;
+    const deltaY = y - swipeStartYRef.current;
+    // The card follows the finger/cursor freely in both directions (a real
+    // grab-and-move feel, matching Discover) - only the horizontal component
+    // decides the like/pass direction and threshold.
+    swipeLatestDeltaXRef.current = deltaX;
+    swipeLatestDeltaYRef.current = deltaY;
+    if (!swipeRafScheduledRef.current) {
+      swipeRafScheduledRef.current = true;
+      swipeRafIdRef.current = requestAnimationFrame(() => {
+        swipeRafIdRef.current = null;
+        if (!swipeIsDraggingRef.current) {
+          swipeRafScheduledRef.current = false;
+          return;
+        }
+        const d = swipeLatestDeltaXRef.current;
+        const dy = swipeLatestDeltaYRef.current;
+        if (swipeCardElRef.current) {
+          swipeCardElRef.current.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg)`;
+        }
+        setSwipeDragX(d);
+        setSwipeDragY(dy);
+        swipeRafScheduledRef.current = false;
+      });
+    }
+  }, []);
+
+  const swipeDragEnd = useCallback((endX: number) => {
+    if (!swipeIsDraggingRef.current) return;
+    swipeIsDraggingRef.current = false;
+    setIsSwipeDragging(false);
+    const deltaX = endX - swipeStartXRef.current;
+    swipeLatestDeltaXRef.current = 0;
+    swipeLatestDeltaYRef.current = 0;
+    if (swipeRafIdRef.current !== null) {
+      cancelAnimationFrame(swipeRafIdRef.current);
+      swipeRafIdRef.current = null;
+    }
+    swipeRafScheduledRef.current = false;
+
+    if (Math.abs(deltaX) > SWIPE_THRESHOLD()) {
+      const direction = deltaX > 0 ? 'right' : 'left';
+      // Drive the fly-away straight on the element, same as Discover - the
+      // card's live transform was written imperatively during the drag, so
+      // relying on React's own style update alone can land a frame late and
+      // spring back to center before vanishing instead of continuing off
+      // in the thrown direction.
+      if (swipeCardElRef.current) {
+        const exitX = direction === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
+        const exitY = window.innerHeight * 0.3;
+        const rotation = direction === 'right' ? 24 : -24;
+        swipeCardElRef.current.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+        swipeCardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
+      }
+      setSwipeExitDirection(direction);
+      setSwipeDragX(0);
+      setSwipeDragY(0);
+      setTimeout(() => {
+        if (direction === 'right') {
+          onLike?.();
+        } else {
+          onPass?.();
+        }
+      }, 400);
+    } else {
+      // Below threshold: spring back to center from wherever it was let go.
+      if (swipeCardElRef.current) {
+        swipeCardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+        swipeCardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+      }
+      setSwipeDragX(0);
+      setSwipeDragY(0);
+    }
+  }, [onLike, onPass]);
+
+  const handleSwipeTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!swipeEnabled) return;
+    const touch = e.touches[0];
+    swipeDragStart(touch.clientX, touch.clientY);
+  }, [swipeEnabled, swipeDragStart]);
+
+  const handleSwipeTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!swipeIsDraggingRef.current) return;
+    const touch = e.touches[0];
+    swipeDragMove(touch.clientX, touch.clientY);
+  }, [swipeDragMove]);
+
+  const handleSwipeTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!swipeIsDraggingRef.current) return;
+    const changedTouch = e.changedTouches && e.changedTouches[0];
+    swipeDragEnd(changedTouch ? changedTouch.clientX : swipeStartXRef.current + swipeLatestDeltaXRef.current);
+  }, [swipeDragEnd]);
+
+  // Desktop/testing support - mouse doesn't keep bubbling to this element
+  // once the cursor leaves it mid-drag, so move/up are attached to the
+  // window for the duration of the drag, same as Discover's own
+  // handleMouseDown.
+  const handleSwipeMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!swipeEnabled) return;
+    swipeDragStart(e.clientX, e.clientY);
+
+    const onWindowMouseMove = (ev: MouseEvent) => {
+      if (!swipeIsDraggingRef.current) return;
+      swipeDragMove(ev.clientX, ev.clientY);
+    };
+    const onWindowMouseUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      if (!swipeIsDraggingRef.current) return;
+      swipeDragEnd(ev.clientX);
+    };
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+  }, [swipeEnabled, swipeDragStart, swipeDragMove, swipeDragEnd]);
+
   const lifestyleFields = [profile.smoking, profile.drinking, profile.exercise_level, profile.sleeping_schedule];
   const hasLifestyle = lifestyleFields.some(val => val && val !== 'not_specified');
 
   return (
     <div
-      className="w-full bg-black flex flex-col overflow-hidden"
+      className="relative w-full bg-black"
       style={{
         // h-full minus the gap below (not h-full + padding-bottom) - padding
         // would sit INSIDE the bordered box, so the border would still touch
@@ -276,54 +469,142 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         // actually leaves the gap outside the border, matching Discover's.
         height: 'calc(100% - clamp(6px, 2vw, 10px))',
         marginBottom: 'clamp(6px, 2vw, 10px)',
-        // Border + rounded bottom corners live on this OUTER wrapper (not the
-        // inner photo box) so they enclose the expanded details panel too,
-        // not just the photo - previously the border only ringed the photo,
-        // leaving the expanded info panel visually "outside" it once opened.
-        borderRadius: '0px 0px 22px 22px',
-        border: '1px solid rgba(236,72,153,0.55)',
       }}
     >
-      {/* Photo area - sized close to Discover's near-full-bleed swipe card
-          (a viewport-relative height rather than a fixed aspect ratio, so it
-          fills the screen the same way) with a sensible floor for short
-          screens; the caption overlay below is clipped to this box so it can
-          never bleed past the photo's own edges. Collapsed, nothing else
-          shares this flex column, so a flat 78vh left a dead strip of plain
-          black between the photo's own bottom (where the caption/feathering
-          is pinned) and the screen's real bottom edge; flex:1 fills that
-          instead so the feathering actually reaches the bottom of the
-          screen. Bottom corners stay rounded and a subtle pink border rings
-          the whole box, matching Discover's swipe card at rest. */}
+      {/* Next card, loaded and waiting behind the current one - same idea as
+          Discover's own swipe deck. Blurred/dimmed until the swipe actually
+          commits, so nobody sees who's next before they've committed to the
+          swipe; the photo itself is already loaded the whole time, so
+          there's no blank flash once this card advances. A sibling BEFORE
+          the draggable card below (not nested inside it) so it stays put
+          while the card on top slides away - it's what's being revealed,
+          not something that should move with the drag. */}
+      {swipeEnabled && nextPreviewImageUrl && (
+        <div
+          className="absolute inset-0 overflow-hidden bg-black"
+          style={{ borderRadius: '0px 0px 22px 22px' }}
+          aria-hidden="true"
+        >
+          <img
+            src={optimizeImageUrl(nextPreviewImageUrl, { width: 300, quality: 40 })}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover object-center"
+            style={{
+              transform: 'scale(1.08)',
+              filter: `blur(${NEXT_CARD_MAX_BLUR_PX * (1 - nextCardRevealProgress)}px)`,
+              transition: 'filter 250ms ease-out',
+            }}
+          />
+          <div
+            className="absolute inset-0 bg-black"
+            style={{
+              opacity: NEXT_CARD_MAX_DARK_OPACITY * (1 - nextCardRevealProgress),
+              transition: 'opacity 250ms ease-out',
+            }}
+          />
+        </div>
+      )}
+
+      {/* The card itself - border, rounded corners and the whole drag
+          transform live HERE (not just the photo), so grabbing anywhere on
+          the visible card - the photo, the name/caption text, the chips -
+          drags the entire bordered card as one rigid unit and counts as a
+          real swipe, exactly like Discover. Previously the drag target was
+          a plain inset-0 box living only inside the photo area, a sibling
+          (not an ancestor) of the caption/dots/back-button, so starting a
+          drag from the caption text never reached the swipe handlers at
+          all - only the bare photo pixels worked. */}
       <div
-        className="relative w-full overflow-hidden"
+        ref={swipeCardElRef}
+        className="absolute inset-0 bg-black flex flex-col overflow-hidden select-none"
         style={{
-          // flex-basis 0% (not 'auto'): on iOS Safari, a flex item with an 'auto'
-          // basis can size itself off its CONTENT's intrinsic height before the
-          // image's own 100%-height is resolved - a tall/portrait photo then
-          // forces this box (and everything below it) taller than the parent
-          // actually has room for, pushing the caption down or off-screen. '0%'
-          // makes flex-grow fill space purely from the parent's own definite
-          // height, with zero dependency on the photo's natural size.
-          // 58% (was 45%) - matches Liked Me's own expanded photo/info split, so the
-          // info panel below reads as the same proportion on both screens.
-          flex: showMoreInfo ? '0 0 58%' : '1 1 0%',
-          // Floors that fit even short screens once the header/nav space above is
-          // correctly reserved (this used to assume ~420px was always available below
-          // the header, but a real short device/emulator can have well under that once
-          // MainApp's wrapper reserves the header/nav's real measured height - the photo
-          // would blow past its own parent's bottom edge and get clipped by the nav
-          // instead of shrinking to fit).
-          minHeight: showMoreInfo ? '180px' : '220px',
-          transition: 'flex-basis 300ms ease-out, min-height 300ms ease-out',
+          // All four corners round in like a card lifting off the stack the
+          // moment it's picked up (dragging) or thrown (exiting), then back
+          // to the flat-top resting shape once it settles - same as
+          // Discover's cardCornerRadius.
+          borderRadius: (isSwipeDragging || swipeExitDirection) ? '26px' : '0px 0px 22px 22px',
+          border: '1px solid rgba(236,72,153,0.55)',
+          willChange: swipeEnabled ? 'transform' : undefined,
+          // Mirrors Discover's own getCardTransform exactly (exit fly-away >
+          // active drag follows the finger in both X and Y > resting) so
+          // React's own re-render (triggered by the same setSwipeDragX/Y
+          // call that scheduled the imperative write above) always settles
+          // on the SAME destination the imperative write already painted -
+          // it never has a chance to snap back to an X-only transform and
+          // erase the vertical offset, which is what silently killed the
+          // "grab and move" feel before (the card could only ever move
+          // horizontally, since this style never read a Y value at all).
+          transform: swipeExitDirection
+            ? `translate3d(${swipeExitDirection === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5}px, ${window.innerHeight * 0.3}px, 0) rotate(${swipeExitDirection === 'right' ? 24 : -24}deg)`
+            : swipeEnabled
+              ? `translate3d(${swipeDragX}px, ${swipeDragY}px, 0) rotate(${swipeDragX * 0.06}deg)`
+              : undefined,
+          transition: isSwipeDragging
+            ? 'border-radius 0.2s ease'
+            : swipeExitDirection
+              ? 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease'
+              : 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease',
         }}
       >
-        {/* Absolute + inset 0, not w-full/h-full: pins this box to the exact
-            dimensions of the flex box above with zero dependency on this
-            element's own content size, so a tall/portrait photo inside can
-            never expand it - belt-and-suspenders on top of the flex-basis
-            fix above, same technique used in Discover and Liked Me. */}
-        <div className="absolute inset-0" onClick={handleNavigationClick} style={{ cursor: 'pointer' }}>
+        {/* Photo area - sized close to Discover's near-full-bleed swipe card
+            (a viewport-relative height rather than a fixed aspect ratio, so it
+            fills the screen the same way) with a sensible floor for short
+            screens; the caption overlay below is clipped to this box so it can
+            never bleed past the photo's own edges. Collapsed, nothing else
+            shares this flex column, so a flat 78vh left a dead strip of plain
+            black between the photo's own bottom (where the caption/feathering
+            is pinned) and the screen's real bottom edge; flex:1 fills that
+            instead so the feathering actually reaches the bottom of the
+            screen. The pointer handlers live HERE (not on some inner sub-box)
+            so a drag started anywhere in this area - photo, caption, dots,
+            back button - is caught, matching Discover's own bubbling-based
+            onTouchStart on its image area. Duration/easing now match
+            Discover's own resize exactly (a flat 300ms, default easing) -
+            Discover is the benchmark for this motion. */}
+        <div
+          className={`relative w-full overflow-hidden select-none transition-all duration-300 ${showMoreInfo ? 'flex-1' : ''}`}
+          style={{
+            cursor: 'pointer',
+            // 'none', not 'pan-y': the card now tracks the finger in both
+            // X and Y for a real grab-and-move feel (matching Discover),
+            // which would otherwise fight the browser's own native
+            // vertical-pan handling for the same gesture.
+            touchAction: swipeEnabled ? 'none' : undefined,
+            ...(showMoreInfo
+              ? {
+                  // Expanded: a normal flex item sharing the column with the
+                  // details panel below, capped so it can't blow past its share.
+                  // 58% matches the details panel's own proportion, so both
+                  // screens read the same split.
+                  flex: '0 0 58%',
+                  minHeight: '180px',
+                  maxHeight: '58%',
+                }
+              : {
+                  // Collapsed: absolutely positioned to the parent's exact box
+                  // (inset 0) instead of a flex-grow child. flex-grow:1 fighting
+                  // a simultaneously-transitioning flex-basis is exactly what
+                  // made this shrink-then-grow on every toggle (a real,
+                  // reported "goes all the way up and comes down" glitch) -
+                  // grow and basis don't animate in lockstep, so the box
+                  // visibly collapsed toward the transitioning basis before
+                  // catching up. Matching Discover's own technique: this box
+                  // is always exactly the size of its (already real-height)
+                  // `relative` parent when collapsed, full stop, with nothing
+                  // to fight mid-transition. On iOS Safari a flex-grow child
+                  // can also lose a sizing fight to a tall photo's own
+                  // intrinsic height regardless of flex-basis - absolute
+                  // positioning removes that possibility entirely too.
+                  position: 'absolute',
+                  inset: 0,
+                }),
+          }}
+          onTouchStart={handleSwipeTouchStart}
+          onTouchMove={handleSwipeTouchMove}
+          onTouchEnd={handleSwipeTouchEnd}
+          onMouseDown={handleSwipeMouseDown}
+          onClick={handleNavigationClick}
+        >
           {currentSlideData && (
             <SlideRenderer
               slide={currentSlideData}
@@ -337,15 +618,57 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               }
             />
           )}
-        </div>
+
+          {/* Swipe direction hint - same red/green X and heart Discover/Liked Me use,
+              fading in with drag distance. */}
+          {swipeEnabled && swipeDragX !== 0 && (
+            <div
+              className={`absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center w-16 h-16 rounded-full border-4 ${
+                swipeDragX > 0 ? 'right-6 border-green-400 bg-green-500/20' : 'left-6 border-red-400 bg-red-500/20'
+              }`}
+              style={{ opacity: Math.min(1, Math.abs(swipeDragX) / SWIPE_THRESHOLD()) }}
+            >
+              {swipeDragX > 0 ? (
+                <Heart className="w-8 h-8 text-green-400" />
+              ) : (
+                <XIcon className="w-8 h-8 text-red-400" />
+              )}
+            </div>
+          )}
+
+          {/* Back button - only when the caller wants one (Circle does; other
+              callers rely on their own outer tab/nav to leave). */}
+        {onBack && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onBack(); }}
+            aria-label="Back"
+            className="absolute left-4 z-10 flex items-center justify-center w-9 h-9 rounded-full text-white bg-black/50 backdrop-blur-md border border-white/20 transition-transform active:scale-95"
+            style={{ top: '4px' }}
+          >
+            <ArrowLeftIcon className="w-4 h-4" strokeWidth={2.5} />
+          </button>
+        )}
+
+        {/* Active-filter pill - only during a Circle category browse. Sits
+            below the cultural-sign glow's max height (which is also
+            top-centered) so the two can never overlap on the rare profile
+            that has both. */}
+        {topLabel && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-white text-xs font-semibold bg-black/50 backdrop-blur-md border border-white/20"
+            style={{ top: '76px' }}
+          >
+            {topLabel}
+          </div>
+        )}
 
         {slides.length > 1 && (
-          <div className="absolute left-4 flex gap-1.5 z-10" style={{ top: '10px' }}>
+          <div className={`absolute ${onBack ? 'left-16' : 'left-4'} flex gap-1.5 z-10`} style={{ top: '14px' }}>
             {slides.map((_, idx) => (
               <div
                 key={idx}
                 className={`h-1.5 rounded-full transition-all duration-200 ${
-                  idx === currentSlide ? 'bg-white w-7' : 'bg-white/50 w-1.5'
+                  idx === currentSlide ? 'bg-pink-500 w-7' : 'bg-pink-500/30 w-1.5'
                 }`}
               />
             ))}
@@ -369,7 +692,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         {/* Crop - top right, same row as the slide dots/sign. Only for photo
             slides (there's nothing to crop on a bio/fact slide). Edits the
             photo currently on screen. */}
-        {currentSlideData?.type === 'image' && currentSlideData.content && (
+        {!readOnly && currentSlideData?.type === 'image' && currentSlideData.content && (
           <button
             onClick={(e) => { e.stopPropagation(); setShowCropModal(true); }}
             aria-label="Crop photo"
@@ -384,7 +707,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           </button>
         )}
 
-        {showCropModal && currentSlideData?.type === 'image' && currentSlideData.content && (
+        {!readOnly && showCropModal && currentSlideData?.type === 'image' && currentSlideData.content && (
           <PhotoCropModal
             imageUrl={currentSlideData.content}
             userId={profile.id}
@@ -545,9 +868,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               )}
             </div>
 
-            {/* Expandable info button - same style/behavior as Discover's MatchCard toggle. */}
+            {/* Expandable info button - same style/behavior as Discover's MatchCard toggle.
+                Stops propagation: the photo area now also has its own onClick for
+                tap-to-navigate-slides, and without this, tapping this button would
+                ALSO advance/rewind a slide underneath it. */}
             <button
-              onClick={() => setShowMoreInfo(prev => !prev)}
+              onClick={(e) => { e.stopPropagation(); setShowMoreInfo(prev => !prev); }}
               className="flex items-center justify-center text-white rounded-full transition-colors duration-200 shrink-0 backdrop-blur-md -mt-1.5"
               style={{
                 width: 30,
@@ -858,15 +1184,20 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           )}
         </div>
       )}
+      </div>
 
-      {/* Undo button - same 'fixed' control as Discover's SwipeButtons. This modal is
-          rendered inline within MainApp's own layout (in place of ProfilePage's
-          content), which keeps MainApp's fixed header/nav visible around it - so it
-          shares the SAME true viewport those are anchored to, and the same nav-aware
-          'fixed' formula that positions this correctly on Discover positions it
-          correctly here too. There's no swipe to undo in a read-only preview, so it
-          steps back through this profile's own photos instead; disabled on the first
-          one. */}
+      {/* Undo button - same 'fixed' control as Discover's SwipeButtons. Kept
+          as a sibling of the card above (not nested inside it): the card
+          carries a CSS transform while dragging, and a transformed ancestor
+          becomes the containing block for any `position: fixed` descendant -
+          nesting this inside it would break its anchor to the true viewport.
+          This modal is rendered inline within MainApp's own layout (in place
+          of ProfilePage's content), which keeps MainApp's fixed header/nav
+          visible around it - so it shares the SAME true viewport those are
+          anchored to, and the same nav-aware 'fixed' formula that positions
+          this correctly on Discover positions it correctly here too. There's
+          no swipe to undo in a read-only preview, so it steps back through
+          this profile's own photos instead; disabled on the first one. */}
       <SwipeButtons
         onReverse={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
         canReverse={currentSlide > 0}

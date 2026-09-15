@@ -482,7 +482,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // hooks forbid and can crash the component when those states toggle.
   const currentMatchWithCaptions = useMemo(() => {
     const current = potentialMatches[currentIndex];
-    if (!current || isAd(current)) return current;
+    // Every call site falls back to `currentMatch` (already non-ad-checked)
+    // via `currentMatchWithCaptions || currentMatch`, so returning undefined
+    // here for the ad case is equivalent to returning the ad itself - but
+    // typed correctly as PotentialMatch | undefined instead of including
+    // AdData, which is what MatchCard's `match` prop actually accepts.
+    if (!current || isAd(current)) return undefined;
     return { ...current, imageCaptions } as PotentialMatch;
   }, [potentialMatches, currentIndex, imageCaptions]);
   // Store distances from location service

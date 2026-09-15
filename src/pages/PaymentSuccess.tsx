@@ -414,8 +414,8 @@ const PaymentSuccess: React.FC = () => {
         <p className="mb-3 text-xs text-gray-700 font-medium">Your payment was successful.<br/>You now have access to:</p>
         <ul className="mb-3 text-left space-y-1.5">
           {premiumFeatures.map((feature, idx) => (
-            <li key={feature.name} className="flex items-center gap-1.5 bg-gradient-to-r from-pink-100 to-yellow-100 rounded-lg px-2.5 py-1 shadow-sm">
-              <span className="inline-flex items-center justify-center bg-pink-200 rounded-full p-1"><feature.icon className="w-3.5 h-3.5 text-pink-500" /></span>
+            <li key={feature.name} className="flex items-center gap-1.5 bg-gradient-to-r from-pink-600/10 to-yellow-100 rounded-lg px-2.5 py-1 shadow-sm">
+              <span className="inline-flex items-center justify-center bg-pink-600 rounded-full p-1"><feature.icon className="w-3.5 h-3.5 text-white" /></span>
               <span className="text-gray-900 font-semibold text-xs">{feature.name}</span>
             </li>
           ))}

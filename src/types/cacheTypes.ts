@@ -50,3 +50,11 @@ export type ChatMatchesCacheValue = {
   matches: unknown[];
   timestamp: number;
 };
+
+export type CircleCacheValue = {
+  // CircleProfile[] from '@/utils/circlePoolFetch' - kept loose here (like
+  // ChatMatchesCacheValue.matches above) since this file has no dependency
+  // on component-level types; cast at the read site instead.
+  pool: unknown[];
+  timestamp: number;
+};

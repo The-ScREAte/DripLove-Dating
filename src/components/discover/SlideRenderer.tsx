@@ -104,15 +104,15 @@ const ImageSlide = React.memo<{
   // Show placeholder if image failed to load
   if (hasError) {
     return (
-      <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-200 to-purple-200 flex items-center justify-center px-8 pt-8 pb-[150px]">
+      <div className="w-full h-full min-h-full bg-gradient-to-br from-pink-700 to-purple-800 flex items-center justify-center px-8 pt-8 pb-[150px]">
         <div className="text-center w-full">
-          <div className="bg-white/80 rounded-full p-8 mb-4 shadow-xl mx-auto max-w-[96px]">
+          <div className="bg-white/90 rounded-full p-8 mb-4 shadow-xl mx-auto max-w-[96px]">
             <User className="w-16 h-16 mx-auto text-gray-500" />
           </div>
-          <span className="text-4xl font-bold text-gray-700 bg-white/50 rounded-full px-6 py-3">
+          <span className="text-4xl font-bold text-white bg-white/15 rounded-full px-6 py-3">
             {matchFirstName?.[0]}{matchLastName?.[0]}
           </span>
-          <p className="text-gray-600 mt-4 text-sm">Image unavailable</p>
+          <p className="text-white/70 mt-4 text-sm">Image unavailable</p>
         </div>
       </div>
     );

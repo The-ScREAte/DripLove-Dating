@@ -105,10 +105,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
             <div className="relative info-tooltip-container">
               <button
                 type="button"
-                className="w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-200"
+                className="w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-600"
                 onClick={() => setShowInfoTooltip(!showInfoTooltip)}
               >
-                <span className="text-pink-700 text-sm font-bold leading-none">!</span>
+                <span className="text-white text-sm font-bold leading-none">!</span>
               </button>
               {showInfoTooltip && (
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
@@ -158,10 +158,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                   <div className="relative info-tooltip-container">
                     <button
                       type="button"
-                      className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                      className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-600"
                       onClick={() => setGroupTooltip(groupTooltip === group.id ? null : group.id)}
                     >
-                      <span className="text-pink-700 text-[10px] font-bold leading-none">!</span>
+                      <span className="text-white text-[10px] font-bold leading-none">!</span>
                     </button>
                     {groupTooltip === group.id && (
                       <div className="absolute bottom-full right-0 mb-3 z-[9999] w-72">
@@ -197,9 +197,9 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                           }`}
                           onClick={() => canSelect && toggleSymbol(symbol.name)}
                         >
-                          <button type="button" className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                          <button type="button" className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-600"
                             onClick={(e) => { e.stopPropagation(); setTooltipSymbol(showTooltip ? null : symbol.name); }}>
-                            <span className="text-pink-700 text-[7px] font-bold leading-none">!</span>
+                            <span className="text-white text-[7px] font-bold leading-none">!</span>
                           </button>
                           <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6" dangerouslySetInnerHTML={{ __html: symbol.svg }} />
                           <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
@@ -245,10 +245,10 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                   <div className="relative info-tooltip-container">
                     <button
                       type="button"
-                      className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                      className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-600"
                       onClick={() => setGroupTooltip(groupTooltip === userCountryGroup.id ? null : userCountryGroup.id)}
                     >
-                      <span className="text-pink-700 text-[10px] font-bold leading-none">!</span>
+                      <span className="text-white text-[10px] font-bold leading-none">!</span>
                     </button>
                     {groupTooltip === userCountryGroup.id && (
                       <div className="absolute bottom-full right-0 mb-3 z-[9999] w-72">
@@ -300,13 +300,13 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                         >
                           <button
                             type="button"
-                            className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                            className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-600"
                             onClick={(e) => {
                               e.stopPropagation();
                               setTooltipSymbol(showTooltip ? null : symbol.name);
                             }}
                           >
-                            <span className="text-pink-700 text-[7px] font-bold leading-none">!</span>
+                            <span className="text-white text-[7px] font-bold leading-none">!</span>
                           </button>
 
                           <div
@@ -383,13 +383,13 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                         <div className="relative info-tooltip-container mr-2">
                           <button
                             type="button"
-                            className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                            className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-600"
                             onClick={(e) => {
                               e.stopPropagation();
                               setGroupTooltip(groupTooltip === group.id ? null : group.id);
                             }}
                           >
-                            <span className="text-pink-700 text-[10px] font-bold leading-none">!</span>
+                            <span className="text-white text-[10px] font-bold leading-none">!</span>
                           </button>
                           {groupTooltip === group.id && (
                             <div className="absolute bottom-full right-0 mb-3 z-[9999] w-72">
@@ -447,13 +447,13 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
                                   <button
                                     type="button"
-                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-100 hover:bg-pink-200 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-200"
+                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-600"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setTooltipSymbol(showTooltip ? null : symbol.name);
                                     }}
                                   >
-                                    <span className="text-pink-700 text-[7px] font-bold leading-none">!</span>
+                                    <span className="text-white text-[7px] font-bold leading-none">!</span>
                                   </button>
 
                                   <div

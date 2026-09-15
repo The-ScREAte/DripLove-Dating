@@ -47,7 +47,7 @@ const formatHeightLabel = (cm: number) => {
 // Where the second captioned photo call-out can land in the expanded details
 // panel - always above Personality. Module-level (not per-render) since it's
 // a fixed constant, not something that needs recreating on every render.
-const PHOTO_ANCHORS = ['lifestyle', 'workEducation'] as const;
+const PHOTO_ANCHORS = ['lifestyle', 'workEducation', 'personality', 'communicationStyle'] as const;
 
 interface MatchCardProps {
   match: PotentialMatch;

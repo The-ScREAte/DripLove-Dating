@@ -31,7 +31,11 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
   // Null means "showing the plain category picker".
   const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [musicDetail, setMusicDetail] = useState('');
+  // Up to 3 top-artist input rows - starts with one, "+" beside it appends
+  // another (up to the 3-row cap), each extra row gets its own remove "x".
+  const [musicTopArtists, setMusicTopArtists] = useState<string[]>(['']);
   const [musicLink, setMusicLink] = useState('');
+  const MUSIC_TOP_ARTISTS_MAX = 3;
   const [newCustom, setNewCustom] = useState('');
   const [showAddCustom, setShowAddCustom] = useState(false);
 
@@ -51,6 +55,7 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
     if (CATEGORIES_WITH_DETAIL.has(category) || CATEGORY_SUB_OPTIONS[category]) {
       setPendingCategory(category);
       setMusicDetail('');
+      setMusicTopArtists(['']);
       setMusicLink('');
     } else {
       addFavorite({ category });
@@ -64,14 +69,29 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
 
   const confirmMusic = () => {
     if (!musicDetail.trim()) return;
+    const topArtists = musicTopArtists.map((a) => a.trim()).filter(Boolean).slice(0, MUSIC_TOP_ARTISTS_MAX);
     addFavorite({
       category: 'Music',
       detail: musicDetail.trim(),
+      topArtists: topArtists.length > 0 ? topArtists : undefined,
       link: musicLink.trim() || undefined,
     });
     setPendingCategory(null);
     setMusicDetail('');
+    setMusicTopArtists(['']);
     setMusicLink('');
+  };
+
+  const updateTopArtist = (index: number, value: string) => {
+    setMusicTopArtists((prev) => prev.map((v, i) => (i === index ? value : v)));
+  };
+
+  const addTopArtistField = () => {
+    setMusicTopArtists((prev) => (prev.length < MUSIC_TOP_ARTISTS_MAX ? [...prev, ''] : prev));
+  };
+
+  const removeTopArtistField = (index: number) => {
+    setMusicTopArtists((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addCustomFavorite = () => {
@@ -149,6 +169,44 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
 
       {favorites.length < FAVORITES_MAX && pendingCategory === 'Music' && (
         <div className="space-y-1.5">
+          <h4 className="text-xs font-medium mb-1.5 text-white">🎤 Top artists (optional, up to {MUSIC_TOP_ARTISTS_MAX})</h4>
+          <div className="space-y-1.5">
+            {musicTopArtists.map((artist, index) => (
+              <div key={index} className="flex gap-1.5">
+                <Input
+                  placeholder={index === 0 ? 'e.g. Kendrick Lamar' : 'Another artist'}
+                  value={artist}
+                  onChange={(e) => updateTopArtist(index, e.target.value)}
+                  className="h-8 text-sm bg-neutral-900 border-pink-500/30 text-white placeholder:text-white/40 flex-1"
+                />
+                {index === 0 ? (
+                  musicTopArtists.length < MUSIC_TOP_ARTISTS_MAX && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 shrink-0 bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
+                      onClick={addTopArtistField}
+                      aria-label="Add another top artist"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 shrink-0 bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
+                    onClick={() => removeTopArtistField(index)}
+                    aria-label="Remove this top artist"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
           <h4 className="text-xs font-medium mb-1.5 text-white">🎵 Favorite artist or album</h4>
           <Input
             placeholder="e.g. Drake, or Scorpion (album)"
