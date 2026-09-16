@@ -1263,7 +1263,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   // longer needs a platform branch with a hardcoded Android guess.
                   // Floor nudged up from 8px to 16px - a bit of breathing room above
                   // the logo/header text even on devices with no safe-area inset.
-                  paddingTop: 'clamp(16px, env(safe-area-inset-top, 16px), 40px)',
+                  // The extra +8px on top of the safe-area inset itself (and raised
+                  // ceiling to match) gives a bit more clearance below the safe area
+                  // on notched/Dynamic Island devices, where the header previously
+                  // sat right at its edge.
+                  paddingTop: 'clamp(16px, calc(env(safe-area-inset-top, 16px) + 8px), 48px)',
                   // Scales with viewport width instead of a fixed px-4 py-2, so a
                   // narrow/small-screen Android phone gets a proportionally smaller
                   // header instead of the same absolute padding as a large phone.

@@ -587,7 +587,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
 
   return (
     <Card className="w-full max-w-md mx-auto backdrop-blur-none bg-transparent shadow-none border-0 relative no-bottom-space pb-0" style={{ marginBottom: 0, paddingBottom: 0 }}>
-      <CardHeader className="text-center pb-4 pt-8 relative">
+      <CardHeader className="text-center pb-0 pt-2 relative">
         
         {/* Only show title for forgot password or account creation */}
         {(showForgotPassword || !isLogin) && (
@@ -602,10 +602,10 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
         )}
       </CardHeader>
 
-      <CardContent className="pb-0" style={{ marginBottom: 0 }}>
+      <CardContent className="px-5 pb-0" style={{ marginBottom: 0 }}>
         {/* Forgot Password Form */}
         {showForgotPassword ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-black">{t('auth.email')}</Label>
               <div className="relative">
@@ -643,7 +643,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
               </Button>
             </div>
 
-            <div className="mt-6 text-center">
+            <div className="mt-4 text-center">
               <button
                 onClick={() => setShowForgotPassword(false)}
                 className="text-black hover:text-gray-700 font-bold transition-colors"
@@ -654,13 +654,13 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
           </div>
         ) : (
           <div>
-            <form 
-              onSubmit={handleSubmit} 
-              className="space-y-4"
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-3"
               action="#"
               method="post"
             >
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold text-black">{t('auth.email')}</Label>
                 <div className="relative">
                   <Input
@@ -672,7 +672,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`mobile-input-field py-4 px-4 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-2 px-4 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.email ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -685,7 +685,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label htmlFor="password" className="text-sm font-semibold text-black">{t('auth.password')}</Label>
                   {isLogin && (
@@ -708,7 +708,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                     onChange={handleInputChange}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    className={`mobile-input-field py-4 px-4 pr-12 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
+                    className={`mobile-input-field py-2 px-4 pr-12 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 rounded-xl text-base ${
                       errors.password ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                     style={getInputStyles()}
@@ -763,7 +763,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
                 </div>
               )}
 
-              <div className="flex justify-center mt-6">
+              <div className="flex justify-center mt-4">
                 <Button
                   type="submit"
                   disabled={loading}
@@ -779,7 +779,7 @@ const AuthForm = ({ isLogin, onToggle, onBack }: AuthFormProps) => {
               </div>
             </form>
 
-            <div className="mt-6 text-center pb-4">
+            <div className="mt-4 text-center pb-2">
               <p className="text-base text-black">
                 {isLogin ? t('auth.dontHaveAccount') : t('auth.alreadyHaveAccount')}
                 <button

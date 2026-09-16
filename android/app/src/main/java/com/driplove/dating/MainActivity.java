@@ -2,6 +2,7 @@ package com.driplove.dating;
 
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.Intent;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
@@ -12,24 +13,72 @@ import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         // Edge-to-edge: allow content to draw behind system bars.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-        
+
         // Enable WebView debugging for development
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             WebView.setWebContentsDebuggingEnabled(true);
         }
-        
+
         // Configure WebView settings for video playback
         configureWebViewForVideo();
-        
+
         // Create notification channels with custom sound
         createNotificationChannels();
+
+        // Cold start from a notification tap: CustomFirebaseMessagingService
+        // builds its own notification (needed for the sender-photo large
+        // icon) and its PendingIntent carries the FCM data payload as plain
+        // intent extras - it never went through Capacitor's own push plugin,
+        // so nothing was ever routing that tap anywhere. Route it here.
+        handleNotificationIntent(getIntent());
+    }
+
+    // App already running (backgrounded): tapping a notification delivers
+    // here instead of onCreate.
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNotificationIntent(intent);
+    }
+
+    // Mirrors resolveNotificationRoute() in src/services/pushNotifications.ts -
+    // keep the two in sync. message -> the specific conversation, match ->
+    // the chat list, like -> Liked Me, everything else -> Discover (default).
+    private void handleNotificationIntent(Intent intent) {
+        if (intent == null) return;
+        String type = intent.getStringExtra("type");
+        if (type == null) return;
+
+        String route;
+        if ("message".equals(type) && intent.getStringExtra("chatId") != null) {
+            route = "/?tab=chat&matchId=" + intent.getStringExtra("chatId");
+        } else if ("match".equals(type)) {
+            route = "/?tab=chat";
+        } else if ("like".equals(type)) {
+            route = "/?tab=liked";
+        } else {
+            return;
+        }
+
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) return;
+        String escapedRoute = route.replace("\\", "\\\\").replace("'", "\\'");
+        // On a cold start the WebView hasn't finished loading the app yet -
+        // there's no reliable "page ready" callback to hook without
+        // overriding Capacitor's own WebViewClient, so a short delay (a
+        // no-op if the app was already running and this is really
+        // onNewIntent) is the same pragmatic approach Capacitor's own deep
+        // link docs use for this exact cold-start race.
+        webView.postDelayed(() -> webView.evaluateJavascript(
+            "window.location.href = '" + escapedRoute + "';", null), 1500);
     }
     
     private void configureWebViewForVideo() {

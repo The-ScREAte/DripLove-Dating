@@ -34,6 +34,14 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
     // Performance optimizations for iOS
     preferredContentMode: 'mobile',
+    // Explicit (not relying on the implicit default): lets Capacitor's own
+    // NotificationRouter install itself as UNUserNotificationCenter's
+    // delegate, which is what forwards a tapped push notification into the
+    // PushNotifications plugin's `pushNotificationActionPerformed` JS event.
+    // AppDelegate.swift used to grab that delegate slot for itself and never
+    // forward taps anywhere, which silently broke all notification deep
+    // linking on iOS - see the comment there.
+    handleApplicationNotifications: true,
     // Ensure WKWebView itself is transparent (needed for CameraPreview toBack:true)
     // Capacitor typings may not include this, but Capacitor will still read it.
     webView: {
@@ -70,7 +78,15 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true
     },
     PushNotifications: {
-      presentationOptions: ["badge", "sound", "banner"]
+      // "banner" was never actually read - the installed @capacitor/push-notifications
+      // version's iOS handler only recognizes "alert"/"badge"/"sound" here (see
+      // PushNotificationsHandler.swift's willPresent switch); it silently no-ops on
+      // anything else. That was masked before because AppDelegate.swift hard-coded
+      // [.banner, .sound, .badge] itself instead of ever letting this config apply -
+      // now that AppDelegate defers to Capacitor's own NotificationRouter (see its
+      // comment), this list is what actually controls the foreground banner, so it
+      // has to say "alert", not "banner".
+      presentationOptions: ["badge", "sound", "alert"]
     },
     // StatusBar config removed - @capacitor/status-bar is replaced by
     // @capacitor-community/safe-area (see src/main.tsx), which handles system

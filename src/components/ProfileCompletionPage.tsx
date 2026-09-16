@@ -654,28 +654,21 @@ const ProfileCompletionPage = () => {
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
     
-    // Send welcome push notification
+    // Queue the welcome push for 10 minutes from now instead of sending it
+    // instantly - a client-side setTimeout can't survive the app being
+    // backgrounded/killed for that long, so this writes to a table a cron
+    // job (process_pending_welcome_notifications, every minute) drains once
+    // due. Replaces the old send-signup-welcome edge function, which tried
+    // to await a 20-minute in-function setTimeout - Supabase Edge Functions
+    // get killed well before that completes, so it never actually fired.
     try {
-      const { sendPushNotification } = await import('@/services/pushNotifications');
-      await sendPushNotification({
-        title: "Welcome to DripLove 💕",
-        body: t('profileCompletion.profileSetup'),
-        userId: user.id,
-        type: 'system',
-        data: { action: 'open_discover' }
+      await supabase.from('pending_welcome_notifications').insert({
+        user_id: user.id,
+        send_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       });
     } catch (error) {
-      console.error('Failed to send welcome notification:', error);
-      // Don't block user flow if notification fails
-    }
-    
-    // Schedule the 20-minute delayed love notification (fire-and-forget)
-    try {
-      supabase.functions.invoke('send-signup-welcome', {
-        body: { userId: user.id, delayMinutes: 20 }
-      }).catch(err => console.error('Failed to schedule delayed notification:', err));
-    } catch (error) {
-      console.error('Failed to invoke signup welcome function:', error);
+      console.error('Failed to schedule welcome notification:', error);
+      // Don't block user flow if this fails
     }
     
     // ANDROID FIX: Update session storage before navigation

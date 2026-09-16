@@ -391,7 +391,7 @@ const Index = ({
         )}
 
         {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
+          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start px-4 pt-3 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
             {/* Video Background */}
             <Suspense fallback={null}>
               <VideoBackground />

@@ -4452,7 +4452,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                   const likeCount = typeof count === 'number' ? count : 0;
                   
                   // Send notification on every like
-                  await sendMultipleLikesNotification(prevMatch.id, likeCount);
+                  await sendMultipleLikesNotification(prevMatch.id, likeCount, currentUser.id);
                 }
               } catch (countError) {
                 // ignore like count errors
@@ -4562,7 +4562,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 const likeCount = typeof count === 'number' ? count : 0;
                 
                 // Send notification on every like
-                await sendMultipleLikesNotification(prevMatch.id, likeCount);
+                await sendMultipleLikesNotification(prevMatch.id, likeCount, currentUser.id);
               }
             } catch (countError) {
               // ignore like count errors

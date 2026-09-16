@@ -275,8 +275,8 @@ export const checkAndSendBatchedLikeNotification = async (
   
   // Send the batched notification
   const success = await sendNotification(
-    'New Interest',
-    'People are showing interest in you. Check them out!',
+    'New Interest ✨',
+    "You're catching some eyes. See who's interested!",
     userId,
     'like'
   );

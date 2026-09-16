@@ -1106,7 +1106,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
             body: t('chat.matchExpiringBody', { name: partnerName }),
             userId: currentUser.id,
             type: 'match',
-            data: { matchId: match.id, partnerId }
+            // senderId lets the edge function resolve the partner's photo
+            // server-side for the notification avatar.
+            data: { matchId: match.id, partnerId, senderId: partnerId }
           });
 
           markExpirationWarningSent(match.id);

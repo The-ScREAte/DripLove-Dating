@@ -13,11 +13,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // Initialize Firebase
         FirebaseApp.configure()
-        
-        // Register for notifications
-        UNUserNotificationCenter.current().delegate = self
+
+        // Notification presentation/tap handling is owned by Capacitor's own
+        // NotificationRouter (installed automatically when the bridge/scene
+        // is created - see capacitor.config.ts's ios.handleApplicationNotifications),
+        // which forwards taps into the PushNotifications plugin's
+        // `pushNotificationActionPerformed` JS event. This used to set itself
+        // as UNUserNotificationCenter's delegate here and hand-roll
+        // willPresent/didReceive, which silently intercepted every
+        // notification tap before the router could ever see it - the app
+        // would open, but always to the default tab, never to the specific
+        // match/chat a message or match notification pointed at, because the
+        // JS side never received the tap event at all.
         Messaging.messaging().delegate = self
-        
+
         return true
     }
 
@@ -69,26 +78,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             name: .capacitorDidFailToRegisterForRemoteNotifications,
             object: error
         )
-    }
-}
-
-// MARK: - UNUserNotificationCenterDelegate
-extension AppDelegate: UNUserNotificationCenterDelegate {
-    
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                willPresent notification: UNNotification,
-                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([.banner, .sound, .badge])
-    }
-
-    func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                didReceive response: UNNotificationResponse,
-                                withCompletionHandler completionHandler: @escaping () -> Void) {
-        NotificationCenter.default.post(
-            name: NSNotification.Name("didReceiveRemoteNotification"),
-            object: response
-        )
-        completionHandler()
     }
 }
 

@@ -144,7 +144,7 @@ export const usePushNotifications = (userId?: string) => {
 
     const success = await sendNotification({
       title: "It's a Match! 🔥",
-      body: `You and ${matchedUserName} liked each other. Say hello!`,
+      body: `You and ${matchedUserName} caught each other's eye. Say hello!`,
       userId: targetUserId,
       type: 'match',
       // senderId lets the edge function resolve this device's own photo
@@ -174,9 +174,10 @@ export const usePushNotifications = (userId?: string) => {
       return false;
     }
 
+    const preview = message.length > 100 ? message.substring(0, 100) + '...' : message;
     const success = await sendNotification({
       title: senderName,
-      body: message.length > 100 ? message.substring(0, 100) + '...' : message,
+      body: preview,
       userId: targetUserId,
       type: 'message',
       // senderId lets the edge function resolve this device's own photo
@@ -203,8 +204,8 @@ export const usePushNotifications = (userId?: string) => {
     // If threshold reached, send notification
     if (shouldNotify && !isUserActive()) {
       const success = await sendNotification({
-        title: 'Someone Likes You ✨',
-        body: 'You caught someone\'s eye. Tap to see who\'s interested.',
+        title: "You're Noticed 👀",
+        body: "You caught someone's eye. See who's interested!",
         userId: targetUserId,
         type: 'like',
         data: { likeCount: likeCount.toString() }
@@ -225,17 +226,19 @@ export const usePushNotifications = (userId?: string) => {
    * Send batched like notification - call this to force check/send
    * Used when conditions are met (3 likes OR 2hr timeout)
    */
-  const sendMultipleLikesNotification = async (targetUserId: string, likeCount: number) => {
+  const sendMultipleLikesNotification = async (targetUserId: string, likeCount: number, likerId?: string) => {
     // Queue the like event instead of sending immediately
     const { shouldNotify, likeCount: currentCount } = queueLikeEvent();
 
     if (shouldNotify && !isUserActive()) {
       const success = await sendNotification({
-        title: 'Someone Likes You ✨',
-        body: 'You caught someone\'s eye. Tap to see who\'s interested.',
+        title: 'New Interest ✨',
+        body: "You're catching some eyes. See who's interested!",
         userId: targetUserId,
         type: 'like',
-        data: { likeCount: currentCount.toString() }
+        // senderId (the most recent liker) lets the edge function resolve
+        // their photo server-side for the notification avatar.
+        data: { likeCount: currentCount.toString(), senderId: likerId }
       });
 
       if (success) {

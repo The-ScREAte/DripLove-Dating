@@ -202,6 +202,19 @@ serve(async (req) => {
     let pushSuccess = false
     let realTimeStored = false
 
+    // iOS's aps.badge sets the app icon's badge count outright (it's not
+    // additive) - hardcoding it to 1 on every push, like this used to,
+    // meant the badge got reset to 1 by every single notification instead
+    // of accumulating, so it only ever showed "1" no matter how many were
+    // actually unread. +1 accounts for the notification this call is about
+    // to insert, which isn't in the count yet at this point.
+    const { count: unreadCount } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+    const badgeCount = (unreadCount ?? 0) + 1
+
     // Send push notifications if tokens exist
     if (tokens && tokens.length > 0) {
       console.log(`📤 Sending push notifications to ${tokens.length} device(s)...`)
@@ -262,9 +275,11 @@ serve(async (req) => {
                       body,
                     },
                     sound: iosSound,
-                    badge: 1,
-                    // No icon/image - iOS will show app icon by default without message bubble
-                    'mutable-content': 0,  // Disable notification service extension
+                    badge: badgeCount,
+                    // Lets the NotificationService app extension (ios/App/NotificationService)
+                    // intercept delivery and download+attach imageUrl below as the sender's
+                    // photo, matching the Android large-icon avatar.
+                    'mutable-content': 1,
                   },
                   // Put custom data at payload level, not inside aps
                   ...notificationData,

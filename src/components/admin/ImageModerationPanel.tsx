@@ -352,8 +352,8 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       if (imageToReject?.user_id) {
         try {
           await sendNotification({
-            title: '⚠️ Photo Rejected',
-            body: 'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
+            title: 'Try Another Photo',
+            body: 'This photo doesn\'t meet our guidelines. Choose another one.',
             userId: imageToReject.user_id,
             type: 'image_rejected',
           });
@@ -479,8 +479,8 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       // sendNotification/'image_rejected' rather than sendAdminNotification.
       try {
         await sendNotification({
-          title: '⚠️ Photo Rejected',
-          body: 'Your image has been rejected because it\'s either inappropriate or not a real representation of yourself. This violates our terms and conditions and if it continues will result in deletion of your account.',
+          title: 'Try Another Photo',
+          body: 'This photo doesn\'t meet our guidelines. Choose another one.',
           userId: reportedUserId,
           type: 'image_rejected',
         });
