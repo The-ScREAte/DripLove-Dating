@@ -151,7 +151,7 @@ const AppUpdatePopup = () => {
 
   return (
     <Dialog open={showPopup} onOpenChange={(open) => !open && handleDismiss()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Download className="w-6 h-6 text-primary" />

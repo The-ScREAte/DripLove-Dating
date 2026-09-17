@@ -224,6 +224,14 @@ serve(async (req) => {
           ? new Date(expiresDateMs)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
+        // SUBSCRIBED with subtype INITIAL_BUY is the very first purchase,
+        // which the client already flagged as trial-or-not via
+        // iap-receipt-validator right after purchase completed - don't
+        // clobber that here. DID_RENEW (including the real post-trial
+        // conversion) and OFFER_REDEEMED always represent a genuine charge,
+        // so is_trial is cleared unconditionally for those.
+        const isInitialBuy = notificationType === 'SUBSCRIBED' && subtype === 'INITIAL_BUY'
+
         const { error: updateError } = await supabase
           .from('user_subscriptions')
           .update({
@@ -237,6 +245,7 @@ serve(async (req) => {
             payment_method: 'apple',
             payment_attempts: 0,
             updated_at: new Date().toISOString(),
+            ...(isInitialBuy ? {} : { is_trial: false }),
           })
           .eq('user_id', userId)
 
@@ -247,13 +256,8 @@ serve(async (req) => {
 
         console.log(`[APPLE-WEBHOOK] ✅ Subscription active until ${expiresAt.toISOString()}`)
 
-        // Record payment + commission for actual charges only. SUBSCRIBED
-        // with subtype INITIAL_BUY is the very first purchase, which the
-        // client already recorded via iap-receipt-validator right after
-        // purchase completed - recording it again here would double-commission
-        // the same transaction. DID_RENEW (including the real post-trial
-        // conversion) and OFFER_REDEEMED represent a genuinely new charge.
-        const isInitialBuy = notificationType === 'SUBSCRIBED' && subtype === 'INITIAL_BUY'
+        // Record payment + commission for actual charges only - recording the
+        // INITIAL_BUY transaction again here would double-commission it.
         if (!isInitialBuy) {
           await recordPaymentAndCommission(supabase, userId, transactionId)
         }

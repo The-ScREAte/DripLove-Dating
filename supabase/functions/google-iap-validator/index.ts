@@ -336,11 +336,17 @@ serve(async (req: Request) => {
     let expiryTimeMillis: number | null = null
     let startTimeMillis: number | null = null
     let autoRenew: boolean = true
+    // paymentState: 0 = pending, 1 = received (real charge), 2 = free trial,
+    // 3 = pending deferred. Only the v3 endpoint exposes it; the v2 fallback
+    // (SubscriptionPurchaseV2) has no equivalent field, so it stays unknown
+    // there and commissioning falls back to the pre-existing behavior.
+    let paymentState: number | null = null
 
     if (source === 'v3') {
       expiryTimeMillis = Number(googleJson?.expiryTimeMillis)
       startTimeMillis = Number(googleJson?.startTimeMillis)
       autoRenew = typeof googleJson?.autoRenewing === 'boolean' ? googleJson.autoRenewing : true
+      paymentState = typeof googleJson?.paymentState === 'number' ? googleJson.paymentState : null
     } else {
       // SubscriptionPurchaseV2
       const firstLineItem = Array.isArray(googleJson?.lineItems) ? googleJson.lineItems[0] : null
@@ -416,6 +422,10 @@ serve(async (req: Request) => {
         auto_renew: autoRenew,
         payment_method: 'google',
         payment_attempts: 0,
+        // paymentState 0 (pending) or 2 (free trial) means no real charge has
+        // happened yet - flag it so the admin/promoter dashboards show
+        // "Pending (Trial)" instead of counting this as a paid Premium user.
+        is_trial: paymentState === 0 || paymentState === 2,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
 
@@ -441,7 +451,25 @@ serve(async (req: Request) => {
 
     console.log('✅ [GOOGLE-IAP-VALIDATOR] Subscription activated for user:', userId)
 
-    // 7️⃣ Record payment and process referral commission for Google IAP
+    // 7️⃣ Record payment and process referral commission for Google IAP - but
+    // only for a transaction that actually charged the user. paymentState 2
+    // is a free trial ($0 charged); crediting commission here would pay a
+    // promoter out of revenue that doesn't exist yet, and if the user
+    // cancels before the trial converts, it never will. The real post-trial
+    // charge arrives via RTDN on google-play-webhook, which already
+    // commissions it.
+    if (paymentState === 2 || paymentState === 0) {
+      console.log('[GOOGLE-IAP-VALIDATOR] Trial/pending paymentState - skipping commission until a real charge occurs:', paymentState)
+      return json(200, {
+        valid: true,
+        active: true,
+        expiresDate: expiresAt,
+        expires_at: expiresAt,
+        transaction_id: transactionId || purchaseToken,
+        purchaseToken,
+      })
+    }
+
     try {
       // Get premium price from payment_config for the user's country
       const { data: profile } = await supabaseClient

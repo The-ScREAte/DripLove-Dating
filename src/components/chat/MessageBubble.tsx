@@ -8,6 +8,10 @@ interface MessageBubbleProps {
   message: ChatMessage;
   currentUser: CurrentUser;
   isConsecutive: boolean;
+  /** True when this is the last bubble of a consecutive run from the same
+   * sender (or a standalone message with no run at all) - the only bubble in
+   * a group that gets the group's avatar, timestamp, and "tail" corner. */
+  isLastInGroup: boolean;
   onDeleteForMe?: (messageId: string) => void;
   onDeleteForEveryone?: (messageId: string) => void;
   onDormancyResponse?: (response: boolean) => void;
@@ -15,12 +19,17 @@ interface MessageBubbleProps {
   repliedMessage?: ChatMessage | null;
   onReplyClick?: (messageId: string) => void;
   isHighlighted?: boolean;
+  /** Only rendered for the other person's messages, only on the last bubble
+   * of their group - initials fall back when there's no photo. */
+  partnerAvatarUrl?: string | null;
+  partnerInitials?: string;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   currentUser,
   isConsecutive,
+  isLastInGroup,
   onDeleteForMe,
   onDeleteForEveryone,
   onDormancyResponse,
@@ -28,6 +37,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   repliedMessage,
   onReplyClick,
   isHighlighted = false,
+  partnerAvatarUrl,
+  partnerInitials = '',
 }) => {
   const { t } = useTranslation();
   const isOwnMessage = message.sender_id === currentUser.id;
@@ -229,7 +240,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
 
       <div
-        className={`flex w-full ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+        className={`flex w-full items-end gap-1.5 ${isOwnMessage ? 'justify-end' : 'justify-start'} ${isConsecutive ? 'mt-0.5' : 'mt-2.5'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -239,14 +250,36 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           transition: gestureLockRef.current === 'horizontal' ? 'none' : 'transform 0.2s ease-out',
         }}
       >
+        {/* Avatar slot - received messages only. A fixed-width spacer holds
+            the bubble's alignment on every bubble in the group; the actual
+            avatar only paints on the group's last bubble, exactly like
+            iMessage/WhatsApp group threads. */}
+        {!isOwnMessage && (
+          <div className="w-6 h-6 shrink-0 self-end">
+            {isLastInGroup && (
+              partnerAvatarUrl ? (
+                <img
+                  src={partnerAvatarUrl}
+                  alt=""
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-pink-500/20 border border-pink-500/30 flex items-center justify-center text-[9px] font-semibold text-pink-300">
+                  {partnerInitials}
+                </div>
+              )
+            )}
+          </div>
+        )}
+
         <div
           ref={bubbleRef}
           className={`
             relative max-w-[82%] sm:max-w-lg
             rounded-2xl
             ${isOwnMessage
-              ? 'bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] rounded-br-md'
-              : 'bg-black/80 text-gray-100 border border-pink-500/30 shadow-[0_3px_10px_rgba(0,0,0,0.4)] rounded-bl-md'
+              ? `bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] ${isLastInGroup ? 'rounded-br-md' : ''}`
+              : `bg-black/80 text-gray-100 border border-pink-500/30 shadow-[0_3px_10px_rgba(0,0,0,0.4)] ${isLastInGroup ? 'rounded-bl-md' : ''}`
             }
             ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
           `}
@@ -270,13 +303,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   }
                 `}
               >
-                <p className={`text-xs font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-pink-300'}`}>
+                <p className={`text-[11px] font-semibold truncate ${isOwnMessage ? 'text-white/90' : 'text-pink-300'}`}>
                   {repliedMessage.sender_id === currentUser.id
                     ? t('chat.you', 'You')
                     : repliedMessage.sender?.first_name || 'User'
                   }
                 </p>
-                <p className={`text-xs line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/80' : 'text-gray-300'}`}>
+                <p className={`text-[10.5px] leading-snug line-clamp-2 mt-0.5 ${isOwnMessage ? 'text-white/60' : 'text-gray-400'}`}>
                   {replyPreviewText}{replyPreviewText.length >= 80 ? '...' : ''}
                 </p>
               </div>
@@ -290,21 +323,25 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </p>
           </div>
 
-          {/* Timestamp & Read Status */}
-          <div className={`flex items-center justify-end gap-1 px-2.5 pb-0 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'}`}>
-            <span className="text-[11px]">
-              {formatTime(message.sent_at || message.created_at)}
-            </span>
-            {isOwnMessage && (
-              <span className="flex items-center">
-                {message.is_read ? (
-                  <CheckCheck className="w-3.5 h-3.5" />
-                ) : (
-                  <Check className="w-3.5 h-3.5" />
-                )}
+          {/* Timestamp & Read Status - only on the last bubble of a group,
+              matching every mainstream chat app's grouping convention (no
+              point repeating the same-minute timestamp on every bubble). */}
+          {isLastInGroup && (
+            <div className={`flex items-center justify-end gap-1 px-2.5 pb-1 pt-0.5 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'}`}>
+              <span className="text-[11px]">
+                {formatTime(message.sent_at || message.created_at)}
               </span>
-            )}
-          </div>
+              {isOwnMessage && (
+                <span className={`flex items-center ${message.is_read ? 'text-white' : 'text-rose-100/80'}`}>
+                  {message.is_read ? (
+                    <CheckCheck className="w-3.5 h-3.5" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Context Menu */}
           {isOptionsOpen && (
@@ -364,7 +401,10 @@ export default React.memo(MessageBubble, (prev, next) => {
     prev.message.is_read === next.message.is_read &&
     JSON.stringify(prev.message.deleted_for) === JSON.stringify(next.message.deleted_for) &&
     prev.isConsecutive === next.isConsecutive &&
+    prev.isLastInGroup === next.isLastInGroup &&
     prev.isHighlighted === next.isHighlighted &&
-    prev.repliedMessage?.id === next.repliedMessage?.id
+    prev.repliedMessage?.id === next.repliedMessage?.id &&
+    prev.partnerAvatarUrl === next.partnerAvatarUrl &&
+    prev.partnerInitials === next.partnerInitials
   );
 });

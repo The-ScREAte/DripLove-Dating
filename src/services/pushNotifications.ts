@@ -528,33 +528,46 @@ class SupabasePushNotificationService {
   }
 
   async removeToken(userId: string): Promise<void> {
-    try {
-      if (!userId) {
-        console.warn('⚠️ Cannot remove push token: userId is missing');
-        return;
-      }
-      
-      // Get the current device token before removing
-      const platform = Capacitor.getPlatform();
-      
-      // Delete the push token for this user and device from the database
-      const { error } = await supabase
-        .from('push_tokens')
-        .delete()
-        .eq('user_id', userId)
-        .eq('platform', platform);
-
-      if (error) {
-        // Silently handle errors - user is logging out anyway
-        void 0;
-      }
-      
-      // Clear the stored device token
-      this.deviceToken = null;
-    } catch (error) {
-      // Silently handle errors during logout - don't block user
-      void 0;
+    if (!userId) {
+      console.warn('⚠️ Cannot remove push token: userId is missing');
+      return;
     }
+
+    const platform = Capacitor.getPlatform();
+
+    // Retry once on failure instead of silently giving up - a logout that
+    // "succeeds" on screen but leaves the token in the DB means this device
+    // keeps getting push notifications for an account nobody's using here
+    // anymore. .select() forces Postgrest to return the deleted rows so a
+    // false-positive "no error, but nothing actually matched" case (RLS
+    // silently filtering, wrong platform value, etc.) is also caught.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('push_tokens')
+          .delete()
+          .eq('user_id', userId)
+          .eq('platform', platform)
+          .select('id');
+
+        if (!error) {
+          if (!data || data.length === 0) {
+            console.warn(`⚠️ removeToken: delete matched 0 rows for user ${userId} (${platform}) on attempt ${attempt} - token may already be gone, or was never saved under this platform`);
+          }
+          this.deviceToken = null;
+          return;
+        }
+
+        console.error(`❌ removeToken: delete failed on attempt ${attempt} for user ${userId} (${platform}):`, error);
+      } catch (error) {
+        console.error(`❌ removeToken: unexpected error on attempt ${attempt} for user ${userId} (${platform}):`, error);
+      }
+    }
+
+    // Still failed after a retry - the caller (logout flow) doesn't block on
+    // this, but it needs to be visible somewhere instead of vanishing.
+    console.error(`❌ removeToken: giving up after 2 attempts - push_tokens row for user ${userId} (${platform}) was NOT removed. This device will keep receiving push notifications for this account.`);
+    this.deviceToken = null;
   }
 
   cleanup(): void {

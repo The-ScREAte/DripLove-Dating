@@ -1739,19 +1739,27 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
 
-          {/* Report - exact same trigger Discover uses (small white circle, red
-              accent), and like Discover it only shows up while viewing a photo since
-              it reports whichever photo is currently on screen. */}
+          {/* Report - same pink-gradient round trigger as the rest of the card's
+              floating action buttons (back arrow above, "show details" elsewhere),
+              and like Discover it only shows up while viewing a photo since it
+              reports whichever photo is currently on screen. */}
           {isImageSlide && (
             <button
               onClick={() => setShowReportModal(true)}
               aria-label={t('reportModal.title')}
-              className="absolute right-4 z-10 flex items-center justify-center w-7 h-7 rounded-full bg-white/95 border border-red-300 text-red-600 transition-colors hover:bg-red-100 active:scale-95"
+              className="absolute right-4 z-10 flex items-center justify-center rounded-full text-white backdrop-blur-md transition-transform active:scale-95 shrink-0"
               style={{
+                width: 24,
+                height: 24,
+                minWidth: 24,
+                minHeight: 24,
+                padding: 0,
+                background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+                boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
                 top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
               }}
             >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>

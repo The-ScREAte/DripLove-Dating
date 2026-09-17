@@ -463,6 +463,9 @@ serve(async (req) => {
           next_billing_date: newExpiry.toISOString(),
           payment_attempts: 0,
           auto_renew: autoRenew,
+          // RENEWED always means Google actually charged the card - clear any
+          // trial flag so this converts from "Pending (Trial)" to Premium.
+          is_trial: false,
         })
         
         if (renewError) {

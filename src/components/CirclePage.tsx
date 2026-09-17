@@ -6,12 +6,81 @@ import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { matchesReciprocalPreference, normalizeCountryCodeList } from './discover/discoverFeedUtils';
 import { parseFavorites } from '@/constants/favorites';
-import { fetchCirclePool, CircleProfile } from '@/utils/circlePoolFetch';
+import {
+  fetchCirclePool,
+  CircleProfile,
+  CircleRowKey,
+  fetchStoredCircleBatch,
+  saveCircleBatch,
+  fetchCircleExclusionIds,
+  fetchCircleProfilesByIds,
+} from '@/utils/circlePoolFetch';
+import PremiumUpgrade from './PremiumUpgrade';
+import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
+
+// Recommended for you / Similar interests only ever show a handful at a
+// time, then go on cooldown instead of silently backfilling from the pool.
+// Both tiers see the same 4-card batch (free sees it has real options, not
+// just one) - the difference is what's actually interactive: premium can
+// swipe all 4, free only ever gets ONE real "lucky swipe" (the top-ranked
+// card, index 0) with the other 3 shown locked purely as a teaser (tapping
+// any of those three opens the premium upsell, never a profile). Swiping
+// the one available free card - or, for premium, working through all 4 -
+// exhausts the whole row and starts its cooldown.
+const ROW_BATCH_SIZE = 4;
+const PREMIUM_ROW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const FREE_ROW_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Compatibility tiers - rank-based (top half of whoever actually has
+// anything in common with the viewer, sorted best-first, is "High"; the
+// rest is "Medium") rather than a fixed percentage cutoff: a fixed floor
+// like "50%+" sounds right in the abstract, but real profiles are sparse
+// enough across getCompatibility's 10 categories that an entire real pool
+// can top out at 30% - a flat threshold like that would leave the row with
+// nothing to show at all. This way there's always a "better half" to call
+// High as long as anyone in the pool shares anything with the viewer.
+//
+// Same composition rule for both rows (Recommended/Similar) and both tiers
+// (free/premium): try for 3 High + 1 Medium, with the Medium card leading
+// (display position 1) and the three Highs following in descending order
+// (so the single best match overall lands in position 2, not position 1).
+// Free vs premium only changes which of these cards are actually
+// swipeable, never which people or what order (see recommendedItems/
+// similarItems below) - a thin pool just yields fewer than 4 cards, never
+// a different shape.
+const composeCircleBatch = <T extends { percent: number }>(rankedDescByScore: T[]): T[] => {
+  if (rankedDescByScore.length === 0) return [];
+
+  const highCount = Math.max(1, Math.ceil(rankedDescByScore.length / 2));
+  const highTier = rankedDescByScore.slice(0, highCount);
+  const mediumTier = rankedDescByScore.slice(highCount);
+
+  const highs = highTier.slice(0, 3);
+  const medium = mediumTier[0];
+
+  if (!medium) {
+    // No Medium tier to draw from (small pool) - just take the best up to
+    // 4, still leading with the second-best so the top match lands second.
+    const fallback = rankedDescByScore.slice(0, ROW_BATCH_SIZE);
+    if (fallback.length < 2) return fallback;
+    const [first, second, ...rest] = fallback;
+    return [second, first, ...rest];
+  }
+
+  return [medium, ...highs];
+};
 
 // How long a cached pool snapshot (see window.circleCache, populated by
 // MainApp's preloadCircleData) is trusted before a fresh fetch replaces it -
 // same order of magnitude as Chat/Liked Me's own background refresh cadence.
 const CIRCLE_CACHE_TTL_MS = 2 * 60 * 1000;
+
+// Category tile counts run 12 separate count queries - cheap individually but
+// slow in aggregate, and identical on every remount within a short window.
+// Module-level (survives remounts, not just this component instance) so
+// flipping tabs and back doesn't re-run all 12 every time.
+const CATEGORY_COUNTS_CACHE_TTL_MS = 2 * 60 * 1000;
+let categoryCountsCache: { key: string; categories: CategoryTile[]; timestamp: number } | null = null;
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -42,6 +111,9 @@ import {
   Laugh,
   Waves,
   Mountain,
+  Lock,
+  RefreshCw,
+  Crown,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -233,6 +305,13 @@ const CATEGORY_DEFS: Array<{ key: string; label: string; icon: CategoryTile['ico
   { key: 'pet', label: 'Pet Lovers', icon: PawPrint, filter: { hasPets: true } },
 ];
 
+// Free users see every tile (so they know what's there) but can't browse
+// into these five - a small lock badge in the corner, tapping opens the
+// premium upsell instead of the filtered deck. Kept as its own set rather
+// than a field on CATEGORY_DEFS so the free/premium gating is one visible
+// list, not scattered across each tile's definition.
+const PREMIUM_ONLY_CATEGORY_KEYS = new Set(['serious', 'casual', 'open', 'verified', 'music', 'social', 'travel']);
+
 const getGenderFilter = (userPreference: string) => {
   if (userPreference === 'male') return ['male'];
   if (userPreference === 'female') return ['female'];
@@ -282,44 +361,183 @@ const toPotentialMatch = (p: CircleProfile): PotentialMatch => ({
   last_googled: p.last_googled || undefined,
 });
 
+// A ring that visually drains as the cooldown counts down, with the time
+// remaining as its own label ("18h", "43m") instead of a static "tomorrow" -
+// updates live off the same once-a-minute tick that already re-checks
+// cooldown expiry elsewhere on this page.
+const CircularCountdown = ({ remainingMs, totalMs }: { remainingMs: number; totalMs: number }) => {
+  const clamped = Math.max(0, Math.min(remainingMs, totalMs));
+  const pct = totalMs > 0 ? clamped / totalMs : 0;
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct);
+  const hours = Math.floor(clamped / (60 * 60 * 1000));
+  const minutes = Math.floor((clamped % (60 * 60 * 1000)) / (60 * 1000));
+  const label = hours > 0 ? `${hours}h` : `${Math.max(minutes, 1)}m`;
+  return (
+    <div className="relative w-14 h-14 flex items-center justify-center">
+      <svg width="56" height="56" className="absolute inset-0 -rotate-90">
+        <circle cx="28" cy="28" r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="4" />
+        <circle
+          cx="28" cy="28" r={radius} fill="none" stroke="#ec4899" strokeWidth="4"
+          strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="text-white text-xs font-semibold">{label}</span>
+    </div>
+  );
+};
+
+// A blurred, camouflaged placeholder card - same footprint as a real card so
+// it sits naturally in the scroll row. Shown at the end of a premium row
+// while a refill is still hours away, or standing alone once a row's fully
+// exhausted/locked (see renderCircleRow) - never a real profile, always
+// "something's coming back" rather than the row just going blank.
+const RefillCard = ({
+  label,
+  sublabel,
+  onClick,
+  countdown,
+}: {
+  label: string;
+  sublabel?: string;
+  onClick?: () => void;
+  // When set, shows the countdown ring instead of the plain refresh icon -
+  // only meaningful once a real cooldown has actually started (see
+  // renderCircleRow), never for the "more's coming once you finish" preview.
+  countdown?: { remainingMs: number; totalMs: number };
+}) => {
+  const content = (
+    <>
+      <div className="absolute inset-0 bg-gradient-to-br from-pink-950 via-purple-950/90 to-black" />
+      <div className="absolute inset-0 bg-white/5" style={{ backdropFilter: 'blur(6px)' }} />
+      <div className="relative h-full flex flex-col items-center justify-center gap-2 px-3 text-center">
+        {countdown ? (
+          <CircularCountdown remainingMs={countdown.remainingMs} totalMs={countdown.totalMs} />
+        ) : onClick ? (
+          // This card is itself an upgrade CTA (free tier's exhausted row) -
+          // same gold Crown as every other upgrade trigger in the app,
+          // instead of the plain pink refresh icon used for a purely
+          // informational "more's coming" card.
+          <div className="w-9 h-9 rounded-full bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center">
+            <Crown className="w-4 h-4 text-yellow-400" />
+          </div>
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-white/10 border border-pink-500/30 flex items-center justify-center">
+            <RefreshCw className="w-4 h-4 text-pink-300" />
+          </div>
+        )}
+        <p className="text-white text-sm font-semibold leading-tight">{label}</p>
+        {sublabel && <p className="text-white/50 text-xs leading-snug">{sublabel}</p>}
+      </div>
+    </>
+  );
+  const className = "flex-shrink-0 w-40 h-60 rounded-2xl border border-pink-500/20 shadow-lg overflow-hidden relative text-left";
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className} style={{ scrollSnapAlign: 'start' }}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div className={className} style={{ scrollSnapAlign: 'start' }}>
+      {content}
+    </div>
+  );
+};
+
+// How long the very first card's badge waits before it teaches itself, and
+// how long it stays expanded before sliding back to just the number.
+const COMPATIBILITY_HINT_DELAY_MS = 600;
+const COMPATIBILITY_HINT_HOLD_MS = 10_000;
+
+// The compact "10%" badge every card shows - except the very first card in
+// a row, which briefly expands to "10% Compatible" once, shortly after
+// appearing, so a new user learns what the number means without needing a
+// label on every single card. Pure CSS transition (max-width + opacity),
+// no animation library needed.
+const CompatibilityBadge = ({ percent, showHint }: { percent: number; showHint?: boolean }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!showHint) return;
+    const openTimer = setTimeout(() => setExpanded(true), COMPATIBILITY_HINT_DELAY_MS);
+    const closeTimer = setTimeout(() => setExpanded(false), COMPATIBILITY_HINT_DELAY_MS + COMPATIBILITY_HINT_HOLD_MS);
+    return () => {
+      clearTimeout(openTimer);
+      clearTimeout(closeTimer);
+    };
+  }, [showHint]);
+
+  return (
+    <span className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold py-0.5 pl-2 pr-2 rounded-full flex items-center">
+      <span className="whitespace-nowrap">{percent}%</span>
+      <span
+        className="whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin-left] duration-500 ease-out"
+        style={{
+          maxWidth: expanded ? 84 : 0,
+          opacity: expanded ? 1 : 0,
+          marginLeft: expanded ? 4 : 0,
+        }}
+      >
+        Compatible
+      </span>
+    </span>
+  );
+};
+
 const PeopleRow = ({
   title,
   subtitle,
   items,
   onSelect,
   showIcons = false,
+  onLockedTap,
+  trailingCard,
 }: {
   title: string;
   subtitle?: string;
-  items: { p: CircleProfile; interestIcons: SharedTrait[]; percent: number }[];
+  // Free-tier gating is per-item: photo blurred + lock badge (same visual
+  // treatment as Liked Me), name/country still visible, tapping opens the
+  // premium upsell instead of the profile - never onSelect. Lets a single
+  // row mix one real, unlocked card with locked teaser cards (free users'
+  // one "lucky swipe" among 3 locked previews).
+  items: { p: CircleProfile; interestIcons: SharedTrait[]; percent: number; locked?: boolean }[];
   onSelect: (p: CircleProfile) => void;
   // Interest icons only make sense on the "Similar interests" row - showing
   // them on "Recommended for you" too was confusing since that row isn't
   // specifically about shared interests.
   showIcons?: boolean;
+  onLockedTap?: () => void;
+  // Appended after the real cards - see RefillCard.
+  trailingCard?: React.ReactNode;
 }) => {
   if (items.length === 0) return null;
   return (
     <div className="mb-7">
       <h2 className="text-white font-semibold text-base px-6 mb-0.5">{title}</h2>
       {subtitle && <p className="text-white/40 text-xs px-6 mb-2">{subtitle}</p>}
-      <div className="flex gap-4 overflow-x-auto px-6 pt-1 pb-3 scrollbar-hide" style={{ scrollSnapType: 'x proximity', scrollPaddingLeft: 24 }}>
-        {items.map(({ p, interestIcons, percent }) => (
+      <div className="flex gap-4 overflow-x-auto px-6 pt-1 pb-0 scrollbar-hide" style={{ scrollSnapType: 'x proximity', scrollPaddingLeft: 24 }}>
+        {items.map(({ p, interestIcons, percent, locked }, index) => (
           <button
             key={p.id}
-            onClick={() => onSelect(p)}
+            onClick={() => (locked ? onLockedTap?.() : onSelect(p))}
             className="flex-shrink-0 w-40 text-left rounded-2xl bg-black border border-pink-500/20 shadow-lg overflow-hidden p-0"
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="relative w-40 h-48 bg-white/5">
               {p.firstImage && (
-                <img src={p.firstImage} alt={p.first_name} className="w-full h-full object-cover" loading="lazy" />
+                <img src={p.firstImage} alt={p.first_name} className={`w-full h-full object-cover ${locked ? 'blur-md' : ''}`} loading="lazy" />
               )}
-              {percent > 0 && (
-                <span className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                  {percent}%
-                </span>
+              {locked && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <div className="bg-black/80 border border-pink-500/40 backdrop-blur-sm rounded-full p-2.5">
+                    <Lock className="w-5 h-5 text-pink-300" />
+                  </div>
+                </div>
               )}
+              {percent > 0 && <CompatibilityBadge percent={percent} showHint={index === 0} />}
               {showIcons && interestIcons.length > 0 && (
                 <div className="absolute bottom-2 right-2 flex gap-1">
                   {interestIcons.slice(0, 3).map(({ icon: Icon, label }, i) => (
@@ -347,6 +565,7 @@ const PeopleRow = ({
             </div>
           </button>
         ))}
+        {trailingCard}
       </div>
     </div>
   );
@@ -355,9 +574,21 @@ const PeopleRow = ({
 const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Same eligibility signal PremiumUpgrade.tsx's own "Start Free Trial"
+  // buttons use - already correctly platform-aware: web/PWA has no native
+  // store to ask, so this stays false there (falls back to "Subscribe");
+  // iOS/Android only read true once the actual store confirms a trial
+  // offer is available for this account.
+  const { eligibleForTrial } = useFreeTrialOffer(currentUser?.id);
   const [pool, setPool] = useState<CircleProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [categories, setCategories] = useState<CategoryTile[]>([]);
+  // Tiles render immediately with their label/icon and no count (count: null
+  // already renders as no number - see the grid below) instead of the whole
+  // grid staying blank until all 12 count queries finish. Real counts fill
+  // in underneath a moment later without blocking anything visible.
+  const [categories, setCategories] = useState<CategoryTile[]>(() =>
+    CATEGORY_DEFS.map((d) => ({ key: d.key, label: d.label, icon: d.icon, count: null, filter: d.filter, isGameLink: d.isGameLink }))
+  );
   const [selectedProfile, setSelectedProfile] = useState<CircleProfile | null>(null);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   // A tapped category tile (e.g. "Travel") opens a real filtered swipe deck -
@@ -367,6 +598,98 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   const [categoryBrowse, setCategoryBrowse] = useState<{ label: string; profiles: CircleProfile[] } | null>(null);
   const [categoryBrowseIndex, setCategoryBrowseIndex] = useState(0);
   const [loadingCategoryKey, setLoadingCategoryKey] = useState<string | null>(null);
+
+  // Recommended/Similar row state: null batch = not computed yet (still
+  // waiting on the pool or cooldown status), [] = computed but empty (pool
+  // had no eligible people), non-empty = the actual snapshot currently
+  // shown. Cooldown timestamps (ms, null = no cooldown on record) come from
+  // circle_row_cooldowns; a null batch is recomputed from the pool the
+  // moment its row's cooldown is clear.
+  const [rowCooldowns, setRowCooldowns] = useState<Record<CircleRowKey, number | null>>({ recommended: null, similar: null });
+  const [rowCooldownsLoaded, setRowCooldownsLoaded] = useState(false);
+  // Hydrated straight from window.circleRowsCache (if a previous mount this
+  // session already resolved it) so reopening Circle shows the same
+  // Recommended/Similar rows instantly instead of going through the whole
+  // stored-batch-fetch-and-reconcile dance - and its loading state - again.
+  const [recommendedBatch, setRecommendedBatch] = useState<CircleProfile[] | null>(
+    () => (window.circleRowsCache?.get(currentUser?.id || '')?.recommended as CircleProfile[] | undefined) ?? null
+  );
+  const [similarBatch, setSimilarBatch] = useState<CircleProfile[] | null>(
+    () => (window.circleRowsCache?.get(currentUser?.id || '')?.similar as CircleProfile[] | undefined) ?? null
+  );
+  // Which row a currently-open profile preview came from, so a like/pass
+  // removes it from the right batch instead of just the general pool.
+  const [activeRowKey, setActiveRowKey] = useState<CircleRowKey | null>(null);
+  const [showCirclePremiumUpgrade, setShowCirclePremiumUpgrade] = useState(false);
+  // Set to a locked category tile's label the moment it's tapped - shows the
+  // lightweight upsell overlay (not the full PremiumUpgrade page yet) with
+  // that label worked into the copy; null hides it. Subscribing there is
+  // what actually opens the full page.
+  const [lockedTileLabel, setLockedTileLabel] = useState<string | null>(null);
+  // Ticks once a minute purely to force a re-check of cooldown expiry while
+  // the tab stays open (e.g. left open across midnight) - the actual expiry
+  // math reads Date.now() fresh each time, this just triggers that recheck.
+  const [cooldownTick, setCooldownTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setCooldownTick((t) => t + 1), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load this user's row cooldowns once - see supabase/migrations/20260917000000_circle_row_cooldowns.sql
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('circle_row_cooldowns')
+        .select('row_key, exhausted_at')
+        .eq('user_id', currentUser.id);
+      if (cancelled) return;
+      const next: Record<CircleRowKey, number | null> = { recommended: null, similar: null };
+      (data || []).forEach((row: { row_key: string; exhausted_at: string }) => {
+        if (row.row_key === 'recommended' || row.row_key === 'similar') {
+          next[row.row_key] = new Date(row.exhausted_at).getTime();
+        }
+      });
+      setRowCooldowns(next);
+      setRowCooldownsLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
+
+  const rowCooldownMs = isPremium ? PREMIUM_ROW_COOLDOWN_MS : FREE_ROW_COOLDOWN_MS;
+
+  // A cooldown that's actually expired clears itself here (and drops the
+  // stale batch so the compute effect below builds a fresh one) instead of
+  // needing a full remount to notice.
+  useEffect(() => {
+    setRowCooldowns((prev) => {
+      const recommendedExpired = prev.recommended !== null && Date.now() - prev.recommended >= rowCooldownMs;
+      const similarExpired = prev.similar !== null && Date.now() - prev.similar >= rowCooldownMs;
+      if (!recommendedExpired && !similarExpired) return prev;
+      if (recommendedExpired) setRecommendedBatch(null);
+      if (similarExpired) setSimilarBatch(null);
+      return {
+        recommended: recommendedExpired ? null : prev.recommended,
+        similar: similarExpired ? null : prev.similar,
+      };
+    });
+  }, [cooldownTick, rowCooldownMs]);
+
+  const markRowExhausted = useCallback(async (key: CircleRowKey) => {
+    const now = Date.now();
+    setRowCooldowns((prev) => ({ ...prev, [key]: now }));
+    if (!currentUser?.id) return;
+    try {
+      await supabase.from('circle_row_cooldowns').upsert(
+        { user_id: currentUser.id, row_key: key, exhausted_at: new Date(now).toISOString() },
+        { onConflict: 'user_id,row_key' }
+      );
+    } catch {
+      // Best-effort - local state already reflects the cooldown for this session.
+    }
+  }, [currentUser?.id]);
 
   // A light pool of eligible people, fetched via the shared fetchCirclePool
   // (see '@/utils/circlePoolFetch') so this stays in lockstep with MainApp's
@@ -419,6 +742,16 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   useEffect(() => {
     if (!currentUser?.id) return;
     let cancelled = false;
+
+    const cacheKey = `${currentUser.id}:${currentUser.country_code || ''}:${currentUser.preference || ''}:${currentUser.gender || ''}:${isPremium ? '1' : '0'}`;
+    if (
+      categoryCountsCache &&
+      categoryCountsCache.key === cacheKey &&
+      Date.now() - categoryCountsCache.timestamp < CATEGORY_COUNTS_CACHE_TTL_MS
+    ) {
+      setCategories(categoryCountsCache.categories);
+      return;
+    }
 
     const load = async () => {
       const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
@@ -480,7 +813,9 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
 
       const results = await Promise.all(CATEGORY_DEFS.map((d) => (d.isGameLink ? Promise.resolve(null) : countFor(d.filter))));
       if (!cancelled) {
-        setCategories(CATEGORY_DEFS.map((d, i) => ({ key: d.key, label: d.label, icon: d.icon, count: results[i], filter: d.filter, isGameLink: d.isGameLink })));
+        const withCounts = CATEGORY_DEFS.map((d, i) => ({ key: d.key, label: d.label, icon: d.icon, count: results[i], filter: d.filter, isGameLink: d.isGameLink }));
+        setCategories(withCounts);
+        categoryCountsCache = { key: cacheKey, categories: withCounts, timestamp: Date.now() };
       }
     };
 
@@ -534,30 +869,124 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     [isRecentlyActive]
   );
 
-  // Recommended for you: everyone in the pool, ranked by how much they
-  // actually have in common with this profile across every category that
-  // counts (interests, cultural signs, favorites, social media, pets,
-  // languages, personality, lifestyle, work/education, and relationship
-  // preference - see getCompatibility) - not just first-come order.
-  const recommended = useMemo(() => {
-    const scored = pool.map((p) => ({ p, ...getCompatibility(me, p) }));
-    return rankByActiveThenCompatibility(scored).slice(0, 5);
-  }, [pool, me, rankByActiveThenCompatibility]);
+  // Recommended for you / Similar interests: a PERSISTED snapshot (see
+  // supabase/migrations/20260918000000_circle_row_batches.sql), not just an
+  // in-memory one - reopening Circle, or reloading the app entirely, shows
+  // exactly the same people until each one is actually decided (liked/
+  // passed/matched/blocked - from Circle, Discover, Liked Me, anywhere),
+  // never a fresh re-ranking that could bump someone undecided out just
+  // because the pool happened to shift. Reconciliation checks the REAL
+  // exclusion set (fetchCircleExclusionIds), not mere presence in this
+  // call's random pool sample - a still-undecided person can miss that
+  // sample by chance and must never be read as "decided" because of it.
+  // Composition (see composeCircleBatch): 3 High-tier matches + 1 Medium,
+  // same for free and premium alike - nobody with zero shared categories
+  // ever surfaces in either row. Similar interests never repeats anyone
+  // from Recommended. Free users only ever get to actually swipe index 0 of
+  // this batch (see recommendedItems/similarItems below) - the other 3 are
+  // a locked, non-interactive teaser.
+  useEffect(() => {
+    if (!rowCooldownsLoaded || loading || pool.length === 0 || !currentUser?.id) return;
+    const userId = currentUser.id;
+    let cancelled = false;
 
-  // A second, genuinely different set of 5 - people who share at least ONE
-  // of those same categories but didn't make the top-5 above. Never repeats
-  // anyone from Recommended (showing the same face twice reads as broken,
-  // not just repetitive) - if too few people share anything at all, the row
-  // is simply shorter (PeopleRow hides itself entirely at zero), which is
-  // correct behavior, not a bug to paper over with a repeat.
-  const similarInterests = useMemo(() => {
-    const alreadyShown = new Set(recommended.map((r) => r.p.id));
-    const scored = pool
-      .filter((p) => !alreadyShown.has(p.id))
-      .map((p) => ({ p, ...getCompatibility(me, p) }))
-      .filter((x) => x.percent > 0);
-    return rankByActiveThenCompatibility(scored).slice(0, 5);
-  }, [pool, me, recommended, rankByActiveThenCompatibility]);
+    const resolveRow = async (
+      key: CircleRowKey,
+      currentBatch: CircleProfile[] | null,
+      setBatch: (b: CircleProfile[]) => void,
+      excludeFromRanking: Set<string>
+    ): Promise<CircleProfile[]> => {
+      const exhaustedAt = rowCooldowns[key];
+      const inCooldown = exhaustedAt !== null && Date.now() - exhaustedAt < rowCooldownMs;
+      if (inCooldown) return [];
+      if (currentBatch !== null) return currentBatch;
+
+      const storedIds = await fetchStoredCircleBatch(userId, key);
+      if (cancelled) return [];
+
+      if (storedIds && storedIds.length > 0) {
+        const decided = await fetchCircleExclusionIds(userId);
+        if (cancelled) return [];
+        const stillUndecidedIds = storedIds.filter((id) => !decided.has(id));
+
+        if (stillUndecidedIds.length === 0) {
+          void saveCircleBatch(userId, key, []);
+          void markRowExhausted(key);
+          setBatch([]);
+          return [];
+        }
+
+        const fromPool = new Map(pool.map((p) => [p.id, p]));
+        const missingIds = stillUndecidedIds.filter((id) => !fromPool.has(id));
+        const fetched = missingIds.length > 0 ? await fetchCircleProfilesByIds(missingIds) : [];
+        if (cancelled) return [];
+        const fetchedById = new Map(fetched.map((p) => [p.id, p]));
+
+        const reconciled = stillUndecidedIds
+          .map((id) => fromPool.get(id) ?? fetchedById.get(id))
+          .filter((p): p is CircleProfile => !!p);
+
+        if (reconciled.length !== storedIds.length) {
+          void saveCircleBatch(userId, key, reconciled.map((p) => p.id));
+        }
+        setBatch(reconciled);
+        return reconciled;
+      }
+
+      // No stored batch (first time, or the previous cycle's cooldown just
+      // cleared) - build a fresh one: ranked, tier-filtered, then persisted
+      // so it becomes the new stable snapshot going forward. Anyone with
+      // zero shared categories never qualifies for either tier.
+      const scored = pool
+        .filter((p) => !excludeFromRanking.has(p.id))
+        .map((p) => ({ p, ...getCompatibility(me, p) }))
+        .filter((x) => x.percent > 0);
+      const rankedFull = rankByActiveThenCompatibility(scored);
+      const ordered = composeCircleBatch(rankedFull).map((x) => x.p);
+      setBatch(ordered);
+      if (ordered.length > 0) void saveCircleBatch(userId, key, ordered.map((p) => p.id));
+      return ordered;
+    };
+
+    (async () => {
+      const recommendedResult = await resolveRow('recommended', recommendedBatch, setRecommendedBatch, new Set());
+      if (cancelled) return;
+      const shownIds = new Set(recommendedResult.map((p) => p.id));
+      await resolveRow('similar', similarBatch, setSimilarBatch, shownIds);
+    })();
+
+    return () => { cancelled = true; };
+  }, [rowCooldownsLoaded, loading, pool, me, rankByActiveThenCompatibility, rowCooldowns, rowCooldownMs, recommendedBatch, similarBatch, isPremium, currentUser?.id, markRowExhausted]);
+
+  // Mirrors both batches into window.circleRowsCache on every change (however
+  // they changed - freshly resolved, reconciled, or trimmed after a decision)
+  // so the very next time this component mounts, the lazy useState
+  // initializers above find them ready and skip the load entirely.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    if (recommendedBatch === null && similarBatch === null) return;
+    const existing = window.circleRowsCache?.get(currentUser.id);
+    window.circleRowsCache?.set(currentUser.id, {
+      recommended: recommendedBatch ?? existing?.recommended ?? [],
+      similar: similarBatch ?? existing?.similar ?? [],
+      timestamp: Date.now(),
+    });
+  }, [currentUser?.id, recommendedBatch, similarBatch]);
+
+  // Free: only index 0 is ever unlocked - that's the one "lucky swipe," and
+  // per composeCircleBatch it's the Medium-tier card, not the best match.
+  // The other 3 (including index 1, the single best High match) are a
+  // locked, non-interactive teaser so free users can see they have real
+  // options, including a taste of their best one, without giving away full
+  // access. Premium: nothing's locked.
+  const recommendedItems = useMemo(
+    () => (recommendedBatch ?? []).map((p, i) => ({ p, ...getCompatibility(me, p), locked: !isPremium && i !== 0 })),
+    [recommendedBatch, me, isPremium]
+  );
+  const similarItems = useMemo(
+    () => (similarBatch ?? []).map((p, i) => ({ p, ...getCompatibility(me, p), locked: !isPremium && i !== 0 })),
+    [similarBatch, me, isPremium]
+  );
 
   const loadImagesForProfile = useCallback(async (profileId: string) => {
     const { data } = await supabase
@@ -580,7 +1009,17 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     setCategoryBrowse(null);
     setCategoryBrowseIndex(0);
     setSelectedImages([]);
+    setActiveRowKey(null);
   }, []);
+
+  // Opening from Recommended/Similar tags which row's batch this profile
+  // came from, so a like/pass below shrinks the right snapshot. Category
+  // tiles and any other entry point leave activeRowKey null, so they never
+  // touch these batches at all.
+  const openCircleRowProfile = useCallback((rowKey: CircleRowKey, profile: CircleProfile) => {
+    setActiveRowKey(rowKey);
+    void openProfile(profile);
+  }, [openProfile]);
 
   // Guards against a double-fire from the swipe gesture's own exit-animation
   // timeout landing while a second gesture is somehow already in flight.
@@ -597,6 +1036,28 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     if (isSwipeActionPending || !currentUser?.id) return;
     setIsSwipeActionPending(true);
     setPool((prev) => prev.filter((p) => p.id !== profile.id));
+
+    // Shrink the exact Recommended/Similar snapshot this profile came from
+    // (not just the general pool) - once it hits empty, that row goes on
+    // cooldown instead of quietly pulling in the next-best pool candidate.
+    // Free users can only ever reach this for index 0 (the one unlocked
+    // "lucky swipe" - the other 3 route to the upsell, never here), and
+    // that single swipe uses up the whole row, not just that one card, so
+    // the remaining locked teasers disappear along with it.
+    if (activeRowKey === 'recommended' || activeRowKey === 'similar') {
+      const setBatch = activeRowKey === 'recommended' ? setRecommendedBatch : setSimilarBatch;
+      setBatch((prev) => {
+        const hadItems = !!prev && prev.length > 0;
+        const next = isPremium ? (prev ?? []).filter((p) => p.id !== profile.id) : [];
+        if (hadItems && next.length === 0) {
+          void markRowExhausted(activeRowKey);
+        }
+        // Keep the persisted snapshot in sync immediately, rather than
+        // waiting for the next mount's reconciliation to notice this swipe.
+        if (currentUser?.id) void saveCircleBatch(currentUser.id, activeRowKey, next.map((p) => p.id));
+        return next;
+      });
+    }
 
     if (categoryBrowse) {
       const nextIndex = categoryBrowseIndex + 1;
@@ -648,7 +1109,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
@@ -661,6 +1122,10 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   const handleCategoryClick = useCallback(async (tile: CategoryTile) => {
     if (tile.isGameLink) {
       navigate('/games');
+      return;
+    }
+    if (!isPremium && PREMIUM_ONLY_CATEGORY_KEYS.has(tile.key)) {
+      setLockedTileLabel(tile.label);
       return;
     }
     if (!currentUser?.id || loadingCategoryKey) return;
@@ -688,11 +1153,12 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         return;
       }
 
-      // Same exclusion set the main pool uses - never show someone already
-      // liked/passed/matched/blocked/on cooldown.
-      const [likesRes, likedByRes, matchesRes, blocksRes, passesRes, cooldownsRes] = await Promise.all([
+      // Same exclusion set Discover and the main Circle pool use - your own
+      // like/pass/match/block/cooldown, never someone else's incoming like on
+      // you (see circlePoolFetch.ts's comment - Discover shows those too;
+      // Liked Me is what surfaces the other side of it).
+      const [likesRes, matchesRes, blocksRes, passesRes, cooldownsRes] = await Promise.all([
         supabase.from('likes').select('liked_id').eq('liker_id', userId),
-        supabase.from('likes').select('liker_id').eq('liked_id', userId),
         supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
         supabase.from('blocks').select('blocked_id,blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
         supabase.from('passes').select('passed_id').eq('passer_id', userId).gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
@@ -700,7 +1166,6 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       ]);
       const excluded = new Set<string>([userId]);
       (likesRes.data || []).forEach((l) => l.liked_id && excluded.add(l.liked_id));
-      (likedByRes.data || []).forEach((l) => l.liker_id && excluded.add(l.liker_id));
       (matchesRes.data || []).forEach((m) => excluded.add(m.user1_id === userId ? m.user2_id : m.user1_id));
       (blocksRes.data || []).forEach((b) => { if (b.blocked_id) excluded.add(b.blocked_id); if (b.blocker_id) excluded.add(b.blocker_id); });
       (passesRes.data || []).forEach((p) => p.passed_id && excluded.add(p.passed_id));
@@ -761,8 +1226,93 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     }
   }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, loadImagesForProfile]);
 
+  // Both tiers see the same 4-card batch. Free: only index 0 is unlocked -
+  // the other 3 are a locked, tap-opens-upsell teaser (see recommendedItems/
+  // similarItems) - swiping that one card uses up the whole row. Premium:
+  // all 4 are real; a blurred "Refilling" card only joins the row once at
+  // least one has actually been swiped (not from the very first render),
+  // as a preview that more is coming. Once a row is fully exhausted - free's
+  // one card used, or premium's batch fully swiped - that same RefillCard
+  // stands alone as the whole row, paired with a short status line, instead
+  // of the row just going blank.
+  const renderCircleRow = (
+    key: CircleRowKey,
+    title: string,
+    items: { p: CircleProfile; interestIcons: SharedTrait[]; percent: number; locked?: boolean }[],
+    batch: CircleProfile[] | null,
+    showIcons: boolean
+  ) => {
+    // A row's "exhausted" messaging is tied to an actual recorded cooldown -
+    // never just "the batch happens to be empty." A genuinely empty batch
+    // (nobody matched this row's criteria at all) shouldn't claim a swipe
+    // was used when none was.
+    const exhaustedAt = rowCooldowns[key];
+    const inCooldown = exhaustedAt !== null && Date.now() - exhaustedAt < rowCooldownMs;
+    const remainingMs = exhaustedAt !== null ? rowCooldownMs - (Date.now() - exhaustedAt) : 0;
+
+    if (!isPremium) {
+      if (items.length > 0) {
+        return (
+          <PeopleRow
+            title={title}
+            items={items}
+            onSelect={(p) => openCircleRowProfile(key, p)}
+            showIcons={showIcons}
+            onLockedTap={() => setLockedTileLabel(title)}
+          />
+        );
+      }
+      if (!inCooldown) return null; // still loading, or genuinely nobody matched - not a used swipe
+      return (
+        <div className="mb-7">
+          <h2 className="text-white font-semibold text-base px-6 mb-0.5">{title}</h2>
+          <p className="text-pink-300 text-xs font-medium px-6 mb-2">You used your lucky swipe!</p>
+          <div className="px-6">
+            <RefillCard
+              label="Refilling"
+              sublabel={eligibleForTrial ? 'Free trial for instant access' : 'Upgrade for instant access'}
+              onClick={() => setLockedTileLabel(title)}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    if (items.length > 0) {
+      return (
+        <PeopleRow
+          title={title}
+          items={items}
+          onSelect={(p) => openCircleRowProfile(key, p)}
+          showIcons={showIcons}
+          trailingCard={items.length < ROW_BATCH_SIZE ? <RefillCard label="Refilling" sublabel="More coming" /> : undefined}
+        />
+      );
+    }
+    if (inCooldown) {
+      return (
+        <div className="mb-7">
+          <h2 className="text-white font-semibold text-base px-6 mb-0.5">{title}</h2>
+          <p className="text-white/40 text-xs px-6 mb-2">You've seen everyone for now.</p>
+          <div className="px-6">
+            <RefillCard label="Refilling" countdown={{ remainingMs, totalMs: rowCooldownMs }} />
+          </div>
+        </div>
+      );
+    }
+    return null; // still loading, or the pool genuinely had nobody for this row
+  };
+
   const activeProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex] : selectedProfile;
   const nextBrowseProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex + 1] : undefined;
+
+  if (showCirclePremiumUpgrade) {
+    return (
+      <div className="h-full w-full overflow-y-auto">
+        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowCirclePremiumUpgrade(false)} preselectedPlan="premium" />
+      </div>
+    );
+  }
 
   if (activeProfile) {
     return (
@@ -771,6 +1321,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         images={selectedImages.length ? selectedImages : (activeProfile.firstImage ? [activeProfile.firstImage] : [])}
         onClose={closeProfileView}
         onBack={closeProfileView}
+        simpleBackButton
         onLike={() => handleCircleLike(activeProfile)}
         onPass={() => handleCirclePass(activeProfile)}
         topLabel={categoryBrowse ? categoryBrowse.label : undefined}
@@ -783,7 +1334,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   return (
     <div className="h-full w-full bg-black overflow-y-auto scrollbar-hide">
       <div className="sticky top-0 z-10 bg-black pt-2 pb-2">
-        <h2 className="text-white font-semibold text-base px-6 mb-1">Circle</h2>
+        <h2 className="text-white font-semibold text-base px-6 mb-1">Circle Up</h2>
         <p className="text-white/40 text-xs px-6">Made easy to spot and find who's right for you.</p>
       </div>
       <div>
@@ -797,8 +1348,8 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           </div>
         ) : (
           <>
-            <PeopleRow title="Recommended for you" items={recommended} onSelect={openProfile} />
-            <PeopleRow title="Similar interests" items={similarInterests} onSelect={openProfile} showIcons />
+            {renderCircleRow('recommended', 'Recommended for you', recommendedItems, recommendedBatch, false)}
+            {renderCircleRow('similar', 'Similar interests', similarItems, similarBatch, true)}
           </>
         )}
 
@@ -806,18 +1357,24 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           {categories.map((tile) => {
             const { key, label, icon: Icon, count, isGameLink } = tile;
             const isLoadingThis = loadingCategoryKey === key;
+            const isLockedForFree = !isPremium && PREMIUM_ONLY_CATEGORY_KEYS.has(key);
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => handleCategoryClick(tile)}
-                disabled={!isGameLink && loadingCategoryKey !== null}
-                className={`text-left rounded-2xl border px-4 py-5 flex flex-col items-center gap-3 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                disabled={!isGameLink && !isLockedForFree && loadingCategoryKey !== null}
+                className={`relative text-left rounded-2xl border px-4 py-5 flex flex-col items-center gap-3 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                   isGameLink
                     ? 'bg-gradient-to-br from-pink-600/20 to-purple-600/20 border-pink-500/30 active:from-pink-600/30 active:to-purple-600/30'
                     : 'bg-white/[0.04] border-white/10 active:bg-white/[0.08]'
                 }`}
               >
+                {isLockedForFree && (
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/80 border border-pink-500/40 flex items-center justify-center">
+                    <Lock className="w-3 h-3 text-pink-300" />
+                  </div>
+                )}
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isGameLink ? 'bg-pink-500/20 border border-pink-500/40' : 'bg-pink-500/10 border border-pink-500/25'}`}>
                   {isLoadingThis ? (
                     <div className="w-4 h-4 border-2 border-pink-400 border-t-transparent rounded-full animate-spin" />
@@ -834,6 +1391,43 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           })}
         </div>
       </div>
+
+      {lockedTileLabel && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setLockedTileLabel(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-2xl border border-pink-500/30 bg-gradient-to-br from-pink-950 via-purple-950 to-black p-6 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-pink-500/15 border border-pink-500/40 flex items-center justify-center">
+              <Lock className="w-5 h-5 text-pink-300" />
+            </div>
+            <p className="text-white text-sm leading-relaxed mb-5">
+              You could see a lot of <span className="font-semibold text-pink-300">{lockedTileLabel}</span> matches waiting for you - but you'll need to upgrade to enjoy this.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setLockedTileLabel(null);
+                setShowCirclePremiumUpgrade(true);
+              }}
+              className="w-full py-3 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black text-sm font-semibold shadow-md transition-colors flex items-center justify-center gap-2"
+            >
+              <Crown className="w-4 h-4" />
+              {eligibleForTrial ? 'Start Free Trial' : 'Upgrade'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLockedTileLabel(null)}
+              className="mt-3 text-white/40 text-xs"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

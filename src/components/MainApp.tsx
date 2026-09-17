@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
-import type { ChatMatchesCacheValue, CircleCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
+import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import { fetchCirclePool } from '@/utils/circlePoolFetch';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
@@ -668,6 +668,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
     if (!window.circleCache) {
       window.circleCache = new Map<string, CircleCacheValue>();
+    }
+    if (!window.circleRowsCache) {
+      window.circleRowsCache = new Map<string, CircleRowsCacheValue>();
     }
   }, []);
 

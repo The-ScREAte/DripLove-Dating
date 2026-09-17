@@ -99,14 +99,14 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isBlocking} className="bg-black border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
+        <DialogFooter className="flex-row justify-end gap-2 space-x-0">
+          <Button variant="outline" onClick={onClose} disabled={isBlocking} className="flex-1 bg-black border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
             {t('common.cancel')}
           </Button>
           <Button
             onClick={handleBlock}
             disabled={isBlocking}
-            className="bg-red-500 hover:bg-red-600 text-white"
+            className="flex-1 bg-red-500 hover:bg-red-600 text-white"
           >
             {isBlocking ? t('block.blocking') : t('block.blockUser')}
           </Button>

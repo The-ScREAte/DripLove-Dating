@@ -220,6 +220,12 @@ serve(async (req) => {
       })
     }
 
+    // Apple marks every transaction started under a free trial or intro offer
+    // with is_trial_period/is_in_intro_offer_period = "true" even though $0
+    // was charged. Persisting this lets the admin (and the promoter portal)
+    // show "Pending (Trial)" instead of counting these as paid Premium users.
+    const isTrialTransaction = latest.is_trial_period === 'true' || latest.is_in_intro_offer_period === 'true'
+
     // 9️⃣ Update Supabase
     if (isActive) {
       const { error } = await supabaseClient
@@ -235,6 +241,7 @@ serve(async (req) => {
           original_transaction_id: originalTransactionId,
           auto_renew: true,
           payment_method: 'apple',
+          is_trial: isTrialTransaction,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
 
@@ -260,7 +267,22 @@ serve(async (req) => {
 
       console.log('✅ [IAP-RECEIPT-VALIDATOR] Premium activated for user:', userId)
 
-      // 🔟 Record payment and process referral commission for IAP
+      // 🔟 Record payment and process referral commission for IAP - but only
+      // for a transaction that actually charged the user. Crediting a
+      // promoter's commission on a trial transaction would pay them out of
+      // revenue that doesn't exist yet, and if the user cancels before the
+      // trial converts, it never will. The real post-trial charge fires
+      // DID_RENEW on apple-app-store-webhook, which already commissions it.
+      if (isTrialTransaction) {
+        console.log('[IAP-RECEIPT-VALIDATOR] Trial/intro transaction - skipping commission until a real charge occurs')
+        return json(200, {
+          valid: true,
+          active: true,
+          expires_at: expiresDate.toISOString(),
+          transaction_id: latest.transaction_id,
+        })
+      }
+
       try {
         // Get premium price from payment_config for the user's country
         const { data: profile } = await supabaseClient

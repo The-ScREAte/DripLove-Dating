@@ -8,7 +8,6 @@ import ReportModal from '@/components/ReportModal';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
-import { getLanguageName } from '@/utils/languageNames';
 
 interface ChatHeaderProps {
   selectedMatch: ChatMatch;
@@ -20,7 +19,17 @@ interface ChatHeaderProps {
   onTestNotification?: () => void;
   isMobile?: boolean;
   currentUserId?: string;
+  /** True while the partner is actively typing in this conversation - takes
+   * over the status line ("typing...") the same way every mainstream chat
+   * app does, so it doesn't need its own separate slot in the header. */
+  isPartnerTyping?: boolean;
 }
+
+// Anything logged in within this window reads as "Active now" - matches the
+// same order-of-magnitude window Circle uses for its own "recently active"
+// signal (see CirclePage's ACTIVE_WINDOW_MS), just much tighter since this is
+// meant to approximate real presence, not "used the app recently at all".
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
   selectedMatch,
@@ -31,7 +40,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onReport,
   onTestNotification,
   isMobile = false,
-  currentUserId
+  currentUserId,
+  isPartnerTyping = false
 }) => {
   const { t } = useTranslation();
   // Determine partner ID correctly
@@ -39,33 +49,56 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
                    (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
   const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [partnerLanguage, setPartnerLanguage] = useState<string | null>(null);
+  const [partnerLastLoginAt, setPartnerLastLoginAt] = useState<string | null>(null);
+  // Recomputed every 30s so "Active now" correctly ages into "Last seen Xm
+  // ago" while the conversation stays open, instead of freezing at whatever
+  // it read on first fetch.
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const { toast } = useToast();
   const menuRef = React.useRef<HTMLDivElement>(null);
 
-  // Fetch partner's preferred language
+  // Fetch partner's last-login timestamp - the only real presence signal
+  // this app tracks (there's no live "online" flag/presence channel), so
+  // "Active now" is an approximation: logged in within the last few minutes.
   useEffect(() => {
-    const fetchPartnerLanguage = async () => {
+    const fetchPartnerStatus = async () => {
       if (!partnerId) return;
-      
+
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('preferred_language')
+          .select('last_login_at')
           .eq('id', partnerId)
           .single();
-        
-        if (!error && data?.preferred_language) {
-          const languageName = getLanguageName(data.preferred_language);
-          setPartnerLanguage(languageName);
+
+        if (!error && data?.last_login_at) {
+          setPartnerLastLoginAt(data.last_login_at);
         }
       } catch (err) {
-        console.error('Error fetching partner language:', err);
+        console.error('Error fetching partner status:', err);
       }
     };
 
-    fetchPartnerLanguage();
+    fetchPartnerStatus();
   }, [partnerId]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowTick(Date.now()), 30000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const { statusText, isOnline } = React.useMemo(() => {
+    if (!partnerLastLoginAt) return { statusText: t('chat.activeOnDripLove'), isOnline: false };
+    const diffMs = nowTick - new Date(partnerLastLoginAt).getTime();
+    if (diffMs < ONLINE_WINDOW_MS) return { statusText: t('chat.activeNow'), isOnline: true };
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 60) return { statusText: t('chat.lastSeenMinutesAgo', { minutes }), isOnline: false };
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return { statusText: t('chat.lastSeenHoursAgo', { hours }), isOnline: false };
+    const days = Math.floor(hours / 24);
+    if (days < 7) return { statusText: t('chat.lastSeenDaysAgo', { days }), isOnline: false };
+    return { statusText: t('chat.lastSeenLongAgo'), isOnline: false };
+  }, [partnerLastLoginAt, nowTick, t]);
   // Click outside to close menu
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -103,18 +136,26 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <ArrowLeft className="w-4 h-4" />
           </Button>
         )}
-        <ChatUserAvatar
-          userId={partnerId}
-          firstName={selectedMatch.first_name}
-          lastName={selectedMatch.last_name}
-          onClick={() => onUserProfileOpen(partnerId)}
-        />
+        <div className="relative shrink-0">
+          <ChatUserAvatar
+            userId={partnerId}
+            firstName={selectedMatch.first_name}
+            lastName={selectedMatch.last_name}
+            onClick={() => onUserProfileOpen(partnerId)}
+          />
+          {isOnline && (
+            <span
+              className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-black"
+              aria-label={t('chat.activeNow')}
+            />
+          )}
+        </div>
         <div className="leading-tight">
           <h3 className="font-semibold text-white text-[15px] sm:text-base">
             {selectedMatch.first_name} {selectedMatch.last_name}
           </h3>
-          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
-            {partnerLanguage ? t('chat.speaks', { language: partnerLanguage }) : t('chat.activeOnDripLove')}
+          <p className={`text-xs sm:text-sm mt-0.5 ${isPartnerTyping ? 'text-pink-400 font-medium' : isOnline ? 'text-green-400' : 'text-gray-400'}`}>
+            {isPartnerTyping ? t('chat.typing') : statusText}
           </p>
         </div>
   </div>

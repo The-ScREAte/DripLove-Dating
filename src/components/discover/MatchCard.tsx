@@ -44,6 +44,15 @@ const formatHeightLabel = (cm: number) => {
   return `${feet}'${inches}" (${cm} cm)`;
 };
 
+// Same imperial conversion as formatHeightLabel, but without the "(XXX cm)"
+// suffix - used in the collapsed card header, which is tight on space.
+const formatHeightImperial = (cm: number) => {
+  const totalInches = Math.round(cm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}'${inches}"`;
+};
+
 // Where the second captioned photo call-out can land in the expanded details
 // panel - always above Personality. Module-level (not per-render) since it's
 // a fixed constant, not something that needs recreating on every render.
@@ -676,7 +685,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     onClick={e => { e.stopPropagation(); setShowReportModal(true); }}
                     aria-label="Report image"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </button>
@@ -808,9 +817,9 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           <span>
                             {match.city}, {match.country}
                             {match.distance !== undefined && match.distance < 999 ? (
-                              <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km away</span>
+                              <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km</span>
                             ) : preCalculatedDistance !== undefined && preCalculatedDistance < 999 ? (
-                              <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km away</span>
+                              <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km</span>
                             ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
                               <span className="ml-2">
                                 • {Math.max(1, Math.round(calculateDistance(
@@ -818,11 +827,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
                                   currentUserLongitude,
                                   match.latitude,
                                   match.longitude
-                                )))} km away
+                                )))} km
                               </span>
                             ))}
                             {typeof match.height_cm === 'number' && match.height_cm > 0 && (
-                              <span className="ml-2">• {formatHeightLabel(match.height_cm)}</span>
+                              <span className="ml-2">• {formatHeightImperial(match.height_cm)}</span>
                             )}
                           </span>
                         </div>

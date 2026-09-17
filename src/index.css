@@ -185,10 +185,17 @@ body.keyboard-open .chat-input-container {
   padding-bottom: 0 !important;
 }
 
-/* Messages area adjusts for input bar */
+/* Messages area adjusts for input bar. --input-bar-height (set in
+   MessageInput.tsx from the input container's real offsetHeight) already
+   includes that container's own env(safe-area-inset-bottom) padding below -
+   adding the same inset again here double-counted it, showing up as a
+   visibly oversized gap above the input bar on iOS devices with a non-zero
+   safe-area inset (the home-indicator bar). Android reports 0 for that
+   inset on most devices, so it wasn't visibly broken there, but the formula
+   was wrong there too. */
 .chat-messages-container {
   /* Add a little extra spacing so the last message isn't cramped */
-  padding-bottom: calc(var(--input-bar-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+  padding-bottom: calc(var(--input-bar-height) + 16px) !important;
 }
 
 /* When keyboard is open, add extra space for keyboard + input bar */
@@ -200,6 +207,13 @@ body.keyboard-open .chat-messages-container {
 .chat-messages-container {
   height: calc(100vh - var(--keyboard-height, 0px) - var(--input-bar-height, 60px));
   overflow-y: auto;
+}
+
+/* Subtle depth on the flat-black chat background - a faint dot grid, not
+   busy enough to compete with message bubbles or hurt legibility. */
+.chat-texture-bg {
+  background-image: radial-gradient(rgba(236, 72, 153, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
 /* Mobile optimizations and safe areas */

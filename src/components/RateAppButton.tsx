@@ -127,7 +127,7 @@ const RateAppButton: React.FC<RateAppButtonProps> = ({ className, onRatingComple
       {/* Web Rating Dialog */}
       {platform === 'web' && (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:max-w-md">
             <DialogHeader className="space-y-3">
               <DialogTitle className="text-xl font-semibold text-center text-gray-900">
                 Rate DripLove

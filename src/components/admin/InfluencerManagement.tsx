@@ -28,7 +28,9 @@ import {
   Link,
   ToggleLeft,
   AlertCircle,
-  Wallet
+  Wallet,
+  Hourglass,
+  Crown
 } from 'lucide-react';
 
 // Promoter setup links always point at the real production domain,
@@ -39,6 +41,13 @@ import {
 // "invalid link" (or nothing at all) since localhost/preview URLs mean
 // nothing off the admin's own machine.
 const PRODUCTION_APP_URL = 'https://www.driplove.love';
+
+// Commissions are stored in GHS in the database, but the admin should see
+// the same USD figures promoters see on their own portal. This mirrors the
+// fixed rate the `influencer_login` RPC uses server-side to compute a
+// promoter's USD balances (see supabase/migrations - v_exchange_rate := 16.0).
+const GHS_TO_USD_RATE = 16.0;
+const ghsToUsd = (ghs: number) => (ghs || 0) / GHS_TO_USD_RATE;
 
 interface PromoCode {
   id: string;
@@ -54,6 +63,7 @@ interface PromoCode {
   is_active: boolean;
   total_signups: number;
   total_paid_subscribers: number;
+  total_trial_users: number;
   total_commission_earned: number;
   created_at: string;
   deleted_at: string | null;
@@ -147,12 +157,13 @@ const InfluencerManagement = () => {
 
         if (statsError || !stats) {
           console.error('Error fetching stats for promo code:', code.id, statsError);
-          return { ...code, total_signups: 0, total_paid_subscribers: 0, total_commission_earned: 0 };
+          return { ...code, total_signups: 0, total_paid_subscribers: 0, total_trial_users: 0, total_commission_earned: 0 };
         }
 
         const s = stats as {
           total_signups: number;
           total_subscribers: number;
+          total_trial_users: number;
           total_commission_ghs: number;
           total_paid_ghs: number;
           outstanding_ghs: number;
@@ -172,6 +183,7 @@ const InfluencerManagement = () => {
           ...code,
           total_signups: s.total_signups || 0,
           total_paid_subscribers: s.total_subscribers || 0,
+          total_trial_users: s.total_trial_users || 0,
           total_commission_earned: s.total_commission_ghs || 0,
         };
       }));
@@ -620,7 +632,7 @@ const InfluencerManagement = () => {
         <Card>
           <CardContent className="py-3 text-center">
             <p className="text-2xl font-bold text-blue-600">
-              GHS {promoCodes.reduce((sum, p) => sum + (p.total_commission_earned || 0), 0).toFixed(2)}
+              ${ghsToUsd(promoCodes.reduce((sum, p) => sum + (p.total_commission_earned || 0), 0)).toFixed(2)}
             </p>
             <p className="text-xs text-gray-500">Commission Paid</p>
           </CardContent>
@@ -662,40 +674,49 @@ const InfluencerManagement = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div className="text-center p-2 bg-gray-50 rounded">
-                    <p className="font-semibold">{promo.commission_enabled ? `${promo.percentage_cut}%` : '—'}</p>
-                    <p className="text-gray-500">Commission</p>
+                <div className="grid grid-cols-5 gap-1">
+                  <div className="flex flex-col items-center gap-0.5 p-1.5 bg-gray-50 rounded">
+                    <Percent className="w-3 h-3 text-gray-500 shrink-0" />
+                    <p className="text-xs font-semibold leading-none">{promo.commission_enabled ? `${promo.percentage_cut}%` : '—'}</p>
+                    <p className="text-[9px] leading-none text-gray-500 truncate w-full text-center">Commi.</p>
                   </div>
-                  <div className="text-center p-2 bg-gray-50 rounded">
-                    <p className="font-semibold">{promo.commission_enabled ? `${promo.commission_duration}x` : '—'}</p>
-                    <p className="text-gray-500">Duration</p>
+                  <div className="flex flex-col items-center gap-0.5 p-1.5 bg-gray-50 rounded">
+                    <Clock className="w-3 h-3 text-gray-500 shrink-0" />
+                    <p className="text-xs font-semibold leading-none">{promo.commission_enabled ? `${promo.commission_duration}x` : '—'}</p>
+                    <p className="text-[9px] leading-none text-gray-500 truncate w-full text-center">Durat.</p>
                   </div>
-                  <div className="text-center p-2 bg-blue-50 rounded">
-                    <p className="font-semibold text-blue-600">{promo.total_signups}</p>
-                    <p className="text-gray-500">Signups</p>
+                  <div className="flex flex-col items-center gap-0.5 p-1.5 bg-blue-50 rounded">
+                    <Users className="w-3 h-3 text-blue-600 shrink-0" />
+                    <p className="text-xs font-semibold leading-none text-blue-600">{promo.total_signups}</p>
+                    <p className="text-[9px] leading-none text-gray-500 truncate w-full text-center">Signups</p>
                   </div>
-                  <div className="text-center p-2 bg-green-50 rounded">
-                    <p className="font-semibold text-green-600">{promo.total_paid_subscribers}</p>
-                    <p className="text-gray-500">Premium</p>
+                  <div className="flex flex-col items-center gap-0.5 p-1.5 bg-orange-50 rounded" title="On a free trial - not yet charged, so not commissioned">
+                    <Hourglass className="w-3 h-3 text-orange-600 shrink-0" />
+                    <p className="text-xs font-semibold leading-none text-orange-600">{promo.total_trial_users || 0}</p>
+                    <p className="text-[9px] leading-none text-gray-500 truncate w-full text-center">Pend.</p>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5 p-1.5 bg-green-50 rounded" title="Actually charged - the only ones counted for commission">
+                    <Crown className="w-3 h-3 text-green-600 shrink-0" />
+                    <p className="text-xs font-semibold leading-none text-green-600">{promo.total_paid_subscribers}</p>
+                    <p className="text-[9px] leading-none text-gray-500 truncate w-full text-center">Prem.</p>
                   </div>
                 </div>
 
                 <div className="text-xs space-y-1">
                   {promo.commission_enabled && (
                     <div>
-                      Total Earned: <span className="font-semibold text-green-600">GHS {(promo.total_commission_earned || 0).toFixed(2)}</span>
+                      Total Earned: <span className="font-semibold text-green-600">${ghsToUsd(promo.total_commission_earned || 0).toFixed(2)}</span>
                     </div>
                   )}
                   {promo.commission_enabled && payoutStats[promo.id] && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Paid Out:</span>
-                        <span className="font-medium text-blue-600">GHS {payoutStats[promo.id].totalPaid.toFixed(2)}</span>
+                        <span className="font-medium text-blue-600">${ghsToUsd(payoutStats[promo.id].totalPaid).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Outstanding:</span>
-                        <span className="font-medium text-orange-600">GHS {payoutStats[promo.id].outstanding.toFixed(2)}</span>
+                        <span className="font-medium text-orange-600">${ghsToUsd(payoutStats[promo.id].outstanding).toFixed(2)}</span>
                       </div>
                       {payoutStats[promo.id].pendingRequests > 0 && (
                         <div className="flex items-center gap-1 text-orange-600">
@@ -1056,6 +1077,10 @@ const InfluencerManagement = () => {
                   <p className="text-2xl font-bold text-purple-600">{selectedPromoCode.total_paid_subscribers}</p>
                   <p className="text-xs text-gray-500">Premium Users</p>
                 </div>
+                <div className="p-3 bg-orange-50 rounded-lg text-center col-span-2" title="On a free trial - not yet charged, so not commissioned">
+                  <p className="text-2xl font-bold text-orange-600">{selectedPromoCode.total_trial_users || 0}</p>
+                  <p className="text-xs text-gray-500">Pending (On Trial)</p>
+                </div>
                 <div className="p-3 bg-gray-50 rounded-lg text-center col-span-2">
                   <p className="text-2xl font-bold text-gray-600">
                     {detailStats.referrals.filter((r: any) => r.user_deleted_at).length}
@@ -1071,19 +1096,19 @@ const InfluencerManagement = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Commission Earned:</span>
                     <span className="font-bold text-green-700">
-                      GHS {Number(detailStats.stats?.total_commission_ghs || 0).toFixed(2)}
+                      ${ghsToUsd(Number(detailStats.stats?.total_commission_ghs || 0)).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Paid Out:</span>
                     <span className="font-semibold text-blue-600">
-                      GHS {Number(detailStats.stats?.total_paid_ghs || 0).toFixed(2)}
+                      ${ghsToUsd(Number(detailStats.stats?.total_paid_ghs || 0)).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-green-200">
                     <span className="font-medium text-gray-700">Outstanding Balance:</span>
                     <span className="font-bold text-orange-600">
-                      GHS {Number(detailStats.stats?.outstanding_ghs || 0).toFixed(2)}
+                      ${ghsToUsd(Number(detailStats.stats?.outstanding_ghs || 0)).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -1107,7 +1132,7 @@ const InfluencerManagement = () => {
                     {detailStats.payouts.map((payout: any) => (
                       <div key={payout.id} className="border rounded p-3 text-sm">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="font-semibold text-lg">GHS {Number(payout.amount).toFixed(2)}</span>
+                          <span className="font-semibold text-lg">${ghsToUsd(Number(payout.amount)).toFixed(2)}</span>
                           <Badge 
                             variant={payout.status === 'pending' ? 'outline' : payout.status === 'completed' ? 'default' : 'destructive'}
                             className={
@@ -1159,7 +1184,7 @@ const InfluencerManagement = () => {
                     {detailStats.commissions.slice(0, 10).map((comm: any) => (
                       <div key={comm.id} className="flex justify-between text-xs border-b py-1">
                         <span>Payment #{comm.deduction_number}</span>
-                        <span className="text-green-600">GHS {Number(comm.commission_amount).toFixed(2)}</span>
+                        <span className="text-green-600">${ghsToUsd(Number(comm.commission_amount)).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>

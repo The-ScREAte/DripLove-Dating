@@ -847,18 +847,6 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
               .insert({ user_id: userId, promo_code_id: formData.promoCodeId });
             if (refError) {
               console.error('Error saving referral:', refError);
-            } else {
-              supabase.auth.getSession().then(({ data: { session } }) => {
-                if (!session?.access_token) return;
-                supabase.functions.invoke('notify-promo-admin', {
-                  body: {
-                    promoCodeId: formData.promoCodeId,
-                    newUserName: `${formData.firstName} ${formData.lastName}`.trim(),
-                    newUserEmail: formData.email,
-                  },
-                  headers: { Authorization: `Bearer ${session.access_token}` },
-                }).catch((notifyErr) => console.error('Error notifying admin of promo code use:', notifyErr));
-              });
             }
           } catch (refErr) {
             console.error('Error saving referral:', refErr);

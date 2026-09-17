@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { MessageCircle, RefreshCw, ArrowDownToLine } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { cacheAvatar, getCachedAvatar } from '@/cache/chatCache';
+import { preloadImageToBlob } from '@/utils/imageCache';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
@@ -38,6 +40,21 @@ const DORMANT_DAYS = 30;
 // Earlier conversations = DORMANT_DAYS; deletion happens after DORMANT_DAYS + DORMANT_DELETE_AFTER_DAYS_IN_EARLIER.
 const DORMANT_DELETE_AFTER_DAYS_IN_EARLIER = 15;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// "Today"/"Yesterday" for the last 2 days, weekday name within the last
+// week, and a full date beyond that - the same convention used everywhere
+// else (WhatsApp/iMessage) so it needs no explanation in the UI itself.
+const formatDateSeparator = (date: Date): string => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today.getTime() - target.getTime()) / MS_PER_DAY);
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays > 1 && diffDays < 7) return date.toLocaleDateString([], { weekday: 'long' });
+  return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+};
 
 const isDormantChat = (match: ChatMatch) => {
   if (!match.last_message_time) return false;
@@ -169,7 +186,88 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
   
   // Reply state (must be before virtualizer effect that uses it)
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  
+
+  // Partner avatar for the message-group avatar (see MessageBubble) - fetched
+  // once per open conversation and shared across every bubble, rather than
+  // each bubble fetching it independently.
+  const [partnerAvatarUrl, setPartnerAvatarUrl] = useState<string | null>(null);
+  const partnerId = useMemo(
+    () => selectedMatch?.partner?.id ||
+      (selectedMatch?.user1_id === currentUser?.id ? selectedMatch?.user2_id : selectedMatch?.user1_id) ||
+      null,
+    [selectedMatch, currentUser?.id]
+  );
+  const partnerInitials = useMemo(
+    () => `${selectedMatch?.first_name?.charAt(0) || ''}${selectedMatch?.last_name?.charAt(0) || ''}`.toUpperCase(),
+    [selectedMatch?.first_name, selectedMatch?.last_name]
+  );
+
+  useEffect(() => {
+    if (!partnerId) { setPartnerAvatarUrl(null); return; }
+    const cached = getCachedAvatar(partnerId);
+    if (cached) { setPartnerAvatarUrl(cached); return; }
+    setPartnerAvatarUrl(null);
+    let cancelled = false;
+    (async () => {
+      const { data: images } = await supabase
+        .from('user_images')
+        .select('image_url')
+        .eq('user_id', partnerId)
+        .eq('is_approved', true)
+        .order('image_order', { ascending: true })
+        .limit(1);
+      const imageUrl = images?.[0]?.image_url;
+      if (!imageUrl || cancelled) return;
+      const blobUrl = await preloadImageToBlob(imageUrl);
+      if (blobUrl && !cancelled) {
+        cacheAvatar(partnerId, blobUrl);
+        setPartnerAvatarUrl(blobUrl);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [partnerId]);
+
+  // Typing indicator - a lightweight broadcast-only channel (no DB writes,
+  // nothing persisted) separate from the postgres_changes channel above so
+  // it can't interfere with message sync. Partner's "typing" broadcast flips
+  // partnerTyping on and a 3s silence timer flips it back off - there's no
+  // explicit "stopped typing" event to listen for.
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const partnerTypingTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!selectedMatch?.id || !currentUser?.id) return;
+    setPartnerTyping(false);
+    const channel = supabase
+      .channel(`typing:${selectedMatch.id}`)
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        if (payload.payload?.userId === currentUser.id) return;
+        setPartnerTyping(true);
+        if (partnerTypingTimeoutRef.current) window.clearTimeout(partnerTypingTimeoutRef.current);
+        partnerTypingTimeoutRef.current = window.setTimeout(() => setPartnerTyping(false), 3000);
+      })
+      .subscribe();
+    typingChannelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+      typingChannelRef.current = null;
+      if (partnerTypingTimeoutRef.current) window.clearTimeout(partnerTypingTimeoutRef.current);
+      setPartnerTyping(false);
+    };
+  }, [selectedMatch?.id, currentUser?.id]);
+
+  const lastTypingBroadcastRef = useRef(0);
+  const broadcastTyping = useCallback(() => {
+    if (!currentUser?.id) return;
+    const now = Date.now();
+    // Throttled - no point broadcasting on every keystroke, the partner's
+    // 3s silence timer already covers the gaps between throttled pings.
+    if (now - lastTypingBroadcastRef.current < 1500) return;
+    lastTypingBroadcastRef.current = now;
+    typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { userId: currentUser.id } });
+  }, [currentUser?.id]);
+
   // ⭐ VIRTUAL SCROLLING: Only render visible messages (90% performance improvement)
   const rowVirtualizer = useVirtualizer({
     count: messages.length,
@@ -2063,7 +2161,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
   {/* Scrollable Chat List (only this area scrolls) */}
   <div
-    className="flex-1 min-h-0 overflow-y-auto pb-44 sm:pb-35"
+    className="flex-1 min-h-0 overflow-y-auto pb-44 sm:pb-35 scrollbar-hide"
     style={{ 
       WebkitOverflowScrolling: 'touch',
       paddingTop: '0px'
@@ -2294,13 +2392,25 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           onTestNotification={testNotification}
           isMobile={true}
           currentUserId={currentUser?.id ?? ''}
+          isPartnerTyping={partnerTyping}
         />
       </div>
 
-      {/* Scrollable Messages Area (only this area scrolls) */}
+      {/* Scrollable Messages Area (only this area scrolls). The faint dot
+          pattern on bg-black gives the background a little depth instead of
+          reading as flat/dead black.
+          NOTE: this must stay a plain block-flow container, not a flex
+          column - react-virtual's rows are absolutely positioned assuming
+          they start flush at this container's own content-box top ("scrollTop
+          0 == first row"); a flex `justify-end` (tried once to close the gap
+          above the input bar on short conversations) shifts that content
+          down without the virtualizer knowing, desyncing which rows it thinks
+          are visible from where they actually paint - visible as the date
+          separator floating detached below the last bubble instead of above
+          the first message of its day. Not worth the tradeoff. */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-black chat-messages-container"
+        className="flex-1 overflow-y-auto px-3 sm:px-4 py-2 bg-black chat-messages-container chat-texture-bg scrollbar-hide"
         style={{
           WebkitOverflowScrolling: 'touch',
           paddingTop: '10px'
@@ -2333,6 +2443,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const message = messages[virtualRow.index];
                 const prevMessage = messages[virtualRow.index - 1];
+                const nextMessage = messages[virtualRow.index + 1];
 
                 const isConsecutive =
                   !!prevMessage &&
@@ -2340,6 +2451,22 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                   new Date(message.created_at || message.sent_at || '').getTime() -
                     new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() <
                     300000;
+
+                // Mirrors isConsecutive but looking forward - the last bubble
+                // of a run is the one whose NEXT message breaks the group
+                // (different sender, or too much time passed), or which has
+                // no next message at all.
+                const isLastInGroup =
+                  !nextMessage ||
+                  nextMessage.sender_id !== message.sender_id ||
+                  new Date(nextMessage.created_at || nextMessage.sent_at || '').getTime() -
+                    new Date(message.created_at || message.sent_at || '').getTime() >=
+                    300000;
+
+                const messageDate = new Date(message.created_at || message.sent_at || '');
+                const prevDate = prevMessage ? new Date(prevMessage.created_at || prevMessage.sent_at || '') : null;
+                const showDateSeparator = !prevDate || messageDate.toDateString() !== prevDate.toDateString();
+                const dateSeparatorLabel = showDateSeparator ? formatDateSeparator(messageDate) : null;
 
                 const repliedMessage = message.reply_to
                   ? messages.find((m) => m.id === message.reply_to) ?? null
@@ -2356,14 +2483,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       left: 0,
                       width: '100%',
                       transform: `translateY(${virtualRow.start}px)`,
-                      paddingBottom: 8,
                       boxSizing: 'border-box',
                     }}
                   >
+                    {dateSeparatorLabel && (
+                      <div className="flex items-center justify-center my-3">
+                        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-gray-400">
+                          {dateSeparatorLabel}
+                        </span>
+                      </div>
+                    )}
                     <MessageBubble
                       message={message}
                       currentUser={currentUser}
                       isConsecutive={isConsecutive}
+                      isLastInGroup={isLastInGroup}
                       onDeleteForMe={deleteMessageForMe}
                       onDeleteForEveryone={deleteMessageForEveryone}
                       onDormancyResponse={handleDormancyResponse}
@@ -2371,6 +2505,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
                       repliedMessage={repliedMessage}
                       onReplyClick={handleScrollToMessage}
                       isHighlighted={highlightedMessageId === message.id}
+                      partnerAvatarUrl={partnerAvatarUrl}
+                      partnerInitials={partnerInitials}
                     />
                   </div>
                 );
@@ -2389,6 +2525,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
           disabled={isSending}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
+          onTyping={broadcastTyping}
         />
       </div>
 

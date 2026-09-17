@@ -400,6 +400,11 @@
     "send": "Send",
     "online": "Online",
     "offline": "Offline",
+    "activeNow": "Active now",
+    "lastSeenMinutesAgo": "Last seen {{minutes}}m ago",
+    "lastSeenHoursAgo": "Last seen {{hours}}h ago",
+    "lastSeenDaysAgo": "Last seen {{days}}d ago",
+    "lastSeenLongAgo": "Offline",
     "typing": "typing...",
     "noMessages": "No messages yet",
     "startConversation": "Start the Conversation!",
@@ -519,6 +524,16 @@
         "name": "Unlock Countries",
         "free": "Your country only",
         "premium": "Up to 4 extra countries"
+      },
+      "circleUp": {
+        "name": "Circle Up",
+        "free": "Basic suggestions",
+        "premium": "See more genuine suggestions"
+      },
+      "filteredSearch": {
+        "name": "Filtered Search",
+        "free": "Not available",
+        "premium": "Easier filters to find your match"
       },
       "allFutureFeatures": {
         "name": "All Future Features",

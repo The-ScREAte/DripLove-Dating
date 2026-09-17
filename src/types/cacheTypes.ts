@@ -58,3 +58,15 @@ export type CircleCacheValue = {
   pool: unknown[];
   timestamp: number;
 };
+
+// The resolved Recommended/Similar row contents (CircleProfile[] each, kept
+// loose for the same reason as CircleCacheValue.pool above). Separate from
+// CircleCacheValue because these are a different, more expensive thing to
+// rebuild (a stored-batch fetch + exclusion reconciliation, not just a pool
+// query) - caching them means reopening Circle doesn't redo that work or
+// show a loading state every single time.
+export type CircleRowsCacheValue = {
+  recommended: unknown[];
+  similar: unknown[];
+  timestamp: number;
+};

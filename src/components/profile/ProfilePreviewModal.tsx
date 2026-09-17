@@ -9,6 +9,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowLeft as ArrowLeftIcon,
+  ChevronLeft,
   Ruler,
   Baby,
   MessageCircle,
@@ -48,6 +49,19 @@ const formatHeightLabel = (cm: number) => {
   return `${feet}'${inches}" (${cm} cm)`;
 };
 
+// Same reasoning as MatchCard.tsx's copy of this helper: a Supabase/Postgrest
+// error can be a plain object with a `message` field rather than an `Error`
+// instance, which `err instanceof Error` misses - masking the real reason
+// (RLS denial, constraint, etc.) right when it's most useful to see it.
+const getSupabaseErrorMessage = (err: unknown): string | undefined => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return undefined;
+};
+
 interface ProfilePreviewModalProps {
   profile: PotentialMatch;
   images: string[];
@@ -70,6 +84,11 @@ interface ProfilePreviewModalProps {
    * on an outer tab/nav to leave instead of an in-component control - this
    * only renders the button when a caller actually wants one (Circle does). */
   onBack?: () => void;
+  /** Circle wants the plain chevron back button (matching PremiumUpgrade's),
+   * not the circular blurred-background arrow-left button every other
+   * caller (e.g. ChatPage) still uses - default false keeps their look
+   * unchanged. */
+  simpleBackButton?: boolean;
   /** Providing BOTH onLike and onPass turns the photo area into a real
    * swipeable card (drag right to like, left to pass - same feel as
    * Discover/Liked Me's own swipe gestures), on top of the existing
@@ -131,12 +150,20 @@ const getSafeImageSrc = (url?: string): string | undefined => {
 // instead of covering the screen; leaving the tab (including tapping the
 // Profile nav icon again) drops back to the real profile page, handled by
 // ProfilePage via onClose/isActiveTab.
-const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange, readOnly = false, onBack, onLike, onPass, topLabel, nextPreviewImageUrl }) => {
+const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange, readOnly = false, onBack, simpleBackButton = false, onLike, onPass, topLabel, nextPreviewImageUrl }) => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
+  // Report image - only reachable in readOnly mode (Circle), same as the
+  // Crop button it sits opposite: nobody should be able to report their own
+  // photo, and nobody but the profile's owner should be able to crop it.
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [selectedReportReason, setSelectedReportReason] = useState('');
   // Crop is applied locally first ("OK" in the crop modal) so the user sees it
   // exactly as it will look here, and only hits storage/db on an explicit Save.
   const [pendingCrop, setPendingCrop] = useState<{ blob: Blob; previewUrl: string; originalUrl: string } | null>(null);
@@ -283,6 +310,60 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   );
 
   const currentSlideData = slides[currentSlide] || slides[0];
+
+  const reportReasons = useMemo(() => [
+    t('reportModal.reasons.inappropriate'),
+    t('reportModal.reasons.fake'),
+    t('reportModal.reasons.spam'),
+    t('reportModal.reasons.offensive'),
+    t('reportModal.reasons.harassment'),
+    t('reportModal.reasons.other'),
+  ], [t]);
+
+  const closeReportModal = useCallback(() => {
+    setShowReportModal(false);
+    setSelectedReportReason('');
+    setReportError('');
+    setReportSuccess(false);
+  }, []);
+
+  // Same reported_images insert MatchCard.tsx uses on Discover, so a report
+  // filed from Circle lands in exactly the same moderation queue.
+  const handleReportImage = useCallback(async () => {
+    if (!selectedReportReason) {
+      setReportError(t('reportModal.selectReason'));
+      return;
+    }
+    setReporting(true);
+    setReportError('');
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const imageUrl = currentSlideData?.content;
+      if (!imageUrl || !profile.id) throw new Error('Missing image or user');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase.from('reported_images').insert({
+        reporter_id: user.id,
+        reported_user_id: profile.id,
+        image_url: imageUrl,
+        status: 'pending',
+        reason: selectedReportReason,
+      });
+      if (error) throw error;
+      setReportSuccess(true);
+      setTimeout(() => {
+        setShowReportModal(false);
+        setReportSuccess(false);
+        setSelectedReportReason('');
+      }, 1500);
+    } catch (err: unknown) {
+      setReportError(getSupabaseErrorMessage(err) || t('reportModal.error'));
+    } finally {
+      setReporting(false);
+    }
+  }, [selectedReportReason, currentSlideData, profile.id, t]);
 
   const handleNavigationClick = useCallback((e: React.MouseEvent) => {
     const x = e.clientX;
@@ -637,8 +718,20 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           )}
 
           {/* Back button - only when the caller wants one (Circle does; other
-              callers rely on their own outer tab/nav to leave). */}
-        {onBack && (
+              callers rely on their own outer tab/nav to leave). Circle uses
+              the plain chevron (matching PremiumUpgrade's back button);
+              every other caller keeps the original circular blurred button. */}
+        {onBack && (simpleBackButton ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onBack(); }}
+            aria-label="Back"
+            className="absolute left-4 top-4 z-10 flex items-center justify-center text-white active:opacity-60 transition-opacity"
+            style={{ background: 'none', border: 'none', padding: 0 }}
+          >
+            <ChevronLeft className="w-8 h-8" strokeWidth={3} />
+          </button>
+        ) : (
           <button
             onClick={(e) => { e.stopPropagation(); onBack(); }}
             aria-label="Back"
@@ -647,7 +740,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           >
             <ArrowLeftIcon className="w-4 h-4" strokeWidth={2.5} />
           </button>
-        )}
+        ))}
 
         {/* Active-filter pill - only during a Circle category browse. Sits
             below the cultural-sign glow's max height (which is also
@@ -705,6 +798,110 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           >
             <Pencil className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
+        )}
+
+        {/* Report - top right, same spot Crop occupies for your own profile.
+            Only when viewing someone else's (readOnly - Circle), and only on
+            an actual photo slide, since it reports whichever photo is on
+            screen. Same pink-gradient round style as every other floating
+            action button on the card. */}
+        {readOnly && currentSlideData?.type === 'image' && currentSlideData.content && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowReportModal(true); }}
+            aria-label={t('reportModal.title')}
+            className="absolute right-4 z-10 flex items-center justify-center rounded-full text-white backdrop-blur-md transition-transform active:scale-95 shrink-0"
+            style={{
+              top: '4px',
+              width: 24,
+              height: 24,
+              minWidth: 24,
+              minHeight: 24,
+              padding: 0,
+              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
+              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+            }}
+          >
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        )}
+
+        {readOnly && showReportModal && (
+          <div
+            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={closeReportModal}
+          >
+            <div
+              className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxHeight: '85vh' }}
+            >
+              <div className="relative px-3 pt-3 pb-2 border-b border-pink-500/20 bg-black shrink-0">
+                <button
+                  onClick={closeReportModal}
+                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
+                  disabled={reporting}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="pr-8">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
+                  <h3 className="text-base font-bold text-white mt-0.5">{t('reportModal.title')}</h3>
+                  <p className="text-[11px] text-gray-300 mt-0.5">{t('reportModal.instruction')}</p>
+                </div>
+              </div>
+
+              <div className="px-3 pb-3 pt-2 overflow-y-auto flex-1 min-h-0">
+                {reportSuccess ? (
+                  <div className="text-green-400 font-semibold text-center py-8">
+                    <div className="mb-2 text-2xl">✓</div>
+                    <div>{t('reportModal.success')}</div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5 mb-3">
+                      {reportReasons.map((reason) => (
+                        <button
+                          key={reason}
+                          onClick={() => setSelectedReportReason(reason)}
+                          disabled={reporting}
+                          className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
+                            selectedReportReason === reason
+                              ? 'border-pink-500 bg-pink-500/20 text-white'
+                              : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
+                          } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                          <span className="text-xs sm:text-sm font-semibold leading-tight flex-1 pr-1">{reason}</span>
+                          {selectedReportReason === reason && (
+                            <svg className="w-4 h-4 text-current flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      onClick={handleReportImage}
+                      disabled={reporting || !selectedReportReason}
+                    >
+                      {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
+                    </button>
+
+                    {reportError && (
+                      <div className="text-red-300 text-xs mt-2 text-center bg-red-950/50 p-2 rounded-lg border border-red-500/30">
+                        {reportError}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {!readOnly && showCropModal && currentSlideData?.type === 'image' && currentSlideData.content && (

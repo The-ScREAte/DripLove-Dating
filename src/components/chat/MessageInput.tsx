@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { X } from 'lucide-react';
+import { X, Smile } from 'lucide-react';
 import { containsBadWords } from '@/utils/textModeration';
 import { useTranslation } from 'react-i18next';
 import { ChatMessage } from '@/types';
+
+// A small, curated set rather than a full emoji-picker library - enough to
+// react quickly without pulling in a picker dependency for what's meant to
+// be a lightweight one-tap add.
+const QUICK_EMOJIS = ['😂', '❤️', '😍', '👍', '🔥', '😢', '😮', '🙏'];
 
 interface MessageInputProps {
   matchId: string | null;
@@ -11,6 +16,10 @@ interface MessageInputProps {
   disabled?: boolean;
   replyingTo?: ChatMessage | null;
   onCancelReply?: () => void;
+  /** Fired on every draft keystroke (already throttled by the caller) so the
+   * partner's header can show "typing...". Purely a broadcast side effect -
+   * nothing here depends on its result. */
+  onTyping?: () => void;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
@@ -18,12 +27,32 @@ const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   disabled = false,
   replyingTo,
-  onCancelReply
+  onCancelReply,
+  onTyping
 }) => {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  // Close the emoji picker on any tap outside it - same convention as every
+  // other popover in the chat UI (message options menu, header's ⋮ menu).
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
 
   // Clear draft when switching conversations
   useEffect(() => {
@@ -116,13 +145,47 @@ const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
       
-      <div className="p-1.5">
+      <div className="p-1.5 relative">
+        {showEmojiPicker && (
+          <div
+            ref={emojiPickerRef}
+            className="absolute bottom-full left-1.5 mb-2 flex gap-1 p-2 bg-black border border-pink-500/30 rounded-2xl shadow-lg"
+          >
+            {QUICK_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  setDraft((prev) => prev + emoji);
+                  setShowEmojiPicker(false);
+                  inputRef.current?.focus();
+                }}
+                className="text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors active:scale-90"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center space-x-2">
-          <div className="flex-1 flex items-center space-x-2 bg-black rounded-full px-4 py-0.5 border-2 border-pink-600 shadow-sm">
+          <div className="flex-1 flex items-center space-x-1.5 bg-black rounded-full pl-2 pr-4 py-0.5 border-2 border-pink-600 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker((prev) => !prev)}
+              disabled={disabled}
+              className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-pink-400 hover:bg-pink-500/10 transition-colors disabled:opacity-50"
+              aria-label={t('chat.addEmoji')}
+            >
+              <Smile className="w-[18px] h-[18px]" />
+            </button>
             <Input
               ref={inputRef}
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (e.target.value.trim()) onTyping?.();
+              }}
               onKeyPress={handleKeyPress}
               placeholder={t('chat.typeMessage')}
               className="flex-1 h-7 rounded-md border-none text-base text-white file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-gray-400 outline-none ring-0 ring-offset-0 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent p-0"
@@ -133,7 +196,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
           <button
             onClick={handleSend}
             disabled={!draft.trim() || disabled}
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-pink-600 border-2 border-pink-600 text-white hover:bg-pink-700 rounded-full w-9 h-9 p-0 shrink-0"
+            className={`inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 rounded-full w-9 h-9 p-0 shrink-0 ${
+              draft.trim() && !disabled
+                ? 'bg-pink-600 border-2 border-pink-600 text-white hover:bg-pink-700 shadow-[0_2px_10px_rgba(236,72,153,0.5)]'
+                : 'bg-transparent border-2 border-gray-700 text-gray-600'
+            }`}
             aria-label={t('chat.sendMessage')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-send w-4 h-4" aria-hidden="true"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg>

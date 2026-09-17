@@ -20,7 +20,7 @@ const VerifyIdentityPrompt = ({ open, onClose, onVerifyNow }: VerifyIdentityProm
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-sm bg-black border border-pink-500/30 text-white p-6 text-center">
+      <DialogContent className="w-[calc(100%-2rem)] rounded-2xl sm:max-w-sm bg-black border border-pink-500/30 text-white p-6 text-center">
         <DialogHeader>
           <div className="w-14 h-14 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto mb-2">
             <ShieldCheck className="w-7 h-7 text-purple-400" />

@@ -107,9 +107,9 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isReporting} className="border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">{t('common.cancel')}</Button>
-          <Button onClick={handleReport} disabled={!reason || isReporting} className="bg-red-500 hover:bg-red-600 text-white">
+        <DialogFooter className="flex-row justify-end gap-2 space-x-0">
+          <Button variant="outline" onClick={onClose} disabled={isReporting} className="flex-1 border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">{t('common.cancel')}</Button>
+          <Button onClick={handleReport} disabled={!reason || isReporting} className="flex-1 bg-red-500 hover:bg-red-600 text-white">
             {isReporting ? t('report.reporting') : t('report.submitReport')}
           </Button>
         </DialogFooter>

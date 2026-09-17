@@ -1120,7 +1120,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 <Button
                   onClick={() => setShowPremiumUpgrade(true)}
                   style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
-                  className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white shadow-sm"
+                  className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black shadow-sm"
                   aria-label={t('Upgrade')}
                 >
                   <Crown className="w-4 h-4" />

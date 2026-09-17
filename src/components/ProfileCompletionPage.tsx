@@ -875,20 +875,8 @@ const ProfileCompletionPage = () => {
               user_id: user.id,
               promo_code_id: formData.promoCodeId
             });
-          if (!refError) {
-            // Best-effort - the referral row is what actually matters, so a
-            // failed notification email never blocks profile completion.
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              if (!session?.access_token) return;
-              supabase.functions.invoke('notify-promo-admin', {
-                body: {
-                  promoCodeId: formData.promoCodeId,
-                  newUserName: `${formData.firstName} ${formData.lastName}`.trim(),
-                  newUserEmail: formData.email,
-                },
-                headers: { Authorization: `Bearer ${session.access_token}` },
-              }).catch((notifyErr) => console.error('Error notifying admin of promo code use:', notifyErr));
-            });
+          if (refError) {
+            console.error('Error saving referral:', refError);
           }
         } catch (refErr) {
           console.error('Error saving referral:', refErr);

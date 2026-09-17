@@ -35,11 +35,11 @@ const DeleteChatDialog: React.FC<DeleteChatDialogProps> = ({
             {t('chat.deleteChatConfirm', { name: matchName })}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="bg-black border border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">{t('chat.cancel')}</AlertDialogCancel>
+        <AlertDialogFooter className="flex-row justify-end gap-2 space-x-0">
+          <AlertDialogCancel className="flex-1 mt-0 bg-black border border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">{t('chat.cancel')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="bg-red-500 hover:bg-red-600 text-white"
+            className="flex-1 bg-red-500 hover:bg-red-600 text-white"
           >
             {t('chat.deleteChat')}
           </AlertDialogAction>
