@@ -1021,6 +1021,27 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     void openProfile(profile);
   }, [openProfile]);
 
+  // Deep link from a re-engagement push notification
+  // (/?tab=circle&circleUserId=<id>, see resolveNotificationRoute in
+  // pushNotifications.ts) - opens that one profile directly, same as tapping
+  // their Recommended card, without waiting on or depending on whatever pool
+  // happens to be loaded. Independent of the pool/batch fetch above so it
+  // works even before that's finished (or if it's a stale/decided batch by
+  // the time the push is actually tapped).
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const params = new URLSearchParams(window.location.search);
+    const circleUserId = params.get('circleUserId');
+    if (!circleUserId) return;
+
+    window.history.replaceState({}, '', window.location.pathname);
+    void (async () => {
+      const [profile] = await fetchCircleProfilesByIds([circleUserId]);
+      if (profile) openCircleRowProfile('recommended', profile);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
   // Guards against a double-fire from the swipe gesture's own exit-animation
   // timeout landing while a second gesture is somehow already in flight.
   const [isSwipeActionPending, setIsSwipeActionPending] = useState(false);

@@ -64,14 +64,20 @@ public class MainActivity extends BridgeActivity {
 
     // Mirrors resolveNotificationRoute() in src/services/pushNotifications.ts -
     // keep the two in sync. message -> the specific conversation, match ->
-    // the chat list, like -> Liked Me, everything else -> Discover (default).
+    // the chat list, like -> Liked Me, open_circle_profile -> that one
+    // Circle profile, everything else -> Discover (default).
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
+        String action = intent.getStringExtra("action");
+        String profileId = intent.getStringExtra("profileId");
         String type = intent.getStringExtra("type");
-        if (type == null) return;
 
         String route;
-        if ("message".equals(type) && intent.getStringExtra("chatId") != null) {
+        if ("open_circle_profile".equals(action) && profileId != null) {
+            route = "/?tab=circle&circleUserId=" + profileId;
+        } else if (type == null) {
+            return;
+        } else if ("message".equals(type) && intent.getStringExtra("chatId") != null) {
             route = "/?tab=chat&matchId=" + intent.getStringExtra("chatId");
         } else if ("match".equals(type)) {
             route = "/?tab=chat";

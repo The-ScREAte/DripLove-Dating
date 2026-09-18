@@ -267,6 +267,14 @@ class SupabasePushNotificationService {
       return '/';
     }
 
+    // Re-engagement notification ("you'd like <person>") - opens that one
+    // profile directly inside Circle. See send_reengagement_notifications
+    // (Postgres function, cron-scheduled) which is the only sender of this
+    // action/profileId combination.
+    if (data?.action === 'open_circle_profile' && data?.profileId) {
+      return `/?tab=circle&circleUserId=${data.profileId}`;
+    }
+
     if (type === 'message' && data?.chatId) {
       return `/?tab=chat&matchId=${data.chatId}`;
     }

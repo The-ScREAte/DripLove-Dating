@@ -95,7 +95,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // landed on whatever tab sessionStorage/default said instead - which
       // is why every notification tap appeared to just open Discover.
       const tabFromUrl = new URLSearchParams(window.location.search).get('tab');
-      if (tabFromUrl === 'chat' || tabFromUrl === 'liked' || tabFromUrl === 'profile' || tabFromUrl === 'dripcheck') {
+      if (tabFromUrl === 'chat' || tabFromUrl === 'liked' || tabFromUrl === 'profile' || tabFromUrl === 'dripcheck' || tabFromUrl === 'circle') {
         return tabFromUrl;
       }
 
