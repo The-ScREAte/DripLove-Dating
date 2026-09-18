@@ -7,6 +7,7 @@ import { isAndroidPlatform, isIOSPlatform, getPlatformSafe } from '@/utils/platf
 import DripCoupleIcon from '@/components/DripCoupleIcon';
 import AppUpdatePopup from '@/components/AppUpdatePopup';
 import FreeTrialBottomSheet from '@/components/FreeTrialBottomSheet';
+import { App } from '@capacitor/app';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
@@ -916,6 +917,27 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     recordUserActivity();
   }, [activeTab, recordUserActivity]);
+
+  // The push icon badge (iOS aps.badge / Android setNumber, both driven by
+  // profiles.badge_count - see send-push-notification) only ever goes UP,
+  // incremented by 1 per push sent server-side. Resetting it back to 0 is
+  // this app's job, whenever the user actually opens/returns to it - both
+  // on cold start and every time the app comes back to the foreground.
+  useEffect(() => {
+    if (!userId) return;
+
+    const resetBadge = () => {
+      supabase.rpc('reset_badge_count').then(({ error }) => {
+        if (error) console.error('Failed to reset badge count:', error);
+      });
+    };
+
+    resetBadge();
+    const listenerPromise = App.addListener('resume', resetBadge);
+    return () => {
+      listenerPromise.then((listener) => listener.remove()).catch(() => {});
+    };
+  }, [userId]);
 
     // Silent push notification initialization - no user notifications
   useEffect(() => {

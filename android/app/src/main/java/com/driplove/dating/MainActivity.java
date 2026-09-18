@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
@@ -47,6 +48,18 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleNotificationIntent(intent);
+    }
+
+    // Clear the notification shade whenever the user opens/returns to the
+    // app. Most launchers badge the icon from the count of notifications
+    // still sitting in the shade, not from any number we set on them - the
+    // one real way to make the badge go back to 0 is to remove them from
+    // there, same as iOS zeroing applicationIconBadgeNumber in
+    // SceneDelegate.swift on scene activation.
+    @Override
+    public void onResume() {
+        super.onResume();
+        NotificationManagerCompat.from(this).cancelAll();
     }
 
     // Mirrors resolveNotificationRoute() in src/services/pushNotifications.ts -

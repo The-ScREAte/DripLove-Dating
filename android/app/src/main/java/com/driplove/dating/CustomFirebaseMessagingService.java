@@ -129,9 +129,22 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             notificationBuilder.setCategory(NotificationCompat.CATEGORY_MESSAGE);
         }
-        
+
+        // setNumber() is the FCM/Android equivalent of iOS's aps.badge - some
+        // launchers (Samsung, etc) badge the icon from this directly. The
+        // edge function sends the real count (send-push-notification's
+        // profiles.badge_count), same number iOS gets.
+        String badgeCountStr = data != null ? data.get("badge_count") : null;
+        if (badgeCountStr != null) {
+            try {
+                notificationBuilder.setNumber(Integer.parseInt(badgeCountStr));
+            } catch (NumberFormatException ignored) {
+                // Missing/malformed badge_count just means no setNumber() call - never worth dropping the notification over.
+            }
+        }
+
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        
+
         // Create notification channel for Android 8.0+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = notificationManager.getNotificationChannel(channelId);
@@ -140,9 +153,16 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
                 createNotificationChannel(notificationManager, channelId);
             }
         }
-        
-        // Show notification
-        notificationManager.notify((int) System.currentTimeMillis(), notificationBuilder.build());
+
+        // Stock/Pixel-style launchers badge the icon from the COUNT OF
+        // NOTIFICATIONS CURRENTLY IN THE SHADE, not setNumber() above - a
+        // unique ID per push (this used to be System.currentTimeMillis())
+        // meant every push stayed in the shade forever, stacking the badge
+        // indefinitely. A stable ID per channel means a new notification of
+        // the same type (another message, another like, ...) replaces the
+        // previous one instead of piling up, same grouping iOS already gets
+        // via apns-collapse-id in the edge function.
+        notificationManager.notify(channelId.hashCode(), notificationBuilder.build());
     }
 
     // Downloads the given image URL and crops it to a circle, matching how

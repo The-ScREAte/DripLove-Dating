@@ -203,17 +203,18 @@ serve(async (req) => {
     let realTimeStored = false
 
     // iOS's aps.badge sets the app icon's badge count outright (it's not
-    // additive) - hardcoding it to 1 on every push, like this used to,
-    // meant the badge got reset to 1 by every single notification instead
-    // of accumulating, so it only ever showed "1" no matter how many were
-    // actually unread. +1 accounts for the notification this call is about
-    // to insert, which isn't in the count yet at this point.
-    const { count: unreadCount } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false)
-    const badgeCount = (unreadCount ?? 0) + 1
+    // additive), so this needs to be the actual right number on every send.
+    // This used to be a count of notifications where is_read = false - but
+    // nothing in the app ever sets that column true (no notification-center
+    // UI exists to mark anything read from), so it was really just each
+    // user's lifetime notification total, not an unread count - a user with
+    // 187 notifications ever could get badge 187 off a single new push.
+    // profiles.badge_count is a plain counter instead: +1 per push sent,
+    // reset to 0 client-side whenever the app comes to the foreground.
+    const { data: newBadgeCount, error: badgeError } = await supabase
+      .rpc('increment_badge_count', { p_user_id: userId })
+    if (badgeError) console.error('❌ Error incrementing badge count:', badgeError)
+    const badgeCount = newBadgeCount ?? 1
 
     // Send push notifications if tokens exist
     if (tokens && tokens.length > 0) {
@@ -265,6 +266,10 @@ serve(async (req) => {
                   visibility: 'PUBLIC',
                   color: '#9333EA',
                   icon: 'ic_launcher',
+                  // FCM's equivalent of apns.badge - some launchers (Samsung,
+                  // etc) show this as the icon badge count. Same badgeCount
+                  // value as iOS, so both platforms agree on the number.
+                  notification_count: badgeCount,
                 },
               },
               apns: {
