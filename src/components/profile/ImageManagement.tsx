@@ -995,10 +995,16 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                 // dvh (not vh) so mobile browser chrome collapsing/expanding
                 // can't make this taller than what's actually visible - vh is
                 // computed against the largest possible viewport, dvh against
-                // the current one. object-contain + both max- bounds means a
-                // very tall or very wide photo always scales down to fit
-                // fully on screen, never crops or overflows either axis.
-                className="max-w-[92vw] max-h-[70dvh] w-auto h-auto object-contain rounded-xl block"
+                // the current one. Plain max-w/max-h (no forced w-full/h-full)
+                // is what makes a replaced element like <img> scale down
+                // proportionally to fit BOTH bounds on its own - a tall
+                // portrait photo hits the height cap and shrinks in width to
+                // match, a wide one hits the width cap and shrinks in height,
+                // so nothing ever overflows or gets cut off either axis.
+                // object-contain is redundant with that (kept as a no-op
+                // safety net) since w-auto/h-auto means there's no fixed box
+                // for it to actually have to fit content into.
+                className="max-w-[92vw] max-h-[65dvh] w-auto h-auto object-contain rounded-xl block border-2 border-pink-500/60"
               />
 
               {/* Optional per-photo description - mirrors the crop/replace/delete
