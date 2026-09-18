@@ -1283,15 +1283,37 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           />
         );
       }
-      if (!inCooldown) return null; // still loading, or genuinely nobody matched - not a used swipe
+      if (loading) return null; // still loading - not a real empty state yet
+      if (inCooldown) {
+        return (
+          <div className="mb-7">
+            <h2 className="text-white font-semibold text-base px-6 mb-0.5">{title}</h2>
+            <p className="text-pink-300 text-xs font-medium px-6 mb-2">You used your lucky swipe!</p>
+            <div className="px-6">
+              <RefillCard
+                label="Refilling"
+                sublabel={eligibleForTrial ? 'Free trial for instant access' : 'Upgrade for instant access'}
+                onClick={() => setLockedTileLabel(title)}
+              />
+            </div>
+          </div>
+        );
+      }
+      // Genuinely nobody matched this row's criteria at all (not a used-up
+      // swipe waiting on cooldown) - this used to just render nothing, a
+      // dead end with no path forward. Premium wouldn't change the honest
+      // physical fact that no one nearby matches (distance/preferences are
+      // the viewer's own settings, not gated by tier), so this doesn't claim
+      // "upgrade to see more people" - only genuinely premium-gated benefits
+      // (faster refill, priority visibility) that actually hold true here.
       return (
         <div className="mb-7">
           <h2 className="text-white font-semibold text-base px-6 mb-0.5">{title}</h2>
-          <p className="text-pink-300 text-xs font-medium px-6 mb-2">You used your lucky swipe!</p>
+          <p className="text-white/40 text-xs px-6 mb-2">Nobody new to show right now.</p>
           <div className="px-6">
             <RefillCard
-              label="Refilling"
-              sublabel={eligibleForTrial ? 'Free trial for instant access' : 'Upgrade for instant access'}
+              label="Go Premium"
+              sublabel="Faster refills & priority visibility"
               onClick={() => setLockedTileLabel(title)}
             />
           </div>
