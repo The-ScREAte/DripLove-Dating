@@ -37,8 +37,13 @@ const ImageViewer = ({ isOpen, onClose, images, initialIndex = 0 }: ImageViewerP
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogTitle className="sr-only">Image Viewer</DialogTitle>
       <DialogDescription className="sr-only">View and navigate through user photos</DialogDescription>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 bg-black/95">
-        <div className="relative w-full h-full">
+      {/* dvh (not vh) throughout so mobile browser chrome collapsing/
+          expanding can't make this taller than what's actually visible - vh
+          is computed against the largest possible viewport, dvh against the
+          current one. overflow-hidden is a hard backstop: whatever the photo's
+          own aspect ratio, it can never push content past the screen edge. */}
+      <DialogContent className="max-w-4xl max-h-[90dvh] p-0 bg-black/95 overflow-hidden">
+        <div className="relative w-full h-full overflow-hidden">
           {/* Close button */}
           <Button
             onClick={onClose}
@@ -56,15 +61,15 @@ const ImageViewer = ({ isOpen, onClose, images, initialIndex = 0 }: ImageViewerP
             </div>
           )}
 
-          <Carousel setApi={setApi} className="w-full h-[80vh]">
+          <Carousel setApi={setApi} className="w-full h-[80dvh]">
             <CarouselContent>
               {images.map((image, index) => (
                 <CarouselItem key={index}>
-                  <div className="flex items-center justify-center h-[80vh] p-4">
+                  <div className="flex items-center justify-center h-[80dvh] p-4">
                     <img loading="lazy" decoding="async"
                       src={image}
                       alt={`Image ${index + 1}`}
-                      className="max-w-full max-h-full object-contain rounded-lg"
+                      className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg"
                     />
                   </div>
                 </CarouselItem>

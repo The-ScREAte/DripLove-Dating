@@ -976,7 +976,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
         const previewUrl = activeImageUrl;
         return (
           <div
-            className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4"
+            className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center p-4 overflow-hidden"
             onClick={() => { setActiveImageUrl(null); setLabelPopupUrl(null); }}
           >
             <button
@@ -992,7 +992,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
               <CachedImage
                 src={getDetailImageUrl(previewUrl)}
                 alt="Photo preview"
-                className="max-w-[92vw] max-h-[70vh] object-contain rounded-xl block"
+                // dvh (not vh) so mobile browser chrome collapsing/expanding
+                // can't make this taller than what's actually visible - vh is
+                // computed against the largest possible viewport, dvh against
+                // the current one. object-contain + both max- bounds means a
+                // very tall or very wide photo always scales down to fit
+                // fully on screen, never crops or overflows either axis.
+                className="max-w-[92vw] max-h-[70dvh] w-auto h-auto object-contain rounded-xl block"
               />
 
               {/* Optional per-photo description - mirrors the crop/replace/delete
