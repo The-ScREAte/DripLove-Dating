@@ -1402,37 +1402,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
 
     markReadInFlightRef.current = true;
 
-    const isUser1 = selectedMatch.user1_id === currentUser.id;
-    const unreadField = isUser1 ? 'user1_unread_count' : 'user2_unread_count';
-
     try {
-      // Step 1: Mark all incoming chat messages as read
-      const { error: chatError } = await supabase
-        .from('chats')
-        .update({ is_read: true })
-        .eq('match_id', selectedMatch.id)
-        .neq('sender_id', currentUser.id)
-        .or('is_read.is.null,is_read.eq.false');
+      // Both writes (chats.is_read + matches.*_unread_count) happen in one
+      // DB transaction via this RPC - they used to be two separate awaited
+      // calls here, which could land only the second one if the app got
+      // backgrounded/killed mid-flight (this function is scheduled from
+      // visibilitychange/beforeunload/unmount, exactly when that's likely).
+      // That permanently zeroed the unread counter while the messages
+      // stayed is_read=false underneath, silently killing the nav badge for
+      // that conversation. See migration
+      // atomic_mark_match_read_and_repair_unread_counts.
+      const { error } = await supabase.rpc('mark_match_messages_read', {
+        p_match_id: selectedMatch.id,
+      });
 
-      if (chatError) {
-        console.error('[ChatPage] Failed to mark chats as read:', chatError);
+      if (error) {
+        console.error('[ChatPage] Failed to mark match messages as read:', error);
       } else {
         // Update local state to show double checkmarks immediately
         setMessages(prev => prev.map(msg =>
           msg.sender_id !== currentUser.id ? { ...msg, is_read: true } : msg
         ));
-      }
 
-      // Step 2: Reset the unread count in the matches table
-      const { error: matchError, data: updateData } = await supabase
-        .from('matches')
-        .update({ [unreadField]: 0 })
-        .eq('id', selectedMatch.id)
-        .select();
-
-      if (matchError) {
-        console.error('[ChatPage] Failed to reset match unread counter:', matchError);
-      } else {
         // Update local matches state to reflect zero unread count
         setMatches(prev => prev.map(m =>
           m.id === selectedMatch.id ? { ...m, unread_messages: 0 } : m
