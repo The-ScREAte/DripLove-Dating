@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
 import type { AppUser, LikedMeCacheValue, LikerProfile } from '@/types/cacheTypes';
 import type { PotentialMatch } from '@/types';
@@ -293,11 +293,12 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       // Blob URLs always safe
       if (urlOrBlob.startsWith("blob:")) return urlOrBlob;
 
-      // Optimize remote URLs for faster loading (sized for retina screens so
-      // cards don't look soft on 2x/3x devices).
+      // Supabase's Image Transformations feature is now switched off at the
+      // project level (see getDetailImageUrl), so every remote URL - grid
+      // thumbnail or full view - resolves to the same raw, already-compressed
+      // file.
       if (urlOrBlob.includes('supabase')) {
-        const width = isGridThumbnail ? 700 : 1080;
-        return optimizeImageUrl(urlOrBlob, { width, quality: 82 });
+        return getDetailImageUrl(urlOrBlob);
       }
 
       return urlOrBlob;
@@ -880,7 +881,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const renderPhotoCaptionCard = useCallback((photo: { url: string; caption: string; label?: string | null }) => (
     <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
       <img
-        src={optimizeImageUrl(photo.url, { width: 400, quality: 70 })}
+        src={getDetailImageUrl(photo.url)}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
       />

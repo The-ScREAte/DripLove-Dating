@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { optimizeImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
 import { computeSpentSoFar } from '@/utils/adSpend';
 import CropModal from '@/components/shared/CropModal';
 import StripeSettings from './StripeSettings';
@@ -110,7 +110,7 @@ const AdListItem: React.FC<{
           <img
             loading="lazy"
             decoding="async"
-            src={optimizeImageUrl(ad.image_url, { width: 100, quality: 60 })}
+            src={getDetailImageUrl(ad.image_url)}
             alt={ad.name}
             className="w-10 h-10 shrink-0 object-cover rounded"
           />

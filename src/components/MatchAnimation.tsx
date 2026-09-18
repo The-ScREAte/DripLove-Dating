@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Heart, MessageCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
 interface MatchAnimationProps {
   currentUserName: string;
@@ -40,10 +40,7 @@ const MatchAnimation = ({
     if (!url) return url;
     try {
       // If the image is served from Supabase, request a reasonably small optimized size
-      if (url.includes('supabase')) {
-        return optimizeImageUrl(url, { width: 400, quality: 80 });
-      }
-      return url;
+      return getDetailImageUrl(url);
     } catch (e) {
       return url;
     }
@@ -133,7 +130,7 @@ const MatchAnimation = ({
           {imgSrc && (
             <div className="mb-4 flex justify-center">
               <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-500/40 shadow-sm" style={{ willChange: 'transform, opacity' }}>
-                <img src={optimizeImageUrl(imgSrc, { width: 200, quality: 60 })} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                <img src={getDetailImageUrl(imgSrc)} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
               </div>
             </div>
           )}

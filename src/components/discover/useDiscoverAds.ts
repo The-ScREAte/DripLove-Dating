@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { calculateAge } from '@/utils/dateUtils';
 import { createDeterministicShuffle } from '@/utils/discoverCache';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { isAndroidPlatform } from '@/utils/platformUtils';
 import { CurrentUser, PotentialMatch } from '@/types';
 import { normalizeCountryCodeList } from './discoverFeedUtils';
@@ -164,17 +164,16 @@ export const useDiscoverAds = ({
   // inserted into the swipe deck (which the cadence logic below can delay
   // for many real swipes). Without this, an ad's photo only started
   // fetching the moment its card was mounted, which is what showed up as
-  // "the ad's image visibly loads in" right when it appeared. Same width/
-  // quality AdCard itself requests (optimizeImageUrl(..., { width: 500,
-  // quality: 60 })), so the URL - and thus the browser's cache entry -
-  // matches exactly; a handful of ads means this is a handful of cheap
-  // image fetches, not a real background-loading burden.
+  // "the ad's image visibly loads in" right when it appeared. Same raw URL
+  // AdCard itself requests (getDetailImageUrl), so the URL - and thus the
+  // browser's cache entry - matches exactly; a handful of ads means this is
+  // a handful of cheap image fetches, not a real background-loading burden.
   useEffect(() => {
     if (ads.length === 0) return;
     const uniqueImageUrls = Array.from(new Set(
       ads
         .filter((ad) => ad.media_type !== 'video' && ad.image_url)
-        .map((ad) => optimizeImageUrl(ad.image_url, { width: 500, quality: 60 }))
+        .map((ad) => getDetailImageUrl(ad.image_url))
     ));
     const preloadImages = uniqueImageUrls.map((url) => {
       const img = new Image();

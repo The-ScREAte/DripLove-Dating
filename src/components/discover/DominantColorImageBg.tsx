@@ -1,6 +1,6 @@
 import React from 'react';
 import { isAndroidPlatform } from '@/utils/platformUtils';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
 interface DominantColorImageBgProps {
   imageUrl?: string;
@@ -21,10 +21,14 @@ const DominantColorImageBg: React.FC<DominantColorImageBgProps> = ({ imageUrl, c
         style={{ background: edgeColor, zIndex: 0 }}
         aria-hidden="true"
       />
-      {/* Low-res thumbnail as background (cheap to decode). We intentionally request a tiny optimized image and lightly blur it. */}
+      {/* Blurred backdrop, reusing the same raw URL the main photo already
+          loads with (Supabase Image Transformations is off - see
+          getDetailImageUrl) - the browser serves this second <img> from its
+          own cache instead of a new network request, and the blur filter
+          below hides the extra resolution either way. */}
       {imageUrl && (
         <img
-          src={optimizeImageUrl(imageUrl, { width: 40, quality: 20 })}
+          src={getDetailImageUrl(imageUrl)}
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
           style={{

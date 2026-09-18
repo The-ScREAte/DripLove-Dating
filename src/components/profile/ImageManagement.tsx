@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/utils/imageCompression';
 import FaceVerification from '@/components/FaceVerification';
 import { fileToBase64 } from '@/utils/faceVerificationUtils';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
 import CachedImage from '@/components/common/CachedImage';
@@ -118,7 +118,7 @@ const SortablePhotoThumb = ({
           loading="lazy"
           decoding="async"
           draggable={false}
-          src={pending ? pending.previewUrl : optimizeImageUrl(userImage.image_url, { width: 500, height: 750, quality: 60 })}
+          src={pending ? pending.previewUrl : getDetailImageUrl(userImage.image_url)}
           alt={`User Image ${index + 1}`}
           className="w-full h-full object-cover rounded-xl shadow-sm pointer-events-none select-none"
           onLoadError={() => onImageError(userImage.image_url)}
@@ -990,7 +990,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
 
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <CachedImage
-                src={optimizeImageUrl(previewUrl, { width: 1200, quality: 80 })}
+                src={getDetailImageUrl(previewUrl)}
                 alt="Photo preview"
                 className="max-w-[92vw] max-h-[70vh] object-contain rounded-xl block"
               />

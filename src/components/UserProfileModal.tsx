@@ -12,7 +12,7 @@ import ImageViewer from './ImageViewer';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/hooks/use-toast';
 import { getCountriesList } from '@/constants/locationData';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CachedImage from '@/components/common/CachedImage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import {
@@ -324,7 +324,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
               {userImages.length > 0 ? (
                 <div className="relative w-24 h-24 mx-auto mb-4">
                   <CachedImage loading="lazy" decoding="async"
-                    src={optimizeImageUrl(userImages[0], { width: 500, quality: 60 })}
+                    src={getDetailImageUrl(userImages[0])}
                     alt={`${profile?.first_name} ${profile?.last_name}`}
                     className="w-24 h-24 rounded-full object-cover cursor-pointer hover:opacity-90 transition-opacity border-4 border-pink-500/40"
                     onClick={() => handleImageClick(0)}
@@ -695,7 +695,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           <CachedImage
                             loading="lazy"
                             decoding="async"
-                            src={optimizeImageUrl(image, { width: 300, quality: 60 })}
+                            src={getDetailImageUrl(image)}
                             alt={`Photo ${index + 1}`}
                             className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                             onClick={() => handleImageClick(index)}

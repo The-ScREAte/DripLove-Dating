@@ -12,7 +12,7 @@ import { compressImage } from '@/utils/imageCompression';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CropModal from '@/components/shared/CropModal';
 // Lazy, not a static import: AdCard lives in the 'discover-tools' chunk while
 // this file is in 'profile-tools' - a static import here creates a circular
@@ -842,7 +842,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                       {formData.image_url && (
                         <img
                           loading="lazy" decoding="async"
-                          src={optimizeImageUrl(formData.image_url, { width: 100, quality: 60 })}
+                          src={getDetailImageUrl(formData.image_url)}
                           alt="Preview"
                           className="w-14 h-14 object-cover rounded"
                         />
@@ -1135,7 +1135,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                         ) : (
                           <img
                             loading="lazy" decoding="async"
-                            src={optimizeImageUrl(ad.image_url, { width: 100, quality: 60 })}
+                            src={getDetailImageUrl(ad.image_url)}
                             alt={ad.name}
                             className="w-12 h-12 shrink-0 object-cover rounded"
                           />

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { optimizeImageUrl as buildOptimizedImageUrl, getRawStorageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl, optimizeImageUrl as buildTransformUrl } from '@/utils/imageOptimizer';
 
 interface ImagePreloaderOptions {
   maxConcurrent?: number;
@@ -25,8 +25,10 @@ interface QueueItem {
 export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const {
     maxConcurrent = 3,
-    quality = 85,
-    width = 800,
+    // quality/width are accepted for backward compatibility with existing
+    // callers but are no longer used to build a Supabase transform URL below
+    // (see getDetailImageUrl) - photos are already resized to <=1024px at
+    // upload time, so this hook's job is to serve them directly.
   } = options;
 
   const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
@@ -46,8 +48,8 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   }, []);
 
   const optimizeImageUrl = useCallback((url: string): string => {
-    return buildOptimizedImageUrl(url, { width, quality });
-  }, [width, quality]);
+    return getDetailImageUrl(url);
+  }, []);
 
   const preloadImage = useCallback((url: string): Promise<void> => {
     const existing = preloadedImagesRef.current.get(url);
@@ -82,10 +84,15 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       };
 
       img.onerror = () => {
-        // Fallback: always try the raw storage object URL when possible.
-        const rawFallbackUrl = getRawStorageUrl(optimizedUrl);
-        const fallbackUrl = rawFallbackUrl && rawFallbackUrl !== optimizedUrl
-          ? rawFallbackUrl
+        // We just tried the raw file (already <=1024px for any photo
+        // uploaded through the app - see getDetailImageUrl). If that failed,
+        // it's most likely a stray oversized legacy photo or a decode issue
+        // on a huge bitmap, so retry once through Supabase's on-the-fly
+        // transform, which re-encodes/downsizes server-side and can succeed
+        // where the raw file didn't.
+        const transformedUrl = buildTransformUrl(url, { width: 1024, quality: 80 });
+        const fallbackUrl = transformedUrl && transformedUrl !== optimizedUrl
+          ? transformedUrl
           : url;
 
         if (fallbackUrl && fallbackUrl !== optimizedUrl) {

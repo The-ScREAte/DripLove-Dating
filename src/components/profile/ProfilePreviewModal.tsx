@@ -22,7 +22,7 @@ import { Pencil } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from '../discover/MatchCardHelpers';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import {
@@ -133,7 +133,7 @@ const formatRelationshipIntent = (intent?: string | null) => {
 const getSafeImageSrc = (url?: string): string | undefined => {
   if (!url) return undefined;
   if (url.startsWith('blob:')) return url;
-  if (url.includes('supabase')) return optimizeImageUrl(url, { width: 1080, quality: 82 });
+  if (url.includes('supabase')) return getDetailImageUrl(url);
   return url;
 };
 
@@ -265,7 +265,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   const renderPhotoCaptionCard = (photo: { url: string; caption: string; label?: string | null }) => (
     <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
       <img
-        src={optimizeImageUrl(photo.url, { width: 400, quality: 70 })}
+        src={getDetailImageUrl(photo.url)}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
       />
@@ -567,7 +567,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           aria-hidden="true"
         >
           <img
-            src={optimizeImageUrl(nextPreviewImageUrl, { width: 300, quality: 40 })}
+            src={getDetailImageUrl(nextPreviewImageUrl)}
             alt=""
             className="absolute inset-0 w-full h-full object-cover object-center"
             style={{

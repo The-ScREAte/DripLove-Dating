@@ -5,6 +5,7 @@ import { SlideContent } from './MatchCardHelpers';
 import { useTranslation } from 'react-i18next';
 import styles from './MatchCard.module.css';
 import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
+import { optimizeImageUrl } from '@/utils/imageOptimizer';
 
 interface SlideRendererProps {
   slide: SlideContent;
@@ -48,6 +49,15 @@ const ImageSlide = React.memo<{
   // fallback (IndexedDB, survives app restarts) so the photo can still show
   // with no internet, as long as it loaded successfully at least once before.
   const [fallbackSrc, setFallbackSrc] = React.useState<string | null>(null);
+  // We normally serve the raw, untransformed photo (it's already resized to
+  // <=1024px at upload, so a Supabase transform buys nothing - see
+  // getDetailImageUrl). If THAT fails to load - a stray oversized legacy
+  // photo, a corrupt/odd-format file, a mobile WebView choking on decoding a
+  // huge bitmap - retry once through Supabase's on-the-fly image transform,
+  // which re-encodes/downsizes server-side and can succeed where the raw
+  // file didn't. Only then fall back to the offline persistent cache.
+  const [transformSrc, setTransformSrc] = React.useState<string | null>(null);
+  const [triedTransform, setTriedTransform] = React.useState(false);
   const [triedCache, setTriedCache] = React.useState(false);
   const fallbackObjectUrlRef = React.useRef<string | null>(null);
 
@@ -61,6 +71,8 @@ const ImageSlide = React.memo<{
     setPrevImageSrc(imageSrc);
     setHasError(false);
     setFallbackSrc(null);
+    setTransformSrc(null);
+    setTriedTransform(false);
     setTriedCache(false);
   }
 
@@ -76,19 +88,34 @@ const ImageSlide = React.memo<{
   }, [imageSrc]);
 
   const handleError = React.useCallback(async () => {
-    if (usingBlob || triedCache) {
+    if (usingBlob) {
       setHasError(true);
       return;
     }
-    setTriedCache(true);
-    const cached = await getCachedObjectUrl(originalUrl);
-    if (cached) {
-      fallbackObjectUrlRef.current = cached;
-      setFallbackSrc(cached);
-    } else {
-      setHasError(true);
+
+    if (!triedTransform) {
+      setTriedTransform(true);
+      const transformed = optimizeImageUrl(originalUrl, { width: 1024, quality: 80 });
+      if (transformed && transformed !== originalUrl && transformed !== imageSrc) {
+        setTransformSrc(transformed);
+        return;
+      }
+      // Not a Supabase URL, or already the transformed variant - nothing to
+      // retry, fall straight through to the cache tier below.
     }
-  }, [originalUrl, triedCache, usingBlob]);
+
+    if (!triedCache) {
+      setTriedCache(true);
+      const cached = await getCachedObjectUrl(originalUrl);
+      if (cached) {
+        fallbackObjectUrlRef.current = cached;
+        setFallbackSrc(cached);
+        return;
+      }
+    }
+
+    setHasError(true);
+  }, [imageSrc, originalUrl, triedCache, triedTransform, usingBlob]);
 
   const handleLoad = React.useCallback(() => {
     // Warm the persistent cache off the real (never blob:) originalUrl even
@@ -138,7 +165,7 @@ const ImageSlide = React.memo<{
         key={imageSrc}
         loading="eager"
         decoding="async"
-        src={fallbackSrc ?? imageSrc}
+        src={fallbackSrc ?? transformSrc ?? imageSrc}
         alt={`${matchFirstName} ${matchLastName}`}
         className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
         draggable={false}

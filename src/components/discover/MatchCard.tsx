@@ -11,7 +11,7 @@ import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
 import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import MusicLinkBadge from './MusicLinkBadge';
@@ -109,7 +109,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   isDragging = false,
   isSwipeAreaOnly = false,
   isDetailsAreaOnly = false,
-  getOptimizedUrl = (url: string) => optimizeImageUrl(url, { width: 1080, quality: 82 }),
+  getOptimizedUrl = (url: string) => getDetailImageUrl(url),
   preCalculatedDistance
   , imageStatus
   , isActiveTab = true
@@ -219,7 +219,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
   const renderPhotoCaptionCard = (photo: { url: string; caption: string; label?: string | null }) => (
     <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
       <img
-        src={optimizeImageUrl(photo.url, { width: 400, quality: 70 })}
+        src={getDetailImageUrl(photo.url)}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
       />

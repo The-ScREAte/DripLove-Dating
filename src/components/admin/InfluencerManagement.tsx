@@ -30,7 +30,8 @@ import {
   AlertCircle,
   Wallet,
   Hourglass,
-  Crown
+  Crown,
+  Send
 } from 'lucide-react';
 
 // Promoter setup links always point at the real production domain,
@@ -93,6 +94,8 @@ const InfluencerManagement = () => {
   const [selectedPromoCode, setSelectedPromoCode] = useState<PromoCode | null>(null);
   const [detailStats, setDetailStats] = useState<any>(null);
   const [passwordSetupLink, setPasswordSetupLink] = useState<string | null>(null);
+  const [passwordSetupLinkPromoId, setPasswordSetupLinkPromoId] = useState<string | null>(null);
+  const [sendingSetupLinkEmail, setSendingSetupLinkEmail] = useState(false);
   const [payoutStats, setPayoutStats] = useState<{[key: string]: {totalPaid: number, outstanding: number, pendingRequests: number}}>({});
 
   // Sync local toggle state with fetched value
@@ -276,17 +279,9 @@ const InfluencerManagement = () => {
       const appUrl = PRODUCTION_APP_URL;
       const setupLink = `${appUrl}/influencer/set-password?id=${newPromoCode.id}&token=${encodeURIComponent(token)}`;
       setPasswordSetupLink(setupLink);
+      setPasswordSetupLinkPromoId(newPromoCode.id);
 
-      // Best-effort - the admin can also always pull up (and re-send) this
-      // link later via the "Setup Link" button while the promoter is still
-      // pending_password, so a failure here isn't fatal to the creation flow.
-      supabase.functions.invoke('notify-promoter-created', {
-        body: { promoCodeId: newPromoCode.id },
-      }).then(({ error: emailError }) => {
-        if (emailError) console.error('Failed to email promoter setup link:', emailError);
-      });
-
-      toast({ title: 'Success', description: 'Promoter created! Setup link emailed to them (and shown below to share yourself).' });
+      toast({ title: 'Success', description: 'Promoter created! Email or copy their setup link below.' });
       setFormData({ code: '', ownerName: '', email: '', password: '', percentageCut: '20', commissionDuration: '1', commissionEnabled: true, showLeadsEnabled: true, showSubscribersEnabled: true, showDemographicsEnabled: true });
       fetchPromoCodes();
     } catch (error) {
@@ -313,16 +308,9 @@ const InfluencerManagement = () => {
 
       const appUrl = PRODUCTION_APP_URL;
       setPasswordSetupLink(`${appUrl}/influencer/set-password?id=${promoCode.id}&token=${encodeURIComponent(result.token)}`);
+      setPasswordSetupLinkPromoId(promoCode.id);
 
-      // Best-effort resend - the new token above was already regenerated
-      // regardless of whether the email succeeds.
-      supabase.functions.invoke('notify-promoter-created', {
-        body: { promoCodeId: promoCode.id },
-      }).then(({ error: emailError }) => {
-        if (emailError) console.error('Failed to email promoter setup link:', emailError);
-      });
-
-      toast({ title: 'Setup link ready', description: 'A fresh link was generated and emailed to the promoter.' });
+      toast({ title: 'Setup link ready', description: 'Email or copy it below.' });
       fetchPromoCodes();
     } catch (error) {
       console.error('Error fetching setup link:', error);
@@ -339,8 +327,26 @@ const InfluencerManagement = () => {
     }
   };
 
+  const sendSetupLinkEmail = async () => {
+    if (!passwordSetupLinkPromoId) return;
+    setSendingSetupLinkEmail(true);
+    try {
+      const { error } = await supabase.functions.invoke('notify-promoter-created', {
+        body: { promoCodeId: passwordSetupLinkPromoId },
+      });
+      if (error) throw error;
+      toast({ title: 'Email sent', description: 'The setup link was emailed to the promoter.' });
+    } catch (error) {
+      console.error('Failed to email promoter setup link:', error);
+      toast({ title: 'Error', description: 'Failed to send the email. You can still copy the link instead.', variant: 'destructive' });
+    } finally {
+      setSendingSetupLinkEmail(false);
+    }
+  };
+
   const closeSetupLinkDialog = () => {
     setPasswordSetupLink(null);
+    setPasswordSetupLinkPromoId(null);
     setShowCreateModal(false);
   };
 
@@ -826,10 +832,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Activate Promo Percentage</p>
-                <p className="text-xs text-gray-500">
-                  On: this promoter earns commission and sees earnings/payout in their portal.
-                  Off: their code is still tracked for leads &amp; subscribers only.
-                </p>
+                <p className="text-xs text-gray-500">Off = leads/subscribers still tracked, no commission.</p>
               </div>
               <Switch
                 checked={formData.commissionEnabled}
@@ -874,10 +877,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Show Leads to Promoter</p>
-                <p className="text-xs text-gray-500">
-                  On: they can see their signup count and the list of people who used their code.
-                  Off: hidden from their portal (you still see it here as admin).
-                </p>
+                <p className="text-xs text-gray-500">Off = hidden from their portal, still visible to you.</p>
               </div>
               <Switch
                 checked={formData.showLeadsEnabled}
@@ -889,10 +889,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Show Subscribers to Promoter</p>
-                <p className="text-xs text-gray-500">
-                  On: they can see how many of their referrals went premium.
-                  Off: hidden from their portal (you still see it here as admin).
-                </p>
+                <p className="text-xs text-gray-500">Off = hidden from their portal, still visible to you.</p>
               </div>
               <Switch
                 checked={formData.showSubscribersEnabled}
@@ -904,10 +901,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Show Lead Demographics</p>
-                <p className="text-xs text-gray-500">
-                  On: they can see a gender/age breakdown of their leads.
-                  Off: hidden from their portal (you still see it here as admin).
-                </p>
+                <p className="text-xs text-gray-500">Off = hidden from their portal, still visible to you.</p>
               </div>
               <Switch
                 checked={formData.showDemographicsEnabled}
@@ -954,15 +948,27 @@ const InfluencerManagement = () => {
                 onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                 placeholder="Enter new password"
               />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 w-full"
+                disabled={!selectedPromoCode || fetchingSetupLinkFor === selectedPromoCode?.id}
+                onClick={() => selectedPromoCode && handleGetSetupLink(selectedPromoCode)}
+              >
+                {fetchingSetupLinkFor === selectedPromoCode?.id ? (
+                  <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                ) : (
+                  <Link className="w-3.5 h-3.5 mr-2" />
+                )}
+                Or send a reset link instead
+              </Button>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Activate Promo Percentage</p>
-                <p className="text-xs text-gray-500">
-                  On: this promoter earns commission and sees earnings/payout in their portal.
-                  Off: their code is still tracked for leads &amp; subscribers only.
-                </p>
+                <p className="text-xs text-gray-500">Off = leads/subscribers still tracked, no commission.</p>
               </div>
               <Switch
                 checked={formData.commissionEnabled}
@@ -1007,10 +1013,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Show Leads to Promoter</p>
-                <p className="text-xs text-gray-500">
-                  On: they can see their signup count and the list of people who used their code.
-                  Off: hidden from their portal (you still see it here as admin).
-                </p>
+                <p className="text-xs text-gray-500">Off = hidden from their portal, still visible to you.</p>
               </div>
               <Switch
                 checked={formData.showLeadsEnabled}
@@ -1022,10 +1025,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Show Subscribers to Promoter</p>
-                <p className="text-xs text-gray-500">
-                  On: they can see how many of their referrals went premium.
-                  Off: hidden from their portal (you still see it here as admin).
-                </p>
+                <p className="text-xs text-gray-500">Off = hidden from their portal, still visible to you.</p>
               </div>
               <Switch
                 checked={formData.showSubscribersEnabled}
@@ -1037,10 +1037,7 @@ const InfluencerManagement = () => {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div className="pr-4">
                 <p className="text-sm font-medium">Show Lead Demographics</p>
-                <p className="text-xs text-gray-500">
-                  On: they can see a gender/age breakdown of their leads.
-                  Off: hidden from their portal (you still see it here as admin).
-                </p>
+                <p className="text-xs text-gray-500">Off = hidden from their portal, still visible to you.</p>
               </div>
               <Switch
                 checked={formData.showDemographicsEnabled}
@@ -1232,20 +1229,31 @@ const InfluencerManagement = () => {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Share this link with the influencer. They will use it to set their password and access their portal.
+              Send this to the influencer so they can set their password.
             </p>
             <div className="p-3 bg-gray-100 rounded-lg">
-              <p className="text-xs text-gray-500 mb-1">Setup Link</p>
               <p className="text-sm font-mono break-all select-all">{passwordSetupLink}</p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={copySetupLink} className="flex-1 bg-pink-500 hover:bg-pink-600">
+              <Button
+                onClick={sendSetupLinkEmail}
+                disabled={sendingSetupLinkEmail}
+                className="flex-1 bg-pink-500 hover:bg-pink-600"
+              >
+                {sendingSetupLinkEmail ? (
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                ) : (
+                  <Send className="w-4 h-4 mr-2" />
+                )}
+                Email It
+              </Button>
+              <Button onClick={copySetupLink} variant="outline" className="flex-1">
                 <Copy className="w-4 h-4 mr-2" /> Copy Link
               </Button>
-              <Button variant="outline" onClick={closeSetupLinkDialog}>
-                Done
-              </Button>
             </div>
+            <Button variant="ghost" size="sm" className="w-full" onClick={closeSetupLinkDialog}>
+              Done
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

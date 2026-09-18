@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 // import { PushNotifications } from '@capacitor/push-notifications'; // Uncomment if you use PushNotifications
 import { Button } from '@/components/ui/button';
 import { Crown, MessageCircle, ChevronDown, ChevronRight, Trash2, Gamepad2 } from 'lucide-react';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CachedImage from '@/components/common/CachedImage';
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
@@ -1065,7 +1065,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   <CachedImage
                     loading="lazy"
                     decoding="async"
-                    src={optimizeImageUrl(previewImages[0], { width: 88, height: 88, quality: 70 })}
+                    src={getDetailImageUrl(previewImages[0])}
                     alt={profile?.first_name || 'Profile photo'}
                     style={{
                       position: 'absolute',

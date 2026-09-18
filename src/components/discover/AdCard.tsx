@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ExternalLink, Volume2, VolumeX, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { supabase } from '@/integrations/supabase/client';
 
 const ADVERTISE_EMAIL = 'driploveinfo@gmail.com';
@@ -128,7 +128,7 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAna
             // useDiscoverAds.ts, well before this card is ever mounted.
             loading="eager"
             decoding="async"
-            src={optimizeImageUrl(ad.image_url, { width: 500, quality: 60 })}
+            src={getDetailImageUrl(ad.image_url)}
             alt={ad.name}
             className="w-full h-full object-cover"
             // Without this, the browser's native HTML5 image-drag-and-drop

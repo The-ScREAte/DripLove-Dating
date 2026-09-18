@@ -80,33 +80,33 @@ export function getRawStorageUrl(url: string | null | undefined): string {
 }
 
 /**
- * Generate a thumbnail URL for profile images
+ * The URL to use everywhere a photo is displayed in the app.
+ *
+ * Supabase's "Storage Image Transformations" (the /render/image/ endpoint
+ * optimizeImageUrl() above builds URLs for) is a billed, quota-limited
+ * feature - the app blew through its monthly quota because many screens
+ * each requested their own resized variant of the same photo. Every photo
+ * is already resized to <=1024px / <=1MB at upload time (see compressImage
+ * in src/utils/imageCompression.ts), so a further server-side transform
+ * was rarely buying any real size reduction - it was mostly just spending
+ * quota for free. To make the quota problem impossible to repeat, the
+ * project's Image Transformations feature has been switched off entirely
+ * (Storage > Settings in the Supabase dashboard), so every image request
+ * in the app now goes through this - the raw, untransformed object URL.
+ *
+ * If Image Transformations is ever re-enabled for a specific real need
+ * (e.g. serving true thumbnails to cut bandwidth on a very high-traffic
+ * list), build that URL with optimizeImageUrl() directly at that one call
+ * site rather than reintroducing a shared "small size" helper that quietly
+ * spreads back out across the app the way this one did.
  */
-export function getThumbnailUrl(url: string | null | undefined): string {
-  return optimizeImageUrl(url, {
-    width: 200,
-    height: 200,
-    quality: 70,
-  });
+export function getDetailImageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  const raw = getRawStorageUrl(url);
+  return raw || url;
 }
 
-/**
- * Generate a medium-sized image URL for cards/previews
- */
-export function getMediumImageUrl(url: string | null | undefined): string {
-  return optimizeImageUrl(url, {
-    width: 400,
-    height: 500,
-    quality: 80,
-  });
-}
-
-/**
- * Generate a full-size optimized image URL
- */
-export function getFullImageUrl(url: string | null | undefined): string {
-  return optimizeImageUrl(url, {
-    width: 800,
-    quality: 85,
-  });
+/** @deprecated use getDetailImageUrl - kept only so old imports don't break. */
+export function getCardImageUrl(url: string | null | undefined): string {
+  return getDetailImageUrl(url);
 }
