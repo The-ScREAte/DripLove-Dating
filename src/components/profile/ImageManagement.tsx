@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -971,8 +972,16 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
         )}
 
       {/* Full-size photo preview - tap a thumbnail to open it big, with the
-          crop/replace/delete actions available right below it. */}
-      {activeImageUrl && (() => {
+          crop/replace/delete actions available right below it. Portaled
+          straight to document.body: rendered inline (like every other piece
+          of this page), a "fixed" position here would actually be relative
+          to the nearest ancestor with a CSS transform (e.g. an animated tab
+          switch wrapper) instead of the real screen - which is exactly the
+          kind of thing that makes a "fixed, full-screen" overlay come out
+          inconsistently sized/positioned depending on where in the app it's
+          opened from. Escaping to body guarantees it's always truly
+          viewport-fixed and on top of everything else, on every platform. */}
+      {activeImageUrl && createPortal((() => {
         const previewUrl = activeImageUrl;
         return (
           <div
@@ -1165,7 +1174,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
             </div>
           </div>
         );
-      })()}
+      })(), document.body)}
 
       {croppingImageUrl && currentUser?.id && (
         <PhotoCropModal
