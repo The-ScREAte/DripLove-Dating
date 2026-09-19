@@ -1179,6 +1179,10 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           premium_param: !!isPremium,
         });
         if (error) throw error;
+        if (!isPremium) {
+          setCircleLikesUsed((prev) => prev + 1);
+          void incrementCircleLikesUsed(currentUser.id).then((total) => setCircleLikesUsed(total));
+        }
         const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
         if (madeMatch) {
           toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
