@@ -1124,6 +1124,13 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   // close back to the grid, or advance to the next card in the deck.
   const performSwipeAction = useCallback(async (profile: CircleProfile, direction: 'like' | 'pass') => {
     if (isSwipeActionPending || !currentUser?.id) return;
+    // Free users: only right swipes (likes) count against Circle's own
+    // 20-a-day allowance. Once it's used up the profile stays put and the
+    // out-of-swipes banner takes over instead.
+    if (direction === 'like' && !isPremium && circleLikesLoaded && circleLikesUsed >= FREE_CIRCLE_DAILY_LIKES) {
+      setShowCircleOutOfLikes(true);
+      return;
+    }
     setIsSwipeActionPending(true);
     setPool((prev) => prev.filter((p) => p.id !== profile.id));
 
