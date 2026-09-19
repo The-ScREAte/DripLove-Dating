@@ -6,4 +6,4 @@
 - [x] Verify typecheck, runtime, and key mobile interactions
 - [x] Unify like and match outcomes across Discover, Liked Me, and Circle
 - [x] Refine Circle category and daily-like overlays
-- [ ] Verify web, iOS, and Android-safe behavior
+- [x] Verify web, iOS, and Android-safe behavior
