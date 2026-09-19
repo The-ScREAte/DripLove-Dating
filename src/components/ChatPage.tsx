@@ -634,16 +634,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         setMessages([]);
       }
 
-  // Dismiss ONLY this conversation's notifications, and only once the user
-  // actually opens it. Everything else stays in the phone's notification
-  // centre until it's tapped or cleared.
-  useEffect(() => {
-    if (!selectedMatch?.id) return;
-    (async () => {
-      const { clearThreadNotifications } = await import('@/services/pushNotifications');
-      await clearThreadNotifications(`chat-${selectedMatch.id}`);
-    })();
-  }, [selectedMatch?.id]);
+      // Dismiss ONLY this conversation's notifications, now that the user has
+      // actually opened it. Everything else stays in the phone's notification
+      // centre until it's tapped or cleared.
+      void (async () => {
+        const { clearThreadNotifications } = await import('@/services/pushNotifications');
+        await clearThreadNotifications(`chat-${selectedMatch.id}`);
+      })();
+
+
 
 
       // ALWAYS fetch new messages in background (even if cache exists)
