@@ -1184,6 +1184,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       if (currentUser?.id) {
         likedMeCache.delete(currentUser.id);
         sessionStorage.removeItem(getStorageKey(currentUser.id));
+        publishSwipeDecision(currentUser.id, profileId, 'pass');
       }
       
       // Set lockout period for free users
