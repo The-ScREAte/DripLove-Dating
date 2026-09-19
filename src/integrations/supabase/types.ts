@@ -1050,6 +1050,7 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string
+          data: Json
           id: string
           is_read: boolean
           message: string
@@ -1060,6 +1061,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          data?: Json
           id?: string
           is_read?: boolean
           message: string
@@ -1070,6 +1072,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          data?: Json
           id?: string
           is_read?: boolean
           message?: string
@@ -2467,6 +2470,14 @@ export type Database = {
           dissolved_count: number
           notified_count: number
         }[]
+      }
+      circle_like_and_usage_batched: {
+        Args: {
+          liked_id_param: string
+          liker_id_param: string
+          premium_param?: boolean
+        }
+        Returns: Json
       }
       claim_broadcast_recipients: {
         Args: {
