@@ -684,8 +684,29 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       if (detail?.userId !== currentUser.id || !detail.profileId) return;
       const profileId = detail.profileId;
       setPool((prev) => prev.filter((profile) => profile.id !== profileId));
-      setRecommendedBatch((prev) => prev?.filter((profile) => profile.id !== profileId) ?? prev);
-      setSimilarBatch((prev) => prev?.filter((profile) => profile.id !== profileId) ?? prev);
+      // Recommended/Similar are a PERSISTED snapshot, so a decision made
+      // elsewhere (Discover, Liked Me) has to shrink the stored row too -
+      // otherwise the person reappears in that row on the next mount. When
+      // the row empties this way it goes on cooldown exactly as it would
+      // have if the last card had been swiped from inside Circle.
+      const shrinkRow = (key: CircleRowKey, setBatch: typeof setRecommendedBatch) => {
+        setBatch((prev) => {
+          if (!prev || !prev.some((profile) => profile.id === profileId)) return prev;
+          const next = prev.filter((profile) => profile.id !== profileId);
+          void saveCircleBatch(currentUser.id, key, next.map((p) => p.id));
+          if (next.length === 0) {
+            const now = Date.now();
+            setRowCooldowns((cd) => ({ ...cd, [key]: now }));
+            void supabase.from('circle_row_cooldowns').upsert(
+              { user_id: currentUser.id, row_key: key, exhausted_at: new Date(now).toISOString() },
+              { onConflict: 'user_id,row_key' }
+            );
+          }
+          return next;
+        });
+      };
+      shrinkRow('recommended', setRecommendedBatch);
+      shrinkRow('similar', setSimilarBatch);
       setCategoryBrowse((prev) => prev ? { ...prev, profiles: prev.profiles.filter((profile) => profile.id !== profileId) } : prev);
       if (selectedProfile?.id === profileId) {
         setSelectedProfile(null);
