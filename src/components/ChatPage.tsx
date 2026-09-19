@@ -32,6 +32,11 @@ interface ChatPageProps {
   currentUser: CurrentUser;
   onUnreadChange?: () => void;
   onDetailViewChange?: (inDetail: boolean) => void;
+  // Set when a message notification is tapped while the app is already
+  // running: opens that exact conversation even if Chat is already mounted
+  // and another conversation is open.
+  deepLinkMatchId?: string | null;
+  onDeepLinkConsumed?: () => void;
 }
 
 // Dormant conversations constants
