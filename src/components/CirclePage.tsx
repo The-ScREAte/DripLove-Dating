@@ -87,6 +87,7 @@ const CATEGORY_COUNTS_CACHE_TTL_MS = 2 * 60 * 1000;
 let categoryCountsCache: { key: string; categories: CategoryTile[]; timestamp: number } | null = null;
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { useToast } from '@/hooks/use-toast';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   Plane,
   Clapperboard,
