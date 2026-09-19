@@ -1306,18 +1306,6 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     try {
       publishSwipeDecision(currentUser.id, profile.id, direction);
       if (direction === 'like') {
-        // Same notifications a Discover swipe sends, so the person on the
-        // other end hears about a Circle like/match identically.
-        try {
-          const { count } = await supabase
-            .from('likes')
-            .select('id', { count: 'exact', head: true })
-            .eq('liked_id', profile.id);
-          await sendMultipleLikesNotification(profile.id, typeof count === 'number' ? count : 1, currentUser.id);
-        } catch {
-          // notification failures never block the swipe
-        }
-
         if (madeMatch) {
           toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
           try {
@@ -1332,6 +1320,19 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
             const win = window as Window & { chatMatchesCache?: Map<string, unknown> };
             win.chatMatchesCache?.delete(currentUser.id);
             window.dispatchEvent(new CustomEvent('newMatch', { detail: { userId: currentUser.id } }));
+          }
+        } else {
+          // A one-way Circle like belongs on Liked Me. Once it is mutual,
+          // send only the match notification so the recipient is not shown
+          // contradictory like and match alerts for the same action.
+          try {
+            const { count } = await supabase
+              .from('likes')
+              .select('id', { count: 'exact', head: true })
+              .eq('liked_id', profile.id);
+            await sendMultipleLikesNotification(profile.id, typeof count === 'number' ? count : 1, currentUser.id);
+          } catch {
+            // Notification failures never block a persisted swipe.
           }
         }
       }
