@@ -1459,6 +1459,42 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   const activeProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex] : selectedProfile;
   const nextBrowseProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex + 1] : undefined;
 
+  // Free users who've used all 20 of today's Circle likes. Same shape as
+  // Discover's own out-of-swipes card, with the CTA wording following
+  // whether this viewer currently qualifies for a free trial.
+  if (showCircleOutOfLikes) {
+    return (
+      <div className="h-full w-full flex items-center justify-center overflow-y-auto p-4">
+        <Card className="max-w-md w-full bg-black border border-pink-500/25 text-white shadow-2xl">
+          <CardContent className="p-6 text-center flex flex-col items-center">
+            <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
+            <h2 className="text-lg font-semibold mb-1.5 text-white">Out of swipes for today</h2>
+            <p className="text-gray-400 text-sm mb-5 max-w-xs">
+              You&apos;ve used all {FREE_CIRCLE_DAILY_LIKES} of your Circle likes for today. They refill tomorrow -
+              or go Premium for unlimited likes right now.
+            </p>
+            <div className="w-full flex flex-col items-center gap-3">
+              <Button
+                onClick={() => { setShowCircleOutOfLikes(false); setShowCirclePremiumUpgrade(true); }}
+                className="w-auto h-9 !rounded-full px-4 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+              >
+                <Crown className="w-3.5 h-3.5 mr-1.5" />
+                {eligibleForTrial ? 'Try now for free' : 'Upgrade to Premium'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowCircleOutOfLikes(false)}
+                className="w-auto h-8 !rounded-full px-3.5 text-xs border-pink-500/30 text-white hover:bg-pink-500/10 bg-transparent"
+              >
+                Back to Circle
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Same empty-state pattern DiscoverPage uses when its own deck runs dry:
   // a real banner (not a toast that's easy to miss), an honest "adjust your
   // preferences" path that costs nothing, and - only if there's actually a
