@@ -1766,14 +1766,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (!premiumForFeed && baseCountryCode) {
           archivedCandidates = archivedCandidates.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
-          if (userLat && userLon) {
-            archivedCandidates = archivedCandidates.filter((p) => {
-              if (!p.latitude || !p.longitude) return true;
-              const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
-              distanceMap[p.id] = dist;
-              return dist <= safeUserMaxDistance;
-            });
-          }
+        }
+
+        // Distance now applies to EVERY tier, but only inside the home
+        // country - unlocked countries are a premium perk and stay
+        // distance-free.
+        if (baseCountryCode && userLat && userLon) {
+          archivedCandidates = archivedCandidates.filter((p) => {
+            const cc = normalizeCountryCode(p.country_code || p.country || '');
+            if (cc && cc !== baseCountryCode) return true;
+            if (!p.latitude || !p.longitude) return true;
+            const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
+            distanceMap[p.id] = dist;
+            return dist <= safeUserMaxDistance;
+          });
         }
 
         if (premiumForFeed && allowedCountryCodes.length > 1) {
