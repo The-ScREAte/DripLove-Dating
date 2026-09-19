@@ -804,6 +804,29 @@ body.keyboard-open .chat-messages-container {
     -webkit-overflow-scrolling: touch !important;
   }
 
+  /* Admin dialogs are rendered outside the Admin page itself. When the mobile
+     keyboard opens, constrain those portaled and hand-built dialogs to the
+     visible area too, so their active input can always scroll above it. */
+  body.keyboard-open:has(.admin-page-container) [role="dialog"] {
+    top: calc((100vh - var(--keyboard-height, 0px)) / 2) !important;
+    max-height: calc(100vh - var(--keyboard-height, 0px) - 24px) !important;
+    overflow-y: auto !important;
+    scroll-padding-bottom: 24px;
+  }
+
+  body.keyboard-open:has(.admin-page-container) .admin-keyboard-modal-overlay {
+    align-items: flex-start !important;
+    overflow-y: auto !important;
+    padding-top: 12px;
+    padding-bottom: calc(var(--keyboard-height, 0px) + 12px);
+  }
+
+  body.keyboard-open:has(.admin-page-container) .admin-keyboard-modal {
+    max-height: calc(100vh - var(--keyboard-height, 0px) - 24px) !important;
+    overflow-y: auto !important;
+    scroll-padding-bottom: 24px;
+  }
+
   /* Admin is the one screen meant to stay a plain white/pink light theme
      (never the app's global dark look) - every shadcn component underneath
      (Card, Input, Select, Dialog, Popover, Button...) reads its colors from

@@ -358,8 +358,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         <div className="text-center text-sm text-gray-500 mb-2">Loading payment config...</div>
       )}
       {showPaymentConfig && !loadingConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto border-2 border-yellow-300">
+        <div className="admin-keyboard-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="admin-keyboard-modal bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto border-2 border-yellow-300">
             <button
               onClick={() => setShowPaymentConfig(false)}
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold transition-colors"
@@ -2130,8 +2130,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
 
         {/* Email Report Modal */}
         {isEmailModalOpen && emailReport && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg relative border">
+          <div className="admin-keyboard-modal-overlay fixed inset-0 z-60 flex items-center justify-center bg-black/40">
+            <div className="admin-keyboard-modal bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg relative border">
               <button onClick={closeEmailModal} className="absolute top-3 right-3 text-gray-400 hover:text-gray-700">✕</button>
               <h2 className="text-lg font-semibold mb-2">Email User about Report #{emailReport.id}</h2>
               <p className="text-sm text-gray-600 mb-4">Choose who to email about this report. The emails below are shown for convenience.</p>
