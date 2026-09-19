@@ -288,6 +288,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       setProfile(data as unknown as ProfileRow);
 
+      // Distances are displayed in km or miles depending on the viewer's own
+      // country - one unit app-wide, never both at once.
+      setDistanceUnitCountry((data as any)?.country_code, (data as any)?.country);
+
       // Fetch user images for profile completion calculation
       try {
         const { data: images, error: imagesError } = await supabase
