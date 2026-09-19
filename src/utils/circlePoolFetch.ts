@@ -144,57 +144,75 @@ export const fetchCirclePool = async (
   // same way Discover itself falls back when location is unavailable.
   const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
 
-  let countryCodes: string[];
+  // Home country is distance-bound; unlocked (premium) countries are not -
+  // exactly how Discover mixes them (see DiscoverPage's locationProfileIds
+  // for the home country vs. fetchUnlockedCountryProfiles for the rest).
+  let homeCountryCodes: string[];
+  let unlockedCountryCodes: string[] = [];
   if (baseCountryCode) {
-    countryCodes = isPremium
-      ? Array.from(new Set([baseCountryCode, ...normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode)]))
-      : [baseCountryCode];
+    homeCountryCodes = [baseCountryCode];
+    unlockedCountryCodes = isPremium
+      ? normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode).filter((c) => c && c !== baseCountryCode)
+      : [];
   } else {
     const { data: countryRows } = await supabase
       .from('profiles')
       .select('country_code')
       .eq('account_status', 'active')
       .not('country_code', 'is', null);
-    countryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
-    if (countryCodes.length === 0) return [];
+    homeCountryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
+    if (homeCountryCodes.length === 0) return [];
   }
+  unlockedCountryCodes = Array.from(new Set(unlockedCountryCodes));
+  const homeSet = new Set(homeCountryCodes);
 
   const POOL_LIMIT = 80;
   type ProfileRow = Omit<CircleProfile, 'firstImage'>;
 
-  // Same active-then-archived top-up Discover uses for its own feed (see
-  // fetchUnlockedCountryProfiles) - without this, Circle silently starved
-  // any time the active-only pool was thin (a real case: one test account's
-  // country had 112 total eligible people but 109 of them were archived,
-  // leaving only 3 active - Discover's feed mixes archived candidates in to
-  // compensate, Circle's didn't, so it looked broken/empty by comparison).
-  const { data: activeData, error: activeError } = await supabase.rpc('get_random_discover_profiles', {
-    p_country_codes: countryCodes,
-    p_allowed_genders: allowedGenders,
-    p_archived: false,
-    p_excluded_ids: Array.from(excluded),
-    p_limit: POOL_LIMIT,
-    p_lat: hasCoords ? userLat : null,
-    p_lon: hasCoords ? userLon : null,
-    p_radius_degrees: radiusDegrees,
-  });
-  const activeRows: ProfileRow[] = (!activeError && Array.isArray(activeData)) ? (activeData as unknown as ProfileRow[]) : [];
-
-  let rows: ProfileRow[] = activeRows;
-  if (activeRows.length < POOL_LIMIT) {
-    const archivedExcludedIds = Array.from(new Set([...excluded, ...activeRows.map((p) => p.id)]));
-    const { data: archivedData, error: archivedError } = await supabase.rpc('get_random_discover_profiles', {
-      p_country_codes: countryCodes,
+  const fetchRows = async (
+    codes: string[],
+    archived: boolean,
+    excludedIds: string[],
+    limit: number,
+    applyRadius: boolean
+  ): Promise<ProfileRow[]> => {
+    if (codes.length === 0 || limit <= 0) return [];
+    const { data, error } = await supabase.rpc('get_random_discover_profiles', {
+      p_country_codes: codes,
       p_allowed_genders: allowedGenders,
-      p_archived: true,
-      p_excluded_ids: archivedExcludedIds,
-      p_limit: POOL_LIMIT - activeRows.length,
-      p_lat: hasCoords ? userLat : null,
-      p_lon: hasCoords ? userLon : null,
-      p_radius_degrees: radiusDegrees,
+      p_archived: archived,
+      p_excluded_ids: excludedIds,
+      p_limit: limit,
+      p_lat: applyRadius && hasCoords ? userLat : null,
+      p_lon: applyRadius && hasCoords ? userLon : null,
+      p_radius_degrees: applyRadius ? radiusDegrees : null,
     });
-    const archivedRows: ProfileRow[] = (!archivedError && Array.isArray(archivedData)) ? (archivedData as unknown as ProfileRow[]) : [];
-    rows = [...activeRows, ...archivedRows];
+    return (!error && Array.isArray(data)) ? (data as unknown as ProfileRow[]) : [];
+  };
+
+  // Same active-then-archived top-up Discover uses for its own feed - without
+  // this, Circle silently starved any time the active-only pool was thin.
+  const excludedIds = Array.from(excluded);
+  const homeLimit = unlockedCountryCodes.length > 0 ? Math.ceil(POOL_LIMIT / 2) : POOL_LIMIT;
+  const unlockedLimit = unlockedCountryCodes.length > 0 ? POOL_LIMIT - homeLimit : 0;
+
+  const [homeActive, unlockedActive] = await Promise.all([
+    fetchRows(homeCountryCodes, false, excludedIds, homeLimit, true),
+    fetchRows(unlockedCountryCodes, false, excludedIds, unlockedLimit, false),
+  ]);
+
+  let rows: ProfileRow[] = [...homeActive, ...unlockedActive];
+  if (rows.length < POOL_LIMIT) {
+    const archivedExcludedIds = Array.from(new Set([...excludedIds, ...rows.map((p) => p.id)]));
+    const missing = POOL_LIMIT - rows.length;
+    const [homeArchived, unlockedArchived] = await Promise.all([
+      fetchRows(homeCountryCodes, true, archivedExcludedIds, missing, true),
+      fetchRows(unlockedCountryCodes, true, archivedExcludedIds, unlockedCountryCodes.length > 0 ? Math.ceil(missing / 2) : 0, false),
+    ]);
+    const seen = new Set(rows.map((p) => p.id));
+    [...homeArchived, ...unlockedArchived].forEach((p) => {
+      if (!seen.has(p.id) && rows.length < POOL_LIMIT) { seen.add(p.id); rows.push(p); }
+    });
   }
 
   const eligible = rows
@@ -206,11 +224,11 @@ export const fetchCirclePool = async (
     })
     // The RPC's radius is a rough lat/lon bounding box (cheap to index, not
     // a true circle) - this narrows it to the real distance, same
-    // "client-side enforcement" step Discover does. A candidate missing
-    // coordinates simply isn't excluded by it (they already passed the
-    // country filter, which is the fallback signal for them).
+    // "client-side enforcement" step Discover does. Only applies to the
+    // viewer's own country: unlocked countries are deliberately unbounded.
     .filter((p) => {
       if (!hasCoords || !p.latitude || !p.longitude) return true;
+      if (!homeSet.has(normalizeCountryCode(p.country_code || ''))) return true;
       return calculateDistance(userLat as number, userLon as number, p.latitude, p.longitude) <= maxDistanceKm;
     });
 
