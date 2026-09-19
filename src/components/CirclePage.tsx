@@ -763,22 +763,21 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     }
 
     const load = async () => {
-      const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
       const allowedGenders = getGenderFilter(currentUser.preference || 'everyone');
-      let countryCodes: string[];
-      if (baseCountryCode) {
-        countryCodes = isPremium
-          ? Array.from(new Set([baseCountryCode, ...normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode)]))
-          : [baseCountryCode];
-      } else {
+      // Home country counts respect the viewer's distance; unlocked premium
+      // countries are not distance-bound (same rule Discover uses).
+      const split = getCircleCountrySplit(currentUser, isPremium);
+      let homeCountryCodes = split.homeCountryCodes;
+      const unlockedCountryCodes = split.unlockedCountryCodes;
+      if (homeCountryCodes.length === 0) {
         const { data: countryRows } = await supabase
           .from('profiles')
           .select('country_code')
           .eq('account_status', 'active')
           .not('country_code', 'is', null);
-        countryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
+        homeCountryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
       }
-      if (countryCodes.length === 0) {
+      if (homeCountryCodes.length === 0 && unlockedCountryCodes.length === 0) {
         if (!cancelled) setCategories(CATEGORY_DEFS.map((d) => ({ key: d.key, label: d.label, icon: d.icon, count: d.isGameLink ? null : 0, filter: d.filter, isGameLink: d.isGameLink })));
         return;
       }
@@ -793,21 +792,26 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         Promise.resolve(getCircleDistanceParams(currentUser, isPremium)),
       ]);
 
-      const countFor = async (filter?: CategoryFilter): Promise<number> => {
+      const countForCountries = async (
+        codes: string[],
+        applyRadius: boolean,
+        filter?: CategoryFilter
+      ): Promise<number> => {
+        if (codes.length === 0) return 0;
+        const useBox = applyRadius && hasCoords && radiusDegrees !== null;
         // "Verified" isn't a plain column filter a REST query can express -
         // it's the same >=85%-profile-completion formula used everywhere
-        // else in the app for the "Verified" checkmark (the real is_verified
-        // column has no adoption yet - see the RPC's own comment), computed
+        // else in the app for the "Verified" checkmark, computed
         // server-side by a dedicated RPC.
         if (filter?.isVerified) {
           const { data, error } = await supabase.rpc('count_circle_verified_profiles', {
-            p_country_codes: countryCodes,
+            p_country_codes: codes,
             p_allowed_genders: allowedGenders,
             p_viewer_gender: currentUser.gender || '',
             p_excluded_ids: Array.from(excluded),
-            p_lat: hasCoords ? userLat : null,
-            p_lon: hasCoords ? userLon : null,
-            p_radius_degrees: radiusDegrees,
+            p_lat: useBox ? userLat : null,
+            p_lon: useBox ? userLon : null,
+            p_radius_degrees: useBox ? radiusDegrees : null,
           });
           if (error) return 0;
           return typeof data === 'number' ? data : 0;
@@ -818,17 +822,17 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
-          .in('country_code', countryCodes)
+          .in('country_code', codes)
           .in('gender', allowedGenders);
         if (excluded.size > 0) {
           q = q.not('id', 'in', `(${Array.from(excluded).join(',')})`);
         }
-        if (hasCoords && radiusDegrees !== null) {
+        if (useBox) {
           q = q
-            .gte('latitude', (userLat as number) - radiusDegrees)
-            .lte('latitude', (userLat as number) + radiusDegrees)
-            .gte('longitude', (userLon as number) - radiusDegrees)
-            .lte('longitude', (userLon as number) + radiusDegrees);
+            .gte('latitude', (userLat as number) - (radiusDegrees as number))
+            .lte('latitude', (userLat as number) + (radiusDegrees as number))
+            .gte('longitude', (userLon as number) - (radiusDegrees as number))
+            .lte('longitude', (userLon as number) + (radiusDegrees as number));
         }
         // Reciprocal: this profile has to actually be open to the viewer's
         // own gender too, not just be a gender the viewer is into.
@@ -843,6 +847,14 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         if (filter?.hasPets) q = q.not('pets', 'is', null).neq('pets', []);
         const { count } = await q;
         return count ?? 0;
+      };
+
+      const countFor = async (filter?: CategoryFilter): Promise<number> => {
+        const [home, unlocked] = await Promise.all([
+          countForCountries(homeCountryCodes, true, filter),
+          countForCountries(unlockedCountryCodes, false, filter),
+        ]);
+        return home + unlocked;
       };
 
       const results = await Promise.all(CATEGORY_DEFS.map((d) => (d.isGameLink ? Promise.resolve(null) : countFor(d.filter))));
