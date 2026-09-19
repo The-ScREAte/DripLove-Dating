@@ -23,6 +23,58 @@ interface RealtimeNotification {
   related_user_id?: string | null;
 }
 
+// Where every notification tap/click goes - ONE table, used by the OS
+// notification tap, the in-app toast click and (when the app is already
+// running) MainApp's in-app navigation, so the three can never disagree.
+//   message -> that exact conversation in Chat
+//   match   -> the Chat list
+//   like    -> Liked Me
+//   image_rejected -> Profile
+//   action open_circle_profile -> that person's profile inside Circle
+//   anything else -> Discover, never Chat by default
+export const resolveNotificationRoute = (
+  type: string | undefined,
+  data: Record<string, unknown> | undefined
+): string => {
+  if (data?.action === 'open_discover') return '/';
+  if (data?.action === 'open_circle_profile' && data?.profileId) {
+    return `/?tab=circle&circleUserId=${data.profileId}`;
+  }
+  if (type === 'message' && data?.chatId) return `/?tab=chat&matchId=${data.chatId}`;
+  if (type === 'match') return '/?tab=chat';
+  if (type === 'like') return '/?tab=liked';
+  if (type === 'image_rejected') return '/?tab=profile';
+  return '/';
+};
+
+// When the app is already running, MainApp registers a handler here so a tap
+// switches tabs in place instead of hard-reloading the whole SPA (the reload
+// was slow and raced with MainApp's own duplicate tap listener, which is why
+// "Recommended for you" taps kept landing on Chat). Falls back to a real
+// navigation when nothing is mounted to handle it.
+export type NotificationNavHandler = (
+  type: string | undefined,
+  data: Record<string, unknown> | undefined
+) => void;
+
+let inAppNavHandler: NotificationNavHandler | null = null;
+
+export const setNotificationNavHandler = (handler: NotificationNavHandler | null): void => {
+  inAppNavHandler = handler;
+};
+
+export const navigateFromNotification = (
+  type: string | undefined,
+  data: Record<string, unknown> | undefined
+): void => {
+  if (inAppNavHandler) {
+    inAppNavHandler(type, data);
+    return;
+  }
+  window.location.href = resolveNotificationRoute(type, data);
+};
+
+
 class SupabasePushNotificationService {
   private isInitialized = false;
   private deviceToken: string | null = null;
