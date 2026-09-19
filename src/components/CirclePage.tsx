@@ -1566,7 +1566,22 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   return (
     <div className="h-full w-full bg-black overflow-y-auto scrollbar-hide">
       <div className="sticky top-0 z-10 bg-black pt-2 pb-2">
-        <h2 className="text-white font-semibold text-base px-6 mb-1">Circle Up</h2>
+        <div className="flex items-start justify-between px-6 gap-3 mb-1">
+          <h2 className="text-white font-semibold text-base">Circle Up</h2>
+          {!isPremium && circleLikesLoaded && (
+            <span
+              className={`flex items-center gap-1 flex-shrink-0 text-[11px] font-medium rounded-full border px-2.5 py-1 ${
+                circleLikesLeft === 0
+                  ? 'text-white/70 border-white/15 bg-white/[0.04]'
+                  : 'text-pink-300 border-pink-500/30 bg-pink-500/10'
+              }`}
+              aria-label={`${circleLikesLeft} of ${FREE_CIRCLE_DAILY_LIKES} Circle likes left today`}
+            >
+              <Heart className="w-3 h-3" />
+              {circleLikesLeft}/{FREE_CIRCLE_DAILY_LIKES}
+            </span>
+          )}
+        </div>
         <p className="text-white/40 text-xs px-6">Made easy to spot and find who's right for you.</p>
       </div>
       <div>
