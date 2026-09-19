@@ -154,15 +154,23 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
             }
         }
 
-        // Stock/Pixel-style launchers badge the icon from the COUNT OF
-        // NOTIFICATIONS CURRENTLY IN THE SHADE, not setNumber() above - a
-        // unique ID per push (this used to be System.currentTimeMillis())
-        // meant every push stayed in the shade forever, stacking the badge
-        // indefinitely. A stable ID per channel means a new notification of
-        // the same type (another message, another like, ...) replaces the
-        // previous one instead of piling up, same grouping iOS already gets
-        // via apns-collapse-id in the edge function.
-        notificationManager.notify(channelId.hashCode(), notificationBuilder.build());
+        // Each push gets its OWN entry in the shade and stays there until the
+        // user taps it or clears it. This used to notify() with a stable
+        // per-channel id, so every new message/like/match silently replaced
+        // the previous one and the phone only ever showed one DripLove
+        // notification. The unique tag comes from the server (notificationTag)
+        // and related notifications share a group (threadKey) so one
+        // conversation still bundles together.
+        String tag = data != null ? data.get("notificationTag") : null;
+        if (tag == null || tag.isEmpty()) {
+            tag = channelId + "-" + System.currentTimeMillis() + "-" + Math.round(Math.random() * 100000);
+        }
+        String threadKey = data != null ? data.get("threadKey") : null;
+        if (threadKey != null && !threadKey.isEmpty()) {
+            notificationBuilder.setGroup(threadKey);
+        }
+
+        notificationManager.notify(tag, tag.hashCode(), notificationBuilder.build());
     }
 
     // Downloads the given image URL and crops it to a circle, matching how

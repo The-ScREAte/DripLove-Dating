@@ -50,17 +50,11 @@ public class MainActivity extends BridgeActivity {
         handleNotificationIntent(intent);
     }
 
-    // Clear the notification shade whenever the user opens/returns to the
-    // app. Most launchers badge the icon from the count of notifications
-    // still sitting in the shade, not from any number we set on them - the
-    // one real way to make the badge go back to 0 is to remove them from
-    // there, same as iOS zeroing applicationIconBadgeNumber in
-    // SceneDelegate.swift on scene activation.
-    @Override
-    public void onResume() {
-        super.onResume();
-        NotificationManagerCompat.from(this).cancelAll();
-    }
+    // Deliberately NOT clearing the notification shade on resume. Opening
+    // the app must not wipe every pending notification - each one stays
+    // until the user taps it (or clears it), and the app only dismisses the
+    // notifications for a specific conversation when that conversation is
+    // opened (see clearThreadNotifications in src/services/pushNotifications.ts).
 
     // Mirrors resolveNotificationRoute() in src/services/pushNotifications.ts -
     // keep the two in sync. message -> the specific conversation, match ->
