@@ -157,7 +157,7 @@ const markExpirationWarningSent = (matchId: string): void => {
   }
 };
 
-const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMatchId, onDeepLinkConsumed }: ChatPageProps) => {
   const { t } = useTranslation();
   const [topCompensation, setTopCompensation] = useState(0);
   
