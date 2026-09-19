@@ -1210,7 +1210,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
