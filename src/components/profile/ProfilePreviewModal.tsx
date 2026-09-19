@@ -599,7 +599,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           all - only the bare photo pixels worked. */}
       <div
         ref={swipeCardElRef}
-        className="absolute inset-0 bg-black flex flex-col overflow-hidden select-none"
+        className={`profile-info-layout ${showMoreInfo ? 'is-expanded' : ''} absolute inset-0 bg-black overflow-hidden select-none`}
         style={{
           // All four corners round in like a card lifting off the stack the
           // moment it's picked up (dragging) or thrown (exiting), then back
@@ -645,7 +645,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             Discover's own resize exactly (a flat 300ms, default easing) -
             Discover is the benchmark for this motion. */}
         <div
-          className={`relative w-full overflow-hidden select-none transition-all duration-300 ${showMoreInfo ? 'flex-1' : ''}`}
+          className="profile-info-photo relative w-full overflow-hidden select-none"
           style={{
             cursor: 'pointer',
             // 'none', not 'pan-y': the card now tracks the finger in both
@@ -653,34 +653,6 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             // which would otherwise fight the browser's own native
             // vertical-pan handling for the same gesture.
             touchAction: swipeEnabled ? 'none' : undefined,
-            ...(showMoreInfo
-              ? {
-                  // Expanded: a normal flex item sharing the column with the
-                  // details panel below, capped so it can't blow past its share.
-                  // 58% matches the details panel's own proportion, so both
-                  // screens read the same split.
-                  flex: '0 0 58%',
-                  minHeight: '180px',
-                  maxHeight: '58%',
-                }
-              : {
-                  // Collapsed: absolutely positioned to the parent's exact box
-                  // (inset 0) instead of a flex-grow child. flex-grow:1 fighting
-                  // a simultaneously-transitioning flex-basis is exactly what
-                  // made this shrink-then-grow on every toggle (a real,
-                  // reported "goes all the way up and comes down" glitch) -
-                  // grow and basis don't animate in lockstep, so the box
-                  // visibly collapsed toward the transitioning basis before
-                  // catching up. Matching Discover's own technique: this box
-                  // is always exactly the size of its (already real-height)
-                  // `relative` parent when collapsed, full stop, with nothing
-                  // to fight mid-transition. On iOS Safari a flex-grow child
-                  // can also lose a sizing fight to a tall photo's own
-                  // intrinsic height regardless of flex-basis - absolute
-                  // positioning removes that possibility entirely too.
-                  position: 'absolute',
-                  inset: 0,
-                }),
           }}
           onTouchStart={handleSwipeTouchStart}
           onTouchMove={handleSwipeTouchMove}
@@ -1111,10 +1083,10 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           Same solid black background and minimal top padding so it reads as
           one continuous panel with the caption above rather than a separate
           block with a gap. */}
-      {showMoreInfo && (
         <div
           ref={expandedDetailsRef}
-          className="bg-black px-4 pt-1 space-y-3 flex-1 overflow-y-auto scrollbar-hide"
+          className="profile-info-panel bg-black px-4 pt-1 space-y-3 overflow-y-auto scrollbar-hide"
+          aria-hidden={!showMoreInfo}
           style={{
             paddingBottom: '10px',
             WebkitOverflowScrolling: 'touch',
@@ -1392,7 +1364,6 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             </div>
           )}
         </div>
-      )}
       </div>
 
       {/* Undo button - same 'fixed' control as Discover's SwipeButtons. Kept
