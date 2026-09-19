@@ -1329,6 +1329,11 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       (blocksRes.data || []).forEach((b) => { if (b.blocked_id) excluded.add(b.blocked_id); if (b.blocker_id) excluded.add(b.blocker_id); });
       (passesRes.data || []).forEach((p) => p.passed_id && excluded.add(p.passed_id));
       (cooldownsRes.data || []).forEach((c) => excluded.add(c.user1_id === userId ? c.user2_id : c.user1_id));
+      // Anyone held by the Recommended/Similar rows belongs only to those
+      // rows - never also in a category deck, where swiping them would
+      // silently gut the row the user is still looking at.
+      (recommendedBatch || []).forEach((p) => excluded.add(p.id));
+      (similarBatch || []).forEach((p) => excluded.add(p.id));
 
       // Same distance/archived rules Discover and Circle's own
       // Recommended/Similar rows already enforce - this RPC used to have
