@@ -4034,9 +4034,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               const rescueUserLon = currentUser?.longitude;
               const rescueMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
               const rescueMaxDistance = Number(rescueMaxDistanceRaw);
-              const safeRescueMaxDistance = premiumActive
-                ? Infinity
-                : Math.min(Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : DEFAULT_MAX_DISTANCE_KM, FREE_USER_MAX_DISTANCE_KM);
+              const safeRescueMaxDistance = Math.min(
+                Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : DEFAULT_MAX_DISTANCE_KM,
+                premiumActive ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
+              );
+              const rescueBaseCountryCode = getTrustedBaseCountryCode(currentUser?.country_code, currentUser?.country);
 
               const freshProfiles = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
                 .filter((p) => {
