@@ -1293,6 +1293,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         const nextProfile = categoryBrowse.profiles[nextIndex];
         setCategoryBrowseIndex(nextIndex);
         void applyProfileImages(nextProfile);
+        // Stay one card ahead so the deck never stalls on a photo fetch.
+        void prefetchProfileImages(categoryBrowse.profiles[nextIndex + 1]);
       } else {
         toast({ title: "That's everyone", description: `You've seen everyone in "${categoryBrowse.label}" for now.` });
         closeProfileView();
