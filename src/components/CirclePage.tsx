@@ -1193,8 +1193,30 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           void incrementCircleLikesUsed(currentUser.id).then((total) => setCircleLikesUsed(total));
         }
         const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
+
+        // Same notifications a Discover swipe sends, so the person on the
+        // other end hears about a Circle like/match identically.
+        try {
+          const { count } = await supabase
+            .from('likes')
+            .select('id', { count: 'exact', head: true })
+            .eq('liked_id', profile.id);
+          await sendMultipleLikesNotification(profile.id, typeof count === 'number' ? count : 1, currentUser.id);
+        } catch {
+          // notification failures never block the swipe
+        }
+
         if (madeMatch) {
           toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
+          try {
+            await sendMatchNotification(
+              profile.id,
+              `${currentUser.first_name || ''}`.trim() || 'Someone',
+              currentUser.id
+            );
+          } catch {
+            // ignore notification errors
+          }
           if (typeof window !== 'undefined') {
             const win = window as Window & { chatMatchesCache?: Map<string, unknown> };
             win.chatMatchesCache?.delete(currentUser.id);
