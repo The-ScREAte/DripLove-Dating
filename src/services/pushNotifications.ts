@@ -302,56 +302,13 @@ class SupabasePushNotificationService {
   }
 
   // Single source of truth for "where does tapping/clicking this
-  // notification go" - shared by both the real OS notification tap
-  // (handleNotificationAction, below) and the in-app foreground toast's own
-  // click handler (showInAppNotification), which used to duplicate this
-  // logic and had drifted out of sync with it.
-  //   message -> the specific conversation in Chat
-  //   match   -> Chat (the list, not a specific conversation)
-  //   like    -> Liked Me
-  //   image_rejected -> Profile (no sender wires this type up yet - see the
-  //     reject_image DB function / moderate-image edge function, neither of
-  //     which currently creates a notification at all - this is here so the
-  //     route is already correct the moment one does)
-  //   system/admin/anything unrecognized -> Discover, never Chat by default
-  private resolveNotificationRoute(type: string | undefined, data: Record<string, unknown> | undefined): string {
-    if (data?.action === 'open_discover') {
-      return '/';
-    }
-
-    // Re-engagement notification ("you'd like <person>") - opens that one
-    // profile directly inside Circle. See send_reengagement_notifications
-    // (Postgres function, cron-scheduled) which is the only sender of this
-    // action/profileId combination.
-    if (data?.action === 'open_circle_profile' && data?.profileId) {
-      return `/?tab=circle&circleUserId=${data.profileId}`;
-    }
-
-    if (type === 'message' && data?.chatId) {
-      return `/?tab=chat&matchId=${data.chatId}`;
-    }
-
-    if (type === 'match') {
-      return '/?tab=chat';
-    }
-
-    if (type === 'like') {
-      return '/?tab=liked';
-    }
-
-    if (type === 'image_rejected') {
-      return '/?tab=profile';
-    }
-
-    // system, admin, and anything else (including a message notification
-    // that's missing its chatId) fall through to Discover.
-    return '/';
-  }
-
+  // notification go" - the shared module-level resolveNotificationRoute /
+  // navigateFromNotification at the top of this file, used by the OS
+  // notification tap (handleNotificationAction, below), the in-app toast's
+  // own click handler, and MainApp's in-app tab navigation alike.
   private handleNotificationAction(notification: ActionPerformed): void {
-    // Handle notification tap/action
     const data = notification.notification.data as Record<string, unknown> | undefined;
-    window.location.href = this.resolveNotificationRoute(data?.type as string | undefined, data);
+    navigateFromNotification(data?.type as string | undefined, data);
   }
 
   private showInAppNotification(payload: NotificationPayload): void {
