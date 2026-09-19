@@ -123,20 +123,20 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-200">Maximum Distance</label>
-              <span className="text-sm text-gray-300">{maxDistance} km</span>
+              <span className="text-sm text-gray-300">{toDisplayDistance(maxDistance)} {getDistanceUnitLabel()}</span>
             </div>
             <Slider
-              value={[maxDistance]}
-              onValueChange={handleDistanceChange}
-              max={500}
+              value={[toDisplayDistance(maxDistance)]}
+              onValueChange={(v) => handleDistanceChange([fromDisplayDistance(v[0])])}
+              max={toDisplayDistance(500)}
               min={1}
               step={5}
               className="w-full"
               disabled={isLoading}
             />
             <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>1 km</span>
-              <span>500 km</span>
+              <span>1 {getDistanceUnitLabel()}</span>
+              <span>{toDisplayDistance(500)} {getDistanceUnitLabel()}</span>
             </div>
           </div>
 
