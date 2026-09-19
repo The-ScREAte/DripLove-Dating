@@ -1410,6 +1410,15 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // silently gut the row the user is still looking at.
       (recommendedBatch || []).forEach((p) => excluded.add(p.id));
       (similarBatch || []).forEach((p) => excluded.add(p.id));
+      // Also honour the PERSISTED reservation, not just what's in memory -
+      // a row that hasn't finished loading (or is on cooldown with a stored
+      // batch) must still keep its people out of every category deck.
+      const [storedRecommended, storedSimilar] = await Promise.all([
+        fetchStoredCircleBatch(userId, 'recommended'),
+        fetchStoredCircleBatch(userId, 'similar'),
+      ]);
+      (storedRecommended || []).forEach((id) => excluded.add(id));
+      (storedSimilar || []).forEach((id) => excluded.add(id));
 
       // Same distance/archived rules Discover and Circle's own
       // Recommended/Similar rows already enforce - this RPC used to have
