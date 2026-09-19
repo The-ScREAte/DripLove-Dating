@@ -4439,6 +4439,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 window.dispatchEvent(
                   new CustomEvent('swipePersisted', { detail: { type: 'like', delta: 1 } })
                 );
+                publishSwipeDecision(currentUser.id, prevMatch.id, 'like');
               }
               
               // Check how many likes the target user has received and send notification
@@ -4511,6 +4512,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             window.dispatchEvent(
               new CustomEvent('swipePersisted', { detail: { type: 'like', delta: 1 } })
             );
+            publishSwipeDecision(currentUser.id, prevMatch.id, 'like');
           }
           
           // If server reports a match, show animation
@@ -4750,6 +4752,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 window.dispatchEvent(
                   new CustomEvent('swipePersisted', { detail: { type: 'pass', delta: 1 } })
                 );
+                publishSwipeDecision(currentUser.id, prevMatch.id, 'pass');
               }
             }
           } catch (fallbackErr) {
@@ -4769,6 +4772,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             window.dispatchEvent(
               new CustomEvent('swipePersisted', { detail: { type: 'pass', delta: 1 } })
             );
+            publishSwipeDecision(currentUser.id, prevMatch.id, 'pass');
           }
         }
       } catch (jobErr) {
