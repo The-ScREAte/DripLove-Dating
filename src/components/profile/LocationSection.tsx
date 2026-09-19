@@ -10,12 +10,15 @@ import { Globe, Crown, ChevronRight } from 'lucide-react';
 import LocationInput from '@/components/forms/LocationInput';
 import UnlockCountriesDialog from './UnlockCountriesDialog';
 import { getCountriesList } from '@/constants/locationData';
+import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/utils/distanceUnits';
 
 // Must match FREE_USER_MAX_DISTANCE_KM / PREMIUM_USER_MAX_DISTANCE_KM in
 // DiscoverPage.tsx (the values that actually gate the discovery query) and
-// the chk_max_distance DB constraint's outer bound (2000km).
+// the chk_max_distance DB constraint's outer bound (5000km). The radius is
+// always additionally bounded by the user's own country - a larger radius
+// never spills into a neighbouring country.
 const FREE_MAX_DISTANCE_KM = 600;
-const PREMIUM_MAX_DISTANCE_KM = 1020;
+const PREMIUM_MAX_DISTANCE_KM = 5000;
 
 interface LocationSectionProps {
   editedProfile: any;
