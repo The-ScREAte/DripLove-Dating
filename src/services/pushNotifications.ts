@@ -424,7 +424,7 @@ class SupabasePushNotificationService {
       // the realtime/web path sets payload.type directly. Checking both here
       // is what makes match/like taps on this toast actually navigate.
       const type = payload.type || (payload.data?.type as string | undefined);
-      window.location.href = this.resolveNotificationRoute(type, payload.data);
+      navigateFromNotification(type, payload.data);
     });
   }
 
