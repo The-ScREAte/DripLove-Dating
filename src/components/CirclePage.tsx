@@ -20,6 +20,7 @@ import {
 import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
+import { FREE_CIRCLE_DAILY_LIKES, getCircleLikesUsedToday, incrementCircleLikesUsed } from '@/utils/circleSwipeLimit';
 
 // Recommended for you / Similar interests only ever show a handful at a
 // time, then go on cooldown instead of silently backfilling from the pool.
