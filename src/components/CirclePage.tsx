@@ -1230,8 +1230,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       if (nextIndex < categoryBrowse.profiles.length) {
         const nextProfile = categoryBrowse.profiles[nextIndex];
         setCategoryBrowseIndex(nextIndex);
-        setSelectedImages(nextProfile.firstImage ? [nextProfile.firstImage] : []);
-        loadImagesForProfile(nextProfile.id).then(setSelectedImages);
+        void applyProfileImages(nextProfile);
       } else {
         toast({ title: "That's everyone", description: `You've seen everyone in "${categoryBrowse.label}" for now.` });
         closeProfileView();
