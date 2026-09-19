@@ -897,9 +897,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     isSupported: pushSupported,
     deviceToken,
     error: pushError,
-    sendMatchNotification,
-    sendMessageNotification,
-    sendLikeNotification,
     recordUserActivity
   } = usePushNotifications(userId);
   
