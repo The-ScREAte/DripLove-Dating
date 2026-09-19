@@ -1708,7 +1708,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // baseCountryCode), and this mirrors how fetchUnlockedCountryProfiles
       // (the active-pool equivalent) already has no distance filter at all
       // for premium.
-      const archivedRadiusInDegrees = (!premiumForFeed && baseCountryCode && userLat && userLon)
+      // Premium WITH unlocked countries still can't use a server-side box
+      // (it would wrongly exclude the unlocked countries' candidates); those
+      // are distance-filtered client-side for home-country rows only, below.
+      const archivedRadiusInDegrees = (baseCountryCode && userLat && userLon && !hasUnlockedCountries)
         ? safeUserMaxDistance / 111.32
         : null;
 
