@@ -4046,7 +4046,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                   // as the other fetches in this file.
                   const cc = normalizeCountryCode(p.country_code || '');
                   if (!cc || !rescueAllowedCountryCodes.includes(cc)) return false;
-                  if (!premiumActive && rescueUserLat && rescueUserLon && p.latitude && p.longitude) {
+                  // Home country respects the distance setting for every
+                  // tier; unlocked countries are distance-free.
+                  const isRescueHomeCountry = !rescueBaseCountryCode || cc === rescueBaseCountryCode;
+                  if (isRescueHomeCountry && rescueUserLat && rescueUserLon && p.latitude && p.longitude) {
                     const dist = calculateDistance(rescueUserLat, rescueUserLon, p.latitude, p.longitude);
                     if (dist > safeRescueMaxDistance) return false;
                   }
