@@ -20,6 +20,7 @@ import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
 import HoppingLogo from './HoppingLogo';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
@@ -256,6 +257,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // visiting Discover - same "It's a match!" banner as Discover uses.
   const [showMatchAnimation, setShowMatchAnimation] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<LikerProfile | null>(null);
+  const { sendMatchNotification } = usePushNotifications(currentUser?.id);
   // ------------------
   // REFS
   // ------------------
@@ -1083,6 +1085,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         if (profileToRemove) {
           setMatchedProfile(profileToRemove);
           setShowMatchAnimation(true);
+        }
+
+        // Liking back from this page is the same mutual-like outcome as
+        // Discover and Circle: notify the other person that it is a match,
+        // rather than leaving them with only their earlier like state.
+        try {
+          const currentUserName = `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || 'Someone';
+          await sendMatchNotification(currentUserName, profileId);
+        } catch {
+          // A notification failure must never undo a successfully created match.
         }
 
         // ChatPage keeps running in the background once visited (MainApp mounts

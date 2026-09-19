@@ -716,14 +716,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           </button>
         ))}
 
-        {/* Active-filter pill - only during a Circle category browse. Sits
-            below the cultural-sign glow's max height (which is also
-            top-centered) so the two can never overlap on the rare profile
-            that has both. */}
+        {/* Active-filter pill - compact and layered directly over the top of
+            the cultural sign while remaining inside the photo safe area. */}
         {topLabel && (
           <div
-            className="absolute left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-white text-xs font-semibold bg-black/50 backdrop-blur-md border border-white/20"
-            style={{ top: '70px' }}
+            className="absolute left-1/2 -translate-x-1/2 z-20 max-w-[55%] truncate px-2 py-0.5 rounded-full text-white text-[10px] font-semibold bg-black/60 backdrop-blur-md border border-white/20"
+            style={{ top: '42px' }}
           >
             {topLabel}
           </div>
@@ -731,10 +729,10 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
 
         {dailyLikeCounter && (
           <div
-            className="absolute right-4 top-6 z-10 flex items-center gap-1 rounded-full border border-pink-500/30 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-pink-200 backdrop-blur-md"
+            className="absolute right-4 top-9 z-10 flex items-center gap-0.5 rounded-full border border-pink-500/30 bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-pink-200 backdrop-blur-md"
             aria-label={`${dailyLikeCounter.remaining} of ${dailyLikeCounter.limit} Circle likes left today`}
           >
-            <Heart className="h-3 w-3" />
+            <Heart className="h-2.5 w-2.5" />
             {dailyLikeCounter.remaining}/{dailyLikeCounter.limit}
           </div>
         )}
