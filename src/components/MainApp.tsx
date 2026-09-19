@@ -129,6 +129,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('profile');
     setVerifySignal(prev => prev + 1);
   };
+  // A tapped notification, handled while the app is already running: these
+  // carry the exact thing to open (a conversation, a person in Circle) into
+  // the tab that owns it, which then clears them once consumed.
+  const [chatDeepLinkMatchId, setChatDeepLinkMatchId] = useState<string | null>(null);
+  const [circleDeepLinkProfileId, setCircleDeepLinkProfileId] = useState<string | null>(null);
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
