@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Users, Heart, X, Calendar, MapPin, ArrowLeft, ArrowUp, ArrowDown,
-  Briefcase, GraduationCap, Crown, Lock, Languages, RefreshCw, ArrowDownToLine,
+  Briefcase, GraduationCap, Crown, Lock, Languages, RefreshCw,
   Ruler, Baby, MessageCircle, Gift, PawPrint, Share2
 } from 'lucide-react';
 
@@ -74,6 +74,7 @@ const LIKED_ME_STORAGE_KEY_PREFIX = 'likedMe_v1_';
 // Likers are fetched a page at a time via get_likers_page - this is both
 // the initial page size and the size of each subsequent "Load More" page.
 const LIKERS_PAGE_SIZE = 500;
+const MIN_REFRESH_VISIBLE_MS = 2000;
 // Where the second captioned photo call-out can land in the expanded details
 // panel - always above Personality. Module-level (not per-render) since it's
 // a fixed constant, not something that needs recreating on every render.
@@ -600,6 +601,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
   // Optimized: batch queries and filter in SQL
   const fetchLikers = useCallback(async (showLoading = false) => {
+    const refreshStartedAt = showLoading ? Date.now() : 0;
     if (!currentUser?.id) {
       setLikers([]);
       setUserImages({});
@@ -651,6 +653,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       }
     } finally {
       if (showLoading) {
+        const remainingHold = MIN_REFRESH_VISIBLE_MS - (Date.now() - refreshStartedAt);
+        if (remainingHold > 0) {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, remainingHold));
+        }
         setIsRefreshing(false);
         setPullDistance(0);
       } else {
@@ -1495,7 +1501,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
   const handleTouchEnd = () => {
     if (!selectedProfile && pullDistance > PULL_TRIGGER_THRESHOLD && !isRefreshing) {
-      fetchLikers(true);
+      setPullDistance(PULL_TRIGGER_THRESHOLD);
+      void fetchLikers(true);
     } else {
       setPullDistance(0);
     }
@@ -2270,26 +2277,21 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Pull to refresh indicator */}
-      {pullDistance > 0 && (
-        <div
-          className="flex items-center justify-center gap-2 bg-black transition-all duration-200"
-          style={{ height: `${pullDistance}px` }}
-        >
-          {isRefreshing ? (
-            <RefreshCw className="w-4 h-4 text-pink-400 animate-spin" strokeWidth={2.5} />
-          ) : (
-            <ArrowDownToLine
-              className="w-4 h-4 text-pink-400 transition-transform duration-150"
-              strokeWidth={2.5}
-              style={{ transform: pullDistance > PULL_TRIGGER_THRESHOLD ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            />
-          )}
-          <div className="text-pink-400 text-sm">
-            {pullDistance > PULL_TRIGGER_THRESHOLD ? (isRefreshing ? t('matches.refreshing') : t('matches.releaseToRefresh')) : t('matches.pullToRefresh')}
-          </div>
+      {/* A stable container lets the refresh affordance ease closed instead of
+          disappearing in the same frame that the request finishes. */}
+      <div
+        className={`flex shrink-0 items-center justify-center gap-2 overflow-hidden bg-black transition-[height,opacity] duration-300 ease-out ${pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'}`}
+        style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
+        aria-live="polite"
+      >
+        <RefreshCw
+          className={`h-4 w-4 text-pink-400 transition-transform duration-300 ${isRefreshing || pullDistance > PULL_TRIGGER_THRESHOLD ? 'animate-spin' : ''}`}
+          strokeWidth={2.5}
+        />
+        <div className="text-sm font-medium text-pink-300">
+          {isRefreshing ? t('matches.refreshing') : pullDistance > PULL_TRIGGER_THRESHOLD ? t('matches.releaseToRefresh') : t('matches.pullToRefresh')}
         </div>
-      )}
+      </div>
 
   <div
     className="flex-shrink-0 shadow-sm border-b border-pink-500/30 px-4 py-4"

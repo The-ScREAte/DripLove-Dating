@@ -751,7 +751,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         {topLabel && (
           <div
             className="absolute left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-white text-xs font-semibold bg-black/50 backdrop-blur-md border border-white/20"
-            style={{ top: '76px' }}
+            style={{ top: '70px' }}
           >
             {topLabel}
           </div>
@@ -759,7 +759,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
 
         {dailyLikeCounter && (
           <div
-            className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full border border-pink-500/30 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-pink-200 backdrop-blur-md"
+            className="absolute right-4 top-6 z-10 flex items-center gap-1 rounded-full border border-pink-500/30 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-pink-200 backdrop-blur-md"
             aria-label={`${dailyLikeCounter.remaining} of ${dailyLikeCounter.limit} Circle likes left today`}
           >
             <Heart className="h-3 w-3" />
