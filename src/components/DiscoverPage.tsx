@@ -1969,14 +1969,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (!premiumForFeed && baseCountryCode) {
           filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
-          if (userLat && userLon) {
-            filteredProfiles = filteredProfiles.filter((p) => {
-              if (!p.latitude || !p.longitude) return true;
-              const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
-              distanceMap[p.id] = dist;
-              return dist <= safeUserMaxDistance;
-            });
-          }
+        }
+
+        // Home-country candidates always respect the viewer's distance
+        // setting (all tiers); unlocked countries stay distance-free.
+        if (baseCountryCode && userLat && userLon) {
+          filteredProfiles = filteredProfiles.filter((p) => {
+            const cc = normalizeCountryCode(p.country_code || p.country || '');
+            if (cc && cc !== baseCountryCode) return true;
+            if (!p.latitude || !p.longitude) return true;
+            const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
+            distanceMap[p.id] = dist;
+            return dist <= safeUserMaxDistance;
+          });
         }
       }
     }
