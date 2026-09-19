@@ -584,6 +584,7 @@ const PeopleRow = ({
 
 const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsumed }: CirclePageProps) => {
   const { toast } = useToast();
+  const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
   const navigate = useNavigate();
   // Same eligibility signal PremiumUpgrade.tsx's own "Start Free Trial"
   // buttons use - already correctly platform-aware: web/PWA has no native
