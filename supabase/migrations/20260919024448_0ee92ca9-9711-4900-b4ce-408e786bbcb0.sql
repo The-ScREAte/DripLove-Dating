@@ -1,0 +1,1 @@
+ALTER TABLE public.user_usage ADD COLUMN IF NOT EXISTS circle_likes_used integer NOT NULL DEFAULT 0;

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch, CurrentUser } from '@/types';
 import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
-import { matchesReciprocalPreference, normalizeCountryCodeList } from './discover/discoverFeedUtils';
+import { matchesReciprocalPreference } from './discover/discoverFeedUtils';
 import { parseFavorites } from '@/constants/favorites';
 import {
   fetchCirclePool,
@@ -15,10 +15,12 @@ import {
   fetchCircleExclusionIds,
   fetchCircleProfilesByIds,
   getCircleDistanceParams,
+  getCircleCountrySplit,
 } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
+import { FREE_CIRCLE_DAILY_LIKES, getCircleLikesUsedToday, incrementCircleLikesUsed } from '@/utils/circleSwipeLimit';
 
 // Recommended for you / Similar interests only ever show a handful at a
 // time, then go on cooldown instead of silently backfilling from the pool.
@@ -635,6 +637,12 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   // banner (upgrade + adjust-preferences, same pattern as Discover's own
   // empty state) instead of just a toast that a user could easily miss.
   const [emptyCategoryLabel, setEmptyCategoryLabel] = useState<string | null>(null);
+  // Circle's own daily allowance for free users - 20 likes (right swipes)
+  // per day, refilling at midnight. Passing stays free and unlimited.
+  const [circleLikesUsed, setCircleLikesUsed] = useState(0);
+  const [circleLikesLoaded, setCircleLikesLoaded] = useState(false);
+  const [showCircleOutOfLikes, setShowCircleOutOfLikes] = useState(false);
+  const circleLikesLeft = Math.max(0, FREE_CIRCLE_DAILY_LIKES - circleLikesUsed);
   // Ticks once a minute purely to force a re-check of cooldown expiry while
   // the tab stays open (e.g. left open across midnight) - the actual expiry
   // math reads Date.now() fresh each time, this just triggers that recheck.
@@ -644,6 +652,21 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     const interval = setInterval(() => setCooldownTick((t) => t + 1), 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  // Today's Circle like count, read once per mount (the row is keyed by
+  // date, so it refills on its own each new day).
+  useEffect(() => {
+    if (!currentUser?.id || isPremium) { setCircleLikesLoaded(true); return; }
+    let cancelled = false;
+    void (async () => {
+      const used = await getCircleLikesUsedToday(currentUser.id);
+      if (cancelled) return;
+      setCircleLikesUsed(used);
+      setCircleLikesLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id, isPremium]);
+
 
   // Load this user's row cooldowns once - see supabase/migrations/20260917000000_circle_row_cooldowns.sql
   useEffect(() => {
@@ -763,22 +786,21 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     }
 
     const load = async () => {
-      const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
       const allowedGenders = getGenderFilter(currentUser.preference || 'everyone');
-      let countryCodes: string[];
-      if (baseCountryCode) {
-        countryCodes = isPremium
-          ? Array.from(new Set([baseCountryCode, ...normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode)]))
-          : [baseCountryCode];
-      } else {
+      // Home country counts respect the viewer's distance; unlocked premium
+      // countries are not distance-bound (same rule Discover uses).
+      const split = getCircleCountrySplit(currentUser, isPremium);
+      let homeCountryCodes = split.homeCountryCodes;
+      const unlockedCountryCodes = split.unlockedCountryCodes;
+      if (homeCountryCodes.length === 0) {
         const { data: countryRows } = await supabase
           .from('profiles')
           .select('country_code')
           .eq('account_status', 'active')
           .not('country_code', 'is', null);
-        countryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
+        homeCountryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
       }
-      if (countryCodes.length === 0) {
+      if (homeCountryCodes.length === 0 && unlockedCountryCodes.length === 0) {
         if (!cancelled) setCategories(CATEGORY_DEFS.map((d) => ({ key: d.key, label: d.label, icon: d.icon, count: d.isGameLink ? null : 0, filter: d.filter, isGameLink: d.isGameLink })));
         return;
       }
@@ -793,21 +815,26 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         Promise.resolve(getCircleDistanceParams(currentUser, isPremium)),
       ]);
 
-      const countFor = async (filter?: CategoryFilter): Promise<number> => {
+      const countForCountries = async (
+        codes: string[],
+        applyRadius: boolean,
+        filter?: CategoryFilter
+      ): Promise<number> => {
+        if (codes.length === 0) return 0;
+        const useBox = applyRadius && hasCoords && radiusDegrees !== null;
         // "Verified" isn't a plain column filter a REST query can express -
         // it's the same >=85%-profile-completion formula used everywhere
-        // else in the app for the "Verified" checkmark (the real is_verified
-        // column has no adoption yet - see the RPC's own comment), computed
+        // else in the app for the "Verified" checkmark, computed
         // server-side by a dedicated RPC.
         if (filter?.isVerified) {
           const { data, error } = await supabase.rpc('count_circle_verified_profiles', {
-            p_country_codes: countryCodes,
+            p_country_codes: codes,
             p_allowed_genders: allowedGenders,
             p_viewer_gender: currentUser.gender || '',
             p_excluded_ids: Array.from(excluded),
-            p_lat: hasCoords ? userLat : null,
-            p_lon: hasCoords ? userLon : null,
-            p_radius_degrees: radiusDegrees,
+            p_lat: useBox ? userLat : null,
+            p_lon: useBox ? userLon : null,
+            p_radius_degrees: useBox ? radiusDegrees : null,
           });
           if (error) return 0;
           return typeof data === 'number' ? data : 0;
@@ -818,17 +845,17 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
-          .in('country_code', countryCodes)
+          .in('country_code', codes)
           .in('gender', allowedGenders);
         if (excluded.size > 0) {
           q = q.not('id', 'in', `(${Array.from(excluded).join(',')})`);
         }
-        if (hasCoords && radiusDegrees !== null) {
+        if (useBox) {
           q = q
-            .gte('latitude', (userLat as number) - radiusDegrees)
-            .lte('latitude', (userLat as number) + radiusDegrees)
-            .gte('longitude', (userLon as number) - radiusDegrees)
-            .lte('longitude', (userLon as number) + radiusDegrees);
+            .gte('latitude', (userLat as number) - (radiusDegrees as number))
+            .lte('latitude', (userLat as number) + (radiusDegrees as number))
+            .gte('longitude', (userLon as number) - (radiusDegrees as number))
+            .lte('longitude', (userLon as number) + (radiusDegrees as number));
         }
         // Reciprocal: this profile has to actually be open to the viewer's
         // own gender too, not just be a gender the viewer is into.
@@ -843,6 +870,14 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         if (filter?.hasPets) q = q.not('pets', 'is', null).neq('pets', []);
         const { count } = await q;
         return count ?? 0;
+      };
+
+      const countFor = async (filter?: CategoryFilter): Promise<number> => {
+        const [home, unlocked] = await Promise.all([
+          countForCountries(homeCountryCodes, true, filter),
+          countForCountries(unlockedCountryCodes, false, filter),
+        ]);
+        return home + unlocked;
       };
 
       const results = await Promise.all(CATEGORY_DEFS.map((d) => (d.isGameLink ? Promise.resolve(null) : countFor(d.filter))));
@@ -1089,6 +1124,13 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   // close back to the grid, or advance to the next card in the deck.
   const performSwipeAction = useCallback(async (profile: CircleProfile, direction: 'like' | 'pass') => {
     if (isSwipeActionPending || !currentUser?.id) return;
+    // Free users: only right swipes (likes) count against Circle's own
+    // 20-a-day allowance. Once it's used up the profile stays put and the
+    // out-of-swipes banner takes over instead.
+    if (direction === 'like' && !isPremium && circleLikesLoaded && circleLikesUsed >= FREE_CIRCLE_DAILY_LIKES) {
+      setShowCircleOutOfLikes(true);
+      return;
+    }
     setIsSwipeActionPending(true);
     setPool((prev) => prev.filter((p) => p.id !== profile.id));
 
@@ -1137,6 +1179,10 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           premium_param: !!isPremium,
         });
         if (error) throw error;
+        if (!isPremium) {
+          setCircleLikesUsed((prev) => prev + 1);
+          void incrementCircleLikesUsed(currentUser.id).then((total) => setCircleLikesUsed(total));
+        }
         const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
         if (madeMatch) {
           toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
@@ -1164,7 +1210,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
@@ -1190,23 +1236,22 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
       const allowedGenders = getGenderFilter(currentUser.preference || 'everyone');
 
-      let countryCodes: string[];
-      if (baseCountryCode) {
-        countryCodes = isPremium
-          ? Array.from(new Set([baseCountryCode, ...normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode)]))
-          : [baseCountryCode];
-      } else {
+      const split = getCircleCountrySplit(currentUser, isPremium);
+      let homeCountryCodes = split.homeCountryCodes;
+      const unlockedCountryCodes = split.unlockedCountryCodes;
+      if (homeCountryCodes.length === 0) {
         const { data: countryRows } = await supabase
           .from('profiles')
           .select('country_code')
           .eq('account_status', 'active')
           .not('country_code', 'is', null);
-        countryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
+        homeCountryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
       }
-      if (countryCodes.length === 0) {
+      if (homeCountryCodes.length === 0 && unlockedCountryCodes.length === 0) {
         setEmptyCategoryLabel(tile.label);
         return;
       }
+      const homeSet = new Set(homeCountryCodes);
 
       // Same exclusion set Discover and the main Circle pool use - your own
       // like/pass/match/block/cooldown, never someone else's incoming like on
@@ -1232,41 +1277,55 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       // away, or archived accounts, that Discover would never show.
       const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
 
-      const { data: rows, error } = await supabase.rpc('get_circle_category_profiles', {
-        p_country_codes: countryCodes,
-        p_allowed_genders: allowedGenders,
-        p_viewer_gender: currentUser.gender || '',
-        p_excluded_ids: Array.from(excluded),
-        p_limit: 60,
-        p_relationship_intent: tile.filter?.relationshipIntent ?? null,
-        p_family_plans: tile.filter?.familyPlans ?? null,
-        p_is_verified: typeof tile.filter?.isVerified === 'boolean' ? tile.filter.isVerified : null,
-        p_interest: tile.filter?.interest ?? null,
-        p_has_music: typeof tile.filter?.hasMusic === 'boolean' ? tile.filter.hasMusic : null,
-        p_has_social_media: typeof tile.filter?.hasSocialMedia === 'boolean' ? tile.filter.hasSocialMedia : null,
-        p_has_pets: typeof tile.filter?.hasPets === 'boolean' ? tile.filter.hasPets : null,
-        p_archived: false,
-        p_lat: hasCoords ? userLat : null,
-        p_lon: hasCoords ? userLon : null,
-        p_radius_degrees: radiusDegrees,
-      });
-      if (error) throw error;
-      if (!Array.isArray(rows) || rows.length === 0) {
+      type ProfileRow = Omit<CircleProfile, 'firstImage'>;
+      const fetchCategoryRows = async (codes: string[], applyRadius: boolean, limit: number): Promise<ProfileRow[]> => {
+        if (codes.length === 0 || limit <= 0) return [];
+        const useBox = applyRadius && hasCoords;
+        const { data, error } = await supabase.rpc('get_circle_category_profiles', {
+          p_country_codes: codes,
+          p_allowed_genders: allowedGenders,
+          p_viewer_gender: currentUser.gender || '',
+          p_excluded_ids: Array.from(excluded),
+          p_limit: limit,
+          p_relationship_intent: tile.filter?.relationshipIntent ?? null,
+          p_family_plans: tile.filter?.familyPlans ?? null,
+          p_is_verified: typeof tile.filter?.isVerified === 'boolean' ? tile.filter.isVerified : null,
+          p_interest: tile.filter?.interest ?? null,
+          p_has_music: typeof tile.filter?.hasMusic === 'boolean' ? tile.filter.hasMusic : null,
+          p_has_social_media: typeof tile.filter?.hasSocialMedia === 'boolean' ? tile.filter.hasSocialMedia : null,
+          p_has_pets: typeof tile.filter?.hasPets === 'boolean' ? tile.filter.hasPets : null,
+          p_archived: false,
+          p_lat: useBox ? userLat : null,
+          p_lon: useBox ? userLon : null,
+          p_radius_degrees: applyRadius ? radiusDegrees : null,
+        });
+        if (error) throw error;
+        return Array.isArray(data) ? (data as unknown as ProfileRow[]) : [];
+      };
+
+      const homeLimit = unlockedCountryCodes.length > 0 ? 30 : 60;
+      const [homeRows, unlockedRows] = await Promise.all([
+        fetchCategoryRows(homeCountryCodes, true, homeLimit),
+        fetchCategoryRows(unlockedCountryCodes, false, unlockedCountryCodes.length > 0 ? 60 - homeLimit : 0),
+      ]);
+      const rows = [...homeRows, ...unlockedRows];
+      if (rows.length === 0) {
         setEmptyCategoryLabel(tile.label);
         return;
       }
 
-      type ProfileRow = Omit<CircleProfile, 'firstImage'>;
-      const eligible = (rows as unknown as ProfileRow[])
+      const eligible = rows
         .filter((p) => {
           if (!p.date_of_birth) return false;
           const age = calculateAge(p.date_of_birth);
           return age >= (currentUser.min_age || 18) && age <= (currentUser.max_age || 99);
         })
         // The RPC's radius is a rough lat/lon bounding box - narrow to the
-        // real distance, same client-side enforcement Discover/fetchCirclePool do.
+        // real distance. Only for the viewer's own country; unlocked
+        // countries are intentionally not distance-bound.
         .filter((p) => {
           if (!hasCoords || !p.latitude || !p.longitude) return true;
+          if (!homeSet.has(normalizeCountryCode(p.country_code || ''))) return true;
           return calculateDistance(userLat as number, userLon as number, p.latitude, p.longitude) <= maxDistanceKm;
         });
 
@@ -1400,6 +1459,42 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   const activeProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex] : selectedProfile;
   const nextBrowseProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex + 1] : undefined;
 
+  // Free users who've used all 20 of today's Circle likes. Same shape as
+  // Discover's own out-of-swipes card, with the CTA wording following
+  // whether this viewer currently qualifies for a free trial.
+  if (showCircleOutOfLikes) {
+    return (
+      <div className="h-full w-full flex items-center justify-center overflow-y-auto p-4">
+        <Card className="max-w-md w-full bg-black border border-pink-500/25 text-white shadow-2xl">
+          <CardContent className="p-6 text-center flex flex-col items-center">
+            <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
+            <h2 className="text-lg font-semibold mb-1.5 text-white">Out of swipes for today</h2>
+            <p className="text-gray-400 text-sm mb-5 max-w-xs">
+              You&apos;ve used all {FREE_CIRCLE_DAILY_LIKES} of your Circle likes for today. They refill tomorrow -
+              or go Premium for unlimited likes right now.
+            </p>
+            <div className="w-full flex flex-col items-center gap-3">
+              <Button
+                onClick={() => { setShowCircleOutOfLikes(false); setShowCirclePremiumUpgrade(true); }}
+                className="w-auto h-9 !rounded-full px-4 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+              >
+                <Crown className="w-3.5 h-3.5 mr-1.5" />
+                {eligibleForTrial ? 'Try now for free' : 'Upgrade to Premium'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowCircleOutOfLikes(false)}
+                className="w-auto h-8 !rounded-full px-3.5 text-xs border-pink-500/30 text-white hover:bg-pink-500/10 bg-transparent"
+              >
+                Back to Circle
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Same empty-state pattern DiscoverPage uses when its own deck runs dry:
   // a real banner (not a toast that's easy to miss), an honest "adjust your
   // preferences" path that costs nothing, and - only if there's actually a
@@ -1471,7 +1566,22 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   return (
     <div className="h-full w-full bg-black overflow-y-auto scrollbar-hide">
       <div className="sticky top-0 z-10 bg-black pt-2 pb-2">
-        <h2 className="text-white font-semibold text-base px-6 mb-1">Circle Up</h2>
+        <div className="flex items-start justify-between px-6 gap-3 mb-1">
+          <h2 className="text-white font-semibold text-base">Circle Up</h2>
+          {!isPremium && circleLikesLoaded && (
+            <span
+              className={`flex items-center gap-1 flex-shrink-0 text-[11px] font-medium rounded-full border px-2.5 py-1 ${
+                circleLikesLeft === 0
+                  ? 'text-white/70 border-white/15 bg-white/[0.04]'
+                  : 'text-pink-300 border-pink-500/30 bg-pink-500/10'
+              }`}
+              aria-label={`${circleLikesLeft} of ${FREE_CIRCLE_DAILY_LIKES} Circle likes left today`}
+            >
+              <Heart className="w-3 h-3" />
+              {circleLikesLeft}/{FREE_CIRCLE_DAILY_LIKES}
+            </span>
+          )}
+        </div>
         <p className="text-white/40 text-xs px-6">Made easy to spot and find who's right for you.</p>
       </div>
       <div>
