@@ -20,6 +20,7 @@ import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
 import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
+import { setNotificationNavHandler } from '@/services/pushNotifications';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type UserImageRow = Database['public']['Tables']['user_images']['Row'];
