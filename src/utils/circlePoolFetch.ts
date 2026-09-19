@@ -26,6 +26,22 @@ const FREE_USER_MAX_DISTANCE_KM = 600;
 // check below (a bounding box is a rough pre-filter, not the real answer).
 const KM_PER_DEGREE_LATITUDE = 111.32;
 
+// Same distance-cap formula fetchCirclePool uses below, pulled out so any
+// other Circle query (category-tile counts, category browse) can filter by
+// the viewer's real distance/archived rules instead of silently ignoring
+// them - which was the actual bug behind "Discover shows nobody but Circle
+// still shows people": category browsing had no distance check at all.
+export const getCircleDistanceParams = (currentUser: CurrentUser, isPremium?: boolean) => {
+  const userLat = currentUser.latitude;
+  const userLon = currentUser.longitude;
+  const rawMaxDistance = Number(currentUser.max_distance ?? currentUser.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
+  const safeMaxDistanceUncapped = Number.isFinite(rawMaxDistance) && rawMaxDistance > 0 ? rawMaxDistance : DEFAULT_MAX_DISTANCE_KM;
+  const maxDistanceKm = isPremium ? safeMaxDistanceUncapped : Math.min(safeMaxDistanceUncapped, FREE_USER_MAX_DISTANCE_KM);
+  const hasCoords = typeof userLat === 'number' && typeof userLon === 'number';
+  const radiusDegrees = hasCoords ? maxDistanceKm / KM_PER_DEGREE_LATITUDE : null;
+  return { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees };
+};
+
 export interface CircleProfile {
   id: string;
   first_name: string;
@@ -126,13 +142,7 @@ export const fetchCirclePool = async (
   // premium can use their full setting. Only meaningful when we actually
   // have the viewer's coordinates; otherwise Circle stays country-only, the
   // same way Discover itself falls back when location is unavailable.
-  const userLat = currentUser.latitude;
-  const userLon = currentUser.longitude;
-  const rawMaxDistance = Number(currentUser.max_distance ?? currentUser.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
-  const safeMaxDistanceUncapped = Number.isFinite(rawMaxDistance) && rawMaxDistance > 0 ? rawMaxDistance : DEFAULT_MAX_DISTANCE_KM;
-  const maxDistanceKm = isPremium ? safeMaxDistanceUncapped : Math.min(safeMaxDistanceUncapped, FREE_USER_MAX_DISTANCE_KM);
-  const hasCoords = typeof userLat === 'number' && typeof userLon === 'number';
-  const radiusDegrees = hasCoords ? maxDistanceKm / KM_PER_DEGREE_LATITUDE : null;
+  const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
 
   let countryCodes: string[];
   if (baseCountryCode) {

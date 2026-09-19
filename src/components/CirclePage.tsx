@@ -14,7 +14,9 @@ import {
   saveCircleBatch,
   fetchCircleExclusionIds,
   fetchCircleProfilesByIds,
+  getCircleDistanceParams,
 } from '@/utils/circlePoolFetch';
+import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 
@@ -114,8 +116,11 @@ import {
   Lock,
   RefreshCw,
   Crown,
+  Heart,
   type LucideIcon,
 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 // One icon per interest tag (see src/constants/formData.ts) - shown as the
 // shared-thing badge on a card instead of spelling the interest out as text.
@@ -626,6 +631,10 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   // that label worked into the copy; null hides it. Subscribing there is
   // what actually opens the full page.
   const [lockedTileLabel, setLockedTileLabel] = useState<string | null>(null);
+  // Set the moment a category tap comes back with nobody - shows a proper
+  // banner (upgrade + adjust-preferences, same pattern as Discover's own
+  // empty state) instead of just a toast that a user could easily miss.
+  const [emptyCategoryLabel, setEmptyCategoryLabel] = useState<string | null>(null);
   // Ticks once a minute purely to force a re-check of cooldown expiry while
   // the tab stays open (e.g. left open across midnight) - the actual expiry
   // math reads Date.now() fresh each time, this just triggers that recheck.
@@ -774,6 +783,16 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         return;
       }
 
+      // Same exclusion set/distance rules the actual category browse and
+      // Discover use - without these the number on each tile was counting
+      // people already liked/passed/matched/blocked, archived accounts, and
+      // anyone regardless of distance, so it promised far more real matches
+      // than existed (e.g. one real account: tile said 114, real count was 0).
+      const [excluded, { userLat, userLon, hasCoords, radiusDegrees }] = await Promise.all([
+        fetchCircleExclusionIds(currentUser.id),
+        Promise.resolve(getCircleDistanceParams(currentUser, isPremium)),
+      ]);
+
       const countFor = async (filter?: CategoryFilter): Promise<number> => {
         // "Verified" isn't a plain column filter a REST query can express -
         // it's the same >=85%-profile-completion formula used everywhere
@@ -785,6 +804,10 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
             p_country_codes: countryCodes,
             p_allowed_genders: allowedGenders,
             p_viewer_gender: currentUser.gender || '',
+            p_excluded_ids: Array.from(excluded),
+            p_lat: hasCoords ? userLat : null,
+            p_lon: hasCoords ? userLon : null,
+            p_radius_degrees: radiusDegrees,
           });
           if (error) return 0;
           return typeof data === 'number' ? data : 0;
@@ -794,8 +817,19 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           .select('id', { count: 'exact', head: true })
           .eq('account_status', 'active')
           .eq('is_admin', false)
+          .eq('is_archived', false)
           .in('country_code', countryCodes)
           .in('gender', allowedGenders);
+        if (excluded.size > 0) {
+          q = q.not('id', 'in', `(${Array.from(excluded).join(',')})`);
+        }
+        if (hasCoords && radiusDegrees !== null) {
+          q = q
+            .gte('latitude', (userLat as number) - radiusDegrees)
+            .lte('latitude', (userLat as number) + radiusDegrees)
+            .gte('longitude', (userLon as number) - radiusDegrees)
+            .lte('longitude', (userLon as number) + radiusDegrees);
+        }
         // Reciprocal: this profile has to actually be open to the viewer's
         // own gender too, not just be a gender the viewer is into.
         if (currentUser.gender) {
@@ -1170,7 +1204,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         countryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
       }
       if (countryCodes.length === 0) {
-        toast({ title: 'No matches yet', description: `No one is available for "${tile.label}" right now.` });
+        setEmptyCategoryLabel(tile.label);
         return;
       }
 
@@ -1192,6 +1226,12 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       (passesRes.data || []).forEach((p) => p.passed_id && excluded.add(p.passed_id));
       (cooldownsRes.data || []).forEach((c) => excluded.add(c.user1_id === userId ? c.user2_id : c.user1_id));
 
+      // Same distance/archived rules Discover and Circle's own
+      // Recommended/Similar rows already enforce - this RPC used to have
+      // neither, so category browsing could surface people hundreds of km
+      // away, or archived accounts, that Discover would never show.
+      const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
+
       const { data: rows, error } = await supabase.rpc('get_circle_category_profiles', {
         p_country_codes: countryCodes,
         p_allowed_genders: allowedGenders,
@@ -1205,19 +1245,30 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         p_has_music: typeof tile.filter?.hasMusic === 'boolean' ? tile.filter.hasMusic : null,
         p_has_social_media: typeof tile.filter?.hasSocialMedia === 'boolean' ? tile.filter.hasSocialMedia : null,
         p_has_pets: typeof tile.filter?.hasPets === 'boolean' ? tile.filter.hasPets : null,
+        p_archived: false,
+        p_lat: hasCoords ? userLat : null,
+        p_lon: hasCoords ? userLon : null,
+        p_radius_degrees: radiusDegrees,
       });
       if (error) throw error;
       if (!Array.isArray(rows) || rows.length === 0) {
-        toast({ title: 'No matches yet', description: `No one new matches "${tile.label}" right now.` });
+        setEmptyCategoryLabel(tile.label);
         return;
       }
 
       type ProfileRow = Omit<CircleProfile, 'firstImage'>;
-      const eligible = (rows as unknown as ProfileRow[]).filter((p) => {
-        if (!p.date_of_birth) return false;
-        const age = calculateAge(p.date_of_birth);
-        return age >= (currentUser.min_age || 18) && age <= (currentUser.max_age || 99);
-      });
+      const eligible = (rows as unknown as ProfileRow[])
+        .filter((p) => {
+          if (!p.date_of_birth) return false;
+          const age = calculateAge(p.date_of_birth);
+          return age >= (currentUser.min_age || 18) && age <= (currentUser.max_age || 99);
+        })
+        // The RPC's radius is a rough lat/lon bounding box - narrow to the
+        // real distance, same client-side enforcement Discover/fetchCirclePool do.
+        .filter((p) => {
+          if (!hasCoords || !p.latitude || !p.longitude) return true;
+          return calculateDistance(userLat as number, userLon as number, p.latitude, p.longitude) <= maxDistanceKm;
+        });
 
       const ids = eligible.map((p) => p.id);
       const { data: imageRows } = ids.length
@@ -1231,7 +1282,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
         .map((p) => ({ ...p, favorites: parseFavorites(p.favorites), firstImage: firstImageByUser[p.id] }));
 
       if (withPhotos.length === 0) {
-        toast({ title: 'No matches yet', description: `No one new matches "${tile.label}" right now.` });
+        setEmptyCategoryLabel(tile.label);
         return;
       }
 
@@ -1301,11 +1352,11 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       }
       // Genuinely nobody matched this row's criteria at all (not a used-up
       // swipe waiting on cooldown) - this used to just render nothing, a
-      // dead end with no path forward. Premium wouldn't change the honest
-      // physical fact that no one nearby matches (distance/preferences are
-      // the viewer's own settings, not gated by tier), so this doesn't claim
-      // "upgrade to see more people" - only genuinely premium-gated benefits
-      // (faster refill, priority visibility) that actually hold true here.
+      // dead end with no path forward. Premium genuinely does grow the pool
+      // here - it unlocks browsing additional countries (see
+      // unlocked_countries / fetchCirclePool's countryCodes logic), not just
+      // the viewer's home one - so this is a real, honest reason to upgrade
+      // when the local pool has run dry, not just a generic pitch.
       return (
         <div className="mb-7">
           <h2 className="text-white font-semibold text-base px-6 mb-0.5">{title}</h2>
@@ -1313,7 +1364,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           <div className="px-6">
             <RefillCard
               label="Go Premium"
-              sublabel="Faster refills & priority visibility"
+              sublabel="Unlock more countries to find more people"
               onClick={() => setLockedTileLabel(title)}
             />
           </div>
@@ -1348,6 +1399,49 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
 
   const activeProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex] : selectedProfile;
   const nextBrowseProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex + 1] : undefined;
+
+  // Same empty-state pattern DiscoverPage uses when its own deck runs dry:
+  // a real banner (not a toast that's easy to miss), an honest "adjust your
+  // preferences" path that costs nothing, and - only if there's actually a
+  // real reason to upgrade (more countries unlocked) - a premium CTA whose
+  // wording matches whether this viewer currently qualifies for a free
+  // trial, exactly like every other upgrade prompt in the app.
+  if (emptyCategoryLabel) {
+    return (
+      <div className="h-full w-full flex items-center justify-center overflow-y-auto p-4">
+        <Card className="max-w-md w-full bg-black border border-pink-500/25 text-white shadow-2xl">
+          <CardContent className="p-6 text-center flex flex-col items-center">
+            <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
+            <h2 className="text-lg font-semibold mb-1.5 text-white">No one matches yet</h2>
+            <p className="text-gray-400 text-sm mb-5 max-w-xs">
+              No one new matches &quot;{emptyCategoryLabel}&quot; right now. Check back soon, or adjust your preferences in Profile.
+            </p>
+            {!isPremium && (
+              <div className="mb-3">
+                <p className="text-yellow-400 text-sm mb-3 max-w-xs mx-auto">
+                  Upgrade to Premium to unlock more countries and see more people.
+                </p>
+                <Button
+                  onClick={() => { setEmptyCategoryLabel(null); setShowCirclePremiumUpgrade(true); }}
+                  className="w-auto h-8 !rounded-full px-3.5 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+                >
+                  <Crown className="w-3.5 h-3.5 mr-1.5" />
+                  {eligibleForTrial ? 'Try now for free' : 'Unlock More Countries'}
+                </Button>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setEmptyCategoryLabel(null)}
+              className="w-auto h-8 !rounded-full px-3.5 text-xs border-pink-500/30 text-white hover:bg-pink-500/10"
+            >
+              Back to Circle
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (showCirclePremiumUpgrade) {
     return (
