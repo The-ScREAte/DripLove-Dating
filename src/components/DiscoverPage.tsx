@@ -2974,9 +2974,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 if (!p.date_of_birth) return false;
                 const age = calculateAge(p.date_of_birth);
                 if (!Number.isFinite(age) || age < minAge || age > maxAge) return false;
-                if (!premiumActive && currentUserData.latitude && currentUserData.longitude && p.latitude && p.longitude) {
-                  const d = calculateDistance(currentUserData.latitude, currentUserData.longitude, p.latitude, p.longitude);
-                  if (d > maxDistance) return false;
+                if (currentUserData.latitude && currentUserData.longitude && p.latitude && p.longitude) {
+                  const cc = normalizeCountryCode(p.country_code || '');
+                  const isHomeCountry = !baseCountryCode || !cc || cc === baseCountryCode;
+                  if (isHomeCountry) {
+                    const d = calculateDistance(currentUserData.latitude, currentUserData.longitude, p.latitude, p.longitude);
+                    if (d > maxDistance) return false;
+                  }
                 }
                 return true;
               });
