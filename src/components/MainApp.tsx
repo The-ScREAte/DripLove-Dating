@@ -1464,7 +1464,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
               > 
-                <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
+                <ChatPage
+                  currentUser={profile}
+                  onUnreadChange={forceRefreshUnreadCount}
+                  onDetailViewChange={setIsChatDetailOpen}
+                  deepLinkMatchId={chatDeepLinkMatchId}
+                  onDeepLinkConsumed={() => setChatDeepLinkMatchId(null)}
+                />
               </div>
             </Suspense>
           )}
