@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch, CurrentUser } from '@/types';
 import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
-import { matchesReciprocalPreference, normalizeCountryCodeList } from './discover/discoverFeedUtils';
+import { matchesReciprocalPreference } from './discover/discoverFeedUtils';
 import { parseFavorites } from '@/constants/favorites';
 import {
   fetchCirclePool,
