@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       admin_actions: {
@@ -574,6 +549,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      circle_row_batches: {
+        Row: {
+          profile_ids: string[]
+          row_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          profile_ids?: string[]
+          row_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          profile_ids?: string[]
+          row_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      circle_row_cooldowns: {
+        Row: {
+          exhausted_at: string
+          row_key: string
+          user_id: string
+        }
+        Insert: {
+          exhausted_at?: string
+          row_key: string
+          user_id: string
+        }
+        Update: {
+          exhausted_at?: string
+          row_key?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       daily_active_stats: {
         Row: {
@@ -1334,6 +1348,30 @@ export type Database = {
           },
         ]
       }
+      pending_welcome_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          send_at: string
+          sent: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          send_at: string
+          sent?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          send_at?: string
+          sent?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       premium_users_history: {
         Row: {
           created_at: string
@@ -1365,6 +1403,7 @@ export type Database = {
         Row: {
           account_status: string | null
           adinkra_symbols: string[] | null
+          badge_count: number
           bio: string | null
           city: string | null
           communication_style: string[] | null
@@ -1398,6 +1437,7 @@ export type Database = {
           last_googled: string | null
           last_login_at: string | null
           last_name: string
+          last_reengagement_sent_at: string | null
           latitude: number | null
           like_me_cooldown_until: string | null
           login_count: number | null
@@ -1432,6 +1472,7 @@ export type Database = {
         Insert: {
           account_status?: string | null
           adinkra_symbols?: string[] | null
+          badge_count?: number
           bio?: string | null
           city?: string | null
           communication_style?: string[] | null
@@ -1465,6 +1506,7 @@ export type Database = {
           last_googled?: string | null
           last_login_at?: string | null
           last_name: string
+          last_reengagement_sent_at?: string | null
           latitude?: number | null
           like_me_cooldown_until?: string | null
           login_count?: number | null
@@ -1499,6 +1541,7 @@ export type Database = {
         Update: {
           account_status?: string | null
           adinkra_symbols?: string[] | null
+          badge_count?: number
           bio?: string | null
           city?: string | null
           communication_style?: string[] | null
@@ -1532,6 +1575,7 @@ export type Database = {
           last_googled?: string | null
           last_login_at?: string | null
           last_name?: string
+          last_reengagement_sent_at?: string | null
           latitude?: number | null
           like_me_cooldown_until?: string | null
           login_count?: number | null
@@ -2179,6 +2223,7 @@ export type Database = {
           expires_at: string | null
           flutterwave_transaction_id: string | null
           id: string
+          is_trial: boolean
           next_billing_date: string | null
           original_transaction_id: string | null
           payment_attempts: number | null
@@ -2197,6 +2242,7 @@ export type Database = {
           expires_at?: string | null
           flutterwave_transaction_id?: string | null
           id?: string
+          is_trial?: boolean
           next_billing_date?: string | null
           original_transaction_id?: string | null
           payment_attempts?: number | null
@@ -2215,6 +2261,7 @@ export type Database = {
           expires_at?: string | null
           flutterwave_transaction_id?: string | null
           id?: string
+          is_trial?: boolean
           next_billing_date?: string | null
           original_transaction_id?: string | null
           payment_attempts?: number | null
@@ -2435,14 +2482,27 @@ export type Database = {
         Args: { admin_notes?: string; image_id: string }
         Returns: boolean
       }
-      count_circle_verified_profiles: {
-        Args: {
-          p_allowed_genders: string[]
-          p_country_codes: string[]
-          p_viewer_gender: string
-        }
-        Returns: number
-      }
+      count_circle_verified_profiles:
+        | {
+            Args: {
+              p_allowed_genders: string[]
+              p_country_codes: string[]
+              p_viewer_gender: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_allowed_genders: string[]
+              p_country_codes: string[]
+              p_excluded_ids?: string[]
+              p_lat?: number
+              p_lon?: number
+              p_radius_degrees?: number
+              p_viewer_gender: string
+            }
+            Returns: number
+          }
       create_admin_user: {
         Args: {
           admin_email: string
@@ -2465,25 +2525,15 @@ export type Database = {
         Returns: undefined
       }
       dissolve_matches: { Args: { match_ids: string[] }; Returns: number }
-      find_matches_by_location:
-        | {
-            Args: { max_distance_km?: number; user_id: string }
-            Returns: {
-              city: string
-              country_code: string
-              distance_km: number
-              profile_id: string
-            }[]
-          }
-        | {
-            Args: { max_distance_km?: number; user_id: string }
-            Returns: {
-              city: string
-              country_code: string
-              distance_km: number
-              profile_id: string
-            }[]
-          }
+      find_matches_by_location: {
+        Args: { max_distance_km?: number; user_id: string }
+        Returns: {
+          city: string
+          country_code: string
+          distance_km: number
+          profile_id: string
+        }[]
+      }
       get_active_users_for_date: {
         Args: { target_date: string }
         Returns: number
@@ -2491,95 +2541,193 @@ export type Database = {
       get_admin_stats: { Args: never; Returns: Json }
       get_all_time_premium_count: { Args: never; Returns: number }
       get_app_stats: { Args: never; Returns: Json }
-      get_circle_category_profiles: {
-        Args: {
-          p_allowed_genders: string[]
-          p_country_codes: string[]
-          p_excluded_ids?: string[]
-          p_family_plans?: string[]
-          p_has_music?: boolean
-          p_has_pets?: boolean
-          p_has_social_media?: boolean
-          p_interest?: string
-          p_is_verified?: boolean
-          p_limit?: number
-          p_relationship_intent?: string
-          p_viewer_gender: string
-        }
-        Returns: {
-          account_status: string | null
-          adinkra_symbols: string[] | null
-          bio: string | null
-          city: string | null
-          communication_style: string[] | null
-          country: string
-          country_code: string | null
-          created_at: string | null
-          date_of_birth: string
-          distance_preference: number | null
-          drinking: string | null
-          education_level: string | null
-          email: string
-          exercise_level: string | null
-          face_descriptor: string | null
-          family_plans: string | null
-          favorites: Json
-          feed_random_weight: number
-          first_name: string
-          fun_fact: string | null
-          gender: string | null
-          has_rated_app: boolean
-          height_cm: number | null
-          id: string
-          industry: string | null
-          interests: string[] | null
-          introvert_extrovert: number | null
-          is_admin: boolean | null
-          is_archived: boolean | null
-          is_custom_city: boolean | null
-          is_verified: boolean
-          languages: string[] | null
-          last_googled: string | null
-          last_login_at: string | null
-          last_name: string
-          latitude: number | null
-          like_me_cooldown_until: string | null
-          login_count: number | null
-          longitude: number | null
-          love_style: string[] | null
-          max_age: number | null
-          max_distance: number | null
-          messy_organized: number | null
-          min_age: number | null
-          occupation: string | null
-          perfect_first_date: string | null
-          pets: string[] | null
-          preference: string
-          preferred_language: string | null
-          profile_completion: number
-          promo_code_used: string | null
-          rated_app_at: string | null
-          relationship_intent: string | null
-          sleeping_schedule: string | null
-          smoking: string | null
-          social_media: string | null
-          spontaneous_planner: number | null
-          terms_accepted: boolean | null
-          terms_accepted_at: string | null
-          total_swipe_count: number
-          unlocked_countries: string[] | null
-          updated_at: string | null
-          visibility_boost_multiplier: number | null
-          visibility_boost_until: string | null
-          zip_code: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "profiles"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
+      get_circle_category_profiles:
+        | {
+            Args: {
+              p_allowed_genders: string[]
+              p_country_codes: string[]
+              p_excluded_ids?: string[]
+              p_family_plans?: string[]
+              p_has_music?: boolean
+              p_has_pets?: boolean
+              p_has_social_media?: boolean
+              p_interest?: string
+              p_is_verified?: boolean
+              p_limit?: number
+              p_relationship_intent?: string
+              p_viewer_gender: string
+            }
+            Returns: {
+              account_status: string | null
+              adinkra_symbols: string[] | null
+              badge_count: number
+              bio: string | null
+              city: string | null
+              communication_style: string[] | null
+              country: string
+              country_code: string | null
+              created_at: string | null
+              date_of_birth: string
+              distance_preference: number | null
+              drinking: string | null
+              education_level: string | null
+              email: string
+              exercise_level: string | null
+              face_descriptor: string | null
+              family_plans: string | null
+              favorites: Json
+              feed_random_weight: number
+              first_name: string
+              fun_fact: string | null
+              gender: string | null
+              has_rated_app: boolean
+              height_cm: number | null
+              id: string
+              industry: string | null
+              interests: string[] | null
+              introvert_extrovert: number | null
+              is_admin: boolean | null
+              is_archived: boolean | null
+              is_custom_city: boolean | null
+              is_verified: boolean
+              languages: string[] | null
+              last_googled: string | null
+              last_login_at: string | null
+              last_name: string
+              last_reengagement_sent_at: string | null
+              latitude: number | null
+              like_me_cooldown_until: string | null
+              login_count: number | null
+              longitude: number | null
+              love_style: string[] | null
+              max_age: number | null
+              max_distance: number | null
+              messy_organized: number | null
+              min_age: number | null
+              occupation: string | null
+              perfect_first_date: string | null
+              pets: string[] | null
+              preference: string
+              preferred_language: string | null
+              profile_completion: number
+              promo_code_used: string | null
+              rated_app_at: string | null
+              relationship_intent: string | null
+              sleeping_schedule: string | null
+              smoking: string | null
+              social_media: string | null
+              spontaneous_planner: number | null
+              terms_accepted: boolean | null
+              terms_accepted_at: string | null
+              total_swipe_count: number
+              unlocked_countries: string[] | null
+              updated_at: string | null
+              visibility_boost_multiplier: number | null
+              visibility_boost_until: string | null
+              zip_code: string | null
+            }[]
+            SetofOptions: {
+              from: "*"
+              to: "profiles"
+              isOneToOne: false
+              isSetofReturn: true
+            }
+          }
+        | {
+            Args: {
+              p_allowed_genders: string[]
+              p_archived?: boolean
+              p_country_codes: string[]
+              p_excluded_ids?: string[]
+              p_family_plans?: string[]
+              p_has_music?: boolean
+              p_has_pets?: boolean
+              p_has_social_media?: boolean
+              p_interest?: string
+              p_is_verified?: boolean
+              p_lat?: number
+              p_limit?: number
+              p_lon?: number
+              p_radius_degrees?: number
+              p_relationship_intent?: string
+              p_viewer_gender: string
+            }
+            Returns: {
+              account_status: string | null
+              adinkra_symbols: string[] | null
+              badge_count: number
+              bio: string | null
+              city: string | null
+              communication_style: string[] | null
+              country: string
+              country_code: string | null
+              created_at: string | null
+              date_of_birth: string
+              distance_preference: number | null
+              drinking: string | null
+              education_level: string | null
+              email: string
+              exercise_level: string | null
+              face_descriptor: string | null
+              family_plans: string | null
+              favorites: Json
+              feed_random_weight: number
+              first_name: string
+              fun_fact: string | null
+              gender: string | null
+              has_rated_app: boolean
+              height_cm: number | null
+              id: string
+              industry: string | null
+              interests: string[] | null
+              introvert_extrovert: number | null
+              is_admin: boolean | null
+              is_archived: boolean | null
+              is_custom_city: boolean | null
+              is_verified: boolean
+              languages: string[] | null
+              last_googled: string | null
+              last_login_at: string | null
+              last_name: string
+              last_reengagement_sent_at: string | null
+              latitude: number | null
+              like_me_cooldown_until: string | null
+              login_count: number | null
+              longitude: number | null
+              love_style: string[] | null
+              max_age: number | null
+              max_distance: number | null
+              messy_organized: number | null
+              min_age: number | null
+              occupation: string | null
+              perfect_first_date: string | null
+              pets: string[] | null
+              preference: string
+              preferred_language: string | null
+              profile_completion: number
+              promo_code_used: string | null
+              rated_app_at: string | null
+              relationship_intent: string | null
+              sleeping_schedule: string | null
+              smoking: string | null
+              social_media: string | null
+              spontaneous_planner: number | null
+              terms_accepted: boolean | null
+              terms_accepted_at: string | null
+              total_swipe_count: number
+              unlocked_countries: string[] | null
+              updated_at: string | null
+              visibility_boost_multiplier: number | null
+              visibility_boost_until: string | null
+              zip_code: string | null
+            }[]
+            SetofOptions: {
+              from: "*"
+              to: "profiles"
+              isOneToOne: false
+              isSetofReturn: true
+            }
+          }
       get_current_subscription_status: {
         Args: { p_user_id: string }
         Returns: {
@@ -2648,6 +2796,7 @@ export type Database = {
         Returns: {
           account_status: string | null
           adinkra_symbols: string[] | null
+          badge_count: number
           bio: string | null
           city: string | null
           communication_style: string[] | null
@@ -2681,6 +2830,7 @@ export type Database = {
           last_googled: string | null
           last_login_at: string | null
           last_name: string
+          last_reengagement_sent_at: string | null
           latitude: number | null
           like_me_cooldown_until: string | null
           login_count: number | null
@@ -2746,6 +2896,7 @@ export type Database = {
       }
       increment_ad_click: { Args: { ad_id: string }; Returns: undefined }
       increment_ad_impression: { Args: { ad_id: string }; Returns: undefined }
+      increment_badge_count: { Args: { p_user_id: string }; Returns: number }
       increment_email_account_usage: {
         Args: { p_account_email: string; p_amount?: number }
         Returns: number
@@ -2787,6 +2938,10 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_match_messages_read: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
       mark_my_profile_broadcast_message_read: {
         Args: { p_recipient_id: string }
         Returns: boolean
@@ -2800,6 +2955,7 @@ export type Database = {
         }
         Returns: Json
       }
+      process_pending_welcome_notifications: { Args: never; Returns: undefined }
       process_referral_commission: {
         Args: {
           p_payment_amount: number
@@ -2829,6 +2985,8 @@ export type Database = {
         Args: { p_amount_ghs: number; p_code: string; p_password: string }
         Returns: Json
       }
+      reset_badge_count: { Args: never; Returns: undefined }
+      send_reengagement_notifications: { Args: never; Returns: undefined }
       set_influencer_password: {
         Args: {
           p_new_password: string
@@ -2979,9 +3137,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
