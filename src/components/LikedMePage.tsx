@@ -1056,6 +1056,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
       if (error) throw error;
 
+      // Tell every other surface (Circle pool, Recommended/Similar rows,
+      // Discover deck) this person is now decided, so they disappear there
+      // immediately instead of lingering until a cache expires.
+      publishSwipeDecision(currentUser.id, profileId, 'like');
+
       // Set lockout period for free users
       if (!isPremium && !hasInteractedToday) {
         await setLockoutPeriod();
