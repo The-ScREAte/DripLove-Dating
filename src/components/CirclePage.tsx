@@ -582,7 +582,7 @@ const PeopleRow = ({
   );
 };
 
-const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
+const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsumed }: CirclePageProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   // Same eligibility signal PremiumUpgrade.tsx's own "Start Free Trial"
