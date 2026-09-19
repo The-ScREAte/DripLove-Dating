@@ -20,6 +20,7 @@ import { calculateDistance } from '@/constants/locationData';
 // get the same generous-but-capped radius, premium the same uncapped one.
 const DEFAULT_MAX_DISTANCE_KM = 50;
 const FREE_USER_MAX_DISTANCE_KM = 600;
+const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 // Approximate km-per-degree of latitude - same conversion DiscoverPage uses
 // to turn a straight-line distance cap into the RPC's lat/lon bounding box,
 // which is then narrowed to a true circle by the client-side calculateDistance
