@@ -144,15 +144,15 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
           <div className="text-xs text-gray-300 space-y-1">
             <div className="flex justify-between">
               <span>• Same city:</span>
-              <span className="text-green-400">~0-25 km</span>
+               <span className="text-green-400">~0-{toDisplayDistance(25)} {getDistanceUnitLabel()}</span>
             </div>
             <div className="flex justify-between">
               <span>• Nearby cities:</span>
-              <span className="text-blue-400">~25-100 km</span>
+              <span className="text-blue-400">~{toDisplayDistance(25)}-{toDisplayDistance(100)} {getDistanceUnitLabel()}</span>
             </div>
             <div className="flex justify-between">
               <span>• Same country:</span>
-              <span className="text-orange-400">~100-500 km</span>
+              <span className="text-orange-400">~{toDisplayDistance(100)}-{toDisplayDistance(500)} {getDistanceUnitLabel()}</span>
             </div>
           </div>
         </div>
