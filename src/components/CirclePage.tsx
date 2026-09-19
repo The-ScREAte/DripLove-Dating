@@ -653,8 +653,8 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Today's Circle like count, read once per mount (and re-read on the
-  // minute tick so a session left open across midnight refills itself).
+  // Today's Circle like count, read once per mount (the row is keyed by
+  // date, so it refills on its own each new day).
   useEffect(() => {
     if (!currentUser?.id || isPremium) { setCircleLikesLoaded(true); return; }
     let cancelled = false;
@@ -665,7 +665,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       setCircleLikesLoaded(true);
     })();
     return () => { cancelled = true; };
-  }, [currentUser?.id, isPremium, cooldownTick]);
+  }, [currentUser?.id, isPremium]);
 
 
   // Load this user's row cooldowns once - see supabase/migrations/20260917000000_circle_row_cooldowns.sql
