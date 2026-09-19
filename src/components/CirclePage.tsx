@@ -23,6 +23,7 @@ import PremiumUpgrade from './PremiumUpgrade';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { getCircleDailyLikeLimit, getCircleLikesUsedToday, recordCircleLike } from '@/utils/circleSwipeLimit';
 import { publishSwipeDecision } from '@/utils/swipeSync';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
 // Recommended for you / Similar interests only ever show a handful at a
 // time, then go on cooldown instead of silently backfilling from the pool.
