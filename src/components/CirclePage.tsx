@@ -1203,23 +1203,22 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
       const allowedGenders = getGenderFilter(currentUser.preference || 'everyone');
 
-      let countryCodes: string[];
-      if (baseCountryCode) {
-        countryCodes = isPremium
-          ? Array.from(new Set([baseCountryCode, ...normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode)]))
-          : [baseCountryCode];
-      } else {
+      const split = getCircleCountrySplit(currentUser, isPremium);
+      let homeCountryCodes = split.homeCountryCodes;
+      const unlockedCountryCodes = split.unlockedCountryCodes;
+      if (homeCountryCodes.length === 0) {
         const { data: countryRows } = await supabase
           .from('profiles')
           .select('country_code')
           .eq('account_status', 'active')
           .not('country_code', 'is', null);
-        countryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
+        homeCountryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
       }
-      if (countryCodes.length === 0) {
+      if (homeCountryCodes.length === 0 && unlockedCountryCodes.length === 0) {
         setEmptyCategoryLabel(tile.label);
         return;
       }
+      const homeSet = new Set(homeCountryCodes);
 
       // Same exclusion set Discover and the main Circle pool use - your own
       // like/pass/match/block/cooldown, never someone else's incoming like on
