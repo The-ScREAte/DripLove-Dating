@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS chk_max_distance;
+ALTER TABLE public.profiles ADD CONSTRAINT chk_max_distance CHECK (max_distance IS NULL OR (max_distance >= 1 AND max_distance <= 5000));
