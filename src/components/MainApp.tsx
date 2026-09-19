@@ -13,6 +13,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
+import { setDistanceUnitCountry } from '@/utils/distanceUnits';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import { fetchCirclePool } from '@/utils/circlePoolFetch';
