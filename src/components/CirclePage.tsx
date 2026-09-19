@@ -262,6 +262,10 @@ interface CirclePageProps {
   currentUser: CurrentUser;
   isPremium?: boolean;
   isActiveTab?: boolean;
+  // Set when a "meet <person>" notification is tapped while the app is
+  // already running - opens that person's profile inside Circle.
+  deepLinkProfileId?: string | null;
+  onDeepLinkConsumed?: () => void;
 }
 
 // CircleProfile + the pool fetch itself now live in '@/utils/circlePoolFetch'
