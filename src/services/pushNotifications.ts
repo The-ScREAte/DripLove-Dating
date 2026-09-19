@@ -21,7 +21,7 @@ interface RealtimeNotification {
   is_read: boolean;
   created_at: string;
   related_user_id?: string | null;
-  data?: Record<string, unknown> | null;
+  data?: unknown;
 }
 
 const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
@@ -302,7 +302,7 @@ class SupabasePushNotificationService {
       this.showInAppNotification({
         title: notification.title,
         body: notification.message,
-        data: { notificationId: notification.id, ...(notification.data || {}) },
+        data: { notificationId: notification.id, ...normalizeNotificationData(notification.data) },
         type: notification.type as 'match' | 'message' | 'like' | 'system' | 'admin'
       });
     }

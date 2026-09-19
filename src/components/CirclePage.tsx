@@ -843,7 +843,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // people already liked/passed/matched/blocked, archived accounts, and
       // anyone regardless of distance, so it promised far more real matches
       // than existed (e.g. one real account: tile said 114, real count was 0).
-      const [excluded, { userLat, userLon, hasCoords, radiusDegrees }] = await Promise.all([
+      const [excluded, { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees }] = await Promise.all([
         fetchCircleExclusionIds(currentUser.id),
         Promise.resolve(getCircleDistanceParams(currentUser, isPremium)),
       ]);
@@ -855,26 +855,9 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       ): Promise<number> => {
         if (codes.length === 0) return 0;
         const useBox = applyRadius && hasCoords && radiusDegrees !== null;
-        // "Verified" isn't a plain column filter a REST query can express -
-        // it's the same >=85%-profile-completion formula used everywhere
-        // else in the app for the "Verified" checkmark, computed
-        // server-side by a dedicated RPC.
-        if (filter?.isVerified) {
-          const { data, error } = await supabase.rpc('count_circle_verified_profiles', {
-            p_country_codes: codes,
-            p_allowed_genders: allowedGenders,
-            p_viewer_gender: currentUser.gender || '',
-            p_excluded_ids: Array.from(excluded),
-            p_lat: useBox ? userLat : null,
-            p_lon: useBox ? userLon : null,
-            p_radius_degrees: useBox ? radiusDegrees : null,
-          });
-          if (error) return 0;
-          return typeof data === 'number' ? data : 0;
-        }
         let q = supabase
           .from('profiles')
-          .select('id', { count: 'exact', head: true })
+          .select('id, latitude, longitude, date_of_birth')
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
@@ -896,13 +879,21 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           q = q.or(`preference.eq.${currentUser.gender},preference.eq.everyone`);
         }
         if (filter?.relationshipIntent) q = q.eq('relationship_intent', filter.relationshipIntent);
+        if (filter?.isVerified) q = q.eq('is_verified', true);
         if (filter?.familyPlans) q = q.in('family_plans', filter.familyPlans);
         if (filter?.interest) q = q.contains('interests', [filter.interest]);
         if (filter?.hasMusic) q = q.contains('favorites', [{ category: 'Music' }]);
         if (filter?.hasSocialMedia) q = q.not('social_media', 'is', null).neq('social_media', '');
         if (filter?.hasPets) q = q.not('pets', 'is', null).neq('pets', []);
-        const { count } = await q;
-        return count ?? 0;
+        const { data, error } = await q;
+        if (error || !data) return 0;
+        return data.filter((profile) => {
+          if (!profile.date_of_birth) return false;
+          const age = calculateAge(profile.date_of_birth);
+          if (age < (currentUser.min_age || 18) || age > (currentUser.max_age || 99)) return false;
+          if (!applyRadius || !hasCoords || typeof profile.latitude !== 'number' || typeof profile.longitude !== 'number') return true;
+          return calculateDistance(userLat as number, userLon as number, profile.latitude, profile.longitude) <= maxDistanceKm;
+        }).length;
       };
 
       const countFor = async (filter?: CategoryFilter): Promise<number> => {

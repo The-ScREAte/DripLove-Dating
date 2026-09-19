@@ -1221,6 +1221,28 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     return () => setNotificationNavHandler(null);
   }, [handleTabChange]);
 
+  // Android's custom notification service updates the URL without reloading
+  // the app. Consume that route immediately when the WebView is already open.
+  useEffect(() => {
+    const handleNativeRoute = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'circle') {
+        const profileId = params.get('circleUserId');
+        if (profileId) setCircleDeepLinkProfileId(profileId);
+        handleTabChange('circle');
+      } else if (tab === 'chat') {
+        const matchId = params.get('matchId');
+        if (matchId) setChatDeepLinkMatchId(matchId);
+        handleTabChange('chat');
+      } else if (tab === 'liked' || tab === 'profile' || tab === 'dripcheck') {
+        handleTabChange(tab);
+      }
+    };
+    window.addEventListener('popstate', handleNativeRoute);
+    return () => window.removeEventListener('popstate', handleNativeRoute);
+  }, [handleTabChange]);
+
   if (!userId) {
     return (
       <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
