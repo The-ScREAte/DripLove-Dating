@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { MapPin, Settings, Target } from 'lucide-react';
 import { locationService, type UserLocation } from '@/services/locationService';
 import { getCountriesList } from '@/constants/locationData';
+import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/utils/distanceUnits';
 
 interface LocationFilterProps {
   currentUser: {
@@ -122,20 +123,20 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-200">Maximum Distance</label>
-              <span className="text-sm text-gray-300">{maxDistance} km</span>
+              <span className="text-sm text-gray-300">{toDisplayDistance(maxDistance)} {getDistanceUnitLabel()}</span>
             </div>
             <Slider
-              value={[maxDistance]}
-              onValueChange={handleDistanceChange}
-              max={500}
+              value={[toDisplayDistance(maxDistance)]}
+              onValueChange={(v) => handleDistanceChange([fromDisplayDistance(v[0])])}
+              max={toDisplayDistance(500)}
               min={1}
               step={5}
               className="w-full"
               disabled={isLoading}
             />
             <div className="flex justify-between text-xs text-gray-400 mt-1">
-              <span>1 km</span>
-              <span>500 km</span>
+              <span>1 {getDistanceUnitLabel()}</span>
+              <span>{toDisplayDistance(500)} {getDistanceUnitLabel()}</span>
             </div>
           </div>
 
@@ -143,15 +144,15 @@ const LocationFilter = ({ currentUser, onLocationUpdate }: LocationFilterProps) 
           <div className="text-xs text-gray-300 space-y-1">
             <div className="flex justify-between">
               <span>• Same city:</span>
-              <span className="text-green-400">~0-25 km</span>
+               <span className="text-green-400">~0-{toDisplayDistance(25)} {getDistanceUnitLabel()}</span>
             </div>
             <div className="flex justify-between">
               <span>• Nearby cities:</span>
-              <span className="text-blue-400">~25-100 km</span>
+              <span className="text-blue-400">~{toDisplayDistance(25)}-{toDisplayDistance(100)} {getDistanceUnitLabel()}</span>
             </div>
             <div className="flex justify-between">
               <span>• Same country:</span>
-              <span className="text-orange-400">~100-500 km</span>
+              <span className="text-orange-400">~{toDisplayDistance(100)}-{toDisplayDistance(500)} {getDistanceUnitLabel()}</span>
             </div>
           </div>
         </div>

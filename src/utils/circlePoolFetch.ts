@@ -20,6 +20,7 @@ import { calculateDistance } from '@/constants/locationData';
 // get the same generous-but-capped radius, premium the same uncapped one.
 const DEFAULT_MAX_DISTANCE_KM = 50;
 const FREE_USER_MAX_DISTANCE_KM = 600;
+const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 // Approximate km-per-degree of latitude - same conversion DiscoverPage uses
 // to turn a straight-line distance cap into the RPC's lat/lon bounding box,
 // which is then narrowed to a true circle by the client-side calculateDistance
@@ -36,7 +37,10 @@ export const getCircleDistanceParams = (currentUser: CurrentUser, isPremium?: bo
   const userLon = currentUser.longitude;
   const rawMaxDistance = Number(currentUser.max_distance ?? currentUser.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
   const safeMaxDistanceUncapped = Number.isFinite(rawMaxDistance) && rawMaxDistance > 0 ? rawMaxDistance : DEFAULT_MAX_DISTANCE_KM;
-  const maxDistanceKm = isPremium ? safeMaxDistanceUncapped : Math.min(safeMaxDistanceUncapped, FREE_USER_MAX_DISTANCE_KM);
+  const maxDistanceKm = Math.min(
+    safeMaxDistanceUncapped,
+    isPremium ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
+  );
   const hasCoords = typeof userLat === 'number' && typeof userLon === 'number';
   const radiusDegrees = hasCoords ? maxDistanceKm / KM_PER_DEGREE_LATITUDE : null;
   return { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees };

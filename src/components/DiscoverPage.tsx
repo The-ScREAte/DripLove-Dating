@@ -99,8 +99,10 @@ const PREMIUM_DAILY_SWIPE_LIMIT = 200;
 const FREE_USER_MAX_DISTANCE_KM = 600;
 // Premium users can search further than free users, but still up to a
 // concrete ceiling rather than being fully unbounded - matches the max on
-// the distance slider in the profile's Location section.
-const PREMIUM_USER_MAX_DISTANCE_KM = 1020;
+// the distance slider in the profile's Location section. The radius is
+// ALWAYS additionally bounded by the home country: a bigger radius never
+// pulls in a neighbouring country's profiles.
+const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 
 // Below this profile-completion percentage, swiping is blocked once the user
 // has already had a few free look-arounds. Was hardcoded as "70" and "5"
@@ -1454,14 +1456,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Phase 1: active users only
     
     if (premiumForFeed) {
-      // STEP 1: Premium sees the ENTIRE home country - no distance cap.
-      // Distance is a free-tier restriction only; premium pays specifically
-      // for full-country + unlocked-country visibility. (distanceMap may
-      // already hold a real km value for some of these from the unconditional
-      // locationService call above - that's kept for display; it never
-      // restricts *inclusion* here.)
+      // STEP 1: Home country, bounded by the user's OWN distance setting.
+      // Premium is no longer "whole country regardless of distance" - the
+      // distance slider is the single truth for everyone, in Discover and
+      // Circle alike. What premium still buys is a much larger maximum
+      // radius (PREMIUM_USER_MAX_DISTANCE_KM) plus unlocked countries.
+      // The radius never crosses a border: the country filter still applies.
       localProfiles = baseCountryCode
         ? await (async () => {
+            const viewerLat = currentUserData?.latitude;
+            const viewerLon = currentUserData?.longitude;
+            const hasCoords = Number.isFinite(Number(viewerLat)) && Number.isFinite(Number(viewerLon)) && !!viewerLat && !!viewerLon;
+            const radiusInDegrees = hasCoords ? safeUserMaxDistance / 111.32 : null;
+
             // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
             // indexed column reshuffled once nightly via pg_cron, not a
             // fresh random() per call) - see get_random_discover_profiles.
@@ -1473,10 +1480,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               p_archived: false,
               p_excluded_ids: excludedIds,
               p_limit: 100,
+              p_lat: radiusInDegrees != null ? viewerLat : null,
+              p_lon: radiusInDegrees != null ? viewerLon : null,
+              p_radius_degrees: radiusInDegrees,
             });
 
             if (error) throw error;
-            const rows = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+            let rows = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+
+            // Precise haversine enforcement on top of the coarse box.
+            if (hasCoords) {
+              rows = rows.filter((p) => {
+                if (!p.latitude || !p.longitude) return true;
+                const dist = calculateDistance(Number(viewerLat), Number(viewerLon), p.latitude, p.longitude);
+                distanceMap[p.id] = dist;
+                return dist <= safeUserMaxDistance;
+              });
+            }
+
             rows.forEach((p) => (distanceMap[p.id] ??= 999));
             return rows;
           })()
@@ -1687,7 +1708,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // baseCountryCode), and this mirrors how fetchUnlockedCountryProfiles
       // (the active-pool equivalent) already has no distance filter at all
       // for premium.
-      const archivedRadiusInDegrees = (!premiumForFeed && baseCountryCode && userLat && userLon)
+      // Premium WITH unlocked countries still can't use a server-side box
+      // (it would wrongly exclude the unlocked countries' candidates); those
+      // are distance-filtered client-side for home-country rows only, below.
+      const archivedRadiusInDegrees = (baseCountryCode && userLat && userLon && !hasUnlockedCountries)
         ? safeUserMaxDistance / 111.32
         : null;
 
@@ -1742,14 +1766,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (!premiumForFeed && baseCountryCode) {
           archivedCandidates = archivedCandidates.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
-          if (userLat && userLon) {
-            archivedCandidates = archivedCandidates.filter((p) => {
-              if (!p.latitude || !p.longitude) return true;
-              const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
-              distanceMap[p.id] = dist;
-              return dist <= safeUserMaxDistance;
-            });
-          }
+        }
+
+        // Distance now applies to EVERY tier, but only inside the home
+        // country - unlocked countries are a premium perk and stay
+        // distance-free.
+        if (baseCountryCode && userLat && userLon) {
+          archivedCandidates = archivedCandidates.filter((p) => {
+            const cc = normalizeCountryCode(p.country_code || p.country || '');
+            if (cc && cc !== baseCountryCode) return true;
+            if (!p.latitude || !p.longitude) return true;
+            const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
+            distanceMap[p.id] = dist;
+            return dist <= safeUserMaxDistance;
+          });
         }
 
         if (premiumForFeed && allowedCountryCodes.length > 1) {
@@ -1939,14 +1969,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (!premiumForFeed && baseCountryCode) {
           filteredProfiles = filteredProfiles.filter((p) => isLocalCountryForFreeUser(p, baseCountryCode));
-          if (userLat && userLon) {
-            filteredProfiles = filteredProfiles.filter((p) => {
-              if (!p.latitude || !p.longitude) return true;
-              const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
-              distanceMap[p.id] = dist;
-              return dist <= safeUserMaxDistance;
-            });
-          }
+        }
+
+        // Home-country candidates always respect the viewer's distance
+        // setting (all tiers); unlocked countries stay distance-free.
+        if (baseCountryCode && userLat && userLon) {
+          filteredProfiles = filteredProfiles.filter((p) => {
+            const cc = normalizeCountryCode(p.country_code || p.country || '');
+            if (cc && cc !== baseCountryCode) return true;
+            if (!p.latitude || !p.longitude) return true;
+            const dist = calculateDistance(userLat, userLon, p.latitude, p.longitude);
+            distanceMap[p.id] = dist;
+            return dist <= safeUserMaxDistance;
+          });
         }
       }
     }
@@ -2898,9 +2933,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               : (baseCountryCode ? [baseCountryCode] : []);
             if (recoveryCountryCodes.length === 0) return [];
 
-            // Distance is a free-tier concept only - premium browses unlocked
-            // countries with no radius, same as the main fetch's international path.
-            const recoveryRadiusInDegrees = (!premiumActive && currentUserData.latitude && currentUserData.longitude)
+            // Distance applies to everyone inside the home country. A
+            // server-side box can only be used when unlocked countries
+            // aren't part of this query (it would be centered on the
+            // viewer and wrongly exclude them); otherwise it's enforced
+            // client-side, home-country rows only, below.
+            const hasUnlockedInRecovery = premiumActive && recoveryCountryCodes.length > 1;
+            const recoveryRadiusInDegrees = (!hasUnlockedInRecovery && currentUserData.latitude && currentUserData.longitude)
               ? maxDistance / 111.32
               : null;
 
@@ -2935,9 +2974,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 if (!p.date_of_birth) return false;
                 const age = calculateAge(p.date_of_birth);
                 if (!Number.isFinite(age) || age < minAge || age > maxAge) return false;
-                if (!premiumActive && currentUserData.latitude && currentUserData.longitude && p.latitude && p.longitude) {
-                  const d = calculateDistance(currentUserData.latitude, currentUserData.longitude, p.latitude, p.longitude);
-                  if (d > maxDistance) return false;
+                if (currentUserData.latitude && currentUserData.longitude && p.latitude && p.longitude) {
+                  const cc = normalizeCountryCode(p.country_code || '');
+                  const isHomeCountry = !baseCountryCode || !cc || cc === baseCountryCode;
+                  if (isHomeCountry) {
+                    const d = calculateDistance(currentUserData.latitude, currentUserData.longitude, p.latitude, p.longitude);
+                    if (d > maxDistance) return false;
+                  }
                 }
                 return true;
               });
@@ -3991,9 +4034,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               const rescueUserLon = currentUser?.longitude;
               const rescueMaxDistanceRaw = currentUser?.max_distance ?? currentUser?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
               const rescueMaxDistance = Number(rescueMaxDistanceRaw);
-              const safeRescueMaxDistance = premiumActive
-                ? Infinity
-                : Math.min(Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : DEFAULT_MAX_DISTANCE_KM, FREE_USER_MAX_DISTANCE_KM);
+              const safeRescueMaxDistance = Math.min(
+                Number.isFinite(rescueMaxDistance) && rescueMaxDistance > 0 ? rescueMaxDistance : DEFAULT_MAX_DISTANCE_KM,
+                premiumActive ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
+              );
+              const rescueBaseCountryCode = getTrustedBaseCountryCode(currentUser?.country_code, currentUser?.country);
 
               const freshProfiles = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
                 .filter((p) => {
@@ -4001,7 +4046,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                   // as the other fetches in this file.
                   const cc = normalizeCountryCode(p.country_code || '');
                   if (!cc || !rescueAllowedCountryCodes.includes(cc)) return false;
-                  if (!premiumActive && rescueUserLat && rescueUserLon && p.latitude && p.longitude) {
+                  // Home country respects the distance setting for every
+                  // tier; unlocked countries are distance-free.
+                  const isRescueHomeCountry = !rescueBaseCountryCode || cc === rescueBaseCountryCode;
+                  if (isRescueHomeCountry && rescueUserLat && rescueUserLon && p.latitude && p.longitude) {
                     const dist = calculateDistance(rescueUserLat, rescueUserLon, p.latitude, p.longitude);
                     if (dist > safeRescueMaxDistance) return false;
                   }

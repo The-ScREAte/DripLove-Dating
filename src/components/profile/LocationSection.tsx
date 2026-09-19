@@ -10,12 +10,15 @@ import { Globe, Crown, ChevronRight } from 'lucide-react';
 import LocationInput from '@/components/forms/LocationInput';
 import UnlockCountriesDialog from './UnlockCountriesDialog';
 import { getCountriesList } from '@/constants/locationData';
+import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/utils/distanceUnits';
 
 // Must match FREE_USER_MAX_DISTANCE_KM / PREMIUM_USER_MAX_DISTANCE_KM in
 // DiscoverPage.tsx (the values that actually gate the discovery query) and
-// the chk_max_distance DB constraint's outer bound (2000km).
+// the chk_max_distance DB constraint's outer bound (5000km). The radius is
+// always additionally bounded by the user's own country - a larger radius
+// never spills into a neighbouring country.
 const FREE_MAX_DISTANCE_KM = 600;
-const PREMIUM_MAX_DISTANCE_KM = 1020;
+const PREMIUM_MAX_DISTANCE_KM = 5000;
 
 interface LocationSectionProps {
   editedProfile: any;
@@ -147,24 +150,31 @@ const LocationSection = ({
           <Label className="text-white">What max distance do you want to see people?</Label>
           <div className="px-3">
           <Slider
-              value={[Math.min(editedProfile.max_distance || 250, distanceMax)]}
-              onValueChange={onDistanceChange || (() => {})}
-              max={distanceMax}
+              value={[toDisplayDistance(Math.min(editedProfile.max_distance || 250, distanceMax))]}
+              onValueChange={(v) => {
+                if (!onDistanceChange) return;
+                const km = Math.min(Math.max(1, fromDisplayDistance(v[0])), distanceMax);
+                onDistanceChange([km]);
+              }}
+              max={toDisplayDistance(distanceMax)}
               min={1}
               step={5}
               className="w-full"
               disabled={!isEditing}
             />
             <div className="flex justify-between text-xs text-white mt-1">
-              <span>1 km</span>
-              <span className="font-medium">{Math.min(editedProfile.max_distance || 250, distanceMax)} km</span>
-              <span>{distanceMax} km</span>
+              <span>1 {getDistanceUnitLabel()}</span>
+              <span className="font-medium">{toDisplayDistance(Math.min(editedProfile.max_distance || 250, distanceMax))} {getDistanceUnitLabel()}</span>
+              <span>{toDisplayDistance(distanceMax)} {getDistanceUnitLabel()}</span>
             </div>
+            <p className="text-[11px] text-gray-400 mt-1">
+              Always stays inside your own country.
+            </p>
           </div>
           {!isPremium && (
             <p className="text-xs text-yellow-200/80 flex items-center gap-1.5">
               <Crown className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-              Upgrade to Premium to search up to {PREMIUM_MAX_DISTANCE_KM} km.
+              Upgrade to Premium to search up to {toDisplayDistance(PREMIUM_MAX_DISTANCE_KM)} {getDistanceUnitLabel()}.
             </p>
           )}
         </div>

@@ -13,6 +13,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
+import { setDistanceUnitCountry } from '@/utils/distanceUnits';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import { fetchCirclePool } from '@/utils/circlePoolFetch';
@@ -287,6 +288,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       }
 
       setProfile(data as unknown as ProfileRow);
+
+      // Distances are displayed in km or miles depending on the viewer's own
+      // country - one unit app-wide, never both at once.
+      setDistanceUnitCountry((data as any)?.country_code, (data as any)?.country);
 
       // Fetch user images for profile completion calculation
       try {

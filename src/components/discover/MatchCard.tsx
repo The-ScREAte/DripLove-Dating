@@ -15,6 +15,7 @@ import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import MusicLinkBadge from './MusicLinkBadge';
+import { formatDistance } from '@/utils/distanceUnits';
 import {
   FAMILY_PLANS_OPTIONS,
   COMMUNICATION_STYLE_OPTIONS,
@@ -817,17 +818,17 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           <span>
                             {match.city}, {match.country}
                             {match.distance !== undefined && match.distance < 999 ? (
-                              <span className="ml-2">• {Math.max(1, Math.round(match.distance))} km</span>
+                              <span className="ml-2">• {formatDistance(match.distance)}</span>
                             ) : preCalculatedDistance !== undefined && preCalculatedDistance < 999 ? (
-                              <span className="ml-2">• {Math.max(1, Math.round(preCalculatedDistance))} km</span>
+                              <span className="ml-2">• {formatDistance(preCalculatedDistance)}</span>
                             ) : (currentUserLatitude && currentUserLongitude && match.latitude && match.longitude && (
                               <span className="ml-2">
-                                • {Math.max(1, Math.round(calculateDistance(
+                                • {formatDistance(calculateDistance(
                                   currentUserLatitude,
                                   currentUserLongitude,
                                   match.latitude,
                                   match.longitude
-                                )))} km
+                                ))}
                               </span>
                             ))}
                             {typeof match.height_cm === 'number' && match.height_cm > 0 && (
