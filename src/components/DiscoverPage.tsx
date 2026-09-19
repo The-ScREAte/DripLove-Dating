@@ -5734,20 +5734,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
   return (
     <>
-      {/* Mobile browser viewport fix styles */}
-      <style>{`
-        /* The discover surface is a plain in-flow box that fills 100% of MainApp's
-           already-padded content area (header reserved via padding-top, nav via
-           padding-bottom). Nothing here uses vh/dvh math anymore - that math was
-           duplicating the reservation and could disagree with the real available
-           space, which is what pushed the card out of view. Everything below sizes
-           itself as a percentage of that one container instead, so it works on any
-           screen. */
-        .discover-image-area.expanded {
-          max-height: 58%;
-        }
-      `}</style>
-
       <div className="discover-container h-full w-full relative overflow-hidden"
            style={{
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
@@ -5902,7 +5888,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           />
           {/* Image area - flexible height that fills remaining space */}
           <div
-            className={`profile-info-photo discover-image-area cursor-pointer select-none relative overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
+            className="profile-info-photo discover-image-area cursor-pointer select-none relative overflow-hidden"
             style={{
               // Collapsed: absolutely positioned to the parent's exact box (inset 0),
               // not a flex-grow child. flex-basis/flex-grow still ultimately depend on
@@ -5913,9 +5899,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               // positioning removes that possibility entirely: this box is always exactly
               // the size of its (already real-height) `relative` parent, full stop,
               // regardless of what's rendered inside it.
-              // Expanded: back to normal flow (flex-1 in className) since it now shares
-              // the column with the details panel below and needs to negotiate space
-              // with it - capped by min/max height so it can't blow past its share.
+              // Expanded: the shared grid owns the exact 58/42 split. Do not add a
+              // percentage max-height here: that percentage would be applied again
+              // inside the already-58% grid row, shrinking the photo a second time and
+              // leaving the large empty band that previously appeared above details.
               // The outer discover-container above is 'pan-y' so the expanded info
               // panel further down can still scroll natively, but THIS specific element
               // fully drives its own dragging in both axes via JS (handleTouchMove sets

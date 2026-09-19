@@ -31,10 +31,12 @@
 }
 
 /* Shared expanded/collapsed details layout for Discover, Liked Me,
-   profile preview and Circle. */
+   profile preview and Circle. Keep the movement short and controlled so the
+   photo does not jump when the details area opens or closes. */
 .profile-info-layout {
   display: grid;
   grid-template-rows: minmax(0, 1fr) minmax(0, 0fr);
+  transition: grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .profile-info-layout.is-expanded {
   grid-template-rows: minmax(180px, 58fr) minmax(0, 42fr);
@@ -47,13 +49,17 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+  transition: opacity 180ms ease, visibility 0s linear 300ms;
 }
 .profile-info-layout.is-expanded .profile-info-panel {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+  transition-delay: 80ms, 0ms;
 }
 @media (prefers-reduced-motion: reduce) {
+  .profile-info-layout,
+  .profile-info-panel,
   .hopping-logo {
     animation: none !important;
     transition-duration: 0.01ms !important;
@@ -757,7 +763,8 @@ body.keyboard-open .chat-messages-container {
     /* Admin page mobile adjustments */
     .admin-page-container {
       padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
-      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+      padding-bottom: calc(var(--keyboard-height, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+      scroll-padding-bottom: calc(var(--keyboard-height, 0px) + 24px) !important;
       padding-left: env(safe-area-inset-left, 0px) !important;
       padding-right: env(safe-area-inset-right, 0px) !important;
     }
@@ -777,7 +784,8 @@ body.keyboard-open .chat-messages-container {
 
       .admin-page-container {
         padding-top: calc(10px + env(safe-area-inset-top, 0px)) !important;
-        padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+        padding-bottom: calc(var(--keyboard-height, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+        scroll-padding-bottom: calc(var(--keyboard-height, 0px) + 24px) !important;
         padding-left: env(safe-area-inset-left, 0px) !important;
         padding-right: env(safe-area-inset-right, 0px) !important;
       }

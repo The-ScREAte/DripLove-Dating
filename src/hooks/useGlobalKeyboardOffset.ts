@@ -30,6 +30,14 @@ export function useGlobalKeyboardOffset() {
       const active = document.activeElement;
       if (!isEditable(active)) return;
       active.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+
+      // A second check after layout settles handles lazy Admin tabs and portaled
+      // dialogs whose position changes when the keyboard first resizes the viewport.
+      window.setTimeout(() => {
+        if (document.activeElement === active) {
+          active.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        }
+      }, 180);
     };
 
     const applyOffset = (height: number) => {
