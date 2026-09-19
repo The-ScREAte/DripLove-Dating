@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
-import { MessageCircle, RefreshCw } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheAvatar, getCachedAvatar } from '@/cache/chatCache';
 import { preloadImageToBlob } from '@/utils/imageCache';
@@ -22,6 +22,7 @@ import MatchExpirationAvatar from './chat/MatchExpirationAvatar';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
+import HoppingLogo from './HoppingLogo';
 
 type WindowWithChatCaches = Window & {
   chatMatchesCache?: typeof chatMatchesCache;
@@ -2251,10 +2252,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
       aria-live="polite"
     >
-      <RefreshCw
-        className={`h-4 w-4 text-pink-400 transition-transform duration-300 ${isRefreshing || pullDistance > PULL_TRIGGER_THRESHOLD ? 'animate-spin' : ''}`}
-        strokeWidth={2.5}
-      />
+      <HoppingLogo size={24} opacity={pullDistance > 0 || isRefreshing ? 1 : 0.65} className="shrink-0" />
       <div className="text-sm font-medium text-pink-300">
         {isRefreshing ? t('chat.refreshing') : pullDistance > PULL_TRIGGER_THRESHOLD ? t('chat.releaseToRefresh') : t('chat.pullToRefresh')}
       </div>

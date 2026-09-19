@@ -5868,7 +5868,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         {/* ...existing code... */}
         <div
           ref={cardElRef}
-          className="h-full w-full relative z-10 flex flex-col"
+          className={`profile-info-layout ${showMoreInfo ? 'is-expanded' : ''} h-full w-full relative z-10`}
           style={{
             transform: cardTransform,
             transformOrigin: 'center center',
@@ -5902,7 +5902,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           />
           {/* Image area - flexible height that fills remaining space */}
           <div
-            className={`discover-image-area ${showMoreInfo ? 'flex-1' : ''} cursor-pointer select-none relative transition-all duration-300 overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
+            className={`profile-info-photo discover-image-area cursor-pointer select-none relative overflow-hidden ${showMoreInfo ? 'expanded' : ''}`}
             style={{
               // Collapsed: absolutely positioned to the parent's exact box (inset 0),
               // not a flex-grow child. flex-basis/flex-grow still ultimately depend on
@@ -5916,10 +5916,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               // Expanded: back to normal flow (flex-1 in className) since it now shares
               // the column with the details panel below and needs to negotiate space
               // with it - capped by min/max height so it can't blow past its share.
-              ...(showMoreInfo
-                ? { flex: '0 0 58%', minHeight: '180px', maxHeight: '58%' }
-                : { position: 'absolute', inset: 0 }),
-
               // The outer discover-container above is 'pan-y' so the expanded info
               // panel further down can still scroll natively, but THIS specific element
               // fully drives its own dragging in both axes via JS (handleTouchMove sets
@@ -6049,9 +6045,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               sibling taking the remaining space - no vh caps, no nested
               wrapper/filler divs fighting each other, so all three screens
               now open to the exact same proportion. */}
-          {showMoreInfo && (
             <div
-              className="discover-info-area relative z-20 flex-1 overflow-y-auto bg-black scrollbar-hide"
+              className="profile-info-panel discover-info-area relative z-20 overflow-y-auto bg-black scrollbar-hide"
+              aria-hidden={!showMoreInfo}
               style={{
                 minHeight: 0,
                 // Overlaps the photo by a hair as extra insurance against subpixel
@@ -6091,7 +6087,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                 )}
               </div>
             </div>
-          )}
         </div>
         {/* Loading more indicator */}
   {/* Loading more indicator removed for professional background loading */}

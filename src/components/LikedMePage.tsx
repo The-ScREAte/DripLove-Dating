@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Users, Heart, X, Calendar, MapPin, ArrowLeft, ArrowUp, ArrowDown,
-  Briefcase, GraduationCap, Crown, Lock, Languages, RefreshCw,
+  Briefcase, GraduationCap, Crown, Lock, Languages,
   Ruler, Baby, MessageCircle, Gift, PawPrint, Share2
 } from 'lucide-react';
 
@@ -19,6 +19,7 @@ import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb }
 import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
+import HoppingLogo from './HoppingLogo';
 
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
@@ -1519,7 +1520,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
     return (
       <div
-        className="h-full w-full relative flex flex-col bg-black overflow-hidden"
+        className={`profile-info-layout ${showMoreInfo ? 'is-expanded' : ''} h-full w-full relative bg-black overflow-hidden`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Photo area - fixed height only while the info panel below is actually
@@ -1529,19 +1530,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             space instead of stopping at a fixed height and leaving a dead gap -
             exactly how Discover's own collapsed card behaves. */}
         <div
-          className={`relative w-full overflow-hidden transition-all duration-300 ${showMoreInfo ? 'flex-1' : ''}`}
-          style={
-            showMoreInfo
-              ? { flex: '0 0 58%', minHeight: '180px', maxHeight: '58%' }
-              // Collapsed: absolutely positioned to the parent's exact box
-              // (inset 0), same technique Discover/the profile preview use -
-              // a flex-shrink-0 child sized by a plain height percentage with
-              // no transition at all (the previous approach here) snapped
-              // instantly with no animation, and reportedly still looked like
-              // a jump/glitch on toggle. This is the one technique proven to
-              // animate cleanly across the app now.
-              : { position: 'absolute', inset: 0 }
-          }
+          className="profile-info-photo relative w-full overflow-hidden"
         >
           {/* Swipeable unit - photo, swipe hint, AND the name/caption all live in
               this one box and move together as a single card on drag, the same
@@ -1786,9 +1775,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             hack: the caption now lives inside the photo box itself). Renders
             nothing at all when collapsed, so there's no empty flex-1 box below the
             photo either. */}
-        {showMoreInfo && (
         <div
-          className="relative z-20 flex-1 overflow-y-auto bg-black scrollbar-hide"
+          className="profile-info-panel relative z-20 overflow-y-auto bg-black scrollbar-hide"
+          aria-hidden={!showMoreInfo}
           style={{
             minHeight: 0,
             WebkitOverflowScrolling: 'touch',
@@ -2091,7 +2080,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             </div>
           </div>
         </div>
-        )}
 
         {/* Action buttons removed - pass/like-back is the swipe gesture on the
             photo (drag left = pass, drag right = like back), same as Discover's
@@ -2284,10 +2272,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
         aria-live="polite"
       >
-        <RefreshCw
-          className={`h-4 w-4 text-pink-400 transition-transform duration-300 ${isRefreshing || pullDistance > PULL_TRIGGER_THRESHOLD ? 'animate-spin' : ''}`}
-          strokeWidth={2.5}
-        />
+        <HoppingLogo size={24} opacity={pullDistance > 0 || isRefreshing ? 1 : 0.65} className="shrink-0" />
         <div className="text-sm font-medium text-pink-300">
           {isRefreshing ? t('matches.refreshing') : pullDistance > PULL_TRIGGER_THRESHOLD ? t('matches.releaseToRefresh') : t('matches.pullToRefresh')}
         </div>

@@ -30,6 +30,45 @@
   transform: translateZ(0);
 }
 
+/* One shared, GPU-friendly details transition for Discover, Liked Me,
+   profile preview and Circle. Keeping both rows mounted lets closing animate
+   just as smoothly as opening instead of disappearing in one frame. */
+.profile-info-layout {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 0fr);
+  transition: grid-template-rows 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.profile-info-layout.is-expanded {
+  grid-template-rows: minmax(180px, 58fr) minmax(0, 42fr);
+}
+.profile-info-photo {
+  min-height: 0;
+  will-change: height;
+}
+.profile-info-panel {
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate3d(0, 10px, 0);
+  transition: opacity 220ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 420ms;
+}
+.profile-info-layout.is-expanded .profile-info-panel {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  transition-delay: 90ms, 0ms, 0ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-info-layout,
+  .profile-info-panel,
+  .hopping-logo {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Chat input keyboard handling - robust solution */
 :root {
   --keyboard-height: 0px;

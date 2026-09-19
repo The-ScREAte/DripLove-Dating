@@ -1071,8 +1071,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
     // Render only the expandable details panel - name/location/tags/toggle now
     // live in the photo caption (isSwipeAreaOnly), so this renders nothing at all
     // when collapsed, matching ProfilePreviewModal's `{showMoreInfo && (...)}` panel.
-    if (!showMoreInfo) return null;
-
     return (
       <div
         className="w-full bg-black"

@@ -22,6 +22,16 @@ import { Keyboard } from "@capacitor/keyboard";
  */
 export function useGlobalKeyboardOffset() {
   useEffect(() => {
+    const isEditable = (element: Element | null): element is HTMLElement =>
+      element instanceof HTMLElement &&
+      (element.matches("input:not([type='radio']):not([type='checkbox']):not([type='button']), textarea, select") || element.isContentEditable);
+
+    const revealActiveField = () => {
+      const active = document.activeElement;
+      if (!isEditable(active)) return;
+      active.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    };
+
     const applyOffset = (height: number) => {
       // Chat already handles its own keyboard avoidance (fixed input bar +
       // internal scroll container) - let it own the shared CSS var/class
@@ -34,15 +44,20 @@ export function useGlobalKeyboardOffset() {
       // Give the page room to scroll the focused field above the keyboard;
       // collapses back to no extra space the instant the keyboard closes.
       document.body.style.paddingBottom = isOpen ? `${height}px` : "";
+      const adminPage = document.querySelector<HTMLElement>(".admin-page-container");
+      if (adminPage) {
+        adminPage.style.paddingBottom = isOpen ? `calc(${height}px + env(safe-area-inset-bottom, 0px))` : "";
+        adminPage.style.scrollPaddingBottom = isOpen ? `${height + 24}px` : "";
+      }
 
       if (isOpen) {
-        setTimeout(() => {
-          const active = document.activeElement;
-          if (active instanceof HTMLElement && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-            active.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }, 120); // let the keyboard's own show animation settle first
+        setTimeout(revealActiveField, 120); // let the keyboard's own show animation settle first
       }
+    };
+
+    const handleFocusIn = (event: FocusEvent) => {
+      if (!document.querySelector(".admin-page-container") || !isEditable(event.target as Element | null)) return;
+      window.setTimeout(revealActiveField, 180);
     };
 
     const isNative = Capacitor.isNativePlatform();
@@ -71,6 +86,7 @@ export function useGlobalKeyboardOffset() {
       // Android native and web/PWA: visualViewport resize is reliable here.
       window.visualViewport.addEventListener("resize", handleVisualViewportResize);
     }
+    document.addEventListener("focusin", handleFocusIn);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -79,6 +95,10 @@ export function useGlobalKeyboardOffset() {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", handleVisualViewportResize);
       }
+      document.removeEventListener("focusin", handleFocusIn);
+      const adminPage = document.querySelector<HTMLElement>(".admin-page-container");
+      adminPage?.style.removeProperty("padding-bottom");
+      adminPage?.style.removeProperty("scroll-padding-bottom");
       document.documentElement.style.removeProperty("--keyboard-height");
       document.body.classList.remove("keyboard-open");
       document.body.style.paddingBottom = "";
