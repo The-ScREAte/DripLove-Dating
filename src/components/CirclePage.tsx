@@ -636,6 +636,12 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   // banner (upgrade + adjust-preferences, same pattern as Discover's own
   // empty state) instead of just a toast that a user could easily miss.
   const [emptyCategoryLabel, setEmptyCategoryLabel] = useState<string | null>(null);
+  // Circle's own daily allowance for free users - 20 likes (right swipes)
+  // per day, refilling at midnight. Passing stays free and unlimited.
+  const [circleLikesUsed, setCircleLikesUsed] = useState(0);
+  const [circleLikesLoaded, setCircleLikesLoaded] = useState(false);
+  const [showCircleOutOfLikes, setShowCircleOutOfLikes] = useState(false);
+  const circleLikesLeft = Math.max(0, FREE_CIRCLE_DAILY_LIKES - circleLikesUsed);
   // Ticks once a minute purely to force a re-check of cooldown expiry while
   // the tab stays open (e.g. left open across midnight) - the actual expiry
   // math reads Date.now() fresh each time, this just triggers that recheck.
