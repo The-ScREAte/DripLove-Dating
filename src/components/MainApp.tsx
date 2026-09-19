@@ -568,25 +568,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           console.error('[MainApp] Push registration error:', error);
         });
         
-        // Add notification tap listener (when app is closed/background)
-        PushNotifications.addListener('pushNotificationActionPerformed', async (notification) => {
-          const data = notification.notification.data;
-          
-          // Wait a bit for app to fully load
-          setTimeout(() => {
-            if (data?.type === 'message' && data?.chatId) {
-              setActiveTab('chat');
-              // Use hash navigation to pass matchId to ChatPage
-              window.location.hash = `matchId=${data.chatId}`;
-            } else if (data?.type === 'match') {
-              setActiveTab('chat');
-            } else if (data?.type === 'like') {
-              setActiveTab('liked');
-            } else {
-              setActiveTab('chat');
-            }
-          }, 500);
-        });
+        // Notification taps are handled in ONE place only: the push service's
+        // own listener, which calls the nav handler registered below. A second
+        // listener used to live here with its own (different) routing and both
+        // fired on every tap, so taps landed unpredictably - do not re-add it.
+        
         
         // Add foreground notification listener
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
