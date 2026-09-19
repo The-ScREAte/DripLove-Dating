@@ -1424,8 +1424,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
       setCategoryBrowse({ label: tile.label, profiles: withPhotos });
       setCategoryBrowseIndex(0);
-      setSelectedImages(withPhotos[0].firstImage ? [withPhotos[0].firstImage] : []);
-      loadImagesForProfile(withPhotos[0].id).then(setSelectedImages);
+      void applyProfileImages(withPhotos[0]);
     } catch (err) {
       console.error('Error loading category browse:', err);
       toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
