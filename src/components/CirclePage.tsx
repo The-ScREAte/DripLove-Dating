@@ -1210,9 +1210,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
           try {
             await sendMatchNotification(
-              profile.id,
               `${currentUser.first_name || ''}`.trim() || 'Someone',
-              currentUser.id
+              profile.id
             );
           } catch {
             // ignore notification errors
