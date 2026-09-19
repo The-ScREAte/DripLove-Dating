@@ -75,6 +75,7 @@ import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb }
 import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
 import { isVerifyPromptEligible, markVerifyPromptTriggered } from '@/utils/verifyPromptStorage';
 import { CurrentUser, PotentialMatch } from '@/types';
+import { publishSwipeDecision } from '@/utils/swipeSync';
 
 // How many lifetime swipes before an unverified user sees the "verify your
 // identity" prompt (shown once, ever - see verifyPromptStorage.ts). Set to 1

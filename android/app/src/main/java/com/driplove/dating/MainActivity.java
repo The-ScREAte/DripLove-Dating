@@ -90,14 +90,12 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
         if (webView == null) return;
         String escapedRoute = route.replace("\\", "\\\\").replace("'", "\\'");
-        // On a cold start the WebView hasn't finished loading the app yet -
-        // there's no reliable "page ready" callback to hook without
-        // overriding Capacitor's own WebViewClient, so a short delay (a
-        // no-op if the app was already running and this is really
-        // onNewIntent) is the same pragmatic approach Capacitor's own deep
-        // link docs use for this exact cold-start race.
-        webView.postDelayed(() -> webView.evaluateJavascript(
-            "window.location.href = '" + escapedRoute + "';", null), 1500);
+        // Queue the destination immediately. The tiny readiness loop replaces
+        // the old blind 1.5-second reload, preserves the SPA, and hands the
+        // route to MainApp as soon as its document exists.
+        webView.post(() -> webView.evaluateJavascript(
+            "(function go(){if(document&&document.documentElement){history.replaceState({},'', '" + escapedRoute + "');window.dispatchEvent(new Event('popstate'));}else{setTimeout(go,25);}})();",
+            null));
     }
     
     private void configureWebViewForVideo() {

@@ -687,12 +687,18 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       setRecommendedBatch((prev) => prev?.filter((profile) => profile.id !== profileId) ?? prev);
       setSimilarBatch((prev) => prev?.filter((profile) => profile.id !== profileId) ?? prev);
       setCategoryBrowse((prev) => prev ? { ...prev, profiles: prev.profiles.filter((profile) => profile.id !== profileId) } : prev);
-      if (selectedProfile?.id === profileId) closeProfileView();
+      if (selectedProfile?.id === profileId) {
+        setSelectedProfile(null);
+        setCategoryBrowse(null);
+        setCategoryBrowseIndex(0);
+        setSelectedImages([]);
+        setActiveRowKey(null);
+      }
       categoryCountsCache = null;
     };
     window.addEventListener('profileDecided', onProfileDecided);
     return () => window.removeEventListener('profileDecided', onProfileDecided);
-  }, [currentUser?.id, selectedProfile?.id, closeProfileView]);
+  }, [currentUser?.id, selectedProfile?.id]);
 
 
   // Load this user's row cooldowns once - see supabase/migrations/20260917000000_circle_row_cooldowns.sql
