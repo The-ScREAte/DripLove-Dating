@@ -1447,7 +1447,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full"
                 style={{ display: activeTab === 'circle' ? 'block' : 'none' }}
               >
-                <CirclePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'circle'} />
+                <CirclePage
+                  currentUser={profile}
+                  isPremium={isPremium}
+                  isActiveTab={activeTab === 'circle'}
+                  deepLinkProfileId={circleDeepLinkProfileId}
+                  onDeepLinkConsumed={() => setCircleDeepLinkProfileId(null)}
+                />
               </div>
             </Suspense>
           )}
