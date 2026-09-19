@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
-import { MessageCircle, RefreshCw, ArrowDownToLine } from 'lucide-react';
+import { MessageCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheAvatar, getCachedAvatar } from '@/cache/chatCache';
 import { preloadImageToBlob } from '@/utils/imageCache';
@@ -45,6 +45,8 @@ const DORMANT_DAYS = 30;
 // Earlier conversations = DORMANT_DAYS; deletion happens after DORMANT_DAYS + DORMANT_DELETE_AFTER_DAYS_IN_EARLIER.
 const DORMANT_DELETE_AFTER_DAYS_IN_EARLIER = 15;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MIN_REFRESH_VISIBLE_MS = 2000;
+const CHAT_BACK_ANIMATION_MS = 280;
 
 // "Today"/"Yesterday" for the last 2 days, weekday name within the last
 // week, and a full date beyond that - the same convention used everywhere
@@ -322,6 +324,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   const [swipeStartX, setSwipeStartX] = useState(0);
   const [swipeStartY, setSwipeStartY] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const conversationViewRef = useRef<HTMLDivElement>(null);
+  const swipeLatestXRef = useRef(0);
+  const swipeStartedAtRef = useRef(0);
+  const swipeBackTimerRef = useRef<number | null>(null);
   
   // Rating dialog state
   // Dormant conversations state
@@ -1094,6 +1100,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   };
 
   const fetchMatches = async (showLoading = false) => {
+    const refreshStartedAt = showLoading ? Date.now() : 0;
     if (showLoading) setIsRefreshing(true);
     if (!currentUser || !currentUser.id) {
       if (showLoading) setIsRefreshing(false);
@@ -1178,6 +1185,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     }
     finally {
       if (showLoading) {
+        const remainingHold = MIN_REFRESH_VISIBLE_MS - (Date.now() - refreshStartedAt);
+        if (remainingHold > 0) {
+          await new Promise<void>((resolve) => window.setTimeout(resolve, remainingHold));
+        }
         setIsRefreshing(false);
         setPullDistance(0);
       }
@@ -1974,6 +1985,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   const handleTouchEnd = () => {
     if (pullDistance > PULL_TRIGGER_THRESHOLD && !isRefreshing) {
       // Trigger a user-visible refresh
+      setPullDistance(PULL_TRIGGER_THRESHOLD);
       void fetchMatches(true);
     } else {
       setPullDistance(0);
@@ -1991,11 +2003,17 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   // Swipe gesture handlers for back navigation
   const handleSwipeStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    // Only start swipe tracking if touch starts from the left edge (first 50px)
-    if (touch.clientX < 50) {
+    // A narrow edge keeps message-bubble reply gestures independent.
+    if (touch.clientX < 36) {
       setSwipeStartX(touch.clientX);
       setSwipeStartY(touch.clientY);
       setIsSwiping(true);
+      swipeLatestXRef.current = 0;
+      swipeStartedAtRef.current = performance.now();
+      if (conversationViewRef.current) {
+        conversationViewRef.current.style.transition = 'none';
+        conversationViewRef.current.style.willChange = 'transform';
+      }
     }
   };
 
@@ -2006,21 +2024,71 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     const deltaX = touch.clientX - swipeStartX;
     const deltaY = touch.clientY - swipeStartY;
     
-    // If horizontal swipe is dominant and moving right
-    if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 50) {
-      // Trigger back navigation
-      setIsSwiping(false);
-      // Mark messages as read in background to keep swipe responsive
-      scheduleMarkMessagesAsRead(0);
-      setSelectedMatch(null);
+    if (Math.abs(deltaY) > Math.abs(deltaX) * 1.15) {
+      handleSwipeCancel();
+      return;
+    }
+
+    if (deltaX > 0 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      swipeLatestXRef.current = Math.min(window.innerWidth, deltaX);
+      const resistedX = Math.min(window.innerWidth, deltaX * 0.92);
+      if (conversationViewRef.current) {
+        conversationViewRef.current.style.transform = `translate3d(${resistedX}px, 0, 0)`;
+        conversationViewRef.current.style.boxShadow = '-18px 0 32px rgba(0, 0, 0, 0.38)';
+      }
     }
   };
 
-  const handleSwipeEnd = () => {
+  const resetConversationPosition = () => {
+    const view = conversationViewRef.current;
+    if (!view) return;
+    view.style.transition = 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms ease-out';
+    view.style.transform = 'translate3d(0, 0, 0)';
+    view.style.boxShadow = 'none';
+    window.setTimeout(() => {
+      if (conversationViewRef.current === view) {
+        view.style.transition = '';
+        view.style.willChange = '';
+      }
+    }, CHAT_BACK_ANIMATION_MS);
+  };
+
+  const handleSwipeCancel = () => {
+    resetConversationPosition();
     setIsSwiping(false);
     setSwipeStartX(0);
     setSwipeStartY(0);
+    swipeLatestXRef.current = 0;
   };
+
+  const handleSwipeEnd = () => {
+    const distance = swipeLatestXRef.current;
+    const elapsed = Math.max(1, performance.now() - swipeStartedAtRef.current);
+    const velocity = distance / elapsed;
+    const shouldGoBack = isSwiping && (distance >= Math.min(120, window.innerWidth * 0.28) || velocity > 0.65);
+
+    if (shouldGoBack && conversationViewRef.current) {
+      const view = conversationViewRef.current;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      view.style.transition = reducedMotion ? 'none' : `transform ${CHAT_BACK_ANIMATION_MS}ms cubic-bezier(0.32, 0.72, 0, 1)`;
+      view.style.transform = `translate3d(${window.innerWidth}px, 0, 0)`;
+      scheduleMarkMessagesAsRead(0);
+      swipeBackTimerRef.current = window.setTimeout(() => {
+        setSelectedMatch(null);
+        swipeBackTimerRef.current = null;
+      }, reducedMotion ? 0 : CHAT_BACK_ANIMATION_MS);
+    } else {
+      resetConversationPosition();
+    }
+    setIsSwiping(false);
+    setSwipeStartX(0);
+    setSwipeStartY(0);
+    swipeLatestXRef.current = 0;
+  };
+
+  useEffect(() => () => {
+    if (swipeBackTimerRef.current !== null) window.clearTimeout(swipeBackTimerRef.current);
+  }, []);
 
   // If there's no authenticated user yet, render a light loading state to avoid
   // dereferencing `currentUser.id` in JSX/handlers. Hooks above must remain
@@ -2179,26 +2247,19 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     onTouchMove={handleTouchMove}
     onTouchEnd={handleTouchEnd}
   >
-    {/* Pull to refresh indicator */}
-    {pullDistance > 0 && (
-      <div
-        className="flex items-center justify-center gap-2 bg-black transition-all duration-200"
-        style={{ height: `${pullDistance}px` }}
-      >
-        {isRefreshing ? (
-          <RefreshCw className="w-4 h-4 text-pink-400 animate-spin" strokeWidth={2.5} />
-        ) : (
-          <ArrowDownToLine
-            className="w-4 h-4 text-pink-400 transition-transform duration-150"
-            strokeWidth={2.5}
-            style={{ transform: pullDistance > PULL_TRIGGER_THRESHOLD ? 'rotate(180deg)' : 'rotate(0deg)' }}
-          />
-        )}
-        <div className="text-pink-400 text-sm">
-          {pullDistance > PULL_TRIGGER_THRESHOLD ? (isRefreshing ? t('chat.refreshing') : t('chat.releaseToRefresh')) : t('chat.pullToRefresh')}
-        </div>
+    <div
+      className={`flex shrink-0 items-center justify-center gap-2 overflow-hidden bg-black transition-[height,opacity] duration-300 ease-out ${pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'}`}
+      style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
+      aria-live="polite"
+    >
+      <RefreshCw
+        className={`h-4 w-4 text-pink-400 transition-transform duration-300 ${isRefreshing || pullDistance > PULL_TRIGGER_THRESHOLD ? 'animate-spin' : ''}`}
+        strokeWidth={2.5}
+      />
+      <div className="text-sm font-medium text-pink-300">
+        {isRefreshing ? t('chat.refreshing') : pullDistance > PULL_TRIGGER_THRESHOLD ? t('chat.releaseToRefresh') : t('chat.pullToRefresh')}
       </div>
-    )}
+    </div>
           {activeConversations.length === 0 && dormantConversations.length === 0 && newMatchList.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
               <div className="mb-6">
@@ -2382,7 +2443,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   };
 
   return (
-  <div className="h-full min-h-0 flex flex-col bg-black" style={{ paddingTop: `${topCompensation}px` }}>
+  <div
+    ref={conversationViewRef}
+    className="h-full min-h-0 flex flex-col bg-black"
+    style={{ paddingTop: `${topCompensation}px`, transform: 'translate3d(0, 0, 0)' }}
+  >
       {/* Chat Header (below global header) */}
   <div
     className="shrink-0 border-b border-pink-500/30 shadow-sm z-20 m-0 p-0"
@@ -2427,6 +2492,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         onTouchStart={handleSwipeStart}
         onTouchMove={handleSwipeMove}
         onTouchEnd={handleSwipeEnd}
+        onTouchCancel={handleSwipeCancel}
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full pt-20">
