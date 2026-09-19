@@ -633,7 +633,19 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         // No cache yet, show empty state
         setMessages([]);
       }
-      
+
+  // Dismiss ONLY this conversation's notifications, and only once the user
+  // actually opens it. Everything else stays in the phone's notification
+  // centre until it's tapped or cleared.
+  useEffect(() => {
+    if (!selectedMatch?.id) return;
+    (async () => {
+      const { clearThreadNotifications } = await import('@/services/pushNotifications');
+      await clearThreadNotifications(`chat-${selectedMatch.id}`);
+    })();
+  }, [selectedMatch?.id]);
+
+
       // ALWAYS fetch new messages in background (even if cache exists)
       fetchMessagesInBackground(selectedMatch.id);
       // Mark messages as read (fire and forget, but log for debugging)
