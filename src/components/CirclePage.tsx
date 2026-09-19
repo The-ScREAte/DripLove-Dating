@@ -16,11 +16,13 @@ import {
   fetchCircleProfilesByIds,
   getCircleDistanceParams,
   getCircleCountrySplit,
+  isCircleProfileEligible,
 } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
-import { FREE_CIRCLE_DAILY_LIKES, getCircleLikesUsedToday, incrementCircleLikesUsed } from '@/utils/circleSwipeLimit';
+import { getCircleDailyLikeLimit, getCircleLikesUsedToday, recordCircleLike } from '@/utils/circleSwipeLimit';
+import { publishSwipeDecision } from '@/utils/swipeSync';
 
 // Recommended for you / Similar interests only ever show a handful at a
 // time, then go on cooldown instead of silently backfilling from the pool.
@@ -643,12 +645,12 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // banner (upgrade + adjust-preferences, same pattern as Discover's own
   // empty state) instead of just a toast that a user could easily miss.
   const [emptyCategoryLabel, setEmptyCategoryLabel] = useState<string | null>(null);
-  // Circle's own daily allowance for free users - 20 likes (right swipes)
-  // per day, refilling at midnight. Passing stays free and unlimited.
+  // Circle's own daily right-like allowance, refilling at midnight.
   const [circleLikesUsed, setCircleLikesUsed] = useState(0);
   const [circleLikesLoaded, setCircleLikesLoaded] = useState(false);
   const [showCircleOutOfLikes, setShowCircleOutOfLikes] = useState(false);
-  const circleLikesLeft = Math.max(0, FREE_CIRCLE_DAILY_LIKES - circleLikesUsed);
+  const circleDailyLimit = getCircleDailyLikeLimit(isPremium);
+  const circleLikesLeft = Math.max(0, circleDailyLimit - circleLikesUsed);
   // Ticks once a minute purely to force a re-check of cooldown expiry while
   // the tab stays open (e.g. left open across midnight) - the actual expiry
   // math reads Date.now() fresh each time, this just triggers that recheck.
@@ -662,7 +664,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // Today's Circle like count, read once per mount (the row is keyed by
   // date, so it refills on its own each new day).
   useEffect(() => {
-    if (!currentUser?.id || isPremium) { setCircleLikesLoaded(true); return; }
+    if (!currentUser?.id) { setCircleLikesLoaded(true); return; }
     let cancelled = false;
     void (async () => {
       const used = await getCircleLikesUsedToday(currentUser.id);
@@ -672,6 +674,31 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     })();
     return () => { cancelled = true; };
   }, [currentUser?.id, isPremium]);
+
+  // A decision made in Discover must disappear from every Circle surface
+  // immediately, without waiting for cache expiry or a remount.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const onProfileDecided = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; profileId?: string }>).detail;
+      if (detail?.userId !== currentUser.id || !detail.profileId) return;
+      const profileId = detail.profileId;
+      setPool((prev) => prev.filter((profile) => profile.id !== profileId));
+      setRecommendedBatch((prev) => prev?.filter((profile) => profile.id !== profileId) ?? prev);
+      setSimilarBatch((prev) => prev?.filter((profile) => profile.id !== profileId) ?? prev);
+      setCategoryBrowse((prev) => prev ? { ...prev, profiles: prev.profiles.filter((profile) => profile.id !== profileId) } : prev);
+      if (selectedProfile?.id === profileId) {
+        setSelectedProfile(null);
+        setCategoryBrowse(null);
+        setCategoryBrowseIndex(0);
+        setSelectedImages([]);
+        setActiveRowKey(null);
+      }
+      categoryCountsCache = null;
+    };
+    window.addEventListener('profileDecided', onProfileDecided);
+    return () => window.removeEventListener('profileDecided', onProfileDecided);
+  }, [currentUser?.id, selectedProfile?.id]);
 
 
   // Load this user's row cooldowns once - see supabase/migrations/20260917000000_circle_row_cooldowns.sql
@@ -816,7 +843,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // people already liked/passed/matched/blocked, archived accounts, and
       // anyone regardless of distance, so it promised far more real matches
       // than existed (e.g. one real account: tile said 114, real count was 0).
-      const [excluded, { userLat, userLon, hasCoords, radiusDegrees }] = await Promise.all([
+      const [excluded, { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees }] = await Promise.all([
         fetchCircleExclusionIds(currentUser.id),
         Promise.resolve(getCircleDistanceParams(currentUser, isPremium)),
       ]);
@@ -828,26 +855,9 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       ): Promise<number> => {
         if (codes.length === 0) return 0;
         const useBox = applyRadius && hasCoords && radiusDegrees !== null;
-        // "Verified" isn't a plain column filter a REST query can express -
-        // it's the same >=85%-profile-completion formula used everywhere
-        // else in the app for the "Verified" checkmark, computed
-        // server-side by a dedicated RPC.
-        if (filter?.isVerified) {
-          const { data, error } = await supabase.rpc('count_circle_verified_profiles', {
-            p_country_codes: codes,
-            p_allowed_genders: allowedGenders,
-            p_viewer_gender: currentUser.gender || '',
-            p_excluded_ids: Array.from(excluded),
-            p_lat: useBox ? userLat : null,
-            p_lon: useBox ? userLon : null,
-            p_radius_degrees: useBox ? radiusDegrees : null,
-          });
-          if (error) return 0;
-          return typeof data === 'number' ? data : 0;
-        }
         let q = supabase
           .from('profiles')
-          .select('id', { count: 'exact', head: true })
+          .select('id, latitude, longitude, date_of_birth')
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false)
@@ -869,13 +879,21 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           q = q.or(`preference.eq.${currentUser.gender},preference.eq.everyone`);
         }
         if (filter?.relationshipIntent) q = q.eq('relationship_intent', filter.relationshipIntent);
+        if (filter?.isVerified) q = q.eq('is_verified', true);
         if (filter?.familyPlans) q = q.in('family_plans', filter.familyPlans);
         if (filter?.interest) q = q.contains('interests', [filter.interest]);
         if (filter?.hasMusic) q = q.contains('favorites', [{ category: 'Music' }]);
         if (filter?.hasSocialMedia) q = q.not('social_media', 'is', null).neq('social_media', '');
         if (filter?.hasPets) q = q.not('pets', 'is', null).neq('pets', []);
-        const { count } = await q;
-        return count ?? 0;
+        const { data, error } = await q;
+        if (error || !data) return 0;
+        return data.filter((profile) => {
+          if (!profile.date_of_birth) return false;
+          const age = calculateAge(profile.date_of_birth);
+          if (age < (currentUser.min_age || 18) || age > (currentUser.max_age || 99)) return false;
+          if (!applyRadius || !hasCoords || typeof profile.latitude !== 'number' || typeof profile.longitude !== 'number') return true;
+          return calculateDistance(userLat as number, userLon as number, profile.latitude, profile.longitude) <= maxDistanceKm;
+        }).length;
       };
 
       const countFor = async (filter?: CategoryFilter): Promise<number> => {
@@ -1117,7 +1135,11 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     onDeepLinkConsumed?.();
     void (async () => {
       const [profile] = await fetchCircleProfilesByIds([circleUserId]);
-      if (profile) openCircleRowProfile('recommended', profile);
+      if (profile && await isCircleProfileEligible(currentUser, profile, isPremium)) {
+        openCircleRowProfile('recommended', profile);
+      } else {
+        toast({ title: 'Profile unavailable', description: 'This profile is no longer available in your Circle.' });
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, deepLinkProfileId]);
@@ -1135,14 +1157,37 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // close back to the grid, or advance to the next card in the deck.
   const performSwipeAction = useCallback(async (profile: CircleProfile, direction: 'like' | 'pass') => {
     if (isSwipeActionPending || !currentUser?.id) return;
-    // Free users: only right swipes (likes) count against Circle's own
-    // 20-a-day allowance. Once it's used up the profile stays put and the
-    // out-of-swipes banner takes over instead.
-    if (direction === 'like' && !isPremium && circleLikesLoaded && circleLikesUsed >= FREE_CIRCLE_DAILY_LIKES) {
+    if (direction === 'like' && circleLikesLoaded && circleLikesUsed >= circleDailyLimit) {
       setShowCircleOutOfLikes(true);
       return;
     }
     setIsSwipeActionPending(true);
+
+    let madeMatch = false;
+    try {
+      if (direction === 'like') {
+        const result = await recordCircleLike(currentUser.id, profile.id, isPremium);
+        setCircleLikesUsed(result.currentUsage);
+        if (result.limitReached || !result.success) {
+          setShowCircleOutOfLikes(true);
+          return;
+        }
+        madeMatch = result.match;
+      } else {
+        const { error } = await supabase.rpc('pass_and_usage_batched', {
+          passer_id_param: currentUser.id,
+          passed_id_param: profile.id,
+          premium_param: !!isPremium,
+        });
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error(`Error ${direction === 'like' ? 'liking' : 'passing'} from Circle:`, error);
+      toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
+      setIsSwipeActionPending(false);
+      return;
+    }
+
     setPool((prev) => prev.filter((p) => p.id !== profile.id));
 
     // Shrink the exact Recommended/Similar snapshot this profile came from
@@ -1183,19 +1228,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     }
 
     try {
+      publishSwipeDecision(currentUser.id, profile.id, direction);
       if (direction === 'like') {
-        const { data, error } = await supabase.rpc('like_and_usage_batched', {
-          liker_id_param: currentUser.id,
-          liked_id_param: profile.id,
-          premium_param: !!isPremium,
-        });
-        if (error) throw error;
-        if (!isPremium) {
-          setCircleLikesUsed((prev) => prev + 1);
-          void incrementCircleLikesUsed(currentUser.id).then((total) => setCircleLikesUsed(total));
-        }
-        const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
-
         // Same notifications a Discover swipe sends, so the person on the
         // other end hears about a Circle like/match identically.
         try {
@@ -1224,13 +1258,6 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
             window.dispatchEvent(new CustomEvent('newMatch', { detail: { userId: currentUser.id } }));
           }
         }
-      } else {
-        const { error } = await supabase.rpc('pass_and_usage_batched', {
-          passer_id_param: currentUser.id,
-          passed_id_param: profile.id,
-          premium_param: !!isPremium,
-        });
-        if (error) throw error;
       }
     } catch (error) {
       console.error(`Error ${direction === 'like' ? 'liking' : 'passing'} from Circle:`, error);
@@ -1242,7 +1269,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, sendMatchNotification, sendMultipleLikesNotification]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
@@ -1491,7 +1518,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   const activeProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex] : selectedProfile;
   const nextBrowseProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex + 1] : undefined;
 
-  // Free users who've used all 20 of today's Circle likes. Same shape as
+  // Users who've used today's tier allowance. Same shape as
   // Discover's own out-of-swipes card, with the CTA wording following
   // whether this viewer currently qualifies for a free trial.
   if (showCircleOutOfLikes) {
@@ -1502,8 +1529,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
             <h2 className="text-lg font-semibold mb-1.5 text-white">Out of swipes for today</h2>
             <p className="text-gray-400 text-sm mb-5 max-w-xs">
-              You&apos;ve used all {FREE_CIRCLE_DAILY_LIKES} of your Circle likes for today. They refill tomorrow -
-              or go Premium for unlimited likes right now.
+              You&apos;ve used all {circleDailyLimit} of your Circle likes for today. They refill tomorrow
+              {!isPremium ? ' — or upgrade for 100 Circle likes each day.' : '.'}
             </p>
             <div className="w-full flex flex-col items-center gap-3">
               <Button
@@ -1590,6 +1617,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         onPass={() => handleCirclePass(activeProfile)}
         topLabel={categoryBrowse ? categoryBrowse.label : undefined}
         nextPreviewImageUrl={nextBrowseProfile?.firstImage || undefined}
+        dailyLikeCounter={circleLikesLoaded ? { remaining: circleLikesLeft, limit: circleDailyLimit } : undefined}
         readOnly
       />
     );
@@ -1600,17 +1628,17 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       <div className="sticky top-0 z-10 bg-black pt-2 pb-2">
         <div className="flex items-start justify-between px-6 gap-3 mb-1">
           <h2 className="text-white font-semibold text-base">Circle Up</h2>
-          {!isPremium && circleLikesLoaded && (
+          {circleLikesLoaded && (
             <span
               className={`flex items-center gap-1 flex-shrink-0 text-[11px] font-medium rounded-full border px-2.5 py-1 ${
                 circleLikesLeft === 0
                   ? 'text-white/70 border-white/15 bg-white/[0.04]'
                   : 'text-pink-300 border-pink-500/30 bg-pink-500/10'
               }`}
-              aria-label={`${circleLikesLeft} of ${FREE_CIRCLE_DAILY_LIKES} Circle likes left today`}
+              aria-label={`${circleLikesLeft} of ${circleDailyLimit} Circle likes left today`}
             >
               <Heart className="w-3 h-3" />
-              {circleLikesLeft}/{FREE_CIRCLE_DAILY_LIKES}
+              {circleLikesLeft}/{circleDailyLimit}
             </span>
           )}
         </div>

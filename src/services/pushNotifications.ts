@@ -21,7 +21,23 @@ interface RealtimeNotification {
   is_read: boolean;
   created_at: string;
   related_user_id?: string | null;
+  data?: unknown;
 }
+
+const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object') return {};
+  const input = value as Record<string, unknown>;
+  const nested = input.data;
+  if (typeof nested === 'string') {
+    try {
+      const parsed = JSON.parse(nested);
+      if (parsed && typeof parsed === 'object') return { ...input, ...(parsed as Record<string, unknown>) };
+    } catch {
+      // Keep the original native payload when a provider sends a plain string.
+    }
+  }
+  return input;
+};
 
 // Where every notification tap/click goes - ONE table, used by the OS
 // notification tap, the in-app toast click and (when the app is already
@@ -58,20 +74,30 @@ export type NotificationNavHandler = (
 ) => void;
 
 let inAppNavHandler: NotificationNavHandler | null = null;
+let pendingNavigation: { type?: string; data: Record<string, unknown> } | null = null;
 
 export const setNotificationNavHandler = (handler: NotificationNavHandler | null): void => {
   inAppNavHandler = handler;
+  if (handler && pendingNavigation) {
+    const pending = pendingNavigation;
+    pendingNavigation = null;
+    handler(pending.type, pending.data);
+  }
 };
 
 export const navigateFromNotification = (
   type: string | undefined,
   data: Record<string, unknown> | undefined
 ): void => {
+  const normalized = normalizeNotificationData(data);
+  const resolvedType = type || (typeof normalized.type === 'string' ? normalized.type : undefined);
   if (inAppNavHandler) {
-    inAppNavHandler(type, data);
+    inAppNavHandler(resolvedType, normalized);
     return;
   }
-  window.location.href = resolveNotificationRoute(type, data);
+  pendingNavigation = { type: resolvedType, data: normalized };
+  const route = resolveNotificationRoute(resolvedType, normalized);
+  if (route !== '/') window.history.replaceState({}, '', route);
 };
 
 
@@ -151,6 +177,15 @@ class SupabasePushNotificationService {
         return;
       }
 
+      // Tap/foreground listeners must exist even when permission was denied
+      // recently; already-delivered notifications can still launch the app.
+      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+        this.handleForegroundNotification(notification);
+      });
+      PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+        this.handleNotificationAction(notification);
+      });
+
       // Check if we should request permission (respects 3-day delay)
       if (!this.shouldRequestPermission()) {
         // Too soon since last denial, skip request
@@ -208,13 +243,6 @@ class SupabasePushNotificationService {
           // Don't throw - let the app continue without push notifications
         });
 
-        PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
-          this.handleForegroundNotification(notification);
-        });
-
-        PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-          this.handleNotificationAction(notification);
-        });
       } else if (permissionStatus.receive === 'denied') {
         // Permission denied, record timestamp for 3-day retry
         this.recordPermissionDenial();
@@ -274,7 +302,7 @@ class SupabasePushNotificationService {
       this.showInAppNotification({
         title: notification.title,
         body: notification.message,
-        data: { notificationId: notification.id },
+        data: { notificationId: notification.id, ...normalizeNotificationData(notification.data) },
         type: notification.type as 'match' | 'message' | 'like' | 'system' | 'admin'
       });
     }
@@ -307,7 +335,7 @@ class SupabasePushNotificationService {
   // notification tap (handleNotificationAction, below), the in-app toast's
   // own click handler, and MainApp's in-app tab navigation alike.
   private handleNotificationAction(notification: ActionPerformed): void {
-    const data = notification.notification.data as Record<string, unknown> | undefined;
+    const data = normalizeNotificationData(notification.notification.data);
     navigateFromNotification(data?.type as string | undefined, data);
   }
 

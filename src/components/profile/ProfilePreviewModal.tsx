@@ -109,6 +109,8 @@ interface ProfilePreviewModalProps {
    * dimmed until the swipe actually commits (mirrors Discover: don't reveal
    * who's next until the user has actually swiped past this one). */
   nextPreviewImageUrl?: string;
+  /** Circle's authoritative remaining right-likes for today. */
+  dailyLikeCounter?: { remaining: number; limit: number };
 }
 
 const BACKGROUND_COLORS = [
@@ -150,7 +152,7 @@ const getSafeImageSrc = (url?: string): string | undefined => {
 // instead of covering the screen; leaving the tab (including tapping the
 // Profile nav icon again) drops back to the real profile page, handled by
 // ProfilePage via onClose/isActiveTab.
-const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange, readOnly = false, onBack, simpleBackButton = false, onLike, onPass, topLabel, nextPreviewImageUrl }) => {
+const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, images, onClose, onPhotoUpdated, onPendingCropChange, readOnly = false, onBack, simpleBackButton = false, onLike, onPass, topLabel, nextPreviewImageUrl, dailyLikeCounter }) => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -752,6 +754,16 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             style={{ top: '76px' }}
           >
             {topLabel}
+          </div>
+        )}
+
+        {dailyLikeCounter && (
+          <div
+            className="absolute right-4 top-4 z-10 flex items-center gap-1 rounded-full border border-pink-500/30 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-pink-200 backdrop-blur-md"
+            aria-label={`${dailyLikeCounter.remaining} of ${dailyLikeCounter.limit} Circle likes left today`}
+          >
+            <Heart className="h-3 w-3" />
+            {dailyLikeCounter.remaining}/{dailyLikeCounter.limit}
           </div>
         )}
 

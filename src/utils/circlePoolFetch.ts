@@ -300,8 +300,11 @@ export const fetchCircleProfilesByIds = async (ids: string[]): Promise<CirclePro
   if (ids.length === 0) return [];
   const { data: rows, error } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, relationship_intent, love_style, pets, communication_style, family_plans, social_media, favorites, adinkra_symbols, languages, introvert_extrovert, spontaneous_planner, messy_organized, smoking, drinking, exercise_level, sleeping_schedule, last_login_at, is_verified, max_distance, distance_preference, fun_fact, perfect_first_date, last_googled')
-    .in('id', ids);
+    .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, gender, preference, relationship_intent, love_style, pets, communication_style, family_plans, social_media, favorites, adinkra_symbols, languages, introvert_extrovert, spontaneous_planner, messy_organized, smoking, drinking, exercise_level, sleeping_schedule, last_login_at, is_verified, max_distance, distance_preference, latitude, longitude, fun_fact, perfect_first_date, last_googled')
+    .in('id', ids)
+    .eq('account_status', 'active')
+    .eq('is_admin', false)
+    .eq('is_archived', false);
   if (error || !Array.isArray(rows)) return [];
 
   const { data: imageRows } = await supabase
@@ -319,4 +322,32 @@ export const fetchCircleProfilesByIds = async (ids: string[]): Promise<CirclePro
   return (rows as unknown as ProfileRow[])
     .filter((p) => firstImageByUser[p.id])
     .map((p) => ({ ...p, favorites: parseFavorites(p.favorites), firstImage: firstImageByUser[p.id] }));
+};
+
+/** Validates a directly linked profile against the same eligibility rules as Circle. */
+export const isCircleProfileEligible = async (
+  currentUser: CurrentUser,
+  profile: CircleProfile,
+  isPremium?: boolean
+): Promise<boolean> => {
+  if (!currentUser.id || profile.id === currentUser.id) return false;
+  const excluded = await fetchCircleExclusionIds(currentUser.id);
+  if (excluded.has(profile.id)) return false;
+  if (!getCircleGenderFilter(currentUser.preference || 'everyone').includes(profile.gender)) return false;
+  if (!matchesReciprocalPreference(currentUser.gender, profile.preference)) return false;
+  if (!profile.date_of_birth) return false;
+  const age = calculateAge(profile.date_of_birth);
+  if (age < (currentUser.min_age || 18) || age > (currentUser.max_age || 99)) return false;
+
+  const split = getCircleCountrySplit(currentUser, isPremium);
+  const profileCountry = normalizeCountryCode(profile.country_code || '');
+  if (profileCountry !== split.baseCountryCode && !split.unlockedCountryCodes.includes(profileCountry)) return false;
+
+  if (profileCountry === split.baseCountryCode) {
+    const { userLat, userLon, hasCoords, maxDistanceKm } = getCircleDistanceParams(currentUser, isPremium);
+    if (hasCoords && typeof profile.latitude === 'number' && typeof profile.longitude === 'number') {
+      if (calculateDistance(userLat as number, userLon as number, profile.latitude, profile.longitude) > maxDistanceKm) return false;
+    }
+  }
+  return true;
 };
