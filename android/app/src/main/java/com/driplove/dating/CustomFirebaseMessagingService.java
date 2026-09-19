@@ -87,11 +87,20 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
             }
         }
         
+        // Unique request code per notification: with a shared request code of
+        // 0 Android reused ONE PendingIntent for every push, so every
+        // notification in the shade carried the extras of whichever push was
+        // sent first - taps landed on the wrong chat/profile.
+        String intentKey = data != null ? data.get("notificationTag") : null;
+        int requestCode = intentKey != null && !intentKey.isEmpty()
+            ? intentKey.hashCode()
+            : (int) System.currentTimeMillis();
+
         PendingIntent pendingIntent = PendingIntent.getActivity(
-            this, 
-            0, 
+            this,
+            requestCode,
             intent,
-            PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         
         // Custom sound URI
