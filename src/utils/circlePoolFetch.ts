@@ -37,7 +37,10 @@ export const getCircleDistanceParams = (currentUser: CurrentUser, isPremium?: bo
   const userLon = currentUser.longitude;
   const rawMaxDistance = Number(currentUser.max_distance ?? currentUser.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
   const safeMaxDistanceUncapped = Number.isFinite(rawMaxDistance) && rawMaxDistance > 0 ? rawMaxDistance : DEFAULT_MAX_DISTANCE_KM;
-  const maxDistanceKm = isPremium ? safeMaxDistanceUncapped : Math.min(safeMaxDistanceUncapped, FREE_USER_MAX_DISTANCE_KM);
+  const maxDistanceKm = Math.min(
+    safeMaxDistanceUncapped,
+    isPremium ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
+  );
   const hasCoords = typeof userLat === 'number' && typeof userLon === 'number';
   const radiusDegrees = hasCoords ? maxDistanceKm / KM_PER_DEGREE_LATITUDE : null;
   return { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees };
