@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
+import { publishSwipeDecision } from '@/utils/swipeSync';
 
 import type { AppUser, LikedMeCacheValue, LikerProfile } from '@/types/cacheTypes';
 import type { PotentialMatch } from '@/types';
