@@ -1117,14 +1117,53 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // slow photo fetch for the card you just swiped past could land after the
   // next card opened and paint the wrong person's gallery.
   const imagesOwnerRef = useRef<string | null>(null);
+  // Photo URLs already fetched this session, keyed by profile id. Swiping
+  // through a deck used to re-query user_images for every single card, so
+  // each swipe waited on a round trip before anything but the thumbnail
+  // showed; now the next cards are fetched and warmed in the background
+  // while the current one is on screen.
+  const imageUrlCacheRef = useRef<Map<string, string[]>>(new Map());
+
+  const fetchAndCacheImages = useCallback(async (profile: CircleProfile): Promise<string[]> => {
+    const cached = imageUrlCacheRef.current.get(profile.id);
+    if (cached) return cached;
+    const urls = await loadImagesForProfile(profile.id);
+    const resolved = urls.length ? urls : (profile.firstImage ? [profile.firstImage] : []);
+    imageUrlCacheRef.current.set(profile.id, resolved);
+    // Keep the map from growing without bound across a long session.
+    if (imageUrlCacheRef.current.size > 120) {
+      const firstKey = imageUrlCacheRef.current.keys().next().value as string | undefined;
+      if (firstKey) imageUrlCacheRef.current.delete(firstKey);
+    }
+    return resolved;
+  }, [loadImagesForProfile]);
+
+  // Warms the browser cache for the exact URLs the card will render, so the
+  // next card paints instantly instead of decoding on arrival.
+  const prefetchProfileImages = useCallback(async (profile: CircleProfile | undefined) => {
+    if (!profile) return;
+    try {
+      const urls = await fetchAndCacheImages(profile);
+      urls.slice(0, 2).forEach((url) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = getDetailImageUrl(url);
+      });
+    } catch {
+      // Prefetch is best-effort - a failure just means the normal load runs.
+    }
+  }, [fetchAndCacheImages]);
+
   const applyProfileImages = useCallback(async (profile: CircleProfile) => {
     imagesOwnerRef.current = profile.id;
     const fallback = profile.firstImage ? [profile.firstImage] : [];
-    setSelectedImages(fallback);
-    const urls = await loadImagesForProfile(profile.id);
+    const cached = imageUrlCacheRef.current.get(profile.id);
+    setSelectedImages(cached && cached.length ? cached : fallback);
+    if (cached && cached.length) return;
+    const urls = await fetchAndCacheImages(profile);
     if (imagesOwnerRef.current !== profile.id) return;
     setSelectedImages(urls.length ? urls : fallback);
-  }, [loadImagesForProfile]);
+  }, [fetchAndCacheImages]);
 
   const openProfile = useCallback(async (profile: CircleProfile) => {
     setSelectedProfile(profile);
