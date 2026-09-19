@@ -2034,7 +2034,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       const resistedX = Math.min(window.innerWidth, deltaX * 0.92);
       if (conversationViewRef.current) {
         conversationViewRef.current.style.transform = `translate3d(${resistedX}px, 0, 0)`;
-        conversationViewRef.current.style.boxShadow = '-18px 0 32px rgba(0, 0, 0, 0.38)';
       }
     }
   };
@@ -2042,9 +2041,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   const resetConversationPosition = () => {
     const view = conversationViewRef.current;
     if (!view) return;
-    view.style.transition = 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 280ms ease-out';
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    view.style.transition = reducedMotion ? 'none' : 'transform 280ms cubic-bezier(0.22, 1, 0.36, 1)';
     view.style.transform = 'translate3d(0, 0, 0)';
-    view.style.boxShadow = 'none';
     window.setTimeout(() => {
       if (conversationViewRef.current === view) {
         view.style.transition = '';
@@ -2445,7 +2444,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   return (
   <div
     ref={conversationViewRef}
-    className="h-full min-h-0 flex flex-col bg-black"
+    className="h-full min-h-0 flex flex-col bg-black shadow-2xl"
     style={{ paddingTop: `${topCompensation}px`, transform: 'translate3d(0, 0, 0)' }}
   >
       {/* Chat Header (below global header) */}
