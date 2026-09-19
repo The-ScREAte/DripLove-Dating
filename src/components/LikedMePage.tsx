@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 // FIX #1: Import blob cache for instant Android image loading
 import { preloadImageToBlob } from '@/utils/imageCache';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
+import { publishSwipeDecision } from '@/utils/swipeSync';
 
 import type { AppUser, LikedMeCacheValue, LikerProfile } from '@/types/cacheTypes';
 import type { PotentialMatch } from '@/types';
@@ -1055,6 +1056,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
       if (error) throw error;
 
+      // Tell every other surface (Circle pool, Recommended/Similar rows,
+      // Discover deck) this person is now decided, so they disappear there
+      // immediately instead of lingering until a cache expires.
+      publishSwipeDecision(currentUser.id, profileId, 'like');
+
       // Set lockout period for free users
       if (!isPremium && !hasInteractedToday) {
         await setLockoutPeriod();
@@ -1178,6 +1184,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       if (currentUser?.id) {
         likedMeCache.delete(currentUser.id);
         sessionStorage.removeItem(getStorageKey(currentUser.id));
+        publishSwipeDecision(currentUser.id, profileId, 'pass');
       }
       
       // Set lockout period for free users
