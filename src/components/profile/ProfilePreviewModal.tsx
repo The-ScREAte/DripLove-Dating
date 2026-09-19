@@ -700,7 +700,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             type="button"
             onClick={(e) => { e.stopPropagation(); onBack(); }}
             aria-label="Back"
-            className="absolute left-4 top-4 z-10 flex items-center justify-center text-white active:opacity-60 transition-opacity"
+            className="absolute left-2 top-4 z-10 flex items-center justify-center text-white active:opacity-60 transition-opacity"
             style={{ background: 'none', border: 'none', padding: 0 }}
           >
             <ChevronLeft className="w-8 h-8" strokeWidth={3} />
@@ -721,7 +721,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         {topLabel && (
           <div
             className="absolute left-1/2 -translate-x-1/2 z-20 max-w-[55%] truncate px-2 py-0.5 rounded-full text-white text-[10px] font-semibold bg-black/60 backdrop-blur-md border border-white/20"
-            style={{ top: '42px' }}
+            style={{ top: '2px' }}
           >
             {topLabel}
           </div>
@@ -738,7 +738,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         )}
 
         {slides.length > 1 && (
-          <div className={`absolute ${onBack ? 'left-16' : 'left-4'} flex gap-1.5 z-10`} style={{ top: '14px' }}>
+          <div className={`absolute ${onBack ? 'left-12' : 'left-4'} flex gap-1.5 z-10`} style={{ top: '14px' }}>
             {slides.map((_, idx) => (
               <div
                 key={idx}
@@ -755,7 +755,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             inside a `position: fixed` ancestor, so a plain absolute overlay
             already paints above everything else on the page. */}
         {profile.adinkra_symbols && profile.adinkra_symbols.length > 0 && (
-          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex flex-col items-center" style={{ top: '4px' }}>
+          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex flex-col items-center" style={{ top: '10px' }}>
             <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
               <div className="relative z-10">
                 <UserAdinkraDisplay adinkraSymbols={profile.adinkra_symbols} />

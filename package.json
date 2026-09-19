@@ -16,12 +16,15 @@
     "get:user:id": "node scripts/get-user-id.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "android:build": "npm run build:android && cap sync android",
-    "android:dev": "npm run build:android && cap sync android && cap open android",
-    "android:run": "npm run build:android && cap sync android && cap run android",
-    "ios:build": "npm run build:capacitor && cap sync ios",
-    "ios:dev": "npm run build:capacitor && cap sync ios && cap open ios",
-    "ios:run": "npm run build:capacitor && cap sync ios && cap run ios"
+    "sync:android": "npm run build:capacitor && cap sync android",
+    "sync:ios": "npm run build:capacitor && cap sync ios",
+    "sync:native": "npm run build:capacitor && cap sync",
+    "android:build": "npm run sync:android",
+    "android:dev": "npm run sync:android && cap open android",
+    "android:run": "npm run sync:android && cap run android",
+    "ios:build": "npm run sync:ios",
+    "ios:dev": "npm run sync:ios && cap open ios",
+    "ios:run": "npm run sync:ios && cap run ios"
   },
   "dependencies": {
     "@awesome-cordova-plugins/in-app-purchase-2": "^8.1.0",
