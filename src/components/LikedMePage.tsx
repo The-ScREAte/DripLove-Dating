@@ -1137,7 +1137,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         variant: "destructive",
       });
     }
-  }, [currentUser?.id, hasInteractedToday, isPremium, likers, setLockoutPeriod, toast]);
+  }, [currentUser?.id, currentUser?.first_name, currentUser?.last_name, hasInteractedToday, isPremium, likers, sendMatchNotification, setLockoutPeriod, toast]);
 
   const handlePass = useCallback(async (profileId: string) => {
     // Optimistic update - remove profile immediately
