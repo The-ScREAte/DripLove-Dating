@@ -99,8 +99,10 @@ const PREMIUM_DAILY_SWIPE_LIMIT = 200;
 const FREE_USER_MAX_DISTANCE_KM = 600;
 // Premium users can search further than free users, but still up to a
 // concrete ceiling rather than being fully unbounded - matches the max on
-// the distance slider in the profile's Location section.
-const PREMIUM_USER_MAX_DISTANCE_KM = 1020;
+// the distance slider in the profile's Location section. The radius is
+// ALWAYS additionally bounded by the home country: a bigger radius never
+// pulls in a neighbouring country's profiles.
+const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 
 // Below this profile-completion percentage, swiping is blocked once the user
 // has already had a few free look-arounds. Was hardcoded as "70" and "5"
