@@ -1244,41 +1244,55 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
       // away, or archived accounts, that Discover would never show.
       const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
 
-      const { data: rows, error } = await supabase.rpc('get_circle_category_profiles', {
-        p_country_codes: countryCodes,
-        p_allowed_genders: allowedGenders,
-        p_viewer_gender: currentUser.gender || '',
-        p_excluded_ids: Array.from(excluded),
-        p_limit: 60,
-        p_relationship_intent: tile.filter?.relationshipIntent ?? null,
-        p_family_plans: tile.filter?.familyPlans ?? null,
-        p_is_verified: typeof tile.filter?.isVerified === 'boolean' ? tile.filter.isVerified : null,
-        p_interest: tile.filter?.interest ?? null,
-        p_has_music: typeof tile.filter?.hasMusic === 'boolean' ? tile.filter.hasMusic : null,
-        p_has_social_media: typeof tile.filter?.hasSocialMedia === 'boolean' ? tile.filter.hasSocialMedia : null,
-        p_has_pets: typeof tile.filter?.hasPets === 'boolean' ? tile.filter.hasPets : null,
-        p_archived: false,
-        p_lat: hasCoords ? userLat : null,
-        p_lon: hasCoords ? userLon : null,
-        p_radius_degrees: radiusDegrees,
-      });
-      if (error) throw error;
-      if (!Array.isArray(rows) || rows.length === 0) {
+      type ProfileRow = Omit<CircleProfile, 'firstImage'>;
+      const fetchCategoryRows = async (codes: string[], applyRadius: boolean, limit: number): Promise<ProfileRow[]> => {
+        if (codes.length === 0 || limit <= 0) return [];
+        const useBox = applyRadius && hasCoords;
+        const { data, error } = await supabase.rpc('get_circle_category_profiles', {
+          p_country_codes: codes,
+          p_allowed_genders: allowedGenders,
+          p_viewer_gender: currentUser.gender || '',
+          p_excluded_ids: Array.from(excluded),
+          p_limit: limit,
+          p_relationship_intent: tile.filter?.relationshipIntent ?? null,
+          p_family_plans: tile.filter?.familyPlans ?? null,
+          p_is_verified: typeof tile.filter?.isVerified === 'boolean' ? tile.filter.isVerified : null,
+          p_interest: tile.filter?.interest ?? null,
+          p_has_music: typeof tile.filter?.hasMusic === 'boolean' ? tile.filter.hasMusic : null,
+          p_has_social_media: typeof tile.filter?.hasSocialMedia === 'boolean' ? tile.filter.hasSocialMedia : null,
+          p_has_pets: typeof tile.filter?.hasPets === 'boolean' ? tile.filter.hasPets : null,
+          p_archived: false,
+          p_lat: useBox ? userLat : null,
+          p_lon: useBox ? userLon : null,
+          p_radius_degrees: applyRadius ? radiusDegrees : null,
+        });
+        if (error) throw error;
+        return Array.isArray(data) ? (data as unknown as ProfileRow[]) : [];
+      };
+
+      const homeLimit = unlockedCountryCodes.length > 0 ? 30 : 60;
+      const [homeRows, unlockedRows] = await Promise.all([
+        fetchCategoryRows(homeCountryCodes, true, homeLimit),
+        fetchCategoryRows(unlockedCountryCodes, false, unlockedCountryCodes.length > 0 ? 60 - homeLimit : 0),
+      ]);
+      const rows = [...homeRows, ...unlockedRows];
+      if (rows.length === 0) {
         setEmptyCategoryLabel(tile.label);
         return;
       }
 
-      type ProfileRow = Omit<CircleProfile, 'firstImage'>;
-      const eligible = (rows as unknown as ProfileRow[])
+      const eligible = rows
         .filter((p) => {
           if (!p.date_of_birth) return false;
           const age = calculateAge(p.date_of_birth);
           return age >= (currentUser.min_age || 18) && age <= (currentUser.max_age || 99);
         })
         // The RPC's radius is a rough lat/lon bounding box - narrow to the
-        // real distance, same client-side enforcement Discover/fetchCirclePool do.
+        // real distance. Only for the viewer's own country; unlocked
+        // countries are intentionally not distance-bound.
         .filter((p) => {
           if (!hasCoords || !p.latitude || !p.longitude) return true;
+          if (!homeSet.has(normalizeCountryCode(p.country_code || ''))) return true;
           return calculateDistance(userLat as number, userLon as number, p.latitude, p.longitude) <= maxDistanceKm;
         });
 
