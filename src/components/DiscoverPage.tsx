@@ -2933,9 +2933,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               : (baseCountryCode ? [baseCountryCode] : []);
             if (recoveryCountryCodes.length === 0) return [];
 
-            // Distance is a free-tier concept only - premium browses unlocked
-            // countries with no radius, same as the main fetch's international path.
-            const recoveryRadiusInDegrees = (!premiumActive && currentUserData.latitude && currentUserData.longitude)
+            // Distance applies to everyone inside the home country. A
+            // server-side box can only be used when unlocked countries
+            // aren't part of this query (it would be centered on the
+            // viewer and wrongly exclude them); otherwise it's enforced
+            // client-side, home-country rows only, below.
+            const hasUnlockedInRecovery = premiumActive && recoveryCountryCodes.length > 1;
+            const recoveryRadiusInDegrees = (!hasUnlockedInRecovery && currentUserData.latitude && currentUserData.longitude)
               ? maxDistance / 111.32
               : null;
 
