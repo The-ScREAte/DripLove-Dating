@@ -2248,14 +2248,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     onTouchEnd={handleTouchEnd}
   >
     <div
-      className={`flex shrink-0 items-center justify-center gap-2 overflow-hidden bg-black transition-[height,opacity] duration-300 ease-out ${pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'}`}
+      className={`flex shrink-0 items-center justify-center overflow-hidden bg-black transition-[height,opacity] duration-300 ease-out ${pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'}`}
       style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
-      aria-live="polite"
     >
       <HoppingLogo size={24} opacity={pullDistance > 0 || isRefreshing ? 1 : 0.65} className="shrink-0" />
-      <div className="text-sm font-medium text-pink-300">
-        {isRefreshing ? t('chat.refreshing') : pullDistance > PULL_TRIGGER_THRESHOLD ? t('chat.releaseToRefresh') : t('chat.pullToRefresh')}
-      </div>
     </div>
           {activeConversations.length === 0 && dormantConversations.length === 0 && newMatchList.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
