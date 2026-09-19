@@ -1392,7 +1392,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         return (now - data.timestamp) < thirtyDaysMs;
       })
       .map(([id, _]) => id));
-    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, userId]);
+    // People currently reserved for Circle's "Recommended for you" /
+    // "Similar interests" rows (circle_row_batches). Those two rows are a
+    // curated, stable snapshot - if the same person also showed up in the
+    // Discover deck they could be swiped from two places and the Circle row
+    // would contradict itself, so Discover leaves them to Circle until that
+    // batch is fully decided (at which point the row is cleared).
+    const { data: circleReservedRows } = await supabase
+      .from('circle_row_batches')
+      .select('profile_ids')
+      .eq('user_id', userId);
+    const circleReservedIds = uniqUuids(
+      (circleReservedRows || []).flatMap((r) => ((r.profile_ids as string[] | null) || []))
+    );
+
+    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, ...circleReservedIds, userId]);
     
     const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
     const userMaxDistance = Number(userMaxDistanceRaw);

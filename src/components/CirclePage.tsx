@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch, CurrentUser } from '@/types';
@@ -1092,12 +1092,26 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     return (data || []).map((r) => r.image_url);
   }, []);
 
-  const openProfile = useCallback(async (profile: CircleProfile) => {
-    setSelectedProfile(profile);
-    setSelectedImages(await loadImagesForProfile(profile.id));
+  // Which profile the photos currently in state belong to. Without this, a
+  // slow photo fetch for the card you just swiped past could land after the
+  // next card opened and paint the wrong person's gallery.
+  const imagesOwnerRef = useRef<string | null>(null);
+  const applyProfileImages = useCallback(async (profile: CircleProfile) => {
+    imagesOwnerRef.current = profile.id;
+    const fallback = profile.firstImage ? [profile.firstImage] : [];
+    setSelectedImages(fallback);
+    const urls = await loadImagesForProfile(profile.id);
+    if (imagesOwnerRef.current !== profile.id) return;
+    setSelectedImages(urls.length ? urls : fallback);
   }, [loadImagesForProfile]);
 
+  const openProfile = useCallback(async (profile: CircleProfile) => {
+    setSelectedProfile(profile);
+    await applyProfileImages(profile);
+  }, [applyProfileImages]);
+
   const closeProfileView = useCallback(() => {
+    imagesOwnerRef.current = null;
     setSelectedProfile(null);
     setCategoryBrowse(null);
     setCategoryBrowseIndex(0);
@@ -1217,8 +1231,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       if (nextIndex < categoryBrowse.profiles.length) {
         const nextProfile = categoryBrowse.profiles[nextIndex];
         setCategoryBrowseIndex(nextIndex);
-        setSelectedImages(nextProfile.firstImage ? [nextProfile.firstImage] : []);
-        loadImagesForProfile(nextProfile.id).then(setSelectedImages);
+        void applyProfileImages(nextProfile);
       } else {
         toast({ title: "That's everyone", description: `You've seen everyone in "${categoryBrowse.label}" for now.` });
         closeProfileView();
@@ -1269,7 +1282,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, applyProfileImages, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
@@ -1329,6 +1342,11 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       (blocksRes.data || []).forEach((b) => { if (b.blocked_id) excluded.add(b.blocked_id); if (b.blocker_id) excluded.add(b.blocker_id); });
       (passesRes.data || []).forEach((p) => p.passed_id && excluded.add(p.passed_id));
       (cooldownsRes.data || []).forEach((c) => excluded.add(c.user1_id === userId ? c.user2_id : c.user1_id));
+      // Anyone held by the Recommended/Similar rows belongs only to those
+      // rows - never also in a category deck, where swiping them would
+      // silently gut the row the user is still looking at.
+      (recommendedBatch || []).forEach((p) => excluded.add(p.id));
+      (similarBatch || []).forEach((p) => excluded.add(p.id));
 
       // Same distance/archived rules Discover and Circle's own
       // Recommended/Similar rows already enforce - this RPC used to have
@@ -1406,15 +1424,14 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
       setCategoryBrowse({ label: tile.label, profiles: withPhotos });
       setCategoryBrowseIndex(0);
-      setSelectedImages(withPhotos[0].firstImage ? [withPhotos[0].firstImage] : []);
-      loadImagesForProfile(withPhotos[0].id).then(setSelectedImages);
+      void applyProfileImages(withPhotos[0]);
     } catch (err) {
       console.error('Error loading category browse:', err);
       toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
     } finally {
       setLoadingCategoryKey(null);
     }
-  }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, loadImagesForProfile]);
+  }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, applyProfileImages, recommendedBatch, similarBatch]);
 
   // Both tiers see the same 4-card batch. Free: only index 0 is unlocked -
   // the other 3 are a locked, tap-opens-upsell teaser (see recommendedItems/
@@ -1608,6 +1625,10 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   if (activeProfile) {
     return (
       <ProfilePreviewModal
+        // Remount per person: the preview keeps its own slide index, expanded
+        // state and swipe-exit transform, so reusing the instance left the
+        // next card stuck mid-swipe with stale info until a full refresh.
+        key={activeProfile.id}
         profile={toPotentialMatch(activeProfile)}
         images={selectedImages.length ? selectedImages : (activeProfile.firstImage ? [activeProfile.firstImage] : [])}
         onClose={closeProfileView}
