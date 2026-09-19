@@ -197,31 +197,6 @@ export const usePushNotifications = (userId?: string) => {
    * Sends notification when: 3+ likes OR 2 hours since first unseen like
    * Respects: 2hr like cooldown, 2min global cooldown, activity suppression
    */
-  const sendLikeNotification = async (likerName: string, targetUserId: string) => {
-    // Queue the like event
-    const { shouldNotify, likeCount } = queueLikeEvent();
-
-    // If threshold reached, send notification
-    if (shouldNotify && !isUserActive()) {
-      const success = await sendNotification({
-        title: "You're Noticed 👀",
-        body: "You caught someone's eye. See who's interested!",
-        userId: targetUserId,
-        type: 'like',
-        data: { likeCount: likeCount.toString() }
-      });
-
-      if (success) {
-        recordNotificationSent('like');
-      }
-
-      return success;
-    }
-
-    // Queued but not sent yet - this is expected behavior
-    return true;
-  };
-
   /**
    * Send batched like notification - call this to force check/send
    * Used when conditions are met (3 likes OR 2hr timeout)
@@ -322,7 +297,6 @@ export const usePushNotifications = (userId?: string) => {
     sendNotification,
     sendMatchNotification,
     sendMessageNotification,
-    sendLikeNotification,
     sendMultipleLikesNotification,
     sendAdminNotification,
     markAsRead,

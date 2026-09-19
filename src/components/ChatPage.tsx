@@ -32,6 +32,11 @@ interface ChatPageProps {
   currentUser: CurrentUser;
   onUnreadChange?: () => void;
   onDetailViewChange?: (inDetail: boolean) => void;
+  // Set when a message notification is tapped while the app is already
+  // running: opens that exact conversation even if Chat is already mounted
+  // and another conversation is open.
+  deepLinkMatchId?: string | null;
+  onDeepLinkConsumed?: () => void;
 }
 
 // Dormant conversations constants
@@ -152,7 +157,7 @@ const markExpirationWarningSent = (matchId: string): void => {
   }
 };
 
-const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMatchId, onDeepLinkConsumed }: ChatPageProps) => {
   const { t } = useTranslation();
   const [topCompensation, setTopCompensation] = useState(0);
   
@@ -484,6 +489,19 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange }: ChatPageP
       }
     }
   }, [currentUser, matches, selectedMatch]);
+
+  // Same thing, but for a tap that arrives while Chat is ALREADY mounted (no
+  // page reload, so no URL to read): MainApp hands the conversation id down
+  // here and we switch to it even if another conversation is open.
+  useEffect(() => {
+    if (!deepLinkMatchId || matches.length === 0) return;
+    const matchToOpen = matches.find(m => m.id === deepLinkMatchId);
+    if (!matchToOpen) return;
+    if (selectedMatch?.id !== matchToOpen.id) {
+      setSelectedMatch(matchToOpen);
+    }
+    onDeepLinkConsumed?.();
+  }, [deepLinkMatchId, matches, selectedMatch?.id, onDeepLinkConsumed]);
 
   // Keep matchesRef in sync
   useEffect(() => {

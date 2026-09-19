@@ -20,6 +20,7 @@ import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
 import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
+import { setNotificationNavHandler } from '@/services/pushNotifications';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type UserImageRow = Database['public']['Tables']['user_images']['Row'];
@@ -128,6 +129,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('profile');
     setVerifySignal(prev => prev + 1);
   };
+  // A tapped notification, handled while the app is already running: these
+  // carry the exact thing to open (a conversation, a person in Circle) into
+  // the tab that owns it, which then clears them once consumed.
+  const [chatDeepLinkMatchId, setChatDeepLinkMatchId] = useState<string | null>(null);
+  const [circleDeepLinkProfileId, setCircleDeepLinkProfileId] = useState<string | null>(null);
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -562,25 +568,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           console.error('[MainApp] Push registration error:', error);
         });
         
-        // Add notification tap listener (when app is closed/background)
-        PushNotifications.addListener('pushNotificationActionPerformed', async (notification) => {
-          const data = notification.notification.data;
-          
-          // Wait a bit for app to fully load
-          setTimeout(() => {
-            if (data?.type === 'message' && data?.chatId) {
-              setActiveTab('chat');
-              // Use hash navigation to pass matchId to ChatPage
-              window.location.hash = `matchId=${data.chatId}`;
-            } else if (data?.type === 'match') {
-              setActiveTab('chat');
-            } else if (data?.type === 'like') {
-              setActiveTab('liked');
-            } else {
-              setActiveTab('chat');
-            }
-          }, 500);
-        });
+        // Notification taps are handled in ONE place only: the push service's
+        // own listener, which calls the nav handler registered below. A second
+        // listener used to live here with its own (different) routing and both
+        // fired on every tap, so taps landed unpredictably - do not re-add it.
+        
         
         // Add foreground notification listener
         PushNotifications.addListener('pushNotificationReceived', (notification) => {
@@ -905,9 +897,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     isSupported: pushSupported,
     deviceToken,
     error: pushError,
-    sendMatchNotification,
-    sendMessageNotification,
-    sendLikeNotification,
     recordUserActivity
   } = usePushNotifications(userId);
   
@@ -1195,6 +1184,43 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, []);
 
+  // The single in-app destination for a tapped notification while the app is
+  // running. Mirrors resolveNotificationRoute (used for cold starts), but
+  // switches tabs in place - no page reload - and hands the exact conversation
+  // or Circle profile to the tab that opens it.
+  useEffect(() => {
+    setNotificationNavHandler((type, data) => {
+      const action = data?.action as string | undefined;
+      const profileId = data?.profileId as string | undefined;
+      const chatId = data?.chatId as string | undefined;
+
+      if (action === 'open_circle_profile' && profileId) {
+        setCircleDeepLinkProfileId(profileId);
+        handleTabChange('circle');
+        return;
+      }
+      if (type === 'message' && chatId) {
+        setChatDeepLinkMatchId(chatId);
+        handleTabChange('chat');
+        return;
+      }
+      if (type === 'match') {
+        handleTabChange('chat');
+        return;
+      }
+      if (type === 'like') {
+        handleTabChange('liked');
+        return;
+      }
+      if (type === 'image_rejected') {
+        handleTabChange('profile');
+        return;
+      }
+      handleTabChange('dripcheck');
+    });
+    return () => setNotificationNavHandler(null);
+  }, [handleTabChange]);
+
   if (!userId) {
     return (
       <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
@@ -1418,7 +1444,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full"
                 style={{ display: activeTab === 'circle' ? 'block' : 'none' }}
               >
-                <CirclePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'circle'} />
+                <CirclePage
+                  currentUser={profile}
+                  isPremium={isPremium}
+                  isActiveTab={activeTab === 'circle'}
+                  deepLinkProfileId={circleDeepLinkProfileId}
+                  onDeepLinkConsumed={() => setCircleDeepLinkProfileId(null)}
+                />
               </div>
             </Suspense>
           )}
@@ -1429,7 +1461,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
               > 
-                <ChatPage currentUser={profile} onUnreadChange={forceRefreshUnreadCount} onDetailViewChange={setIsChatDetailOpen} />
+                <ChatPage
+                  currentUser={profile}
+                  onUnreadChange={forceRefreshUnreadCount}
+                  onDetailViewChange={setIsChatDetailOpen}
+                  deepLinkMatchId={chatDeepLinkMatchId}
+                  onDeepLinkConsumed={() => setChatDeepLinkMatchId(null)}
+                />
               </div>
             </Suspense>
           )}

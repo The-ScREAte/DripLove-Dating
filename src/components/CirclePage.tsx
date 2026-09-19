@@ -87,6 +87,7 @@ const CATEGORY_COUNTS_CACHE_TTL_MS = 2 * 60 * 1000;
 let categoryCountsCache: { key: string; categories: CategoryTile[]; timestamp: number } | null = null;
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { useToast } from '@/hooks/use-toast';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   Plane,
   Clapperboard,
@@ -262,6 +263,10 @@ interface CirclePageProps {
   currentUser: CurrentUser;
   isPremium?: boolean;
   isActiveTab?: boolean;
+  // Set when a "meet <person>" notification is tapped while the app is
+  // already running - opens that person's profile inside Circle.
+  deepLinkProfileId?: string | null;
+  onDeepLinkConsumed?: () => void;
 }
 
 // CircleProfile + the pool fetch itself now live in '@/utils/circlePoolFetch'
@@ -578,8 +583,9 @@ const PeopleRow = ({
   );
 };
 
-const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
+const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsumed }: CirclePageProps) => {
   const { toast } = useToast();
+  const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
   const navigate = useNavigate();
   // Same eligibility signal PremiumUpgrade.tsx's own "Start Free Trial"
   // buttons use - already correctly platform-aware: web/PWA has no native
@@ -1097,19 +1103,24 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
   // happens to be loaded. Independent of the pool/batch fetch above so it
   // works even before that's finished (or if it's a stale/decided batch by
   // the time the push is actually tapped).
+  // deepLinkProfileId covers the app-already-running tap (handed down by
+  // MainApp, no reload/URL involved); the URL param covers a cold start.
   useEffect(() => {
     if (!currentUser?.id) return;
     const params = new URLSearchParams(window.location.search);
-    const circleUserId = params.get('circleUserId');
+    const circleUserId = deepLinkProfileId || params.get('circleUserId');
     if (!circleUserId) return;
 
-    window.history.replaceState({}, '', window.location.pathname);
+    if (params.get('circleUserId')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    onDeepLinkConsumed?.();
     void (async () => {
       const [profile] = await fetchCircleProfilesByIds([circleUserId]);
       if (profile) openCircleRowProfile('recommended', profile);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]);
+  }, [currentUser?.id, deepLinkProfileId]);
 
   // Guards against a double-fire from the swipe gesture's own exit-animation
   // timeout landing while a second gesture is somehow already in flight.
@@ -1184,8 +1195,29 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
           void incrementCircleLikesUsed(currentUser.id).then((total) => setCircleLikesUsed(total));
         }
         const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
+
+        // Same notifications a Discover swipe sends, so the person on the
+        // other end hears about a Circle like/match identically.
+        try {
+          const { count } = await supabase
+            .from('likes')
+            .select('id', { count: 'exact', head: true })
+            .eq('liked_id', profile.id);
+          await sendMultipleLikesNotification(profile.id, typeof count === 'number' ? count : 1, currentUser.id);
+        } catch {
+          // notification failures never block the swipe
+        }
+
         if (madeMatch) {
           toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
+          try {
+            await sendMatchNotification(
+              `${currentUser.first_name || ''}`.trim() || 'Someone',
+              profile.id
+            );
+          } catch {
+            // ignore notification errors
+          }
           if (typeof window !== 'undefined') {
             const win = window as Window & { chatMatchesCache?: Map<string, unknown> };
             win.chatMatchesCache?.delete(currentUser.id);
@@ -1210,7 +1242,7 @@ const CirclePage = ({ currentUser, isPremium }: CirclePageProps) => {
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, sendMatchNotification, sendMultipleLikesNotification]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
