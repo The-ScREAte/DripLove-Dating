@@ -1187,6 +1187,43 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   }, []);
 
+  // The single in-app destination for a tapped notification while the app is
+  // running. Mirrors resolveNotificationRoute (used for cold starts), but
+  // switches tabs in place - no page reload - and hands the exact conversation
+  // or Circle profile to the tab that opens it.
+  useEffect(() => {
+    setNotificationNavHandler((type, data) => {
+      const action = data?.action as string | undefined;
+      const profileId = data?.profileId as string | undefined;
+      const chatId = data?.chatId as string | undefined;
+
+      if (action === 'open_circle_profile' && profileId) {
+        setCircleDeepLinkProfileId(profileId);
+        handleTabChange('circle');
+        return;
+      }
+      if (type === 'message' && chatId) {
+        setChatDeepLinkMatchId(chatId);
+        handleTabChange('chat');
+        return;
+      }
+      if (type === 'match') {
+        handleTabChange('chat');
+        return;
+      }
+      if (type === 'like') {
+        handleTabChange('liked');
+        return;
+      }
+      if (type === 'image_rejected') {
+        handleTabChange('profile');
+        return;
+      }
+      handleTabChange('dripcheck');
+    });
+    return () => setNotificationNavHandler(null);
+  }, [handleTabChange]);
+
   if (!userId) {
     return (
       <div className="min-h-fill flex items-center justify-center bg-gradient-to-br from-pink-50 to-purple-50 p-4">
