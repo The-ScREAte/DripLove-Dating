@@ -1092,10 +1092,23 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     return (data || []).map((r) => r.image_url);
   }, []);
 
+  // Which profile the photos currently in state belong to. Without this, a
+  // slow photo fetch for the card you just swiped past could land after the
+  // next card opened and paint the wrong person's gallery.
+  const imagesOwnerRef = useRef<string | null>(null);
+  const applyProfileImages = useCallback(async (profile: CircleProfile) => {
+    imagesOwnerRef.current = profile.id;
+    const fallback = profile.firstImage ? [profile.firstImage] : [];
+    setSelectedImages(fallback);
+    const urls = await loadImagesForProfile(profile.id);
+    if (imagesOwnerRef.current !== profile.id) return;
+    setSelectedImages(urls.length ? urls : fallback);
+  }, [loadImagesForProfile]);
+
   const openProfile = useCallback(async (profile: CircleProfile) => {
     setSelectedProfile(profile);
-    setSelectedImages(await loadImagesForProfile(profile.id));
-  }, [loadImagesForProfile]);
+    await applyProfileImages(profile);
+  }, [applyProfileImages]);
 
   const closeProfileView = useCallback(() => {
     setSelectedProfile(null);
