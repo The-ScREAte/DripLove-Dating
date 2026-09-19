@@ -2292,6 +2292,7 @@ export type Database = {
       }
       user_usage: {
         Row: {
+          circle_likes_used: number
           created_at: string
           date: string
           id: string
@@ -2301,6 +2302,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          circle_likes_used?: number
           created_at?: string
           date?: string
           id?: string
@@ -2310,6 +2312,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          circle_likes_used?: number
           created_at?: string
           date?: string
           id?: string
