@@ -1456,14 +1456,19 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // Phase 1: active users only
     
     if (premiumForFeed) {
-      // STEP 1: Premium sees the ENTIRE home country - no distance cap.
-      // Distance is a free-tier restriction only; premium pays specifically
-      // for full-country + unlocked-country visibility. (distanceMap may
-      // already hold a real km value for some of these from the unconditional
-      // locationService call above - that's kept for display; it never
-      // restricts *inclusion* here.)
+      // STEP 1: Home country, bounded by the user's OWN distance setting.
+      // Premium is no longer "whole country regardless of distance" - the
+      // distance slider is the single truth for everyone, in Discover and
+      // Circle alike. What premium still buys is a much larger maximum
+      // radius (PREMIUM_USER_MAX_DISTANCE_KM) plus unlocked countries.
+      // The radius never crosses a border: the country filter still applies.
       localProfiles = baseCountryCode
         ? await (async () => {
+            const viewerLat = currentUserData?.latitude;
+            const viewerLon = currentUserData?.longitude;
+            const hasCoords = Number.isFinite(Number(viewerLat)) && Number.isFinite(Number(viewerLon)) && !!viewerLat && !!viewerLon;
+            const radiusInDegrees = hasCoords ? safeUserMaxDistance / 111.32 : null;
+
             // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
             // indexed column reshuffled once nightly via pg_cron, not a
             // fresh random() per call) - see get_random_discover_profiles.
@@ -1475,10 +1480,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               p_archived: false,
               p_excluded_ids: excludedIds,
               p_limit: 100,
+              p_lat: radiusInDegrees != null ? viewerLat : null,
+              p_lon: radiusInDegrees != null ? viewerLon : null,
+              p_radius_degrees: radiusInDegrees,
             });
 
             if (error) throw error;
-            const rows = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+            let rows = Array.isArray(profiles) ? (profiles as unknown as ProfileRow[]) : [];
+
+            // Precise haversine enforcement on top of the coarse box.
+            if (hasCoords) {
+              rows = rows.filter((p) => {
+                if (!p.latitude || !p.longitude) return true;
+                const dist = calculateDistance(Number(viewerLat), Number(viewerLon), p.latitude, p.longitude);
+                distanceMap[p.id] = dist;
+                return dist <= safeUserMaxDistance;
+              });
+            }
+
             rows.forEach((p) => (distanceMap[p.id] ??= 999));
             return rows;
           })()
