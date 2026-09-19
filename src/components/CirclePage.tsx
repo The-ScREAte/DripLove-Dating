@@ -1625,6 +1625,10 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   if (activeProfile) {
     return (
       <ProfilePreviewModal
+        // Remount per person: the preview keeps its own slide index, expanded
+        // state and swipe-exit transform, so reusing the instance left the
+        // next card stuck mid-swipe with stale info until a full refresh.
+        key={activeProfile.id}
         profile={toPotentialMatch(activeProfile)}
         images={selectedImages.length ? selectedImages : (activeProfile.firstImage ? [activeProfile.firstImage] : [])}
         onClose={closeProfileView}
