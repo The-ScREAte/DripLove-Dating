@@ -1242,7 +1242,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, loadImagesForProfile, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, sendMatchNotification, sendMultipleLikesNotification]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
