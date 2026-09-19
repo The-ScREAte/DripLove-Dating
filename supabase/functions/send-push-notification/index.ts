@@ -244,6 +244,25 @@ serve(async (req) => {
             androidChannelId = 'driplove_notifications'
         }
 
+        // Every push must stand on its own in the notification shade: 50 sends
+        // = 50 notifications that stay until the user taps or clears them.
+        // Collapsing used to be keyed on `type` alone (apns-collapse-id) and on
+        // a per-channel id on Android, so each new message/like/match simply
+        // replaced the previous one.
+        //   uniqueKey  -> makes this notification distinct (never collapses)
+        //   threadKey  -> groups related notifications (one chat) and lets the
+        //                 app dismiss just that conversation's notifications
+        //                 when the user opens it.
+        const rawChatId = (notificationData as Record<string, unknown>).chatId
+        const rawSenderId = (notificationData as Record<string, unknown>).senderId
+        const threadKey =
+          type === 'message' && typeof rawChatId === 'string' && rawChatId
+            ? `chat-${rawChatId}`
+            : typeof rawSenderId === 'string' && rawSenderId
+              ? `${type}-${rawSenderId}`
+              : `${type}`
+        const uniqueKey = `${threadKey}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
         // Send to each device token using FCM v1 API
         const sendPromises = tokens.map(async (tokenData: PushToken) => {
           const fcmMessage = {
@@ -256,6 +275,8 @@ serve(async (req) => {
               data: {
                 ...notificationData,
                 type,
+                threadKey,
+                notificationTag: uniqueKey,
               },
               android: {
                 priority: 'high',
@@ -266,9 +287,10 @@ serve(async (req) => {
                   visibility: 'PUBLIC',
                   color: '#9333EA',
                   icon: 'ic_launcher',
-                  // FCM's equivalent of apns.badge - some launchers (Samsung,
-                  // etc) show this as the icon badge count. Same badgeCount
-                  // value as iOS, so both platforms agree on the number.
+                  // A unique tag per push is what keeps each notification in
+                  // the shade instead of replacing the previous one; the
+                  // group keeps a conversation's notifications bundled.
+                  tag: uniqueKey,
                   notification_count: badgeCount,
                 },
               },
@@ -281,6 +303,7 @@ serve(async (req) => {
                     },
                     sound: iosSound,
                     badge: badgeCount,
+                    'thread-id': threadKey,
                     // Lets the NotificationService app extension (ios/App/NotificationService)
                     // intercept delivery and download+attach imageUrl below as the sender's
                     // photo, matching the Android large-icon avatar.
@@ -289,10 +312,11 @@ serve(async (req) => {
                   // Put custom data at payload level, not inside aps
                   ...notificationData,
                   type,
+                  threadKey,
                 },
                 headers: {
                   'apns-priority': '10',
-                  'apns-collapse-id': type,
+                  'apns-collapse-id': uniqueKey.slice(0, 64),
                 },
               },
             },

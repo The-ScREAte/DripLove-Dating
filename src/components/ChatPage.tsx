@@ -366,20 +366,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   useEffect(() => {
     if (!currentUser || !currentUser.id) return;
     
-    // Clear badge count when user opens chat page - dynamic import for Android performance
-    (async () => {
-      try {
-        const { Capacitor } = await import('@capacitor/core');
-        if (Capacitor.isNativePlatform()) {
-          const { PushNotifications } = await import('@capacitor/push-notifications');
-          PushNotifications.removeAllDeliveredNotifications().catch(() => {
-            // Ignore errors
-          });
-        }
-      } catch {
-        // Ignore errors
-      }
-    })();
+    // NOTE: opening the chat list must NOT wipe the notification shade.
+    // Each notification is dismissed only when its own conversation is
+    // opened - see the selectedMatch effect below.
+    
     
     // ⭐ Check if we have valid cached data first (instant render)
     if (isCacheValidForUser(currentUser.id)) {
@@ -643,7 +633,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         // No cache yet, show empty state
         setMessages([]);
       }
-      
+
+      // Dismiss ONLY this conversation's notifications, now that the user has
+      // actually opened it. Everything else stays in the phone's notification
+      // centre until it's tapped or cleared.
+      void (async () => {
+        const { clearThreadNotifications } = await import('@/services/pushNotifications');
+        await clearThreadNotifications(`chat-${selectedMatch.id}`);
+      })();
+
+
+
+
       // ALWAYS fetch new messages in background (even if cache exists)
       fetchMessagesInBackground(selectedMatch.id);
       // Mark messages as read (fire and forget, but log for debugging)

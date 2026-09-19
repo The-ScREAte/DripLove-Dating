@@ -100,6 +100,28 @@ export const navigateFromNotification = (
   if (route !== '/') window.history.replaceState({}, '', route);
 };
 
+// Dismiss only the notifications belonging to ONE conversation/thread, called
+// when the user actually opens that conversation. Opening the app itself must
+// never wipe the shade - unread notifications stay until they're tapped or
+// cleared by the user.
+export const clearThreadNotifications = async (threadKey: string): Promise<void> => {
+  if (!threadKey || !Capacitor.isNativePlatform()) return;
+  try {
+    const delivered = await PushNotifications.getDeliveredNotifications();
+    const matching = (delivered?.notifications || []).filter((n) => {
+      const data = normalizeNotificationData(n.data);
+      if (data.threadKey === threadKey) return true;
+      const chatId = typeof data.chatId === 'string' ? data.chatId : undefined;
+      return !!chatId && `chat-${chatId}` === threadKey;
+    });
+    if (matching.length > 0) {
+      await PushNotifications.removeDeliveredNotifications({ notifications: matching });
+    }
+  } catch {
+    // A failure here just leaves the notification in the shade - never fatal.
+  }
+};
+
 
 class SupabasePushNotificationService {
   private isInitialized = false;
