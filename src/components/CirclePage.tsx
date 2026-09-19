@@ -1101,19 +1101,24 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // happens to be loaded. Independent of the pool/batch fetch above so it
   // works even before that's finished (or if it's a stale/decided batch by
   // the time the push is actually tapped).
+  // deepLinkProfileId covers the app-already-running tap (handed down by
+  // MainApp, no reload/URL involved); the URL param covers a cold start.
   useEffect(() => {
     if (!currentUser?.id) return;
     const params = new URLSearchParams(window.location.search);
-    const circleUserId = params.get('circleUserId');
+    const circleUserId = deepLinkProfileId || params.get('circleUserId');
     if (!circleUserId) return;
 
-    window.history.replaceState({}, '', window.location.pathname);
+    if (params.get('circleUserId')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    onDeepLinkConsumed?.();
     void (async () => {
       const [profile] = await fetchCircleProfilesByIds([circleUserId]);
       if (profile) openCircleRowProfile('recommended', profile);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id]);
+  }, [currentUser?.id, deepLinkProfileId]);
 
   // Guards against a double-fire from the swipe gesture's own exit-animation
   // timeout landing while a second gesture is somehow already in flight.
