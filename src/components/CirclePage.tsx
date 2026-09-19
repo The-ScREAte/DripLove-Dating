@@ -1111,6 +1111,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   }, [applyProfileImages]);
 
   const closeProfileView = useCallback(() => {
+    imagesOwnerRef.current = null;
     setSelectedProfile(null);
     setCategoryBrowse(null);
     setCategoryBrowseIndex(0);
