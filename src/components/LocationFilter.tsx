@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { MapPin, Settings, Target } from 'lucide-react';
 import { locationService, type UserLocation } from '@/services/locationService';
 import { getCountriesList } from '@/constants/locationData';
+import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/utils/distanceUnits';
 
 interface LocationFilterProps {
   currentUser: {

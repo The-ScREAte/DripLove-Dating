@@ -15,6 +15,7 @@ import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import MusicLinkBadge from './MusicLinkBadge';
+import { formatDistance } from '@/utils/distanceUnits';
 import {
   FAMILY_PLANS_OPTIONS,
   COMMUNICATION_STYLE_OPTIONS,
