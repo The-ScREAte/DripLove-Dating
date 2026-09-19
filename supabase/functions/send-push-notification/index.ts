@@ -351,6 +351,7 @@ serve(async (req) => {
         message: body, // Column is 'message', not 'body'
         type,
         is_read: false, // Column is 'is_read', not 'read'
+        data: notificationData,
         created_at: new Date().toISOString(),
       })
 
