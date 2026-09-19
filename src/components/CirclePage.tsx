@@ -1419,7 +1419,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     } finally {
       setLoadingCategoryKey(null);
     }
-  }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, loadImagesForProfile]);
+  }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, loadImagesForProfile, recommendedBatch, similarBatch]);
 
   // Both tiers see the same 4-card batch. Free: only index 0 is unlocked -
   // the other 3 are a locked, tap-opens-upsell teaser (see recommendedItems/
