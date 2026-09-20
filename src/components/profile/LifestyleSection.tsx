@@ -100,6 +100,7 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
               <SelectContent className={selectContentClass}>
                 <SelectItem className={selectItemClass} value="yes">{t('common.yes')}</SelectItem>
                 <SelectItem className={selectItemClass} value="no">{t('common.no')}</SelectItem>
+                <SelectItem className={selectItemClass} value="sometimes">{t('profile.sometimes')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
