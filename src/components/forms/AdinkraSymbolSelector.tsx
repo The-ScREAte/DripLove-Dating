@@ -101,7 +101,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
       <div>
         <div className="flex items-center justify-between gap-3 mb-1">
           <div className="flex items-center gap-2">
-            <Label className="text-base font-medium">Cultural Signs</Label>
+            <Label className="text-base font-medium">Cultural Signs *</Label>
             <div className="relative info-tooltip-container">
               <button
                 type="button"

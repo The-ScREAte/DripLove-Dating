@@ -142,12 +142,98 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
     setActiveMeaning({ name, meaning, left, tailLeft, placement, verticalOffset });
   };
 
+  // Chip mode: the component IS the pill (a single flat <button>, no
+  // wrapper divs) so it sits in an "at a glance" chip row exactly like the
+  // plain-text trait chips next to it (Extrovert, Messy, ...) - same box
+  // model, same height. The earlier version wrapped UserAdinkraDisplay's
+  // whole multi-symbol stack (relative + flex divs) inside the caller's own
+  // pill <span>, which nested a block layout inside an inline one and threw
+  // off both the height and the truncation of long sign names (truncate on
+  // the outer span never reaches text buried in a child element - min-w-0
+  // below is what actually lets the inner text span shrink and ellipsize).
+  if (showLabel) {
+    const { name, symbol, SvgComponent } = visibleSymbols[0];
+    return (
+      <>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openMeaning(name, symbol?.meaning || '', e.currentTarget);
+          }}
+          onTouchStart={stopTouchPropagation}
+          onTouchMove={stopTouchPropagation}
+          onTouchEnd={stopTouchPropagation}
+          className="inline-flex items-center gap-1 min-h-0 max-w-[110px] shrink-0 rounded-full border border-yellow-400/60 bg-yellow-400/10 px-2 py-0.5 text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 transition-transform duration-150 active:scale-90"
+          aria-label={`Show meaning of ${name}`}
+        >
+          {renderSymbolContent(name, symbol, SvgComponent, LABEL_ICON_SIZE)}
+          <span className="min-w-0 truncate capitalize">{name}</span>
+        </button>
+        {activeMeaning && createPortal(
+          <>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setActiveMeaning(null)}
+              onTouchStart={stopTouchPropagation}
+              onTouchMove={stopTouchPropagation}
+              onTouchEnd={(e) => { e.stopPropagation(); setActiveMeaning(null); }}
+              className="fixed inset-0 z-[9998]"
+              style={{ background: 'transparent', border: 'none', padding: 0 }}
+            />
+            <div
+              className={`fixed z-[9999] flex items-start ${
+                activeMeaning.placement === 'above' ? 'flex-col-reverse' : 'flex-col'
+              }`}
+              style={{
+                left: activeMeaning.left,
+                width: POPUP_WIDTH,
+                ...(activeMeaning.placement === 'above'
+                  ? { bottom: activeMeaning.verticalOffset }
+                  : { top: activeMeaning.verticalOffset }),
+              }}
+            >
+              <div
+                className={`w-3 h-3 rotate-45 ${activeMeaning.placement === 'above' ? '-mt-1.5' : '-mb-1.5'}`}
+                style={{
+                  marginLeft: activeMeaning.tailLeft,
+                  background: 'rgba(10,10,10,0.92)',
+                  ...(activeMeaning.placement === 'above'
+                    ? { borderRight: '1px solid rgba(236,72,153,0.35)', borderBottom: '1px solid rgba(236,72,153,0.35)' }
+                    : { borderLeft: '1px solid rgba(236,72,153,0.35)', borderTop: '1px solid rgba(236,72,153,0.35)' }),
+                }}
+              />
+              <div
+                className="relative w-44 rounded-xl backdrop-blur-md border border-pink-500/35 shadow-xl px-2.5 py-2 text-left cursor-pointer"
+                style={{ background: 'rgba(10,10,10,0.92)' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMeaning(null);
+                }}
+                onTouchStart={stopTouchPropagation}
+                onTouchMove={stopTouchPropagation}
+                onTouchEnd={(e) => { e.stopPropagation(); setActiveMeaning(null); }}
+              >
+                <p className="text-[11px] leading-snug">
+                  <span className="text-pink-400 font-semibold">{activeMeaning.name}</span>
+                  <span className="text-gray-200">: {activeMeaning.meaning}</span>
+                </p>
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="relative">
       <div className="flex items-center gap-3">
         {visibleSymbols.map(({ name, symbol, SvgComponent }, index) => {
           const isCenter = index === centerIndex;
-          const size = showLabel ? LABEL_ICON_SIZE : (isCenter ? CENTER_ICON_SIZE : SIDE_ICON_SIZE);
+          const size = isCenter ? CENTER_ICON_SIZE : SIDE_ICON_SIZE;
 
           return (
             <button
@@ -160,10 +246,8 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
               onTouchStart={stopTouchPropagation}
               onTouchMove={stopTouchPropagation}
               onTouchEnd={stopTouchPropagation}
-              className={`flex items-center shrink-0 transition-transform duration-150 active:scale-90 ${
-                showLabel ? 'gap-1 justify-start' : 'justify-center'
-              }`}
-              style={showLabel ? { zIndex: isCenter ? 2 : 1 } : {
+              className="flex items-center justify-center shrink-0 min-h-0 min-w-0 transition-transform duration-150 active:scale-90"
+              style={{
                 width: size,
                 height: size,
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
@@ -172,7 +256,6 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
               aria-label={`Show meaning of ${name}`}
             >
               {renderSymbolContent(name, symbol, SvgComponent, size)}
-              {showLabel && <span className="whitespace-nowrap capitalize">{name}</span>}
             </button>
           );
         })}

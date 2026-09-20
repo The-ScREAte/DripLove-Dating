@@ -12,6 +12,13 @@ export const validateRegistrationForm = (formData: any) => {
   // Country is now optional per Apple's App Store guidelines
   if (!formData.gender) newErrors.gender = 'Gender is required';
   if (!formData.preference) newErrors.preference = 'Preference is required';
+  // At least one cultural sign is required - users can select as many as
+  // they like (up to the existing cap of 10 in AdinkraSymbolSelector), but
+  // zero isn't allowed since Sign Match and the info-area sign chips both
+  // depend on every profile having at least one.
+  if (!Array.isArray(formData.adinkraSymbols) || formData.adinkraSymbols.length === 0) {
+    newErrors.adinkraSymbols = 'Please select at least one cultural sign';
+  }
 
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

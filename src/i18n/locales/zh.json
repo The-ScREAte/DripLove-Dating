@@ -230,7 +230,7 @@
     "perfectFirstDatePlaceholder": "描述您理想的第一次约会...",
     "lastGoogledPlaceholder": "您最后搜索了什么？",
     "chooseInterests": "选择您的兴趣",
-    "adinkraDescription": "您的文化符号（最多选择10个）",
+    "adinkraDescription": "您的文化符号（最多选择10个） *",
     "selected": "已选择",
     "availableSymbols": "可用符号",
     "noAdinkraSelected": "尚未选择文化符号。",

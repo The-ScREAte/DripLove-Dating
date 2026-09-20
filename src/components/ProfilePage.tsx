@@ -680,6 +680,22 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
   const handleSave = async () => {
     if (isSaving) return;
+
+    // At least one cultural sign is required (same rule as registration) -
+    // users can pick as many as they like up to the existing cap of 10, but
+    // clearing them all back out here would otherwise leave a profile with
+    // none, quietly breaking the "every user has at least one sign" guarantee
+    // Sign Match and the info-area chips both depend on.
+    if (!Array.isArray(editedProfile.adinkra_symbols) || editedProfile.adinkra_symbols.length === 0) {
+      toast({
+        title: 'Select at least one sign',
+        description: 'Choose at least one cultural sign in Cultural Signs before saving.',
+        variant: 'destructive',
+      });
+      setOpenSection('adinkra');
+      return;
+    }
+
     setIsSaving(true);
 
     try {

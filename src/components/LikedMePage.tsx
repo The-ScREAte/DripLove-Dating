@@ -1686,12 +1686,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                           </span>
                         ))}
                         {signHighlights.map((sign) => (
-                          <span
-                            key={sign}
-                            className="inline-flex items-center gap-1 leading-none text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-yellow-400/10 border border-yellow-400/60 px-2 py-0.5 rounded-full truncate max-w-[110px] shrink-0"
-                          >
-                            <UserAdinkraDisplay adinkraSymbols={[sign]} showLabel />
-                          </span>
+                          <UserAdinkraDisplay key={sign} adinkraSymbols={[sign]} showLabel />
                         ))}
                         {musicHighlight?.link && (
                           <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
