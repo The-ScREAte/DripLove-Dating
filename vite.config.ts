@@ -211,6 +211,20 @@ export default defineConfig(({ mode }) => ({
             return 'photo-crop-modal';
           }
 
+          // Shared cultural-sign data (used by both a profile/ component -
+          // AdinkraSection - and discover/ components - UserAdinkraDisplay,
+          // AdinkraBar) with no manualChunks rule of its own, Rollup folded it
+          // into whichever chunk happened to bundle it first (discover-tools),
+          // making profile-tools import it back FROM discover-tools - the
+          // same profile-tools <-> discover-tools cycle noted above for
+          // PhotoCropModal, producing the identical "Cannot access before
+          // initialization" crash on first paint. Isolating it here the same
+          // way breaks the cycle: both sides import this shared chunk instead
+          // of each other.
+          if (id.includes('/src/constants/africanSymbols') || id.includes('/src/constants/signCompatibility')) {
+            return 'adinkra-data';
+          }
+
           // Profile sub-components
           if (id.includes('/src/components/profile/')) {
             return 'profile-tools';
