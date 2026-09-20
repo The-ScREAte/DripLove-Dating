@@ -33,11 +33,12 @@ import type { PotentialMatch } from '@/types';
 // Reuse Discover's exact slide-building/rendering so the "view a liker" screen
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from './discover/MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32, seededShuffle } from './discover/MatchCardHelpers';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink, parseFavorites } from '@/constants/favorites';
 import MusicLinkBadge from './discover/MusicLinkBadge';
 import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
+import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import {
   FAMILY_PLANS_OPTIONS,
   COMMUNICATION_STYLE_OPTIONS,
@@ -928,18 +929,24 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return calculateProfileCompletion(selectedProfile, profileImages).showVerifiedBadge;
   }, [selectedProfile, userImages]);
 
-  // One cultural sign to surface as its own chip, cycling through ALL of this
-  // profile's signs (not just the first) as the viewer taps through photos -
-  // shared signs with the current user come first, then the rest follow in
-  // order across later photos, mirroring Discover's MatchCard.
-  const signHighlight = useMemo(() => {
+  // Two cultural signs to surface as their own chips, shuffled with a
+  // per-profile seed so which ones lead feels random without reshuffling on
+  // every render - shared signs with the current user are still weighted to
+  // shuffle ahead of the rest so common ground tends to surface first. Still
+  // cycles which two lead as the viewer taps through photos, mirroring
+  // Discover's MatchCard.
+  const signHighlights = useMemo(() => {
     const theirs = selectedProfile?.adinkra_symbols;
-    if (!theirs || theirs.length === 0) return null;
+    if (!theirs || theirs.length === 0) return [];
     const mine = (currentUser as unknown as { adinkra_symbols?: string[] | null })?.adinkra_symbols || [];
     const shared = theirs.filter(symbol => mine.includes(symbol));
     const rest = theirs.filter(symbol => !mine.includes(symbol));
-    const ordered = [...shared, ...rest];
-    return ordered[currentSlide % ordered.length];
+    const rand = mulberry32(seedFromString(`${selectedProfile?.id || ''}_signhighlight`));
+    const ordered = [...seededShuffle(shared, rand), ...seededShuffle(rest, rand)];
+    if (ordered.length === 0) return [];
+    if (ordered.length === 1) return [ordered[0]];
+    const start = currentSlide % ordered.length;
+    return [ordered[start], ordered[(start + 1) % ordered.length]];
   }, [selectedProfile, currentUser, currentSlide]);
 
   // Structured favorites (jsonb) - parsed once so both the compact preview
@@ -1668,7 +1675,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                       {selectedProfile.bio}
                     </p>
                   ) : (
-                    !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
+                    !showMoreInfo && (previewHighlights.length > 0 || signHighlights.length > 0 || musicHighlight) && (
                       <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
                         {previewHighlights.map((highlight, index) => (
                           <span
@@ -1678,11 +1685,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                             {truncateChipLabel(highlight)}
                           </span>
                         ))}
-                        {signHighlight && (
-                          <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
-                            <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                        {signHighlights.map((sign) => (
+                          <span
+                            key={sign}
+                            className="text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-yellow-400/10 border border-yellow-400/60 px-2 py-0.5 rounded-full truncate max-w-[110px] shrink-0"
+                          >
+                            <UserAdinkraDisplay adinkraSymbols={[sign]} showLabel />
                           </span>
-                        )}
+                        ))}
                         {musicHighlight?.link && (
                           <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
                         )}
@@ -2217,7 +2227,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlight, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, captionedPhotos, secondPhotoAnchor, renderPhotoCaptionCard, showAbout, showVerifiedBadge]);
+  }, [selectedProfile, slides, previewHighlights, signHighlights, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, captionedPhotos, secondPhotoAnchor, renderPhotoCaptionCard, showAbout, showVerifiedBadge]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showMatchAnimation && matchedProfile) {
@@ -2385,8 +2395,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     )}
                   </div>
                   <CardContent className="p-3 flex-1 bg-black">
-                    <h3 className={`font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                      {liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}
+                    <h3 className={`flex items-center gap-1.5 font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
+                      <span className="truncate">{liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}</span>
+                      {isRecentlyOnline(liker.last_login_at, SWIPE_ONLINE_WINDOW_MS) && (
+                        <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" aria-label="Active now" />
+                      )}
                     </h3>
                     <p className="text-xs text-gray-400 truncate">
                       {liker.country}, {liker.city}

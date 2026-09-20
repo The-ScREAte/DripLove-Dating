@@ -127,6 +127,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 
 // One icon per interest tag (see src/constants/formData.ts) - shown as the
 // shared-thing badge on a card instead of spelling the interest out as text.
@@ -569,8 +570,14 @@ const PeopleRow = ({
               )}
             </div>
             <div className="px-3 py-2.5">
-              <p className="text-white text-sm font-medium truncate">
-                {p.first_name}, {calculateAge(p.date_of_birth)}
+              <p className="flex items-center gap-1.5 text-white text-sm font-medium truncate">
+                <span className="truncate">{p.first_name}, {calculateAge(p.date_of_birth)}</span>
+                {isRecentlyOnline(p.last_login_at, SWIPE_ONLINE_WINDOW_MS) && (
+                  <span
+                    className="w-2 h-2 rounded-full bg-green-500 shrink-0"
+                    aria-label="Active now"
+                  />
+                )}
               </p>
               {(p.city || p.country) && (
                 <p className="text-white/50 text-xs truncate">

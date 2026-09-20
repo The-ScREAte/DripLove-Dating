@@ -73,6 +73,7 @@ export interface ChatMatch {
   id: string;
   first_name: string;
   last_name: string;
+  last_login_at?: string | null;
   profile_photo?: string;
   unread_messages?: number;
   last_message?: string;

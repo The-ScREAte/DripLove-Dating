@@ -39,6 +39,7 @@ interface LocationSectionProps {
   isPremium?: boolean;
   userId?: string;
   onUnlockedCountriesChange?: (countries: string[]) => void;
+  onUpgradeClick?: () => void;
 }
 
 const LocationSection = ({ 
@@ -51,7 +52,8 @@ const LocationSection = ({
   onAgeRangeChange,
   isPremium,
   userId,
-  onUnlockedCountriesChange
+  onUnlockedCountriesChange,
+  onUpgradeClick
 }: LocationSectionProps) => {
   const { t } = useTranslation();
   const [showCountryDialog, setShowCountryDialog] = useState(false);
@@ -73,7 +75,7 @@ const LocationSection = ({
         </h3>
         
         {/* Gender and Looking For Preferences */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="gender" className="text-white">{t('profile.gender')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('gender', value)} value={editedProfile.gender}>
@@ -174,7 +176,7 @@ const LocationSection = ({
           {!isPremium && (
             <p className="text-xs text-yellow-200/80 flex items-center gap-1.5">
               <Crown className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-              Upgrade to Premium to search up to {toDisplayDistance(PREMIUM_MAX_DISTANCE_KM)} {getDistanceUnitLabel()}.
+              Upgrade to Premium to unlock more distance in your country, then multiple countries - access love without borders.
             </p>
           )}
         </div>
@@ -239,20 +241,25 @@ const LocationSection = ({
 
       {/* Premium Upsell for Free Users */}
       {!isPremium && (
-        <div className="flex items-start gap-3 p-3 bg-black rounded-lg border border-yellow-500/30 text-sm">
+        <button
+          type="button"
+          onClick={() => onUpgradeClick?.()}
+          className="w-full flex items-start gap-3 p-3 bg-black rounded-lg border border-yellow-500/30 text-sm text-left transition-colors hover:bg-yellow-500/5"
+        >
           <div className="p-2 bg-yellow-500/15 rounded-full">
             <Globe className="w-5 h-5 text-yellow-500" />
           </div>
           <div className="flex-1 space-y-1">
             <p className="flex items-center gap-2 text-sm font-semibold text-white">
-              Match worldwide
+              Love without borders
               <Crown className="w-4 h-4 text-yellow-500" />
             </p>
             <p className="text-xs text-white">
-              Unlock up to 3 extra countries when you go Premium.
+              Go Premium to unlock up to 3 extra countries beyond your own.
             </p>
           </div>
-        </div>
+          <ChevronRight className="w-4 h-4 text-yellow-500/70 shrink-0 mt-1" />
+        </button>
       )}
 
       {/* Location Status - Only show warnings when location is not available */}

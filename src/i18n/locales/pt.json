@@ -249,7 +249,8 @@
       "personality": "Complete os controles de personalidade",
       "funQuestions": "Responda perguntas divertidas",
       "interests": "Selecione pelo menos 3 interesses"
-    }
+    },
+    "freeTonight": "Livre esta noite"
   },
   "discover": {
     "title": "DripCheck",
@@ -403,6 +404,7 @@
     "blockUser": "Bloquear usuário",
     "deleteForMe": "Excluir para mim",
     "deleteForEveryone": "Excluir para todos",
+    "deleteForAll": "Excluir para todos",
     "reply": "Responder",
     "activeOnDripLove": "Ativo no DripLove",
     "inappropriateLanguage": "Sua mensagem contém linguagem inapropriada. Por favor, remova-a.",
@@ -632,7 +634,9 @@
   "deleteMessage": {
     "confirmTitle": "Excluir esta mensagem?",
     "cancel": "Cancelar",
-    "delete": "Excluir"
+    "delete": "Excluir",
+    "tooOldTitle": "Tarde demais para excluir para todos",
+    "tooOldDescription": "Esta mensagem tem mais de 24 horas - você ainda pode excluí-la só para você."
   },
   "reportModal": {
     "title": "Denunciar Imagem",
@@ -999,5 +1003,14 @@
     "Dwennimmen": "Chifres de carneiro. Símbolo de humildade junto com força.",
     "Nyame Dua": "Árvore de Deus. Símbolo da presença e proteção de Deus.",
     "Boa Me Na Me Mmoa Wo": "Ajude-me e deixe-me ajudá-lo. Símbolo de cooperação e interdependência."
+  },
+  "streak": {
+    "dayCount": "Dia {{count}}",
+    "levelLabel": "Nível de sequência {{level}}",
+    "daysToNextLevel_one": "Falta {{count}} dia para o nível {{level}}",
+    "daysToNextLevel_other": "Faltam {{count}} dias para o nível {{level}}",
+    "levelUpToday": "Volte amanhã para começar o nível {{level}}",
+    "priorityHint": "Quanto maior a sua sequência, mais prioridade você tem para matches de qualidade.",
+    "continue": "Continuar"
   }
 }

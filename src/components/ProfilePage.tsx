@@ -104,9 +104,14 @@ interface ProfilePageProps {
   // Bumped by MainApp when the swipe-triggered "Verify Your Identity" prompt is
   // accepted - jumps straight to the Photos section, which shows the Verify card.
   verifySignal?: number;
+  // Set by MainApp (see handleNavigateToProfileSection) when a profile summary
+  // chip is tapped from Discover's filter sheet - opens and scrolls to the
+  // named section. `nonce` changes on every tap so tapping the same section
+  // twice in a row still re-triggers the scroll.
+  openSectionSignal?: { section: string; nonce: number } | null;
 }
 
-const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0, advertiseSignal = 0, verifySignal = 0 }: ProfilePageProps) => {
+const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTerms, onShowPrivacy, isPremium, isActiveTab = true, profileTabSignal = 0, advertiseSignal = 0, verifySignal = 0, openSectionSignal = null }: ProfilePageProps) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   // Screenshots are blocked app-wide by default - Profile is one of the two
@@ -174,6 +179,16 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       });
     }
   }, [verifySignal]);
+
+  // Jump to and open a specific section - triggered by tapping a profile
+  // summary chip in Discover's filter sheet (see ProfileBasicsChips /
+  // handleNavigateToProfileSection in MainApp). Reuses the same scroll-into-
+  // view effect keyed on `openSection` above - no separate scroll needed here.
+  useEffect(() => {
+    if (openSectionSignal?.section) {
+      setOpenSection(openSectionSignal.section);
+    }
+  }, [openSectionSignal]);
 
   const { toast } = useToast();
   // Premium status for this page's own UI comes from the `isPremium` prop
@@ -372,6 +387,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     drinking: '',
     exercise_level: '',
     sleeping_schedule: '',
+    free_tonight: '',
     occupation: '',
     occupationCustom: '',
     industry: '',
@@ -473,6 +489,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           drinking: profile.drinking || '',
           exercise_level: profile.exercise_level || '',
           sleeping_schedule: profile.sleeping_schedule || '',
+          free_tonight: profile.free_tonight || '',
           occupation: profile.occupation && !occupationOptions.includes(profile.occupation) ? 'Other' : (profile.occupation || ''),
           occupationCustom: profile.occupation && !occupationOptions.includes(profile.occupation) ? profile.occupation : '',
           industry: profile.industry && !industryOptions.includes(profile.industry) ? 'Other' : (profile.industry || ''),
@@ -523,6 +540,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
           drinking: '',
           exercise_level: '',
           sleeping_schedule: '',
+          free_tonight: '',
           occupation: '',
           occupationCustom: '',
           industry: '',
@@ -685,6 +703,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         drinking: editedProfile.drinking || 'not_specified',
         exercise_level: editedProfile.exercise_level || 'not_specified',
         sleeping_schedule: editedProfile.sleeping_schedule || 'not_specified',
+        free_tonight: editedProfile.free_tonight || null,
         occupation: (editedProfile.occupation === 'Other'
           ? editedProfile.occupationCustom?.trim()
           : editedProfile.occupation?.trim()) || null,
@@ -842,6 +861,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
         drinking: profile.drinking || '',
         exercise_level: profile.exercise_level || '',
         sleeping_schedule: profile.sleeping_schedule || '',
+        free_tonight: profile.free_tonight || '',
         occupation: profile.occupation && !occupationOptions.includes(profile.occupation) ? 'Other' : (profile.occupation || ''),
         occupationCustom: profile.occupation && !occupationOptions.includes(profile.occupation) ? profile.occupation : '',
         industry: profile.industry && !industryOptions.includes(profile.industry) ? 'Other' : (profile.industry || ''),
@@ -1432,6 +1452,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 setEditedProfile(prev => ({ ...prev, unlocked_countries: countries }));
                 onProfileUpdate();
               }}
+              onUpgradeClick={() => setShowPremiumUpgrade(true)}
             />
           </CollapsibleSection>
           <CollapsibleSection

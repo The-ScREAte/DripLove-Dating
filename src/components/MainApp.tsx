@@ -15,6 +15,8 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { loadUserLanguage } from '@/utils/languageSync';
 import { setDistanceUnitCountry } from '@/utils/distanceUnits';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
+import { useDailyStreak } from '@/hooks/useDailyStreak';
+import StreakFlash from '@/components/StreakFlash';
 import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import { fetchCirclePool } from '@/utils/circlePoolFetch';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
@@ -114,8 +116,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // ⭐ STATE PRESERVATION: Restore active tab from sessionStorage when returning from games
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => {
+    // Only pre-mount Discover when it's actually the tab being opened on.
+    // Unconditionally including 'dripcheck' here meant every notification
+    // deep link (message/match/like/circle) ALSO force-mounted DiscoverPage,
+    // which immediately kicks off its own deck fetch + image preload
+    // pipeline in the background - competing with the actually-requested
+    // tab's own fetch for the network/main thread and making that tab feel
+    // slow to open. Discover still mounts fine the instant it's tapped,
+    // exactly like every other non-default tab already does.
     const initialTab = getInitialTab();
-    return new Set(['dripcheck', initialTab]);
+    return new Set([initialTab]);
   });
   const [profileTabSignal, setProfileTabSignal] = useState(0);
   const [advertiseSignal, setAdvertiseSignal] = useState(0);
@@ -129,6 +139,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const handleNavigateToVerify = () => {
     setActiveTab('profile');
     setVerifySignal(prev => prev + 1);
+  };
+  // Jump to Profile with a specific section expanded and scrolled into view -
+  // used by the profile summary chips in Discover's filter sheet, so tapping
+  // e.g. "male" or "Artist" there takes you straight to the field that sets
+  // it instead of just opening Profile at the top.
+  const [profileSectionSignal, setProfileSectionSignal] = useState<{ section: string; nonce: number } | null>(null);
+  const handleNavigateToProfileSection = (section: string) => {
+    handleTabChange('profile');
+    setProfileSectionSignal({ section, nonce: Date.now() });
   };
   // A tapped notification, handled while the app is already running: these
   // carry the exact thing to open (a conversation, a person in Circle) into
@@ -253,6 +272,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   
   // Track user activity for accurate "Active Users" stats
   useActivityTracker(userId);
+
+  // Daily login streak - records today's login once, surfaces the flash
+  // overlay the first time each calendar day it comes back is_new_day.
+  const { streak: dailyStreak, dismiss: dismissStreakFlash } = useDailyStreak(userId);
 
   const fetchUserProfile = useCallback(async () => {
     if (!userId) {
@@ -1199,6 +1222,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const profileId = data?.profileId as string | undefined;
       const chatId = data?.chatId as string | undefined;
 
+      // action wins over type (a broadcast can carry both - type there only
+      // picks the notification's channel/sound) - matches
+      // resolveNotificationRoute, which this handler had drifted out of sync
+      // with: an explicit open_discover tap was falling through to whatever
+      // `type` happened to be instead of landing on Discover.
+      if (action === 'open_discover') {
+        handleTabChange('dripcheck');
+        return;
+      }
       if (action === 'open_circle_profile' && profileId) {
         setCircleDeepLinkProfileId(profileId);
         handleTabChange('circle');
@@ -1460,7 +1492,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 className="w-full h-full" 
                 style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
               > 
-                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToAdvertise={handleNavigateToAdvertise} onNavigateToVerify={handleNavigateToVerify} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
+                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToProfileSection={handleNavigateToProfileSection} onNavigateToAdvertise={handleNavigateToAdvertise} onNavigateToVerify={handleNavigateToVerify} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
               </div>
             </Suspense>
           )}
@@ -1528,6 +1560,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   profileTabSignal={profileTabSignal}
                   advertiseSignal={advertiseSignal}
                   verifySignal={verifySignal}
+                  openSectionSignal={profileSectionSignal}
                 />
               </div>
             </Suspense>
@@ -1674,6 +1707,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       {/* Free trial offer - one-time bottom sheet, first eligible app open */}
       <FreeTrialBottomSheet userId={userId} />
+
+      {/* Daily login streak flash - once per calendar day, right after record_daily_login confirms a fresh day */}
+      {dailyStreak?.isNewDay && (
+        <StreakFlash currentStreak={dailyStreak.currentStreak} onClose={dismissStreakFlash} />
+      )}
     </div>
   );
 };

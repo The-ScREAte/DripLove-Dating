@@ -1413,6 +1413,7 @@ export type Database = {
           country: string
           country_code: string | null
           created_at: string | null
+          current_streak: number
           date_of_birth: string
           distance_preference: number | null
           drinking: string | null
@@ -1424,6 +1425,7 @@ export type Database = {
           favorites: Json
           feed_random_weight: number
           first_name: string
+          free_tonight: string | null
           fun_fact: string | null
           gender: string | null
           has_rated_app: boolean
@@ -1441,9 +1443,12 @@ export type Database = {
           last_login_at: string | null
           last_name: string
           last_reengagement_sent_at: string | null
+          last_streak_date: string | null
+          last_streak_reminder_sent_date: string | null
           latitude: number | null
           like_me_cooldown_until: string | null
           login_count: number | null
+          longest_streak: number
           longitude: number | null
           love_style: string[] | null
           max_age: number | null
@@ -1482,6 +1487,7 @@ export type Database = {
           country: string
           country_code?: string | null
           created_at?: string | null
+          current_streak?: number
           date_of_birth: string
           distance_preference?: number | null
           drinking?: string | null
@@ -1493,6 +1499,7 @@ export type Database = {
           favorites?: Json
           feed_random_weight?: number
           first_name: string
+          free_tonight?: string | null
           fun_fact?: string | null
           gender?: string | null
           has_rated_app?: boolean
@@ -1510,9 +1517,12 @@ export type Database = {
           last_login_at?: string | null
           last_name: string
           last_reengagement_sent_at?: string | null
+          last_streak_date?: string | null
+          last_streak_reminder_sent_date?: string | null
           latitude?: number | null
           like_me_cooldown_until?: string | null
           login_count?: number | null
+          longest_streak?: number
           longitude?: number | null
           love_style?: string[] | null
           max_age?: number | null
@@ -1551,6 +1561,7 @@ export type Database = {
           country?: string
           country_code?: string | null
           created_at?: string | null
+          current_streak?: number
           date_of_birth?: string
           distance_preference?: number | null
           drinking?: string | null
@@ -1562,6 +1573,7 @@ export type Database = {
           favorites?: Json
           feed_random_weight?: number
           first_name?: string
+          free_tonight?: string | null
           fun_fact?: string | null
           gender?: string | null
           has_rated_app?: boolean
@@ -1579,9 +1591,12 @@ export type Database = {
           last_login_at?: string | null
           last_name?: string
           last_reengagement_sent_at?: string | null
+          last_streak_date?: string | null
+          last_streak_reminder_sent_date?: string | null
           latitude?: number | null
           like_me_cooldown_until?: string | null
           login_count?: number | null
+          longest_streak?: number
           longitude?: number | null
           love_style?: string[] | null
           max_age?: number | null
@@ -2581,6 +2596,7 @@ export type Database = {
               country: string
               country_code: string | null
               created_at: string | null
+              current_streak: number
               date_of_birth: string
               distance_preference: number | null
               drinking: string | null
@@ -2592,6 +2608,7 @@ export type Database = {
               favorites: Json
               feed_random_weight: number
               first_name: string
+              free_tonight: string | null
               fun_fact: string | null
               gender: string | null
               has_rated_app: boolean
@@ -2609,9 +2626,12 @@ export type Database = {
               last_login_at: string | null
               last_name: string
               last_reengagement_sent_at: string | null
+              last_streak_date: string | null
+              last_streak_reminder_sent_date: string | null
               latitude: number | null
               like_me_cooldown_until: string | null
               login_count: number | null
+              longest_streak: number
               longitude: number | null
               love_style: string[] | null
               max_age: number | null
@@ -2676,6 +2696,7 @@ export type Database = {
               country: string
               country_code: string | null
               created_at: string | null
+              current_streak: number
               date_of_birth: string
               distance_preference: number | null
               drinking: string | null
@@ -2687,6 +2708,7 @@ export type Database = {
               favorites: Json
               feed_random_weight: number
               first_name: string
+              free_tonight: string | null
               fun_fact: string | null
               gender: string | null
               has_rated_app: boolean
@@ -2704,9 +2726,12 @@ export type Database = {
               last_login_at: string | null
               last_name: string
               last_reengagement_sent_at: string | null
+              last_streak_date: string | null
+              last_streak_reminder_sent_date: string | null
               latitude: number | null
               like_me_cooldown_until: string | null
               login_count: number | null
+              longest_streak: number
               longitude: number | null
               love_style: string[] | null
               max_age: number | null
@@ -2817,6 +2842,7 @@ export type Database = {
           country: string
           country_code: string | null
           created_at: string | null
+          current_streak: number
           date_of_birth: string
           distance_preference: number | null
           drinking: string | null
@@ -2828,6 +2854,7 @@ export type Database = {
           favorites: Json
           feed_random_weight: number
           first_name: string
+          free_tonight: string | null
           fun_fact: string | null
           gender: string | null
           has_rated_app: boolean
@@ -2845,9 +2872,12 @@ export type Database = {
           last_login_at: string | null
           last_name: string
           last_reengagement_sent_at: string | null
+          last_streak_date: string | null
+          last_streak_reminder_sent_date: string | null
           latitude: number | null
           like_me_cooldown_until: string | null
           login_count: number | null
+          longest_streak: number
           longitude: number | null
           love_style: string[] | null
           max_age: number | null
@@ -2979,6 +3009,14 @@ export type Database = {
         Returns: Json
       }
       record_daily_active_count: { Args: never; Returns: undefined }
+      record_daily_login: {
+        Args: { p_user_id: string }
+        Returns: {
+          current_streak: number
+          is_new_day: boolean
+          longest_streak: number
+        }[]
+      }
       record_premium_subscription: {
         Args: { p_user_id: string }
         Returns: undefined
@@ -3001,6 +3039,8 @@ export type Database = {
       }
       reset_badge_count: { Args: never; Returns: undefined }
       send_reengagement_notifications: { Args: never; Returns: undefined }
+      send_streak_broken_notifications: { Args: never; Returns: undefined }
+      send_streak_reminder_notifications: { Args: never; Returns: undefined }
       set_influencer_password: {
         Args: {
           p_new_password: string

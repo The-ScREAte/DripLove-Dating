@@ -27,6 +27,7 @@ export type LikerProfile = {
   sleeping_schedule?: string | null;
   relationship_intent?: string | null;
   bio?: string | null;
+  last_login_at?: string | null;
   fun_fact?: string | null;
   perfect_first_date?: string | null;
   last_googled?: string | null;

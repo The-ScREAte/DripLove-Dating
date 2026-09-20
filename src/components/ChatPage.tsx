@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { MessageCircle } from 'lucide-react';
+import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheAvatar, getCachedAvatar } from '@/cache/chatCache';
 import { preloadImageToBlob } from '@/utils/imageCache';
@@ -23,6 +24,7 @@ import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
 import HoppingLogo from './HoppingLogo';
+import { isRecentlyOnline, CHAT_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 
 type WindowWithChatCaches = Window & {
   chatMatchesCache?: typeof chatMatchesCache;
@@ -275,6 +277,60 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     lastTypingBroadcastRef.current = now;
     typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { userId: currentUser.id } });
   }, [currentUser?.id]);
+
+  // "Someone is typing" on the chat LIST too, not just once a conversation
+  // is open - subscribes to the exact same per-match typing broadcast
+  // channel the open-conversation effect above uses (same channel name, so
+  // it hears the same broadcasts), for every match that already has a
+  // conversation. Only while the list itself is what's showing - the
+  // moment a conversation opens, that match's own typing effect above takes
+  // over and this steps out of the way instead of double-subscribing.
+  const matchIdsWithConversation = useMemo(
+    () => matches.filter(m => m.last_message).map(m => m.id),
+    [matches]
+  );
+  const matchIdsWithConversationKey = matchIdsWithConversation.join(',');
+  const [listTypingMatchIds, setListTypingMatchIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (selectedMatch || !currentUser?.id || matchIdsWithConversation.length === 0) {
+      setListTypingMatchIds(new Set());
+      return;
+    }
+
+    const timeouts = new Map<string, number>();
+    const channels = matchIdsWithConversation.map((matchId) =>
+      supabase
+        .channel(`typing:${matchId}`)
+        .on('broadcast', { event: 'typing' }, (payload) => {
+          if (payload.payload?.userId === currentUser.id) return;
+          setListTypingMatchIds(prev => {
+            if (prev.has(matchId)) return prev;
+            const next = new Set(prev);
+            next.add(matchId);
+            return next;
+          });
+          const existing = timeouts.get(matchId);
+          if (existing) window.clearTimeout(existing);
+          timeouts.set(matchId, window.setTimeout(() => {
+            setListTypingMatchIds(prev => {
+              if (!prev.has(matchId)) return prev;
+              const next = new Set(prev);
+              next.delete(matchId);
+              return next;
+            });
+          }, 3000));
+        })
+        .subscribe()
+    );
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
+      timeouts.forEach(id => window.clearTimeout(id));
+      setListTypingMatchIds(new Set());
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMatch, currentUser?.id, matchIdsWithConversationKey]);
 
   // ⭐ VIRTUAL SCROLLING: Only render visible messages (90% performance improvement)
   const rowVirtualizer = useVirtualizer({
@@ -700,6 +756,40 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatch, currentUser?.id]);
 
+  // Realtime's WebSocket can silently die while the app is backgrounded -
+  // mobile OSes throttle/suspend background network and JS timers, so the
+  // client's own reconnect can lag well behind the app actually coming back
+  // to the foreground. Any message sent (to the open conversation, or to any
+  // other match) during that gap is simply missed - postgres_changes is a
+  // live stream with no replay, and nothing else was refetching to catch up.
+  // That's why a message sometimes took a while to show up while the
+  // conversation was already open, and why the unread badge sometimes never
+  // updated at all. A one-shot resync the moment the app (or this tab) is
+  // visible again fixes both, without reintroducing the polling-while-typing
+  // jank the note above deliberately removed - this only ever runs on an
+  // actual foreground transition, never on a timer.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const resync = () => {
+      if (document.visibilityState === 'hidden') return;
+      scheduleFetchMatches();
+      if (selectedMatch?.id) {
+        void fetchMessagesInBackground(selectedMatch.id);
+        void resyncReadReceipts(selectedMatch.id);
+      }
+    };
+
+    document.addEventListener('visibilitychange', resync);
+    const listenerPromise = App.addListener('resume', resync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', resync);
+      listenerPromise.then((listener) => listener.remove()).catch(() => {});
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, selectedMatch?.id]);
+
   // ⭐ ANDROID OPTIMIZATION: Reduced message polling (3s instead of 1s)
   // Real-time subscription handles instant updates, polling is just a fallback
   // NOTE: Message polling removed to avoid UI jank while typing.
@@ -900,6 +990,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     first_name?: string;
     last_name?: string;
     is_admin?: boolean;
+    last_login_at?: string | null;
   };
 
   type MatchRowChat = {
@@ -964,6 +1055,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
             : undefined,
           first_name: firstName,
           last_name: lastName,
+          last_login_at: partner?.last_login_at ?? null,
           last_message_obj: lastMessage,
           unread_messages: unreadCount,
           last_message: lastMessage?.message || '',
@@ -1030,8 +1122,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         .from('matches')
         .select(`
           id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, last_login_at),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, last_login_at),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
@@ -1113,8 +1205,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         .from('matches')
         .select(`
           id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, last_login_at),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, last_login_at),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
@@ -1420,6 +1512,45 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       }
     } catch (error) {
       // Silently handle background fetch errors
+    }
+  };
+
+  // fetchMessagesInBackground above only ever asks for rows newer than the
+  // last cached message - it can't catch a read receipt, which is an UPDATE
+  // to a message already in the cache (mine, now marked is_read by the
+  // other person). The live 'UPDATE' subscription usually catches this
+  // instantly, but not if it fired while this device's socket was silently
+  // dead (see the resume-resync effect below) - without this, a checkmark
+  // could stay single/grey forever even though the other person read it.
+  // Only ever reads is_read for messages I sent; never touches theirs.
+  const resyncReadReceipts = async (matchId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('id')
+        .eq('match_id', matchId)
+        .eq('sender_id', currentUser.id)
+        .eq('is_read', true);
+
+      if (error || !data || data.length === 0) return;
+
+      const readIds = new Set(data.map(row => row.id));
+      setMessages(prev => {
+        let changed = false;
+        const updated = prev.map(m => {
+          if (m.sender_id === currentUser.id && !m.is_read && readIds.has(m.id)) {
+            changed = true;
+            return { ...m, is_read: true };
+          }
+          return m;
+        });
+        if (!changed) return prev;
+        chatMessagesCache.set(matchId, { messages: updated, timestamp: Date.now() });
+        return updated;
+      });
+    } catch (error) {
+      // Best-effort only - a missed read receipt self-corrects next time
+      // this runs, never worth surfacing an error for.
     }
   };
 
@@ -1813,6 +1944,20 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       if (!message || message.sender_id !== currentUser.id) {
         return;
       }
+
+      // Same 24h window the delete RLS policy enforces server-side - caught
+      // here too so a menu opened right as the window closed fails with a
+      // clear message instead of a silent, unexplained no-op.
+      const sentAt = message.created_at || message.sent_at;
+      if (!sentAt || Date.now() - new Date(sentAt).getTime() >= 24 * 60 * 60 * 1000) {
+        toast({
+          title: t('deleteMessage.tooOldTitle', 'Too late to delete for all'),
+          description: t('deleteMessage.tooOldDescription', 'This message is older than 24 hours - you can still delete it for yourself.'),
+          variant: 'destructive'
+        });
+        return;
+      }
+
       // Delete from database completely
       const { error: deleteError } = await supabase
         .from('chats')
@@ -2323,6 +2468,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
                           {match.unread_messages > 9 ? '9+' : match.unread_messages}
                         </div>
                       )}
+                      {isRecentlyOnline(match.last_login_at, CHAT_ONLINE_WINDOW_MS) && (
+                        <span
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-black"
+                          aria-label={t('chat.activeNow')}
+                        />
+                      )}
                     </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
@@ -2339,7 +2490,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
                         </span>
                       )}
                     </div>
-                    {match.last_message && (
+                    {listTypingMatchIds.has(match.id) ? (
+                      <p className="text-sm text-pink-400 font-medium italic truncate mt-1">
+                        {t('chat.typing')}
+                      </p>
+                    ) : match.last_message && (
                       <p className="text-sm text-gray-300 truncate mt-1">
                         {match.last_message}
                       </p>
@@ -2576,6 +2731,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
                       isHighlighted={highlightedMessageId === message.id}
                       partnerAvatarUrl={partnerAvatarUrl}
                       partnerInitials={partnerInitials}
+                      conversationAreaRef={messagesContainerRef}
                     />
                   </div>
                 );

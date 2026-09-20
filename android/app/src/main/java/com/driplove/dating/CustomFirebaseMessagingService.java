@@ -121,19 +121,6 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(0); // Don't use defaults, we set custom sound
 
-        // Match/message notifications carry the other person's photo (see
-        // send-push-notification edge function) - show it as the rounded
-        // avatar on the right, same as any messaging app. onMessageReceived
-        // already runs off the main thread, so a blocking download here is
-        // safe; a missing/failed image just falls back to the plain layout.
-        String imageUrl = data != null ? data.get("imageUrl") : null;
-        if (imageUrl != null && !imageUrl.isEmpty()) {
-            Bitmap avatar = downloadAndRoundBitmap(imageUrl);
-            if (avatar != null) {
-                notificationBuilder.setLargeIcon(avatar);
-            }
-        }
-        
         // For heads-up notifications (Android 5.0+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             notificationBuilder.setCategory(NotificationCompat.CATEGORY_MESSAGE);
@@ -179,7 +166,33 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
             notificationBuilder.setGroup(threadKey);
         }
 
-        notificationManager.notify(tag, tag.hashCode(), notificationBuilder.build());
+        // Post immediately - Realtime already shows the message inside an
+        // open conversation the moment it's inserted, over a plain
+        // WebSocket. Waiting on a network round-trip here before the shade
+        // notification even appears (the avatar download below used to run
+        // BEFORE this notify(), blocking it for however long that fetch
+        // took - up to 5s on a slow connection) was routinely losing that
+        // race and made the notification look "late" compared to the
+        // message already sitting in the conversation.
+        int notificationId = tag.hashCode();
+        notificationManager.notify(tag, notificationId, notificationBuilder.build());
+
+        // Match/message notifications carry the other person's photo (see
+        // send-push-notification edge function) - fetch it in the
+        // background and silently upgrade the already-visible notification
+        // in place once it's ready. A missing/failed image just leaves the
+        // plain layout the notify() above already posted.
+        String imageUrl = data != null ? data.get("imageUrl") : null;
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            final String finalTag = tag;
+            new Thread(() -> {
+                Bitmap avatar = downloadAndRoundBitmap(imageUrl);
+                if (avatar != null) {
+                    notificationBuilder.setLargeIcon(avatar);
+                    notificationManager.notify(finalTag, notificationId, notificationBuilder.build());
+                }
+            }, "driplove-notif-avatar").start();
+        }
     }
 
     // Downloads the given image URL and crops it to a circle, matching how

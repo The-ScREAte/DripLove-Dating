@@ -600,12 +600,38 @@ body.keyboard-open .chat-messages-container {
   }
 
   /* ✅ Ensure touch targets are appropriate size on mobile */
-  button, 
+  button,
   [role="button"],
   input,
   select,
   textarea {
     min-height: 44px;
+  }
+
+  /* Discover's filter sheet (DiscoverFiltersModal.tsx) reuses ProfilePage's
+     own LocationSection component as-is - same preferences UI, same fields -
+     but as a quick bottom sheet it needs to read noticeably more compact
+     than the full Profile page affords. Scoped to .discover-filters-compact
+     so LocationSection itself and Profile page are untouched. The
+     min-height reset is required on every interactive element here because
+     of the touch-target rule directly above, which otherwise silently wins
+     over any smaller height set here regardless of what's tried on the
+     element itself. */
+  .discover-filters-compact input,
+  .discover-filters-compact button[role="combobox"] {
+    height: 2.25rem;
+    min-height: 0;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+  .discover-filters-compact .space-y-6 > * + * {
+    margin-top: 1.25rem;
+  }
+  .discover-filters-compact .space-y-4 > * + * {
+    margin-top: 0.75rem;
+  }
+  .discover-filters-compact .space-y-3 > * + * {
+    margin-top: 0.5rem;
   }
 
   /* ✅ Improve text readability on mobile */

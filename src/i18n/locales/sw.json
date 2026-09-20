@@ -249,7 +249,8 @@
       "personality": "Kamilisha sliders za tabia",
       "funQuestions": "Jibu maswali ya kufurahisha",
       "interests": "Chagua angalau mapendekezo 3"
-    }
+    },
+    "freeTonight": "Huru Usiku Huu"
   },
   "discover": {
     "discover": "Gundua",
@@ -403,6 +404,7 @@
     "blockUser": "Zuia Mtumiaji",
     "deleteForMe": "Futa kwa ajili yangu",
     "deleteForEveryone": "Futa kwa kila mtu",
+    "deleteForAll": "Futa kwa wote",
     "reply": "Jibu",
     "activeOnDripLove": "Hai kwenye DripLove",
     "inappropriateLanguage": "Ujumbe wako una lugha isiyofaa. Tafadhali uondoe.",
@@ -633,7 +635,9 @@
   "deleteMessage": {
     "confirmTitle": "Futa ujumbe huu?",
     "cancel": "Ghairi",
-    "delete": "Futa"
+    "delete": "Futa",
+    "tooOldTitle": "Imechelewa kufuta kwa wote",
+    "tooOldDescription": "Ujumbe huu una zaidi ya masaa 24 - bado unaweza kuufuta kwa ajili yako tu."
   },
   "reportModal": {
     "title": "Ripoti Picha",
@@ -1000,5 +1004,14 @@
     "Dwennimmen": "Pembe za kondoo dume. Ishara ya unyenyekevu pamoja na nguvu.",
     "Nyame Dua": "Mti wa Mungu. Ishara ya uwepo na ulinzi wa Mungu.",
     "Boa Me Na Me Mmoa Wo": "Nisaidie na nikuruhusu nikusaidie. Ishara ya ushirikiano na utegemezano."
+  },
+  "streak": {
+    "dayCount": "Siku {{count}}",
+    "levelLabel": "Kiwango cha Mfululizo {{level}}",
+    "daysToNextLevel_one": "Siku {{count}} zaidi hadi Kiwango {{level}}",
+    "daysToNextLevel_other": "Siku {{count}} zaidi hadi Kiwango {{level}}",
+    "levelUpToday": "Rudi kesho kuanza Kiwango {{level}}",
+    "priorityHint": "Kadiri mfululizo wako unavyoongezeka, ndivyo unavyopewa kipaumbele zaidi kwa mechi bora.",
+    "continue": "Endelea"
   }
 }

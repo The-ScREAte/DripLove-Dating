@@ -57,9 +57,10 @@ public class MainActivity extends BridgeActivity {
     // opened (see clearThreadNotifications in src/services/pushNotifications.ts).
 
     // Mirrors resolveNotificationRoute() in src/services/pushNotifications.ts -
-    // keep the two in sync. message -> the specific conversation, match ->
-    // the chat list, like -> Liked Me, open_circle_profile -> that one
-    // Circle profile, everything else -> Discover (default).
+    // keep the two in sync. open_discover -> Discover (default, no route
+    // needed), open_circle_profile -> that one Circle profile, message ->
+    // the specific conversation, match -> the chat list, like -> Liked Me,
+    // image_rejected -> Profile, everything else -> Discover (default).
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getStringExtra("action");
@@ -67,7 +68,13 @@ public class MainActivity extends BridgeActivity {
         String type = intent.getStringExtra("type");
 
         String route;
-        if ("open_circle_profile".equals(action) && profileId != null) {
+        // action wins over type, same as resolveNotificationRoute - an
+        // admin broadcast can carry both an explicit action AND a type
+        // (used only for the notification's channel/sound), and the action
+        // is the one that says where a tap should actually go.
+        if ("open_discover".equals(action)) {
+            return;
+        } else if ("open_circle_profile".equals(action) && profileId != null) {
             route = "/?tab=circle&circleUserId=" + profileId;
         } else if (type == null) {
             return;
@@ -77,6 +84,8 @@ public class MainActivity extends BridgeActivity {
             route = "/?tab=chat";
         } else if ("like".equals(type)) {
             route = "/?tab=liked";
+        } else if ("image_rejected".equals(type)) {
+            route = "/?tab=profile";
         } else {
             return;
         }

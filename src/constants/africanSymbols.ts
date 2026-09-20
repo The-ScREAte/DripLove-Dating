@@ -82,6 +82,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Nyame Dua', meaning: "Tree of God. Symbol of God's presence and protection.", svg: badge('<path d="M24 40V24"/><path d="M24 24C15 24 12 16 12 12c6 0 12 3 12 12z"/><path d="M24 24c9 0 12-8 12-12-6 0-12 3-12 12z"/>', themed(9)) },
       { name: 'Fawohodie', meaning: 'Independence. Symbol of freedom and emancipation.', svg: badge('<path d="M14 34l10-20 10 20"/><path d="M18 26h12"/>', themed(10)) },
       { name: 'Bese Saka', meaning: 'Sack of cola nuts. Symbol of abundance, togetherness, and prosperity.', svg: badge('<circle cx="18" cy="18" r="6"/><circle cx="30" cy="18" r="6"/><circle cx="18" cy="30" r="6"/><circle cx="30" cy="30" r="6"/>', themed(11)) },
+      { name: 'Akoben', meaning: 'War horn. Symbol of vigilance and the call to action.', svg: badge('<path d="M24 9l12 5v11c0 8-6 15-14 16-8-1-14-8-14-16V14z"/><path d="M24 15v18"/>', themed(12)) },
+      { name: 'Adwo', meaning: 'Calm. Symbol of peace and quiet strength.', svg: badge('<path d="M8 20c4-4 8-4 12 0s8 4 12 0 8-4 12 0M8 28c4-4 8-4 12 0s8 4 12 0 8-4 12 0"/>', themed(13)) },
+      { name: 'Mpatapo', meaning: 'Knot of reconciliation. Symbol of peacemaking and unity.', svg: badge('<path d="M24 24c1.5 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 3 2 4.5 4.5 4.5s4.5-1.3 4.5-4.5-1.3-4.5-4.5-4.5-4.5 3-4.5 6c0 4.5 3 7.5 7.5 7.5"/>', themed(14)) },
+      { name: 'Nyame Ye Ohene', meaning: 'God is king. Symbol of divine sovereignty.', svg: badge('<path d="M12 34h24l-2-14-7 6-7-10-7 10-7-6z"/>', themed(15)) },
+      { name: 'Osram Ne Nsoromma', meaning: 'Moon and star. Symbol of faithfulness and harmony.', svg: badge('<path d="M28 10a15 15 0 1 0 0 28 12 12 0 0 1 0-28z"/>', themed(16)) },
     ]
   },
   {
@@ -103,6 +108,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Peace', meaning: 'Symbol of harmony and peaceful resolution.', svg: badge('<circle cx="24" cy="24" r="13" stroke-width="1.75"/><path d="M24 11v26M11 24h26"/>', themed(6)) },
       { name: 'Justice', meaning: 'Symbol of fairness and balanced judgment.', svg: badge('<path d="M24 10v28"/><path d="M12 18h24"/><path d="M12 18l-4 8h8l-4-8z"/><path d="M36 18l-4 8h8l-4-8z"/>', themed(8)) },
       { name: 'Secrecy', meaning: 'Symbol of hidden knowledge, guarded within secret societies.', svg: badge('<path d="M18 22a6 6 0 0 1 12 0v4"/><rect x="16" y="24" width="16" height="12" rx="2"/>', themed(0)) },
+      { name: 'Ikenga', meaning: 'Shrine of personal strength. Symbol of achievement and willpower.', svg: badge('<path d="M17 32c-6-6-2-16 4-14M31 32c6-6 2-16-4-14"/><ellipse cx="24" cy="30" rx="6" ry="5"/>', themed(10)) },
+      { name: 'Uli Pattern', meaning: 'Body and wall art. Symbol of beauty and identity.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(11)) },
+      { name: 'Nsibidi', meaning: 'Ideographic script. Symbol of hidden knowledge and communication.', svg: badge('<path d="M11 15l6 6-6 6 6 6M37 15l-6 6 6 6-6 6"/><path d="M17 15l6 6-6 6 6 6"/>', themed(12)) },
+      { name: 'Igbo Mbari', meaning: 'Sacred art house. Symbol of creation and devotion.', svg: badge('<path d="M24 10c-8 0-12 6-12 13s5 13 12 13 12-6 12-13-4-13-12-13z"/><circle cx="19" cy="21" r="1.8" fill="currentColor" stroke="none"/><circle cx="29" cy="21" r="1.8" fill="currentColor" stroke="none"/>', themed(13)) },
+      { name: 'Efik Ekpe Leopard', meaning: 'Leopard society. Symbol of authority and secrecy.', svg: badge('<circle cx="24" cy="30" r="5"/><circle cx="16" cy="20" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="32" cy="20" r="3"/>', themed(14)) },
     ]
   },
   {
@@ -122,6 +132,10 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Solomonic Seal', meaning: "Interlaced star symbolizing King Solomon's wisdom and protection.", svg: badge('<path d="M24 9l4.6 8 9.2.9-6.8 6.2 1.9 9.1L24 28.8 15.1 33.2l1.9-9.1-6.8-6.2 9.2-.9z"/>', themed(5)) },
       { name: 'Meskel Flower', meaning: 'The Meskel daisy, symbol of the finding of the True Cross and new beginnings.', svg: badge('<circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/><path d="M24 20V11M24 28v9M20 24h-9M28 24h9M21 21l-6-6M27 21l6-6M21 27l-6 6M27 27l6 6"/>', themed(6)) },
       { name: "Coptic Cross", meaning: 'Ornate cross pattern representing eternal faith and continuity.', svg: badge('<path d="M24 9v30M14 19h20M14 29h20"/><circle cx="24" cy="19" r="3"/>', themed(3)) },
+      { name: 'Ethiopian Lion', meaning: 'Lion of Judah. Symbol of royal strength and pride.', svg: badge('<circle cx="24" cy="30" r="5"/><circle cx="16" cy="20" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="32" cy="20" r="3"/>', themed(8)) },
+      { name: 'Lalibela Rose', meaning: 'Sacred flower. Symbol of devotion and renewal.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(9)) },
+      { name: 'Blue Nile', meaning: 'The river’s source. Symbol of life and origin.', svg: badge('<path d="M8 20c4-4 8-4 12 0s8 4 12 0 8-4 12 0M8 28c4-4 8-4 12 0s8 4 12 0 8-4 12 0"/>', themed(10)) },
+      { name: 'Ethiopian Crown', meaning: 'Imperial crown. Symbol of majesty and heritage.', svg: badge('<path d="M12 34h24l-2-14-7 6-7-10-7 10-7-6z"/>', themed(11)) },
     ]
   },
   {
@@ -141,6 +155,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Ogunda Meji', meaning: 'Symbol of clearing the path, courage, and warrior spirit.', svg: badge('<path d="M24 10v28"/><path d="M17 17l14 14M31 17l-14 14"/>', themed(3)) },
       { name: 'Irosun Meji', meaning: 'Symbol of visibility, revelation, and truth coming to light.', svg: badge('<circle cx="24" cy="24" r="14" stroke-width="1.75"/><path d="M24 10v6M24 32v6M10 24h6M32 24h6"/>', themed(1)) },
       { name: 'Owonrin Meji', meaning: 'Symbol of transformation, upheaval, and unexpected change.', svg: badge('<path d="M12 32c4-10 8 6 12-4s8 6 12-4"/>', themed(7)) },
+      { name: 'Osa Meji', meaning: 'Odù of hidden forces. Symbol of mystery and transformation.', svg: badge('<path d="M28 10a15 15 0 1 0 0 28 12 12 0 0 1 0-28z"/>', themed(8)) },
+      { name: 'Irete Meji', meaning: 'Odù of perseverance. Symbol of steady wisdom.', svg: badge('<path d="M24 24c1.5 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 3 2 4.5 4.5 4.5s4.5-1.3 4.5-4.5-1.3-4.5-4.5-4.5-4.5 3-4.5 6c0 4.5 3 7.5 7.5 7.5"/>', themed(9)) },
+      { name: 'Otura Meji', meaning: 'Odù of truth. Symbol of clarity and destiny.', svg: badge('<circle cx="24" cy="24" r="8" fill="currentColor" stroke="none"/><path d="M24 8v6M24 34v6M8 24h6M34 24h6M13 13l4 4M31 31l4 4M35 13l-4 4M17 31l-4 4"/>', themed(10)) },
+      { name: 'Ika Meji', meaning: 'Odù of protection. Symbol of resolve against adversity.', svg: badge('<path d="M24 9l12 5v11c0 8-6 15-14 16-8-1-14-8-14-16V14z"/><path d="M24 15v18"/>', themed(11)) },
+      { name: 'Ofun Meji', meaning: 'Odù of purity. Symbol of divine blessing and completion.', svg: badge('<path d="M24 9l3.6 9.4 10 .8-7.6 6.8 2.4 9.6L24 30l-8.4 5.6 2.4-9.6-7.6-6.8 10-.8z"/>', themed(12)) },
     ]
   },
   {
@@ -160,6 +179,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Sacred Enclosure', meaning: 'The Great Enclosure walls, symbol of the royal court and community protection.', svg: badge('<circle cx="24" cy="24" r="14" stroke-width="1.75"/><circle cx="24" cy="24" r="8"/>', themed(8)) },
       { name: 'Soapstone Bowl', meaning: 'Ceremonial carved bowl, symbol of ritual and offering.', svg: badge('<ellipse cx="24" cy="26" rx="14" ry="7"/><path d="M10 26c0 6 6 10 14 10s14-4 14-10"/>', themed(4)) },
       { name: 'Drum of Unity', meaning: 'Ceremonial drum, symbol of celebration and communal gathering.', svg: badge('<path d="M15 18h18l-3 18h-12z"/><ellipse cx="24" cy="18" rx="9" ry="3.5"/>', themed(9)) },
+      { name: 'Great Zimbabwe Wall', meaning: 'Ancient stone walls. Symbol of permanence and craftsmanship.', svg: badge('<path d="M9 34l9-18 6 8 5-6 10 16z"/>', themed(8)) },
+      { name: 'Balancing Stones', meaning: 'Natural rock formations. Symbol of equilibrium and patience.', svg: badge('<circle cx="24" cy="32" r="9"/><circle cx="24" cy="16" r="6"/>', themed(9)) },
+      { name: 'Mbira', meaning: 'Thumb piano. Symbol of music and ancestral voice.', svg: badge('<path d="M15 18h18l-3 18h-12z"/><ellipse cx="24" cy="18" rx="9" ry="3.5"/>', themed(10)) },
+      { name: 'Zebra Pattern', meaning: 'Striped hide. Symbol of individuality within unity.', svg: badge('<path d="M12 14v20M18 14v20M24 14v20M30 14v20M36 14v20"/>', themed(11)) },
+      { name: 'Great Zimbabwe Sun', meaning: 'Radiant sun. Symbol of vitality and renewal.', svg: badge('<circle cx="24" cy="24" r="8" fill="currentColor" stroke="none"/><path d="M24 8v6M24 34v6M8 24h6M34 24h6M13 13l4 4M31 31l4 4M35 13l-4 4M17 31l-4 4"/>', themed(12)) },
     ]
   },
   {
@@ -179,6 +203,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Trance Dance', meaning: 'Symbol of spiritual journeying between worlds during ritual dance.', svg: badge('<path d="M24 12v10M17 30l7-8 7 8"/><circle cx="24" cy="10" r="2.5" fill="currentColor" stroke="none"/>', themed(8)) },
       { name: 'Star Path', meaning: 'Symbol of guidance from the night sky and ancestral spirits.', svg: badge('<circle cx="24" cy="24" r="2" fill="currentColor" stroke="none"/><circle cx="14" cy="16" r="1.5" fill="currentColor" stroke="none"/><circle cx="34" cy="16" r="1.5" fill="currentColor" stroke="none"/><circle cx="14" cy="34" r="1.5" fill="currentColor" stroke="none"/><circle cx="34" cy="34" r="1.5" fill="currentColor" stroke="none"/><path d="M14 16l10 8 10-8M14 34l10-8 10 8"/>', themed(5)) },
       { name: 'Ostrich Egg', meaning: 'Water-storage vessel and canvas for art, symbol of resourcefulness.', svg: badge('<ellipse cx="24" cy="24" rx="11" ry="14"/><path d="M17 20h14M17 27h14"/>', themed(1)) },
+      { name: 'San Rock Art', meaning: 'Ancient painted stone. Symbol of memory and storytelling.', svg: badge('<path d="M11 15l6 6-6 6 6 6M37 15l-6 6 6 6-6 6"/><path d="M17 15l6 6-6 6 6 6"/>', themed(8)) },
+      { name: 'Moon Dance', meaning: 'Night ritual. Symbol of intuition and cycles.', svg: badge('<path d="M28 10a15 15 0 1 0 0 28 12 12 0 0 1 0-28z"/>', themed(9)) },
+      { name: 'Springbok', meaning: 'Swift antelope. Symbol of agility and grace.', svg: badge('<path d="M17 32c-6-6-2-16 4-14M31 32c6-6 2-16-4-14"/><ellipse cx="24" cy="30" rx="6" ry="5"/>', themed(10)) },
+      { name: 'Bushman Bow', meaning: 'Hunting bow. Symbol of precision and provision.', svg: badge('<path d="M14 10c14 6 14 22 0 28"/><path d="M14 10v28"/>', themed(11)) },
+      { name: 'Healing Plant', meaning: 'Medicinal herb. Symbol of restoration and care.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(12)) },
     ]
   },
   {
@@ -198,6 +227,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Ndop Portrait', meaning: 'Idealized royal portrait figure, symbol of legacy and remembrance.', svg: badge('<circle cx="24" cy="16" r="5"/><rect x="16" y="22" width="16" height="14" rx="4"/>', themed(2)) },
       { name: 'Cowrie Currency', meaning: 'Shells once used as currency, symbol of wealth and exchange.', svg: badge('<ellipse cx="17" cy="22" rx="6" ry="8"/><ellipse cx="31" cy="26" rx="6" ry="8"/><path d="M14 22h6M28 26h6"/>', themed(11)) },
       { name: 'Raffia Cloth Pattern', meaning: 'Woven textile geometry, symbol of craftsmanship and community identity.', svg: badge('<path d="M11 15l6 6-6 6 6 6M37 15l-6 6 6 6-6 6"/><path d="M17 15l6 6-6 6 6 6"/>', themed(9)) },
+      { name: 'Lukasa Memory Board', meaning: 'Memory device. Symbol of history and record-keeping.', svg: badge('<path d="M24 24c1.5 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 3 2 4.5 4.5 4.5s4.5-1.3 4.5-4.5-1.3-4.5-4.5-4.5-4.5 3-4.5 6c0 4.5 3 7.5 7.5 7.5"/>', themed(8)) },
+      { name: 'Leopard Power', meaning: 'Leopard spirit. Symbol of stealth and authority.', svg: badge('<circle cx="24" cy="30" r="5"/><circle cx="16" cy="20" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="32" cy="20" r="3"/>', themed(9)) },
+      { name: 'Palm Frond', meaning: 'Palm branch. Symbol of peace and sustenance.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(10)) },
+      { name: 'River Crossing', meaning: 'Crossing the water. Symbol of transition and courage.', svg: badge('<path d="M8 20c4-4 8-4 12 0s8 4 12 0 8-4 12 0M8 28c4-4 8-4 12 0s8 4 12 0 8-4 12 0"/>', themed(11)) },
+      { name: 'Talking Drum', meaning: 'Speaking drum. Symbol of communication and rhythm.', svg: badge('<path d="M15 18h18l-3 18h-12z"/><ellipse cx="24" cy="18" rx="9" ry="3.5"/>', themed(12)) },
     ]
   },
   {
@@ -217,6 +251,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Kanaga Mask', meaning: 'Ritual mask representing the structure of the universe and human-cosmos link.', svg: badge('<path d="M24 12v24"/><path d="M14 16h20M14 32h20"/><path d="M14 16l-3-5M34 16l3-5M14 32l-3 5M34 32l3 5"/>', themed(7)) },
       { name: 'Toguna Pillars', meaning: 'Low-roofed council house pillars, symbol of wisdom and community deliberation.', svg: badge('<path d="M13 36V20M20 36V20M28 36V20M35 36V20"/><path d="M11 20h26"/>', themed(11)) },
       { name: 'Binu Shrine', meaning: 'Sacred shrine symbol representing totemic ancestral spirits.', svg: badge('<path d="M24 10l12 8v18H12V18z"/><circle cx="24" cy="26" r="4"/>', themed(6)) },
+      { name: 'Dogon Door Pattern', meaning: 'Carved granary door. Symbol of guarded wisdom.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(8)) },
+      { name: 'Dogon Ladder', meaning: 'Escarpment ladder. Symbol of ascent and aspiration.', svg: badge('<path d="M9 34l9-18 6 8 5-6 10 16z"/>', themed(9)) },
+      { name: 'Dogon Granary Door', meaning: 'Sacred storehouse door. Symbol of provision and order.', svg: badge('<circle cx="24" cy="32" r="9"/><circle cx="24" cy="16" r="6"/>', themed(10)) },
+      { name: 'Dogon Mask Dance', meaning: 'Ritual mask dance. Symbol of ancestral communion.', svg: badge('<path d="M24 10c-8 0-12 6-12 13s5 13 12 13 12-6 12-13-4-13-12-13z"/><circle cx="19" cy="21" r="1.8" fill="currentColor" stroke="none"/><circle cx="29" cy="21" r="1.8" fill="currentColor" stroke="none"/>', themed(11)) },
+      { name: 'Dogon Crescent', meaning: 'Crescent moon. Symbol of cosmic rhythm.', svg: badge('<path d="M28 10a15 15 0 1 0 0 28 12 12 0 0 1 0-28z"/>', themed(12)) },
     ]
   },
   {
@@ -236,6 +275,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Khamsa Hand', meaning: "Hand-shaped amulet, symbol of protection from the 'evil eye.'", svg: badge('<path d="M24 34V18M18 34v-9M30 34v-9M15 30v-6M33 30v-6"/><path d="M15 24a9 9 0 0 1 18 0"/>', themed(6)) },
       { name: 'Carpet Diamond', meaning: 'Geometric weaving motif from Amazigh rugs, symbol of fertility and land.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(8)) },
       { name: 'Oasis Palm', meaning: 'Date palm symbol representing life, sustenance, and desert resilience.', svg: badge('<path d="M24 38V20"/><path d="M24 20c-6-4-10-2-12 2 6 2 9-1 12-2zM24 20c6-4 10-2 12 2-6 2-9-1-12-2zM24 20c-3-6-1-10 0-12 3 4 2 8 0 12zM24 20c3-6 1-10 0-12"/>', themed(1)) },
+      { name: 'Amazigh Moon', meaning: 'Crescent of the Amazigh. Symbol of guidance and renewal.', svg: badge('<path d="M28 10a15 15 0 1 0 0 28 12 12 0 0 1 0-28z"/>', themed(8)) },
+      { name: 'Amazigh Star', meaning: 'Guiding star. Symbol of direction and hope.', svg: badge('<path d="M24 9l3.6 9.4 10 .8-7.6 6.8 2.4 9.6L24 30l-8.4 5.6 2.4-9.6-7.6-6.8 10-.8z"/>', themed(9)) },
+      { name: 'Amazigh Eye', meaning: 'Watchful eye. Symbol of protection from harm.', svg: badge('<ellipse cx="24" cy="24" rx="14" ry="8"/><circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/>', themed(10)) },
+      { name: 'Amazigh Weave', meaning: 'Woven textile. Symbol of heritage and craft.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(11)) },
+      { name: 'Atlas Mountains', meaning: 'Great range. Symbol of endurance and majesty.', svg: badge('<path d="M9 34l9-18 6 8 5-6 10 16z"/>', themed(12)) },
     ]
   },
   {
@@ -255,6 +299,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Lotus Flower', meaning: 'Symbol of rebirth, purity, and the rising sun.', svg: badge('<path d="M24 34V20"/><path d="M24 20c-6-2-9-8-9-12 6 0 9 5 9 12zM24 20c6-2 9-8 9-12-6 0-9 5-9 12z"/>', themed(9)) },
       { name: 'Sun Disk (Aten)', meaning: 'Symbol of the sun as the giver of all life.', svg: badge('<circle cx="24" cy="24" r="8" fill="currentColor" stroke="none"/><path d="M24 8v6M24 34v6M8 24h6M34 24h6M13 13l4 4M31 31l4 4M35 13l-4 4M17 31l-4 4"/>', themed(6)) },
       { name: "Feather of Ma'at", meaning: 'Symbol of truth, balance, and cosmic order.', svg: badge('<path d="M24 36V12"/><path d="M24 14l-8 4M24 18l8 4M24 22l-8 4M24 26l8 4M24 30l-8 4"/>', themed(11)) },
+      { name: 'Eye of Ra', meaning: 'The sun god’s eye. Symbol of power and protection.', svg: badge('<ellipse cx="24" cy="24" rx="14" ry="8"/><circle cx="24" cy="24" r="4" fill="currentColor" stroke="none"/>', themed(8)) },
+      { name: 'Horus Falcon', meaning: 'Sky god’s falcon. Symbol of vision and kingship.', svg: badge('<path d="M24 13c-4 0-6.5 3-6.5 6.5v7c0 4 2.5 6.5 6.5 6.5s6.5-2.5 6.5-6.5v-7C30.5 16 28 13 24 13z"/><path d="M18 33h12l-2 5h-8z"/>', themed(9)) },
+      { name: 'Bastet Cat', meaning: 'Cat goddess. Symbol of grace and protection of the home.', svg: badge('<circle cx="24" cy="30" r="5"/><circle cx="16" cy="20" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="32" cy="20" r="3"/>', themed(10)) },
+      { name: 'Isis Knot', meaning: 'Tyet knot. Symbol of protection and eternal life.', svg: badge('<path d="M24 24c1.5 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 3 2 4.5 4.5 4.5s4.5-1.3 4.5-4.5-1.3-4.5-4.5-4.5-4.5 3-4.5 6c0 4.5 3 7.5 7.5 7.5"/>', themed(11)) },
+      { name: 'Papyrus', meaning: 'Reed plant. Symbol of knowledge and record.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(12)) },
     ]
   },
   {
@@ -274,6 +323,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Sun Shield Pattern', meaning: 'Radiating pattern symbolizing the sun, life, and vitality on the savanna.', svg: badge('<circle cx="24" cy="24" r="7"/><path d="M24 10v4M24 34v4M10 24h4M34 24h4M15 15l3 3M33 33l-3-3M33 15l-3 3M15 33l3-3"/>', themed(5)) },
       { name: 'Enkang Circle', meaning: 'The circular homestead layout, symbol of family unity and communal protection.', svg: badge('<circle cx="24" cy="24" r="14" stroke-width="1.75"/><rect x="20" y="20" width="8" height="8" rx="2"/>', themed(11)) },
       { name: 'Age-Set Mark', meaning: "Pattern marking a warrior's age-group and shared lifelong bond.", svg: badge('<path d="M11 18h26M11 24h26M11 30h26"/>', themed(8)) },
+      { name: 'Maasai Red Shuka', meaning: 'Woven red cloth. Symbol of identity and courage.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(8)) },
+      { name: 'Maasai Lion', meaning: 'The lion hunt. Symbol of bravery and manhood.', svg: badge('<circle cx="24" cy="30" r="5"/><circle cx="16" cy="20" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="32" cy="20" r="3"/>', themed(9)) },
+      { name: 'Maasai Manyatta', meaning: 'Warrior homestead. Symbol of brotherhood and discipline.', svg: badge('<path d="M24 12l13 24H11z"/><path d="M24 20v16"/>', themed(10)) },
+      { name: 'Maasai Cattle', meaning: 'Herd of cattle. Symbol of wealth and sustenance.', svg: badge('<path d="M17 32c-6-6-2-16 4-14M31 32c6-6 2-16-4-14"/><ellipse cx="24" cy="30" rx="6" ry="5"/>', themed(11)) },
+      { name: 'Maasai Warrior Dance', meaning: 'The adumu jump dance. Symbol of vitality and pride.', svg: badge('<path d="M15 18h18l-3 18h-12z"/><ellipse cx="24" cy="18" rx="9" ry="3.5"/>', themed(12)) },
     ]
   },
   {
@@ -293,6 +347,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Djembe Rhythm', meaning: 'Drum pattern symbolizing celebration, oral history, and communal joy.', svg: badge('<path d="M15 16h18l-3 20h-12z"/><ellipse cx="24" cy="16" rx="9" ry="3.5"/>', themed(11)) },
       { name: 'Sunu Gaal', meaning: 'The fishing pirogue (boat), symbol of resilience and the journey of life.', svg: badge('<path d="M10 30q14 8 28 0l-4 6H14z"/><path d="M24 30V12M24 15l7 4-7 3"/>', themed(3)) },
       { name: 'Xalam Lute', meaning: 'Traditional stringed instrument, symbol of griot storytelling and heritage.', svg: badge('<ellipse cx="18" cy="30" rx="7" ry="6"/><path d="M22 26l12-14"/><path d="M31 14l3-2"/>', themed(8)) },
+      { name: 'Wolof Weave', meaning: 'Woven textile. Symbol of craftsmanship and pride.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(8)) },
+      { name: 'Serer Star', meaning: 'Guiding star. Symbol of ancestry and direction.', svg: badge('<path d="M24 9l3.6 9.4 10 .8-7.6 6.8 2.4 9.6L24 30l-8.4 5.6 2.4-9.6-7.6-6.8 10-.8z"/>', themed(9)) },
+      { name: 'Senegal River', meaning: 'The great river. Symbol of life and connection.', svg: badge('<path d="M8 20c4-4 8-4 12 0s8 4 12 0 8-4 12 0M8 28c4-4 8-4 12 0s8 4 12 0 8-4 12 0"/>', themed(10)) },
+      { name: 'Baobab Spirit', meaning: 'Spirit of the baobab. Symbol of ancestral presence.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(11)) },
+      { name: 'Wolof Drum', meaning: 'Sabar drum. Symbol of celebration and voice.', svg: badge('<path d="M15 18h18l-3 18h-12z"/><ellipse cx="24" cy="18" rx="9" ry="3.5"/>', themed(12)) },
     ]
   },
   {
@@ -312,6 +371,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Elephant Mask', meaning: 'Prestigious royal mask, symbol of power, wealth, and long memory.', svg: badge('<circle cx="24" cy="18" r="8"/><path d="M20 26c-3 4-3 9 0 12"/><path d="M28 26c3 4 3 9 0 12"/>', themed(2)) },
       { name: 'Double Gong', meaning: 'Royal instrument used to announce and honor the chief, symbol of ceremony.', svg: badge('<circle cx="17" cy="24" r="7"/><circle cx="31" cy="24" r="7"/><path d="M17 17V11M31 17V11M24 11h0"/>', themed(7)) },
       { name: 'Kingdom Star', meaning: 'Symbol marking royal lineage and the unity of the Grassfields kingdoms.', svg: badge('<path d="M24 9l3.6 9.4 10 .8-7.6 6.8 2.4 9.6L24 30l-8.4 5.6 2.4-9.6-7.6-6.8 10-.8z"/>', themed(5)) },
+      { name: 'Bamileke Elephant', meaning: 'Royal elephant. Symbol of power and memory.', svg: badge('<circle cx="24" cy="18" r="8"/><path d="M20 26c-3 4-3 9 0 12"/><path d="M28 26c3 4 3 9 0 12"/>', themed(8)) },
+      { name: 'Bamileke Sun', meaning: 'Radiant sun. Symbol of vitality and kingship.', svg: badge('<circle cx="24" cy="24" r="8" fill="currentColor" stroke="none"/><path d="M24 8v6M24 34v6M8 24h6M34 24h6M13 13l4 4M31 31l4 4M35 13l-4 4M17 31l-4 4"/>', themed(9)) },
+      { name: 'Bamileke Spider', meaning: 'Wise spider. Symbol of foresight and ancestry.', svg: badge('<circle cx="24" cy="24" r="6"/><path d="M18 20l-7-5M18 28l-7 5M30 20l7-5M30 28l7 5M20 18l-4-8M28 18l4-8"/>', themed(10)) },
+      { name: 'Bamileke Beadwork', meaning: 'Royal beadwork. Symbol of status and artistry.', svg: badge('<path d="M12 20a12 12 0 0 1 24 0"/><circle cx="12" cy="20" r="2" fill="currentColor" stroke="none"/><circle cx="18" cy="11" r="2" fill="currentColor" stroke="none"/><circle cx="30" cy="11" r="2" fill="currentColor" stroke="none"/><circle cx="36" cy="20" r="2" fill="currentColor" stroke="none"/>', themed(11)) },
+      { name: 'Bamileke Palace', meaning: 'Royal palace. Symbol of lineage and authority.', svg: badge('<path d="M12 34h24l-2-14-7 6-7-10-7 10-7-6z"/>', themed(12)) },
     ]
   },
   {
@@ -331,6 +395,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Shetani Spirit', meaning: 'Imaginative spirit figures from Makonde carving, symbol of the unseen world.', svg: badge('<path d="M24 10c-6 0-9 5-9 10 0 8 5 16 9 16s9-8 9-16c0-5-3-10-9-10z"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/><circle cx="28" cy="18" r="1.6" fill="currentColor" stroke="none"/>', themed(9)) },
       { name: 'Ebony Carving', meaning: 'Fine blackwood sculpture, symbol of craftsmanship and cultural pride.', svg: badge('<path d="M24 10v28"/><path d="M17 16c0 8 14 8 14 0M17 30c0 8 14 8 14 0"/>', themed(0)) },
       { name: 'Coastal Dhow', meaning: 'Traditional sailing vessel, symbol of trade, travel, and Swahili coastal heritage.', svg: badge('<path d="M10 30q14 7 28 0l-4 5H14z"/><path d="M24 30V11l9 8z"/>', themed(3)) },
+      { name: 'Makonde Mother and Child', meaning: 'Carved figure. Symbol of nurture and continuity.', svg: badge('<path d="M24 36s-10-7.5-10-15a8 8 0 0 1 10-3.5A8 8 0 0 1 34 21c0 7.5-10 15-10 15z"/>', themed(8)) },
+      { name: 'Makonde Tree Figure', meaning: 'Carved tree of life. Symbol of ancestry and growth.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(9)) },
+      { name: 'Maasai Shield Dance', meaning: 'Warrior shield dance. Symbol of unity and pride.', svg: badge('<path d="M24 9l12 5v11c0 8-6 15-14 16-8-1-14-8-14-16V14z"/><path d="M24 15v18"/>', themed(10)) },
+      { name: 'Zanzibar Door Pattern', meaning: 'Carved coastal door. Symbol of welcome and heritage.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(11)) },
+      { name: 'Tanzania Baobab', meaning: 'The great tree. Symbol of endurance and gathering.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(12)) },
     ]
   },
   {
@@ -350,6 +419,11 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
       { name: 'Herero Star', meaning: 'Symbol seen in Herero textile patterns, representing guidance and hope.', svg: badge('<path d="M24 9l3.5 9.5L37 22l-9.5 3.5L24 35l-3.5-9.5L11 22l9.5-3.5z"/>', themed(2)) },
       { name: 'Ancestral Fire', meaning: 'The sacred okuruwo fire, symbol of ancestral connection and family continuity.', svg: badge('<path d="M24 13c-3 4-4 8-2 12 2 4 6 6 6 6s-2-4 0-8c2-4 4-6 4-10-2 2-6 4-8 0z"/><path d="M14 36h20"/>', themed(7)) },
       { name: 'Welwitschia Leaf', meaning: 'Ancient desert plant, symbol of endurance and living history.', svg: badge('<path d="M24 38V16"/><path d="M24 16c-8 2-10 12-10 18M24 16c8 2 10 12 10 18"/>', themed(4)) },
+      { name: 'Himba Jewelry', meaning: 'Ochre-beaded adornment. Symbol of beauty and identity.', svg: badge('<path d="M12 20a12 12 0 0 1 24 0"/><circle cx="12" cy="20" r="2" fill="currentColor" stroke="none"/><circle cx="18" cy="11" r="2" fill="currentColor" stroke="none"/><circle cx="30" cy="11" r="2" fill="currentColor" stroke="none"/><circle cx="36" cy="20" r="2" fill="currentColor" stroke="none"/>', themed(8)) },
+      { name: 'Herero Dress Pattern', meaning: 'Vivid woven dress. Symbol of resilience and pride.', svg: badge('<path d="M24 10l14 14-14 14-14-14z"/><path d="M24 18l6 6-6 6-6-6z"/>', themed(9)) },
+      { name: 'Namib Desert Star', meaning: 'Desert night sky. Symbol of guidance and hope.', svg: badge('<path d="M24 9l3.6 9.4 10 .8-7.6 6.8 2.4 9.6L24 30l-8.4 5.6 2.4-9.6-7.6-6.8 10-.8z"/>', themed(10)) },
+      { name: 'Himba Cattle', meaning: 'Sacred cattle. Symbol of wealth and lineage.', svg: badge('<path d="M17 32c-6-6-2-16 4-14M31 32c6-6 2-16-4-14"/><ellipse cx="24" cy="30" rx="6" ry="5"/>', themed(11)) },
+      { name: 'Desert Fire', meaning: 'The evening fire. Symbol of warmth and ancestral bond.', svg: badge('<path d="M24 13c-3 4-4 8-2 12 2 4 6 6 6 6s-2-4 0-8c2-4 4-6 4-10-2 2-6 4-8 0z"/>', themed(12)) },
     ]
   },
   {

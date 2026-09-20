@@ -278,7 +278,8 @@
     "approximateLocation": "Approximate Location",
     "approximateLocationDescription": "Your city isn't in our database. You'll still get matches based on country/region.",
     "locationRequired": "Location Required",
-    "locationRequiredDescription": "Please add your city to enable location-based matching."
+    "locationRequiredDescription": "Please add your city to enable location-based matching.",
+    "freeTonight": "Free Tonight"
   },
   "discover": {
     "title": "DripCheck",
@@ -446,6 +447,7 @@
     "failedToDeleteChat": "Failed to delete chat. Please try again.",
     "deleteForMe": "Delete for me",
     "deleteForEveryone": "Delete for everyone",
+    "deleteForAll": "Delete for all",
     "reply": "Reply",
     "activeOnDripLove": "Active on DripLove",
     "inappropriateLanguage": "Your message contains inappropriate language. Please remove it.",
@@ -696,7 +698,9 @@
   "deleteMessage": {
     "confirmTitle": "Delete this message?",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "tooOldTitle": "Too late to delete for all",
+    "tooOldDescription": "This message is older than 24 hours - you can still delete it for yourself."
   },
   "reportModal": {
     "title": "Report this photo",
@@ -1079,5 +1083,14 @@
     "Dwennimmen": "Ram's horns. Symbol of humility together with strength.",
     "Nyame Dua": "Tree of God. Symbol of God's presence and protection.",
     "Boa Me Na Me Mmoa Wo": "Help me and let me help you. Symbol of cooperation and interdependence."
+  },
+  "streak": {
+    "dayCount": "Day {{count}}",
+    "levelLabel": "Streak Level {{level}}",
+    "daysToNextLevel_one": "{{count}} more day to Level {{level}}",
+    "daysToNextLevel_other": "{{count}} more days to Level {{level}}",
+    "levelUpToday": "Come back tomorrow to start Level {{level}}",
+    "priorityHint": "The higher your streak, the more you're prioritized for quality matches.",
+    "continue": "Continue"
   }
 }

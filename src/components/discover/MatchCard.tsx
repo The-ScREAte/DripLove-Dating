@@ -9,13 +9,14 @@ import { PotentialMatch } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { getLanguageName } from '@/utils/languageNames';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from './MatchCardHelpers';
+import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32, seededShuffle } from './MatchCardHelpers';
 import { SlideRenderer } from './SlideRenderer';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import MusicLinkBadge from './MusicLinkBadge';
 import { formatDistance } from '@/utils/distanceUnits';
+import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import {
   FAMILY_PLANS_OPTIONS,
   COMMUNICATION_STYLE_OPTIONS,
@@ -257,23 +258,29 @@ const MatchCard: React.FC<MatchCardProps> = ({
     [stableMatch, memoUserImages]
   );
 
-  // One cultural sign to surface as its own chip, cycling through ALL of this
-  // profile's signs (not just the first) as the user taps through photos -
-  // shared signs with the current user are moved to the front so the first
-  // photo leads with common ground, then the rest of the profile's own signs
-  // follow in order across later photos.
-  const signHighlight = useMemo(() => {
+  // Two cultural signs to surface as their own chips (this used to also
+  // duplicate as a floating badge above the header - removed, this is now
+  // the only place a profile's signs show). Shuffled with a per-profile seed
+  // so which ones lead feels random without reshuffling on every render;
+  // shared signs with the current user are still weighted to shuffle ahead
+  // of the rest so common ground tends to surface first. Still cycles which
+  // two lead as the viewer swipes through photos, same as before.
+  const signHighlights = useMemo(() => {
     const theirs = stableMatch.adinkra_symbols;
-    if (!theirs || theirs.length === 0) return null;
+    if (!theirs || theirs.length === 0) return [];
     const mine = currentUserAdinkraSymbols || [];
     const shared = theirs.filter(symbol => mine.includes(symbol));
     const rest = theirs.filter(symbol => !mine.includes(symbol));
-    const ordered = [...shared, ...rest];
-    return ordered[currentSlide % ordered.length];
+    const rand = mulberry32(seedFromString(`${stableMatch.id || stableMatch.first_name || ''}_signhighlight`));
+    const ordered = [...seededShuffle(shared, rand), ...seededShuffle(rest, rand)];
+    if (ordered.length === 0) return [];
+    if (ordered.length === 1) return [ordered[0]];
+    const start = currentSlide % ordered.length;
+    return [ordered[start], ordered[(start + 1) % ordered.length]];
   }, [stableMatch, currentUserAdinkraSymbols, currentSlide]);
 
   // A favorite carrying a share link (e.g. a music track/album) surfaces as
-  // its own circular badge in the compact preview row, mirroring signHighlight.
+  // its own circular badge in the compact preview row, mirroring signHighlights.
   const musicHighlight = useMemo(
     () => findFavoriteWithLink(stableMatch.favorites),
     [stableMatch]
@@ -665,20 +672,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Current slide content */}
           {slides && slides.length > 0 && (
             <div className="w-full h-full transition-all duration-300 ease-in-out">
-              {/* Report button for image slides - positioned closer to top edge.
-                  Same stacking-context ceiling as the sign display/slide dots below — portaled
-                  out so it can render above the global header instead of underneath it. */}
+              {/* Report button for image slides. Same stacking-context ceiling
+                  as the sign display/slide dots below — portaled out so it
+                  can render above the global header instead of underneath
+                  it. Aligned to the same top offset as DiscoverTopBar's own
+                  row (DiscoverTopBar.tsx) so the two read as one bar - this
+                  button sits in the reserved slot on its right edge instead
+                  of DiscoverTopBar duplicating report's own logic. */}
               {isActiveTab && slides[currentSlide]?.type === 'image' && createPortal(
                 <div
                   className="fixed right-3 z-[9999]"
                   style={{
-                    // The header is now a real flex sibling of the content area (not an
-                    // overlay the card sits behind), so this only needs to clear the
-                    // header's own real height plus a small breathing gap - not also
-                    // re-adding a safe-area allowance the header already accounts for
-                    // internally, and not the old flat pixel guess from when the card
-                    // rendered directly behind a position: fixed header.
-                    top: 'calc(var(--app-header-height, 72px) + 6px)'
+                    top: 'calc(var(--app-header-height, 72px) + 8px)'
                   }}
                 >
                   <button
@@ -694,33 +699,11 @@ const MatchCard: React.FC<MatchCardProps> = ({
                 document.body
               )}
 
-              {/* Optimized cultural sign glow effect.
-                  Portaled straight to document.body: `discover-container` is `position: fixed`
-                  which — regardless of its own z-index — always establishes its own stacking
-                  context, so no z-index on anything inside it can ever paint above a sibling
-                  like the global header that has an explicit z-index. Portaling out is the only
-                  way for this to actually render above the header. */}
-              {isActiveTab && stableMatch.adinkra_symbols && stableMatch.adinkra_symbols.length > 0 && createPortal(
-                <div
-                  className="fixed left-1/2 transform -translate-x-1/2 z-[9999]"
-                  style={{
-                    // Same reasoning as the report button above - clears the header's
-                    // real height plus a small gap, not a stale pixel guess from when
-                    // the header overlaid the card instead of sitting above it in flow.
-                    top: 'calc(var(--app-header-height, 72px) + 4px)'
-                  }}
-                >
-                  <div className="relative flex flex-col items-center">
-                    <div className="relative w-12 h-12 flex items-center justify-center overflow-visible">
-                      {/* Adinkra Symbol */}
-                      <div className="relative z-10">
-                        <UserAdinkraDisplay adinkraSymbols={stableMatch.adinkra_symbols} />
-                      </div>
-                    </div>
-                  </div>
-                </div>,
-                document.body
-              )}
+              {/* The top-of-card cultural sign badge (all of this profile's signs,
+                  stacked) used to render here via a portal. Removed - the info
+                  area below already surfaces two of their signs as chips
+                  (see signHighlights), so this was a redundant, floating
+                  duplicate of the same information. */}
               {/* ⭐ PHASE 1.8: Use memoized SlideRenderer (40-60% Android render improvement) */}
               <SlideRenderer
                 slide={currentSlideData}
@@ -736,24 +719,24 @@ const MatchCard: React.FC<MatchCardProps> = ({
 
           {/* Slide indicators */}
           {/* Same stacking-context ceiling as the sign display above — portaled out so the
-              slide dots can render above the global header instead of underneath it. */}
+              slide dots can render above the global header instead of underneath it.
+              Sits just below DiscoverTopBar's row, slim (thin bars, no
+              border) and deep pink instead of white/grey. */}
           {isActiveTab && slides && slides.length > 1 && createPortal(
             <div
-              className="fixed left-4 flex space-x-2 z-[9999]"
+              className="fixed left-4 flex space-x-1.5 z-[9999]"
               style={{
-                // Same reasoning as the report button above - clears the header's real
-                // height plus a small gap, not a stale pixel guess.
-                top: 'calc(var(--app-header-height, 72px) + 8px)',
+                top: 'calc(var(--app-header-height, 72px) + 38px)',
                 pointerEvents: 'none'
               }}
             >
               {slides.map((_, index) => (
                 <div
                   key={index}
-                  className={`w-3 h-2 rounded-full transition-all duration-300 ${
+                  className={`h-1 rounded-full transition-all duration-300 ${
                     index === currentSlide
-                      ? 'bg-white shadow-lg border border-pink-300'
-                      : 'bg-white/30 border border-pink-300/80'
+                      ? 'w-4 bg-pink-600'
+                      : 'w-1 bg-pink-600/40'
                   }`}
                 />
               ))}
@@ -785,6 +768,12 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
                     {toTitleCase(match.first_name)} {toTitleCase(match.last_name)}, {calculateAge(match.date_of_birth)}
                   </h2>
+                  {isRecentlyOnline(match.last_login_at, SWIPE_ONLINE_WINDOW_MS) && (
+                    <span
+                      className="w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-black shrink-0"
+                      aria-label={t('chat.activeNow')}
+                    />
+                  )}
                   {showVerifiedBadge && (
                     <img
                       loading="lazy"
@@ -853,7 +842,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                     {stableMatch.bio}
                   </p>
                 ) : (
-                  !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
+                  !showMoreInfo && (previewHighlights.length > 0 || signHighlights.length > 0 || musicHighlight) && (
                     <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
                       {previewHighlights.map((highlight, index) => (
                         <span
@@ -863,11 +852,14 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           {truncateChipLabel(highlight)}
                         </span>
                       ))}
-                      {signHighlight && (
-                        <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-6 h-6 shrink-0">
-                          <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                      {signHighlights.map((sign) => (
+                        <span
+                          key={sign}
+                          className="text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-yellow-400/10 border border-yellow-400/60 px-2 py-0.5 rounded-full truncate max-w-[110px] shrink-0"
+                        >
+                          <UserAdinkraDisplay adinkraSymbols={[sign]} showLabel />
                         </span>
-                      )}
+                      ))}
                       {musicHighlight?.link && (
                         <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
                       )}

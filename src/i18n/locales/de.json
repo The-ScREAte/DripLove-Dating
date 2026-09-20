@@ -253,7 +253,8 @@
       "personality": "Vervollständigen Sie Persönlichkeitsregler",
       "funQuestions": "Beantworten Sie lustige Fragen",
       "interests": "Wählen Sie mindestens 3 Interessen"
-    }
+    },
+    "freeTonight": "Heute Abend frei"
   },
   "discover": {
     "title": "DripCheck",
@@ -407,6 +408,7 @@
     "blockUser": "Benutzer blockieren",
     "deleteForMe": "Für mich löschen",
     "deleteForEveryone": "Für alle löschen",
+    "deleteForAll": "Für alle löschen",
     "reply": "Antworten",
     "activeOnDripLove": "Aktiv auf DripLove",
     "inappropriateLanguage": "Ihre Nachricht enthält unangemessene Sprache. Bitte entfernen Sie sie.",
@@ -637,7 +639,9 @@
   "deleteMessage": {
     "confirmTitle": "Diese Nachricht löschen?",
     "cancel": "Abbrechen",
-    "delete": "Löschen"
+    "delete": "Löschen",
+    "tooOldTitle": "Zu spät, um für alle zu löschen",
+    "tooOldDescription": "Diese Nachricht ist älter als 24 Stunden - du kannst sie aber noch für dich löschen."
   },
   "reportModal": {
     "title": "Bild melden",
@@ -911,5 +915,14 @@
     "Dwennimmen": "Widderhörner. Symbol für Demut zusammen mit Stärke.",
     "Nyame Dua": "Baum Gottes. Symbol für Gottes Gegenwart und Schutz.",
     "Boa Me Na Me Mmoa Wo": "Hilf mir und lass mich dir helfen. Symbol für Zusammenarbeit und gegenseitige Abhängigkeit."
+  },
+  "streak": {
+    "dayCount": "Tag {{count}}",
+    "levelLabel": "Streak-Level {{level}}",
+    "daysToNextLevel_one": "Noch {{count}} Tag bis Level {{level}}",
+    "daysToNextLevel_other": "Noch {{count}} Tage bis Level {{level}}",
+    "levelUpToday": "Komm morgen wieder, um Level {{level}} zu starten",
+    "priorityHint": "Je höher deine Streak, desto mehr wirst du für hochwertige Matches priorisiert.",
+    "continue": "Weiter"
   }
 }

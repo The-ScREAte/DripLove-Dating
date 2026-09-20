@@ -17,6 +17,7 @@ export interface ProfileWithActivity {
   id: string;
   last_login_at?: string | null;
   created_at?: string | null;
+  current_streak?: number | null;
 }
 
 // 72-hour activity window (Tinder's standard)
@@ -75,6 +76,28 @@ function recencyDecayScore(lastActiveStr: string | null | undefined, now: number
   return Math.exp(-hoursSince / RECENCY_DECAY_CONSTANT_HOURS);
 }
 
+// Daily login streak priority (see record_daily_login in
+// supabase/migrations/20260920180000_daily_login_streak.sql and the streak
+// flash UI): every 5 consecutive days is one "streak level" - day 1-5 is
+// level 1, day 6-10 is level 2, and so on. Each level adds a small, capped
+// boost on top of the recency decay score above, so a long streak gives a
+// real edge in ranking without ever letting streak alone override genuine
+// recent activity (the boost is well under the 0-1 decay range, and caps
+// out rather than growing unbounded for very long streaks).
+const STREAK_LEVEL_SIZE = 5;
+const STREAK_BOOST_PER_LEVEL = 0.05;
+const STREAK_BOOST_CAP = 0.35;
+
+export function getStreakLevel(streak: number | null | undefined): number {
+  if (!streak || streak < 1) return 0;
+  return Math.floor((streak - 1) / STREAK_LEVEL_SIZE) + 1;
+}
+
+function streakBoost(streak: number | null | undefined): number {
+  const level = getStreakLevel(streak);
+  return Math.min(STREAK_BOOST_CAP, level * STREAK_BOOST_PER_LEVEL);
+}
+
 /**
  * Reorder profiles by a smooth, exponentially-decaying recency score instead
  * of a binary "active within 72h or not" bucket split. More recently active
@@ -85,7 +108,7 @@ function recencyDecayScore(lastActiveStr: string | null | undefined, now: number
  *
  * This is still a SOFT weighting - no one is removed, just reordered.
  */
-export function applyActivityWeighting<T extends { id: string; last_login_at?: string | null; created_at?: string | null }>(
+export function applyActivityWeighting<T extends { id: string; last_login_at?: string | null; created_at?: string | null; current_streak?: number | null }>(
   profiles: T[],
   seed: string = ''
 ): T[] {
@@ -99,7 +122,8 @@ export function applyActivityWeighting<T extends { id: string; last_login_at?: s
     const lastActiveStr = profile.last_login_at || profile.created_at;
     const decay = recencyDecayScore(lastActiveStr, now);
     const jitter = (jitterRandom() - 0.5) * RECENCY_JITTER_AMPLITUDE;
-    return { profile, rank: decay + jitter };
+    const boost = streakBoost(profile.current_streak);
+    return { profile, rank: decay + jitter + boost };
   });
 
   scored.sort((a, b) => b.rank - a.rank);

@@ -92,6 +92,18 @@ const LifestyleSection = ({ editedProfile, isEditing, onSelectChange, onFamilyPl
             </Select>
           </div>
           <div>
+            <Label htmlFor="free_tonight" className="text-white">{t('profile.freeTonight')}</Label>
+            <Select disabled={!isEditing} onValueChange={(value) => onSelectChange('free_tonight', value)} value={editedProfile.free_tonight}>
+              <SelectTrigger id="free_tonight" className={selectTriggerClass}>
+                <SelectValue placeholder={t('common.select')} />
+              </SelectTrigger>
+              <SelectContent className={selectContentClass}>
+                <SelectItem className={selectItemClass} value="yes">{t('common.yes')}</SelectItem>
+                <SelectItem className={selectItemClass} value="no">{t('common.no')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label className="text-white mb-1.5 block">{t('profile.familyPlans', 'Family plans')}</Label>
             <ChipSelect
               options={FAMILY_PLANS_OPTIONS}

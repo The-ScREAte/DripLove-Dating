@@ -253,7 +253,8 @@
       "personality": "Complétez les curseurs de personnalité",
       "funQuestions": "Répondez aux questions amusantes",
       "interests": "Sélectionnez au moins 3 intérêts"
-    }
+    },
+    "freeTonight": "Libre ce soir"
   },
   "discover": {
     "title": "DripCheck",
@@ -407,6 +408,7 @@
     "blockUser": "Bloquer l'utilisateur",
     "deleteForMe": "Supprimer pour moi",
     "deleteForEveryone": "Supprimer pour tout le monde",
+    "deleteForAll": "Supprimer pour tous",
     "reply": "Répondre",
     "activeOnDripLove": "Actif sur DripLove",
     "inappropriateLanguage": "Votre message contient un langage inapproprié. Veuillez le supprimer.",
@@ -636,7 +638,9 @@
   "deleteMessage": {
     "confirmTitle": "Supprimer ce message ?",
     "cancel": "Annuler",
-    "delete": "Supprimer"
+    "delete": "Supprimer",
+    "tooOldTitle": "Trop tard pour supprimer pour tous",
+    "tooOldDescription": "Ce message a plus de 24 heures - vous pouvez encore le supprimer pour vous seul."
   },
   "reportModal": {
     "title": "Signaler l'image",
@@ -1018,5 +1022,14 @@
     "Dwennimmen": "Cornes de bélier. Symbole d'humilité associée à la force.",
     "Nyame Dua": "Arbre de Dieu. Symbole de la présence et de la protection de Dieu.",
     "Boa Me Na Me Mmoa Wo": "Aide-moi et laisse-moi t'aider. Symbole de coopération et d'interdépendance."
+  },
+  "streak": {
+    "dayCount": "Jour {{count}}",
+    "levelLabel": "Série niveau {{level}}",
+    "daysToNextLevel_one": "Encore {{count}} jour pour le niveau {{level}}",
+    "daysToNextLevel_other": "Encore {{count}} jours pour le niveau {{level}}",
+    "levelUpToday": "Revenez demain pour commencer le niveau {{level}}",
+    "priorityHint": "Plus votre série est longue, plus vous êtes mis en avant pour des rencontres de qualité.",
+    "continue": "Continuer"
   }
 }

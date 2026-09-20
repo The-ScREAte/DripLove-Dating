@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
 import { AdinkraSvgComponents, type AdinkraSymbolName } from '@/components/adinkra/AdinkraSvgs';
 
@@ -8,10 +9,31 @@ const ALL_SYMBOLS = AFRICAN_SYMBOL_GROUPS.flatMap(group => group.symbols);
 const CENTER_ICON_SIZE = 20;
 const SIDE_ICON_SIZE = 14;
 const MAX_VISIBLE = 3;
+const POPUP_WIDTH = 176; // matches w-44 below
+const VIEWPORT_MARGIN = 8;
+const POPUP_GAP = 10; // space between the tapped badge and the popup
 
 interface UserAdinkraDisplayProps {
   adinkraSymbols: string[];
+  // Shows the sign's name next to its icon, matching the other "at a glance"
+  // trait chips (Extrovert, Messy, etc.) instead of an icon-only badge.
+  showLabel?: boolean;
 }
+
+const LABEL_ICON_SIZE = 13;
+
+interface ActiveMeaning {
+  name: string;
+  meaning: string;
+  left: number;
+  tailLeft: number; // horizontal offset of the speech-bubble tail within the popup
+  placement: 'above' | 'below';
+  verticalOffset: number; // top (below) or bottom (above) px, depending on placement
+}
+
+// Rough popup height used only to decide whether there's room above the
+// badge - the box itself sizes to its actual content either way.
+const ESTIMATED_POPUP_HEIGHT = 64;
 
 const normalizeSvgSize = (svg: string, size: number) => {
   // Ensure the rendered SVG fits inside our fixed-size container.
@@ -28,11 +50,40 @@ const normalizeSvgSize = (svg: string, size: number) => {
     });
 };
 
+// The photo card these badges sit on top of (Discover's MatchCard, and the
+// same swipe layout Circle/Liked Me/profile preview all share) tracks
+// swipe-to-like/pass gestures with raw onTouchStart/onTouchMove/onTouchEnd
+// on the whole card, above this component in the tree. Those fire and
+// bubble on ANY touch inside the card, badges included, before a tap ever
+// becomes a click - stopPropagation() on the button's own onClick was never
+// enough, since it only stops the click, not the touch sequence the card
+// already consumed first. Stopping propagation at the touch level itself
+// (below) keeps that touch out of the card's swipe tracking entirely, so
+// the tap resolves into a normal click afterward instead of being
+// swallowed as a (zero-distance) swipe.
+const stopTouchPropagation = (e: React.TouchEvent) => e.stopPropagation();
+
+// Every card that hosts these badges (photo card, profile-preview panel,
+// Circle/Liked Me detail views) clips its own content with overflow-hidden
+// or overflow-y-auto so photos and scroll areas stay within their rounded
+// bounds - and each is also its own transformed/positioned stacking context
+// for the swipe animation. A popup rendered in-place (position: absolute)
+// inherits both problems: it gets clipped by the nearest overflow ancestor,
+// or renders behind other UI even when unclipped, since z-index only ever
+// wins within its own stacking context. Portaling straight to document.body
+// and positioning with fixed coordinates (computed from the tapped badge's
+// own bounding rect) sidesteps every ancestor's overflow/transform entirely,
+// the same fix already used for MessageBubble's context menu.
+const clampPopupLeft = (center: number) => {
+  const raw = center - POPUP_WIDTH / 2;
+  const maxLeft = window.innerWidth - POPUP_WIDTH - VIEWPORT_MARGIN;
+  return Math.max(VIEWPORT_MARGIN, Math.min(raw, maxLeft));
+};
+
 // Shows the user's sign symbols as a small stack — a bigger one in the center flanked by
-// two smaller ones on the sides. Tapping the center symbol opens a meaning popup; tapping
-// a side symbol dismisses it from the stack.
-const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adinkraSymbols }) => {
-  const [activeMeaning, setActiveMeaning] = useState<{ name: string; meaning: string; align: 'left' | 'center' | 'right' } | null>(null);
+// two smaller ones on the sides. Tapping any symbol opens a meaning popup near it.
+const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adinkraSymbols, showLabel = false }) => {
+  const [activeMeaning, setActiveMeaning] = useState<ActiveMeaning | null>(null);
 
   if (!adinkraSymbols || adinkraSymbols.length === 0) {
     return null;
@@ -72,14 +123,31 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
     ) : null
   );
 
+  const openMeaning = (name: string, meaning: string, targetEl: HTMLElement) => {
+    const rect = targetEl.getBoundingClientRect();
+    const badgeCenter = rect.left + rect.width / 2;
+    const left = clampPopupLeft(badgeCenter);
+    const tailLeft = Math.max(12, Math.min(badgeCenter - left - 6, POPUP_WIDTH - 24));
+
+    // Prefer directly above the tapped sign (what "meaning on top of the
+    // sign" means here) - fall back to below only when there's genuinely
+    // not enough room above (e.g. the badge sits right at the top edge).
+    const spaceAbove = rect.top;
+    const placement: 'above' | 'below' =
+      spaceAbove >= ESTIMATED_POPUP_HEIGHT + POPUP_GAP + VIEWPORT_MARGIN ? 'above' : 'below';
+    const verticalOffset = placement === 'above'
+      ? window.innerHeight - rect.top + POPUP_GAP
+      : rect.bottom + POPUP_GAP;
+
+    setActiveMeaning({ name, meaning, left, tailLeft, placement, verticalOffset });
+  };
+
   return (
     <div className="relative">
       <div className="flex items-center gap-3">
         {visibleSymbols.map(({ name, symbol, SvgComponent }, index) => {
           const isCenter = index === centerIndex;
-          const size = isCenter ? CENTER_ICON_SIZE : SIDE_ICON_SIZE;
-          const align: 'left' | 'center' | 'right' =
-            index === 0 ? 'left' : index === visibleSymbols.length - 1 ? 'right' : 'center';
+          const size = showLabel ? LABEL_ICON_SIZE : (isCenter ? CENTER_ICON_SIZE : SIDE_ICON_SIZE);
 
           return (
             <button
@@ -87,10 +155,15 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setActiveMeaning({ name, meaning: symbol?.meaning || '', align });
+                openMeaning(name, symbol?.meaning || '', e.currentTarget);
               }}
-              className="flex items-center justify-center shrink-0 transition-transform duration-150 active:scale-90"
-              style={{
+              onTouchStart={stopTouchPropagation}
+              onTouchMove={stopTouchPropagation}
+              onTouchEnd={stopTouchPropagation}
+              className={`flex items-center shrink-0 transition-transform duration-150 active:scale-90 ${
+                showLabel ? 'gap-1 justify-start' : 'justify-center'
+              }`}
+              style={showLabel ? { zIndex: isCenter ? 2 : 1 } : {
                 width: size,
                 height: size,
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))',
@@ -99,12 +172,13 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
               aria-label={`Show meaning of ${name}`}
             >
               {renderSymbolContent(name, symbol, SvgComponent, size)}
+              {showLabel && <span className="whitespace-nowrap capitalize">{name}</span>}
             </button>
           );
         })}
       </div>
 
-      {activeMeaning && (
+      {activeMeaning && createPortal(
         <>
           {/* Full-viewport tap-catcher — any tap outside the popup itself closes it. A plain
               backdrop like this is far more reliable across touch/mouse/devices than a
@@ -114,38 +188,55 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
             type="button"
             aria-label="Close"
             onClick={() => setActiveMeaning(null)}
-            className="fixed inset-0 z-40"
+            onTouchStart={stopTouchPropagation}
+            onTouchMove={stopTouchPropagation}
+            onTouchEnd={(e) => { e.stopPropagation(); setActiveMeaning(null); }}
+            className="fixed inset-0 z-[9998]"
             style={{ background: 'transparent', border: 'none', padding: 0 }}
           />
           <div
-            className={`absolute top-full mt-2 z-50 flex flex-col ${
-              activeMeaning.align === 'left'
-                ? 'left-0 items-start'
-                : activeMeaning.align === 'right'
-                  ? 'right-0 items-end'
-                  : 'left-1/2 -translate-x-1/2 items-center'
+            className={`fixed z-[9999] flex items-start ${
+              activeMeaning.placement === 'above' ? 'flex-col-reverse' : 'flex-col'
             }`}
+            style={{
+              left: activeMeaning.left,
+              width: POPUP_WIDTH,
+              ...(activeMeaning.placement === 'above'
+                ? { bottom: activeMeaning.verticalOffset }
+                : { top: activeMeaning.verticalOffset }),
+            }}
           >
-            {/* Little speech-bubble tail pointing up at the symbols */}
+            {/* Speech-bubble tail pointing at the tapped symbol - points down
+                when the popup sits above it, up when it sits below. */}
             <div
-              className="w-3 h-3 rotate-45 -mb-1.5"
-              style={{ background: 'rgba(10,10,10,0.85)', borderLeft: '1px solid rgba(236,72,153,0.35)', borderTop: '1px solid rgba(236,72,153,0.35)' }}
+              className={`w-3 h-3 rotate-45 ${activeMeaning.placement === 'above' ? '-mt-1.5' : '-mb-1.5'}`}
+              style={{
+                marginLeft: activeMeaning.tailLeft,
+                background: 'rgba(10,10,10,0.92)',
+                ...(activeMeaning.placement === 'above'
+                  ? { borderRight: '1px solid rgba(236,72,153,0.35)', borderBottom: '1px solid rgba(236,72,153,0.35)' }
+                  : { borderLeft: '1px solid rgba(236,72,153,0.35)', borderTop: '1px solid rgba(236,72,153,0.35)' }),
+              }}
             />
             <div
-              className="relative w-44 rounded-xl backdrop-blur-md border border-pink-500/35 shadow-xl px-1.5 py-1 text-left cursor-pointer"
-              style={{ background: 'rgba(10,10,10,0.85)' }}
+              className="relative w-44 rounded-xl backdrop-blur-md border border-pink-500/35 shadow-xl px-2.5 py-2 text-left cursor-pointer"
+              style={{ background: 'rgba(10,10,10,0.92)' }}
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveMeaning(null);
               }}
+              onTouchStart={stopTouchPropagation}
+              onTouchMove={stopTouchPropagation}
+              onTouchEnd={(e) => { e.stopPropagation(); setActiveMeaning(null); }}
             >
-              <p className="text-[10.5px] leading-snug">
+              <p className="text-[11px] leading-snug">
                 <span className="text-pink-400 font-semibold">{activeMeaning.name}</span>
                 <span className="text-gray-200">: {activeMeaning.meaning}</span>
               </p>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

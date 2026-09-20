@@ -249,7 +249,8 @@
       "personality": "أكمل منزلقات الشخصية",
       "funQuestions": "أجب على الأسئلة الممتعة",
       "interests": "حدد 3 اهتمامات على الأقل"
-    }
+    },
+    "freeTonight": "متفرغ الليلة"
   },
   "discover": {
     "discover": "اكتشف",
@@ -403,6 +404,7 @@
     "blockUser": "حظر المستخدم",
     "deleteForMe": "حذف بالنسبة لي",
     "deleteForEveryone": "حذف للجميع",
+    "deleteForAll": "حذف للجميع",
     "reply": "رد",
     "activeOnDripLove": "نشط على DripLove",
     "inappropriateLanguage": "تحتوي رسالتك على لغة غير لائقة. يرجى إزالتها.",
@@ -633,7 +635,9 @@
   "deleteMessage": {
     "confirmTitle": "حذف هذه الرسالة؟",
     "cancel": "إلغاء",
-    "delete": "حذف"
+    "delete": "حذف",
+    "tooOldTitle": "فات الأوان للحذف للجميع",
+    "tooOldDescription": "هذه الرسالة أقدم من 24 ساعة - لا يزال بإمكانك حذفها بالنسبة لك فقط."
   },
   "reportModal": {
     "title": "الإبلاغ عن الصورة",
@@ -1000,5 +1004,14 @@
     "Dwennimmen": "قرون الكبش. رمز للتواضع مع القوة.",
     "Nyame Dua": "شجرة الله. رمز لحضور الله وحمايته.",
     "Boa Me Na Me Mmoa Wo": "ساعدني ودعني أساعدك. رمز للتعاون والترابط."
+  },
+  "streak": {
+    "dayCount": "اليوم {{count}}",
+    "levelLabel": "مستوى التتابع {{level}}",
+    "daysToNextLevel_one": "يوم واحد متبقٍ للمستوى {{level}}",
+    "daysToNextLevel_other": "{{count}} أيام متبقية للمستوى {{level}}",
+    "levelUpToday": "عد غدًا لبدء المستوى {{level}}",
+    "priorityHint": "كلما زاد تتابعك اليومي، زادت أولويتك للحصول على تطابقات مميزة.",
+    "continue": "متابعة"
   }
 }

@@ -67,6 +67,9 @@ import MatchAnimation from './MatchAnimation';
 import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
 import AdCard from './discover/AdCard';
+import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar';
+import DiscoverFiltersModal from './discover/DiscoverFiltersModal';
+import { hasSignCompatibility } from '@/utils/signCompatibility';
 import RatingFunnel from './RatingFunnel';
 import VerifyIdentityPrompt from './VerifyIdentityPrompt';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
@@ -174,6 +177,7 @@ interface DiscoverPageProps {
   currentUser: CurrentUser;
   onNavigateToChat?: (userId: string) => void;
   onNavigateToProfile?: () => void;
+  onNavigateToProfileSection?: (section: string) => void;
   onNavigateToAdvertise?: () => void;
   onNavigateToVerify?: () => void;
   isPremium?: boolean;
@@ -227,6 +231,7 @@ type ProfileRow = Pick<
   | 'adinkra_symbols'
   | 'created_at'
   | 'last_login_at'
+  | 'current_streak'
   | 'height_cm'
   | 'languages'
   | 'family_plans'
@@ -353,11 +358,25 @@ type WindowWithIntervals = Window & {
   chatMatchesCache?: Map<string, unknown>;
 };
 
-const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNavigateToAdvertise, onNavigateToVerify, isPremium, profileCompletion: parentProfileCompletion, isActiveTab = true }: DiscoverPageProps) => {
+const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNavigateToProfileSection, onNavigateToAdvertise, onNavigateToVerify, isPremium, profileCompletion: parentProfileCompletion, isActiveTab = true }: DiscoverPageProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   
+  // Top filter bar: "Mine" is the existing deck below, unchanged. "Double
+  // Date" is a placeholder for now (a "coming soon" overlay instead of doing
+  // nothing on tap). "Sign Match" is the same deck, same fetch/cache/image
+  // pipeline, narrowed to people who share at least one of the viewer's own
+  // signs (see filterBySignCompatibility below) - read via a ref (not the
+  // state var directly) from inside fetchPotentialMatches/loadMoreMatches so
+  // those don't need discoverCategory added to their own already-long
+  // useCallback dependency arrays just to avoid a stale closure.
+  const [discoverCategory, setDiscoverCategory] = useState<DiscoverCategory>('mine');
+  const discoverCategoryRef = useRef(discoverCategory);
+  useEffect(() => {
+    discoverCategoryRef.current = discoverCategory;
+  }, [discoverCategory]);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<MatchOrAd[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageIndex, setImageIndex] = useState(0);
@@ -372,8 +391,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   useEffect(() => {
     potentialMatchesRef.current = potentialMatches;
   }, [potentialMatches]);
+  // Mirrors currentIndex - read by the category-switch effect below to
+  // snapshot exactly where the viewer was in the deck being left, without
+  // needing currentIndex itself in that effect's dependency array (which
+  // would re-run it on every swipe, not just an actual tab change).
+  const currentIndexRef = useRef(0);
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
   const [noMoreProfiles, setNoMoreProfiles] = useState(false); // Track when truly no more profiles available
+  const noMoreProfilesRef = useRef(false);
+  useEffect(() => {
+    noMoreProfilesRef.current = noMoreProfiles;
+  }, [noMoreProfiles]);
   const [emptyStateMode, setEmptyStateMode] = useState<'exhausted' | 'transient-error'>('exhausted');
+  const emptyStateModeRef = useRef<'exhausted' | 'transient-error'>('exhausted');
+  useEffect(() => {
+    emptyStateModeRef.current = emptyStateMode;
+  }, [emptyStateMode]);
 
   // Premium-only: avoid showing the empty card when the local pool ends.
   // We auto-retry once; only show the empty card if that retry also yields nothing.
@@ -2424,6 +2459,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     []
   );
 
+  // Sign Match reuses fetchPotentialMatchesData exactly as-is - same query,
+  // same gender/age/distance/country preferences, same everything - and
+  // just narrows the RESULT to people compatible with at least one of the
+  // viewer's own signs, per the curated cross-cultural compatibility graph
+  // (src/constants/signCompatibility.ts) - not just an identical sign, e.g.
+  // a Gye Nyame is compatible with an Ankh even though they're different
+  // signs. Ads always pass through untouched. If the viewer hasn't set any
+  // signs of their own there's nothing to match against, so this is a no-op
+  // rather than filtering everyone out.
+  const filterBySignCompatibility = useCallback((list: MatchOrAd[], mySigns: string[]): MatchOrAd[] => {
+    if (mySigns.length === 0) return list;
+    return list.filter((item) => {
+      if (isAd(item)) return true;
+      const theirSigns = (item as PotentialMatch).adinkra_symbols;
+      return !!theirSigns && hasSignCompatibility(mySigns, theirSigns);
+    });
+  }, []);
+
   const fetchPotentialMatches = useCallback(async (opts?: { background?: boolean; cacheKey?: string }) => {
 
     if (!currentUser?.id) return;
@@ -2445,21 +2498,56 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       setNoMoreProfiles(false); // Reset when fetching new profiles
       setEmptyStateMode('exhausted');
 
-      const result = await Promise.race([
+      let result = await Promise.race([
         fetchPotentialMatchesData(currentUser.id, allowedGenders),
         new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error('Discover fetch timed out')), 25000);
         }),
       ]);
-      
+
+      // Sign Match narrows a random base-query batch down to only
+      // compatible people (see filterBySignCompatibility) - with a fairly
+      // selective compatibility graph, a single batch can easily happen to
+      // contain zero compatible people even when plenty exist overall
+      // (get_random_discover_profiles samples fresh each call, so retrying
+      // explores a different slice of the pool). Without retrying here, the
+      // very first unlucky batch permanently showed "no sign matches" for
+      // the rest of the session once combined with the category snapshot
+      // cache below. Only retry when the RAW batch wasn't empty - a truly
+      // empty raw batch means the base query itself is exhausted, which no
+      // amount of retrying will fix.
+      if (discoverCategoryRef.current === 'signMatch' && result) {
+        const mySigns = currentUser?.adinkra_symbols || [];
+        let attempts = 0;
+        while (
+          attempts < 3 &&
+          result.matches.length > 0 &&
+          filterBySignCompatibility(result.matches, mySigns).length === 0
+        ) {
+          attempts += 1;
+          const retry = await Promise.race([
+            fetchPotentialMatchesData(currentUser.id, allowedGenders),
+            new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Discover fetch timed out')), 25000);
+            }),
+          ]).catch(() => null);
+          if (!retry) break;
+          result = retry;
+        }
+      }
+
       if (result) {
         if (fetchSeq !== fetchSequenceRef.current) {
           // Discard stale fetch results
           return;
         }
         const { matches, images, distances, index, asyncActivityDeck } = result;
-        
-        const matchesWithAds = injectAds(matches);
+
+        const signFilteredMatches = discoverCategoryRef.current === 'signMatch'
+          ? filterBySignCompatibility(matches, currentUser?.adinkra_symbols || [])
+          : matches;
+
+        const matchesWithAds = injectAds(signFilteredMatches);
 
         // IMPORTANT: Maintain the invariant that the current card is always at index 0.
         // If we restore a resume index, trim the deck so we don't keep earlier cards around
@@ -2594,7 +2682,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       setHasCompletedInitialFetch(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages]);
+  }, [currentUser, allowedGenders, toast, fetchPotentialMatchesData, injectAds, batchFetchLanguages, filterBySignCompatibility]);
 
   // ⭐ SMART BACKGROUND LOADING: Preload more profiles when user is idle
   // ⭐ ANDROID FIX: Limited idle loading on Android (20 profiles max) to balance UX and performance
@@ -3505,6 +3593,86 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     readLastCardImagesCache,
   ]);
 
+  // Switching the top bar's category swaps to that category's own deck.
+  // Each category's deck (cards, index, and whether it's still loading/
+  // empty) is snapshotted here the moment you leave it, so switching back
+  // restores it instantly from memory instead of clearing to empty and
+  // re-fetching - that re-fetch was the actual cause of the "no profiles"
+  // flash reported when switching back to an already-loaded tab: clearing
+  // potentialMatches to [] made the empty-state screen below render for the
+  // ~1s round trip before the fresh fetch landed, even though the exact same
+  // deck was sitting right there a moment earlier. A category never visited
+  // yet this session still falls through to a real fetch, same as before.
+  const categoryDeckSnapshotsRef = useRef<Partial<Record<DiscoverCategory, {
+    matches: MatchOrAd[];
+    index: number;
+    hasCompletedInitialFetch: boolean;
+    noMoreProfiles: boolean;
+    emptyStateMode: 'exhausted' | 'transient-error';
+  }>>>({});
+  const previousCategoryRef = useRef<DiscoverCategory>(discoverCategory);
+  const isFirstCategoryRenderRef = useRef(true);
+  useEffect(() => {
+    if (isFirstCategoryRenderRef.current) {
+      isFirstCategoryRenderRef.current = false;
+      previousCategoryRef.current = discoverCategory;
+      return;
+    }
+    if (!currentUser?.id) return;
+
+    // Snapshot the deck being left, exactly as it stands right now.
+    categoryDeckSnapshotsRef.current[previousCategoryRef.current] = {
+      matches: potentialMatchesRef.current,
+      index: currentIndexRef.current,
+      hasCompletedInitialFetch: hasCompletedInitialFetchRef.current,
+      noMoreProfiles: noMoreProfilesRef.current,
+      emptyStateMode: emptyStateModeRef.current,
+    };
+    previousCategoryRef.current = discoverCategory;
+
+    const snapshot = categoryDeckSnapshotsRef.current[discoverCategory];
+    if (snapshot) {
+      // Already fetched this session - restore instantly, no flash.
+      setPotentialMatches(snapshot.matches);
+      setCurrentIndex(snapshot.index);
+      setHasCompletedInitialFetch(snapshot.hasCompletedInitialFetch);
+      setNoMoreProfiles(snapshot.noMoreProfiles);
+      setEmptyStateMode(snapshot.emptyStateMode);
+
+      // Self-heal a stale "no matches" Sign Match snapshot: compatibility
+      // filtering narrows a random batch down hard, so an earlier visit
+      // this session can easily have landed on an unlucky empty sample even
+      // though compatible people exist - without this, that one bad sample
+      // stayed cached as "exhausted" for the rest of the session no matter
+      // how many times the tab was revisited. Runs silently in the
+      // background (no loading flash) and only replaces the deck if it
+      // actually finds real matches.
+      if (discoverCategory === 'signMatch' && snapshot.matches.length === 0) {
+        void fetchPotentialMatches({ background: true });
+      }
+      return;
+    }
+
+    // First time visiting this category this session - genuinely nothing to
+    // restore, so this (and only this) case still clears and fetches fresh.
+    // isLoading must go back to true here too: with hasCompletedInitialFetch
+    // and potentialMatches both cleared but isLoading left at its old
+    // (false) value, NONE of the three loading/empty-state guards below
+    // matched, so the component fell through to the main deck render with
+    // an empty array - currentMatch came out undefined and reading any
+    // property off it (first_name, date_of_birth, ...) threw, which is
+    // exactly the crash hit switching to a category for the first time
+    // (Sign Match, almost always a first visit).
+    setPotentialMatches([]);
+    setCurrentIndex(0);
+    setNoMoreProfiles(false);
+    setEmptyStateMode('exhausted');
+    setHasCompletedInitialFetch(false);
+    setIsLoading(true);
+    void fetchPotentialMatches({ background: false });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discoverCategory]);
+
 
   // Cleanup on unmount (minimal now that continuous loader is removed)
   useEffect(() => {
@@ -3818,7 +3986,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true });
       if (!result) return;
 
-      const { matches, images, distances } = result;
+      const { images, distances } = result;
+      // Same sign-compatibility narrowing fetchPotentialMatches applies to
+      // the initial/foreground fetch (see filterBySignCompatibility) -
+      // without this, a background refill while swiping through Sign Match
+      // would silently mix incompatible profiles back into the deck.
+      const matches = discoverCategoryRef.current === 'signMatch'
+        ? filterBySignCompatibility(result.matches, currentUser?.adinkra_symbols || [])
+        : result.matches;
 
       // BUG FIX: this is called proactively while the user still has real
       // cards on screen (both the "≤25/14 remaining" effect below and the
@@ -3864,15 +4039,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       let refillChunk = newProfiles.slice(0, refillChunkSize);
 
       if (refillChunk.length === 0) {
-        // Duplicate-heavy result set: retry once immediately to avoid a confusing no-op.
-        const retryResult = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true });
-        if (!retryResult || retryResult.matches.length === 0) {
-          setEmptyStateMode('exhausted');
-          return;
-        }
+        // Duplicate-heavy (or, for Sign Match, compatibility-filtered-to-zero)
+        // result set: retry with fresh random batches instead of giving up
+        // immediately. Sign Match gets a few extra attempts since a single
+        // batch can easily land zero compatible people by chance even when
+        // plenty exist overall - non-sign-match keeps the original single
+        // retry, which was already enough for the plain duplicate case.
+        const isSignMatch = discoverCategoryRef.current === 'signMatch';
+        const maxRetries = isSignMatch ? 3 : 1;
+        let retryAttempt = 0;
+        while (retryAttempt < maxRetries && refillChunk.length === 0) {
+          retryAttempt += 1;
+          const retryResult = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true }).catch(() => null);
+          const retryMatches = retryResult && isSignMatch
+            ? filterBySignCompatibility(retryResult.matches, currentUser?.adinkra_symbols || [])
+            : retryResult?.matches;
+          if (!retryMatches || retryMatches.length === 0) continue;
 
-        const retryNewProfiles = retryResult.matches.filter((m) => !existingProfileIds.has(m.id));
-        refillChunk = retryNewProfiles.slice(0, refillChunkSize);
+          const retryNewProfiles = retryMatches.filter((m) => !existingProfileIds.has(m.id));
+          refillChunk = retryNewProfiles.slice(0, refillChunkSize);
+        }
 
         if (refillChunk.length === 0) {
           setEmptyStateMode('exhausted');
@@ -3927,6 +4113,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     batchFetchLanguages,
     premiumTrulyEmptyAfterRetry,
     fetchPotentialMatchesData,
+    filterBySignCompatibility,
   ]);
 
   const lastAutoRefillAttemptAtRef = useRef<number>(0);
@@ -5567,16 +5754,46 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     );
   }
 
+  // Rendered identically ahead of every return below (loading, loading-more,
+  // empty state) so the category bar - and with it the only way to switch
+  // off an empty tab - is never lost no matter which of these states
+  // Discover is currently in. The main deck render further down already has
+  // its own copy inside discover-container; exactly one of these ever
+  // mounts per render, so there's never a duplicate.
+  const topBar = (
+    <>
+      <DiscoverTopBar
+        isActiveTab={isActiveTab}
+        activeCategory={discoverCategory}
+        onCategoryChange={setDiscoverCategory}
+        onFilterClick={() => setShowFiltersModal(true)}
+      />
+      {currentUser && (
+        <DiscoverFiltersModal
+          isOpen={showFiltersModal}
+          onClose={() => setShowFiltersModal(false)}
+          currentUser={currentUser}
+          isPremium={premiumActive}
+          onUpgradeClick={() => setShowPremiumUpgrade(true)}
+          onNavigateToProfileSection={onNavigateToProfileSection}
+        />
+      )}
+    </>
+  );
+
   // Show loading state ONLY while initial fetch is in progress AND we have no profiles
   if (!hasCompletedInitialFetch && potentialMatches.length === 0 && isLoading) {
     return (
-      <div className="h-full w-full flex items-center justify-center overflow-y-auto">
-        <div className="flex flex-col items-center">
-          <div className="mb-4">
-            <HoppingLogo size={80} />
+      <>
+        {topBar}
+        <div className="h-full w-full flex items-center justify-center overflow-y-auto">
+          <div className="flex flex-col items-center">
+            <div className="mb-4">
+              <HoppingLogo size={80} />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -5587,13 +5804,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // where the empty screen would flash before the refill silently lands a moment later.
   if (potentialMatches.length === 0 && hasCompletedInitialFetch && isLoadingMore) {
     return (
-      <div className="h-full w-full flex items-center justify-center overflow-y-auto">
-        <div className="flex flex-col items-center">
-          <div className="mb-4">
-            <HoppingLogo size={80} />
+      <>
+        {topBar}
+        <div className="h-full w-full flex items-center justify-center overflow-y-auto">
+          <div className="flex flex-col items-center">
+            <div className="mb-4">
+              <HoppingLogo size={80} />
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -5602,15 +5822,21 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   if (potentialMatches.length === 0 && hasCompletedInitialFetch) {
     const emptyTitle = emptyStateMode === 'transient-error'
       ? 'Refresh didn\'t work'
-      : t('discover.noMoreProfiles');
+      : discoverCategory === 'signMatch'
+        ? 'No sign matches right now'
+        : t('discover.noMoreProfiles');
 
     const emptyDescription = emptyStateMode === 'transient-error'
       ? 'We hit a quick connection issue. Tap refresh to retry.'
-      : t('discover.noProfilesDescription');
+      : discoverCategory === 'signMatch'
+        ? 'No profiles available now for your sign compatibility. Check back soon, or switch to For Me.'
+        : t('discover.noProfilesDescription');
 
     // Show empty state - user can manually refresh
     // Background loading will continue silently without showing spinner
     return (
+      <>
+      {topBar}
       <div className="h-full w-full flex items-center justify-center overflow-y-auto">
         <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
           <CardContent className="p-6 text-center flex flex-col items-center">
@@ -5670,6 +5896,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           </CardContent>
         </Card>
       </div>
+      </>
+    );
+  }
+
+  // Defensive catch-all: every render path below this point assumes
+  // potentialMatches[currentIndex] exists (currentMatch.first_name,
+  // .date_of_birth, etc. are read unconditionally, with no optional
+  // chaining) - the three guards above are meant to be exhaustive for every
+  // way the deck can be empty, but this is what actually stood between an
+  // empty deck and a hard crash. It's what was missing when switching to a
+  // category for the first time (Sign Match): the state reset cleared
+  // potentialMatches and hasCompletedInitialFetch together without also
+  // setting isLoading back to true, so none of the three guards above
+  // matched for a moment and the empty deck fell all the way through to
+  // here. Kept as a safety net even now that the actual reset is fixed, so
+  // the same gap can't reintroduce a crash again.
+  if (potentialMatches.length === 0) {
+    return (
+      <>
+        {topBar}
+        <div className="h-full w-full flex items-center justify-center overflow-y-auto">
+          <div className="flex flex-col items-center">
+            <div className="mb-4">
+              <HoppingLogo size={80} />
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -5742,6 +5996,51 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
              WebkitUserSelect: 'none',
              WebkitTouchCallout: 'none'
            }}>
+
+      {/* For You / Double Date / Astrology + filters - portaled, see
+          DiscoverTopBar for why. Pushes MatchCard's own slide dots down to
+          clear it (see the top offset on those dots in MatchCard.tsx). */}
+      <DiscoverTopBar
+        isActiveTab={isActiveTab}
+        activeCategory={discoverCategory}
+        onCategoryChange={setDiscoverCategory}
+        onFilterClick={() => setShowFiltersModal(true)}
+      />
+      {currentUser && (
+        <DiscoverFiltersModal
+          isOpen={showFiltersModal}
+          onClose={() => setShowFiltersModal(false)}
+          currentUser={currentUser}
+          isPremium={premiumActive}
+          onUpgradeClick={() => setShowPremiumUpgrade(true)}
+          onNavigateToProfileSection={onNavigateToProfileSection}
+        />
+      )}
+
+      {/* Double Date / Astrology are placeholders for now - a "coming soon"
+          cover instead of the real deck, rather than the tap silently doing
+          nothing. Plain overlay (not portaled): only needs to sit above the
+          card within discover-container, not above the global header. */}
+      {/* Only Double Date is still a placeholder - Sign Match is a real,
+          working filter on the same deck (see filterBySignCompatibility),
+          so it must NOT be covered by this "coming soon" overlay. This used
+          to read `discoverCategory !== 'mine'`, which caught signMatch too
+          and silently hid the real filtered deck behind this screen
+          whenever it had any results. */}
+      {discoverCategory === 'doubleDate' && (
+        <div className="absolute inset-0 z-[400] flex flex-col items-center justify-center gap-3 bg-black px-8 text-center">
+          <span className="text-4xl">👯</span>
+          <h3 className="text-lg font-bold text-white">Double Date</h3>
+          <p className="text-sm text-gray-400 max-w-xs">Coming soon.</p>
+          <button
+            type="button"
+            onClick={() => setDiscoverCategory('mine')}
+            className="mt-2 px-4 py-2 rounded-full bg-pink-500 hover:bg-pink-600 text-white text-sm font-semibold transition-colors"
+          >
+            Back to For Me
+          </button>
+        </div>
+      )}
 
       {/* --- Swipe Guide Popup for New Users --- */}
       {swipeGuideOverlay}

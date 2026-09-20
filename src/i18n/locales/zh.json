@@ -249,7 +249,8 @@
       "personality": "完成性格滑块",
       "funQuestions": "回答趣味问题",
       "interests": "至少选择3个兴趣"
-    }
+    },
+    "freeTonight": "今晚有空"
   },
   "discover": {
     "discover": "发现",
@@ -403,6 +404,7 @@
     "blockUser": "屏蔽用户",
     "deleteForMe": "为我删除",
     "deleteForEveryone": "为所有人删除",
+    "deleteForAll": "为所有人删除",
     "reply": "回复",
     "activeOnDripLove": "在DripLove上活跃",
     "inappropriateLanguage": "您的消息包含不当语言。请删除它。",
@@ -633,7 +635,9 @@
   "deleteMessage": {
     "confirmTitle": "删除此消息？",
     "cancel": "取消",
-    "delete": "删除"
+    "delete": "删除",
+    "tooOldTitle": "已超过可为所有人删除的时限",
+    "tooOldDescription": "这条消息发送已超过24小时，你仍可以仅为自己删除它。"
   },
   "reportModal": {
     "title": "举报图片",
@@ -1000,5 +1004,13 @@
     "Dwennimmen": "公羊角。谦逊与力量的象征。",
     "Nyame Dua": "神之树。上帝的存在和保护的象征。",
     "Boa Me Na Me Mmoa Wo": "帮助我，让我帮助你。合作和相互依存的象征。"
+  },
+  "streak": {
+    "dayCount": "第 {{count}} 天",
+    "levelLabel": "连续登录等级 {{level}}",
+    "daysToNextLevel_other": "还需 {{count}} 天升到等级 {{level}}",
+    "levelUpToday": "明天登录即可开启等级 {{level}}",
+    "priorityHint": "连续登录天数越多，越能获得优质匹配的优先展示。",
+    "continue": "继续"
   }
 }

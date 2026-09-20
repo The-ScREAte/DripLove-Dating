@@ -23,7 +23,7 @@ import { PotentialMatch } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
-import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32 } from '../discover/MatchCardHelpers';
+import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32, seededShuffle } from '../discover/MatchCardHelpers';
 import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
 import {
   FAMILY_PLANS_OPTIONS,
@@ -223,13 +223,20 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
     () => getPreviewHighlights(profile, currentSlide),
     [profile, currentSlide]
   );
-  // Cycles through ALL of this profile's signs (not just the first) as the
-  // viewer taps through photos, mirroring MatchCard's rotation.
-  const signHighlight = useMemo(() => {
+  // Two of this profile's signs, shuffled with a per-profile seed so which
+  // ones lead feels random without reshuffling on every render, and still
+  // cycling which two lead as the viewer taps through photos - mirrors
+  // MatchCard's signHighlights (this used to also duplicate as a floating
+  // badge above the photo, now removed).
+  const signHighlights = useMemo(() => {
     const theirs = profile.adinkra_symbols;
-    if (!theirs || theirs.length === 0) return null;
-    return theirs[currentSlide % theirs.length];
-  }, [profile.adinkra_symbols, currentSlide]);
+    if (!theirs || theirs.length === 0) return [];
+    const rand = mulberry32(seedFromString(`${profile.id || profile.first_name || ''}_signhighlight`));
+    const ordered = seededShuffle(theirs, rand);
+    if (ordered.length === 1) return [ordered[0]];
+    const start = currentSlide % ordered.length;
+    return [ordered[start], ordered[(start + 1) % ordered.length]];
+  }, [profile.adinkra_symbols, profile.id, profile.first_name, currentSlide]);
   // Up to 2 of this profile's photos that have a caption set (ImageManagement.tsx),
   // picked once via a seeded shuffle so the same 1-2 photos surface consistently
   // rather than a different random pick every render.
@@ -750,19 +757,10 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           </div>
         )}
 
-        {/* Cultural sign - same centered glow treatment as Discover's MatchCard.
-            No portal needed here: unlike the swipe card, this photo area isn't
-            inside a `position: fixed` ancestor, so a plain absolute overlay
-            already paints above everything else on the page. */}
-        {profile.adinkra_symbols && profile.adinkra_symbols.length > 0 && (
-          <div className="absolute left-1/2 -translate-x-1/2 z-10 flex flex-col items-center" style={{ top: '10px' }}>
-            <div className="relative w-16 h-16 flex items-center justify-center overflow-visible">
-              <div className="relative z-10">
-                <UserAdinkraDisplay adinkraSymbols={profile.adinkra_symbols} />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* The top-of-photo cultural sign badge (all of this profile's signs)
+            used to render here. Removed - the info area below already
+            surfaces two of their signs as chips (see signHighlights), so
+            this was a redundant, floating duplicate of the same info. */}
 
         {/* Crop - top right, same row as the slide dots/sign. Only for photo
             slides (there's nothing to crop on a bio/fact slide). Edits the
@@ -1024,7 +1022,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                   {profile.bio}
                 </p>
               ) : (
-                !showMoreInfo && (previewHighlights.length > 0 || signHighlight || musicHighlight) && (
+                !showMoreInfo && (previewHighlights.length > 0 || signHighlights.length > 0 || musicHighlight) && (
                   <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
                     {previewHighlights.map((highlight, index) => (
                       <span
@@ -1034,11 +1032,14 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                         {truncateChipLabel(highlight)}
                       </span>
                     ))}
-                    {signHighlight && (
-                      <span className="flex items-center justify-center bg-yellow-400/10 border border-yellow-400/60 rounded-full w-8 h-8 shrink-0">
-                        <UserAdinkraDisplay adinkraSymbols={[signHighlight]} />
+                    {signHighlights.map((sign) => (
+                      <span
+                        key={sign}
+                        className="text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-yellow-400/10 border border-yellow-400/60 px-2 py-0.5 rounded-full truncate max-w-[110px] shrink-0"
+                      >
+                        <UserAdinkraDisplay adinkraSymbols={[sign]} showLabel />
                       </span>
-                    )}
+                    ))}
                     {musicHighlight?.link && (
                       <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
                     )}
