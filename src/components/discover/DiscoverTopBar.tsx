@@ -72,9 +72,9 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
           type="button"
           onClick={onFilterClick}
           aria-label="Discover filters"
-          className="shrink-0 w-7 h-7 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
+          className="shrink-0 w-8 h-8 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
         >
-          <SlidersHorizontal className="w-[17px] h-[17px]" />
+          <SlidersHorizontal className="w-[20px] h-[20px]" />
         </button>
 
         {/* Only this middle strip scrolls horizontally (for whenever more
@@ -108,7 +108,7 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
             is the exact size of MatchCard's report button (24x24, see
             .reportButton in MatchCard.module.css), which visually occupies
             this slot at the same top offset. */}
-        <div className="w-7 h-7 shrink-0" aria-hidden="true" />
+        <div className="w-8 h-8 shrink-0" aria-hidden="true" />
       </div>
     </div>,
     document.body

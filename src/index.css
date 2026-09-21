@@ -646,8 +646,11 @@ body.keyboard-open .chat-messages-container {
     border-top-color: rgba(236, 72, 153, 0.45);
   }
   .discover-filters-compact > button:has(.lucide-x) {
-    top: 0.625rem;
+    top: 0.375rem;
     color: rgb(236 72 153);
+  }
+  .discover-filters-compact > button:has(.lucide-x) .lucide-x {
+    stroke-width: 3.5;
   }
 
   /* ✅ Improve text readability on mobile */
