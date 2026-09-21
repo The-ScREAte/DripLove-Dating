@@ -98,12 +98,12 @@ const MatchAnimation = ({
         }}
       >
         <CardContent className="p-6 text-center">
-          <div className="mb-4">
-            <div className="flex justify-center items-center gap-3">
+          <div className="mb-3">
+            <div className="flex justify-center items-center gap-1.5">
               {/* Central hearts - lightweight and only transform/opacity */}
-              <Heart className="w-10 h-10 text-pink-400" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
+              <Heart className="w-[34px] h-[34px] text-pink-400" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
               <Heart className="w-14 h-14 text-red-500 animate-pulse-slow" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
-              <Heart className="w-10 h-10 text-pink-400" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
+              <Heart className="w-[34px] h-[34px] text-pink-400" style={{ transformOrigin: 'center', willChange: 'transform, opacity' }} />
             </div>
 
             {/* Floating hearts (reduced count) - CSS keyframes only animate transform & opacity */}
@@ -120,16 +120,16 @@ const MatchAnimation = ({
             </div>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-3">
             <h1 className="text-2xl font-bold text-pink-400 mb-1">{t('match.itsAMatch')}</h1>
-            <p className="text-gray-300 text-base">
+            <p className="text-gray-300 text-base leading-snug px-1">
               {t('match.youAndLikedEachOther', { name: matchedUserName })}
             </p>
           </div>
 
           {imgSrc && (
             <div className="mb-4 flex justify-center">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-500/40 shadow-sm" style={{ willChange: 'transform, opacity' }}>
+              <div className="w-[88px] h-[88px] rounded-full overflow-hidden border-4 border-pink-500/40 shadow-sm" style={{ willChange: 'transform, opacity' }}>
                 <img src={getDetailImageUrl(imgSrc)} alt={matchedUserName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
               </div>
             </div>
@@ -138,11 +138,14 @@ const MatchAnimation = ({
           <div className="space-y-3">
             <Button
               onClick={handleStartChat}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold py-3"
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-base py-3"
             >
-              <MessageCircle className="w-5 h-5 mr-2 inline-block" /> {t('match.startChatting')}
+              <span className="flex items-center justify-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                {t('match.startChatting')}
+              </span>
             </Button>
-            <Button onClick={handleClose} variant="outline" className="w-full bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
+            <Button onClick={handleClose} variant="outline" className="w-full bg-transparent border border-pink-500/25 text-gray-300 text-sm font-normal hover:bg-neutral-800 hover:text-white">
               {t('match.keepSwiping')}
             </Button>
           </div>
