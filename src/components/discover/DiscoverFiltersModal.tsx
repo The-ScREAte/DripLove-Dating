@@ -126,8 +126,9 @@ const DiscoverFiltersModal: React.FC<DiscoverFiltersModalProps> = ({
         // A plain vh percentage doesn't account for the status bar/notch, so
         // on some devices the sheet could still stretch right up under it.
         // This instead always leaves a fixed gap below the safe area, the
-        // same margin on every device regardless of screen height or notch.
-        style={{ maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 56px)' }}
+        // same margin on every device regardless of screen height or notch -
+        // 150px so there's still real breathing room on short screens too.
+        style={{ maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 150px)' }}
       >
         <SheetHeader className="text-left mb-1.5">
           <SheetTitle className="text-white text-base">Discover Filters</SheetTitle>
