@@ -1,16 +1,24 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Crown, Heart, RotateCcw, Users, Check, AlertCircle, ArrowLeft, Globe } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, AlertCircle, ArrowLeft, Globe, Circle, SlidersHorizontal, X as XIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import HoppingLogo from '@/components/HoppingLogo';
 
+// Kept in sync with the real feature list on PremiumUpgrade.tsx (premium.features.*
+// in the locale files) - this screen used to promise a shorter, slightly different
+// list than what Premium actually includes (Circle Up, Filtered Search and Ad
+// Frequency were missing entirely).
 const premiumFeatures = [
   { name: 'Unlimited Daily Swipes', icon: Heart },
   { name: 'Reverse Dislikes', icon: RotateCcw },
   { name: 'See All Who Liked You', icon: Users },
-  { name: 'Unlock Global Matches', icon: Globe },
+  { name: 'Unlock Countries', icon: Globe },
+  { name: 'Circle Up', icon: Circle },
+  { name: 'Filtered Search', icon: SlidersHorizontal },
+  { name: 'Fewer Ads', icon: XIcon },
   { name: 'Priority Support', icon: Crown },
   { name: 'All future premium features included!', icon: Check },
 ];
@@ -403,6 +411,23 @@ const PaymentSuccess: React.FC = () => {
     );
   }
 
+  // Show a clear "we're checking this" state while waitForPremiumActivation
+  // polls in the background (up to 25s) - the success card used to render
+  // immediately with just a small pulsing text line for this, easy to miss,
+  // which is why a real activation that just took a few seconds looked
+  // exactly like it had silently failed.
+  if (upgrading && !upgradeSuccess) {
+    return (
+      <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
+          <HoppingLogo size={72} className="mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-1.5">Confirming your payment...</h1>
+          <p className="text-sm text-gray-600">This usually takes just a few seconds.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show success state
   return (
   <div className="min-h-fill flex flex-col items-center justify-center bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 p-3">
@@ -420,7 +445,6 @@ const PaymentSuccess: React.FC = () => {
             </li>
           ))}
         </ul>
-        {upgrading && <div className="mb-2 text-xs text-pink-600 font-semibold animate-pulse">Activating premium...</div>}
         {error && <div className="mb-2 text-xs text-red-600 font-semibold animate-shake">{error}</div>}
         <Button
           className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-2 px-4 rounded-full text-sm shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-1"
