@@ -6,7 +6,8 @@
     "daysToNextLevel_other": "Faltan {{count}} días para el nivel {{level}}",
     "levelUpToday": "Vuelve mañana para empezar el nivel {{level}}",
     "priorityHint": "Cuanto mayor sea tu racha, más prioridad tendrás para encontrar coincidencias de calidad.",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "levelComplete": "🎉 ¡Nivel {{level}} completado!"
   },
   "profile": {
     "freeTonight": "Libre esta noche"

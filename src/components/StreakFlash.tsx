@@ -84,10 +84,10 @@ const StreakFlash: React.FC<StreakFlashProps> = ({ currentStreak, onClose }) => 
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-white mb-1.5">
+          <h1 className="text-2xl font-bold text-white mb-1">
             {t('streak.dayCount', { count: currentStreak })}
           </h1>
-          <div className="inline-block px-3 py-1 rounded-full bg-pink-500/15 border border-pink-500/40 text-pink-400 text-base font-semibold mb-4">
+          <div className="inline-block px-3 py-1 rounded-full bg-pink-500/15 border border-pink-500/40 text-pink-400 text-sm font-semibold mb-4">
             {t('streak.levelLabel', { level })}
           </div>
 
@@ -102,11 +102,20 @@ const StreakFlash: React.FC<StreakFlashProps> = ({ currentStreak, onClose }) => 
             ))}
           </div>
 
-          <p className="text-gray-300 text-base mb-3">
-            {daysToNextLevel > 0
-              ? t('streak.daysToNextLevel', { count: daysToNextLevel, level: level + 1 })
-              : t('streak.levelUpToday', { level: level + 1 })}
-          </p>
+          {daysToNextLevel > 0 ? (
+            <p className="text-gray-300 text-sm mb-3">
+              {t('streak.daysToNextLevel', { count: daysToNextLevel, level: level + 1 })}
+            </p>
+          ) : (
+            <>
+              <p className="text-pink-400 font-bold text-base mb-1">
+                {t('streak.levelComplete', { level })}
+              </p>
+              <p className="text-gray-300 text-sm mb-3">
+                {t('streak.levelUpToday', { level: level + 1 })}
+              </p>
+            </>
+          )}
 
           <p className="text-gray-300 text-sm">{t('streak.priorityHint')}</p>
         </CardContent>

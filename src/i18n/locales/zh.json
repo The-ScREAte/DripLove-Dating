@@ -1011,6 +1011,7 @@
     "daysToNextLevel_other": "还需 {{count}} 天升到等级 {{level}}",
     "levelUpToday": "明天登录即可开启等级 {{level}}",
     "priorityHint": "连续登录天数越多，越能获得优质匹配的优先展示。",
-    "continue": "继续"
+    "continue": "继续",
+    "levelComplete": "🎉 等级 {{level}} 完成！"
   }
 }

@@ -1012,6 +1012,7 @@
     "daysToNextLevel_other": "{{count}} أيام متبقية للمستوى {{level}}",
     "levelUpToday": "عد غدًا لبدء المستوى {{level}}",
     "priorityHint": "كلما زاد تتابعك اليومي، زادت أولويتك للحصول على تطابقات مميزة.",
-    "continue": "متابعة"
+    "continue": "متابعة",
+    "levelComplete": "🎉 اكتمل المستوى {{level}}!"
   }
 }

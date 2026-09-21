@@ -1030,6 +1030,7 @@
     "daysToNextLevel_other": "Encore {{count}} jours pour le niveau {{level}}",
     "levelUpToday": "Revenez demain pour commencer le niveau {{level}}",
     "priorityHint": "Plus votre série est longue, plus vous êtes mis en avant pour des rencontres de qualité.",
-    "continue": "Continuer"
+    "continue": "Continuer",
+    "levelComplete": "🎉 Niveau {{level}} terminé !"
   }
 }

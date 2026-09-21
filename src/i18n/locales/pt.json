@@ -1011,6 +1011,7 @@
     "daysToNextLevel_other": "Faltam {{count}} dias para o nível {{level}}",
     "levelUpToday": "Volte amanhã para começar o nível {{level}}",
     "priorityHint": "Quanto maior a sua sequência, mais prioridade você tem para matches de qualidade.",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "levelComplete": "🎉 Nível {{level}} concluído!"
   }
 }

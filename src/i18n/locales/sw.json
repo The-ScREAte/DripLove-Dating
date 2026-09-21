@@ -1012,6 +1012,7 @@
     "daysToNextLevel_other": "Siku {{count}} zaidi hadi Kiwango {{level}}",
     "levelUpToday": "Rudi kesho kuanza Kiwango {{level}}",
     "priorityHint": "Kadiri mfululizo wako unavyoongezeka, ndivyo unavyopewa kipaumbele zaidi kwa mechi bora.",
-    "continue": "Endelea"
+    "continue": "Endelea",
+    "levelComplete": "🎉 Kiwango {{level}} kimekamilika!"
   }
 }

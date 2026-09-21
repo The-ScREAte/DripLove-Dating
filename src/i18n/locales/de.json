@@ -923,6 +923,7 @@
     "daysToNextLevel_other": "Noch {{count}} Tage bis Level {{level}}",
     "levelUpToday": "Komm morgen wieder, um Level {{level}} zu starten",
     "priorityHint": "Je höher deine Streak, desto mehr wirst du für hochwertige Matches priorisiert.",
-    "continue": "Weiter"
+    "continue": "Weiter",
+    "levelComplete": "🎉 Level {{level}} abgeschlossen!"
   }
 }
