@@ -906,13 +906,24 @@ body.keyboard-open .chat-messages-container {
     --ring: 222.2 84% 4.9%;
   }
 
-  /* Hide scrollbar utility */
+  /* Hide scrollbar utility (kept for any explicit references) */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Scroll indicators hidden app-wide - a native-feeling mobile app doesn't
+     show them anywhere, not just on the few containers that opted in above.
+     Scrolling itself is untouched, only the visible track/thumb. */
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
   }
 
