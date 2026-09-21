@@ -482,16 +482,10 @@ const LocationInput = ({
       {/* Message when country is unlocked (user is outside their profile country) */}
       {isProfileEdit && outsideCountryStatus.isOutside && outsideCountryStatus.checked && !isCheckingOutsideCountry && (
         <div className="flex items-center justify-between gap-3 p-2 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 text-xs">
-          <div className="flex flex-col gap-0.5">
-            <span className="flex items-center gap-1 text-sm font-medium text-green-800 dark:text-green-200">
-              <CheckCircle2 className="w-4 h-4" />
-              Country change available
-            </span>
-            <span className="text-green-600 dark:text-green-300 text-[11px]">
-              You appear to be in {outsideCountryStatus.currentLocation || 'a different country'}.
-              {disabled && ' Go to Edit mode to apply the change.'}
-            </span>
-          </div>
+          <span className="flex items-center gap-1.5 text-sm font-medium text-green-800 dark:text-green-200">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            You're in {outsideCountryStatus.currentLocation || 'a different country'}
+          </span>
           {/* Only show Change button when in edit mode (not disabled) */}
           {!disabled && (
             <Button
@@ -499,13 +493,9 @@ const LocationInput = ({
               size="sm"
               onClick={handleAutoChangeCountry}
               disabled={isChangingCountry}
-              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white"
+              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white shrink-0"
             >
-              {isChangingCountry ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>Change to {outsideCountryStatus.currentLocation}</>
-              )}
+              {isChangingCountry ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Change'}
             </Button>
           )}
         </div>

@@ -176,7 +176,7 @@ const LocationSection = ({
           {!isPremium && (
             <p className="text-xs text-yellow-200/80 flex items-center gap-1.5">
               <Crown className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-              Upgrade to Premium to unlock more distance in your country, then multiple countries - access love without borders.
+              Go Premium for more distance.
             </p>
           )}
         </div>

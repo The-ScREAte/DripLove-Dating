@@ -633,6 +633,14 @@ body.keyboard-open .chat-messages-container {
   .discover-filters-compact .space-y-3 > * + * {
     margin-top: 0.5rem;
   }
+  /* Every button in this sheet (Save, the country auto-detect "Change"
+     button, the gender/preference dropdowns, the Manage Countries and
+     Love-without-borders buttons, the close X) reads as one consistent
+     pill-shaped family instead of Profile page's default rounded-md/lg
+     corners - scoped here so Profile page's own buttons are untouched. */
+  .discover-filters-compact button {
+    border-radius: 9999px;
+  }
 
   /* The sheet's built-in close (X) button and top border are shared shadcn
      Sheet styling (sheet.tsx) used by every sheet in the app - scoped here
