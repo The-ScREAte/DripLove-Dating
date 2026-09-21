@@ -1008,9 +1008,9 @@
   "streak": {
     "dayCount": "第 {{count}} 天",
     "levelLabel": "连续登录等级 {{level}}",
-    "daysToNextLevel_other": "还需 {{count}} 天升到等级 {{level}}",
-    "levelUpToday": "明天登录即可开启等级 {{level}}",
-    "priorityHint": "连续登录天数越多，越能获得优质匹配的优先展示。",
+    "daysToNextLevel_other": "还需 {{count}} 天到等级 {{level}}",
+    "levelUpToday": "明天登录即可进入等级 {{level}}。",
+    "priorityHint": "保持连续登录即可优先获得优质匹配。",
     "continue": "继续",
     "levelComplete": "🎉 等级 {{level}} 完成！"
   }

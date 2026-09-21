@@ -2,10 +2,10 @@
   "streak": {
     "dayCount": "Día {{count}}",
     "levelLabel": "Racha nivel {{level}}",
-    "daysToNextLevel_one": "Falta {{count}} día para el nivel {{level}}",
-    "daysToNextLevel_other": "Faltan {{count}} días para el nivel {{level}}",
-    "levelUpToday": "Vuelve mañana para empezar el nivel {{level}}",
-    "priorityHint": "Cuanto mayor sea tu racha, más prioridad tendrás para encontrar coincidencias de calidad.",
+    "daysToNextLevel_one": "{{count}} día para el nivel {{level}}",
+    "daysToNextLevel_other": "{{count}} días para el nivel {{level}}",
+    "levelUpToday": "Vuelve mañana para el nivel {{level}}.",
+    "priorityHint": "Mantén tu racha para tener prioridad en coincidencias de calidad.",
     "continue": "Continuar",
     "levelComplete": "🎉 ¡Nivel {{level}} completado!"
   },

@@ -1087,10 +1087,10 @@
   "streak": {
     "dayCount": "Day {{count}}",
     "levelLabel": "Streak Level {{level}}",
-    "daysToNextLevel_one": "{{count}} more day to Level {{level}}",
-    "daysToNextLevel_other": "{{count}} more days to Level {{level}}",
-    "levelUpToday": "Come back tomorrow to start Level {{level}}",
-    "priorityHint": "The higher your streak, the more you're prioritized for quality matches.",
+    "daysToNextLevel_one": "{{count}} day to Level {{level}}",
+    "daysToNextLevel_other": "{{count}} days to Level {{level}}",
+    "levelUpToday": "Come back tomorrow for Level {{level}}.",
+    "priorityHint": "Keep your streak going to get prioritized for quality matches.",
     "continue": "Continue",
     "levelComplete": "🎉 Level {{level}} complete!"
   }

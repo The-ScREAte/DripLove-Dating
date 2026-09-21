@@ -1008,10 +1008,10 @@
   "streak": {
     "dayCount": "Siku {{count}}",
     "levelLabel": "Kiwango cha Mfululizo {{level}}",
-    "daysToNextLevel_one": "Siku {{count}} zaidi hadi Kiwango {{level}}",
-    "daysToNextLevel_other": "Siku {{count}} zaidi hadi Kiwango {{level}}",
-    "levelUpToday": "Rudi kesho kuanza Kiwango {{level}}",
-    "priorityHint": "Kadiri mfululizo wako unavyoongezeka, ndivyo unavyopewa kipaumbele zaidi kwa mechi bora.",
+    "daysToNextLevel_one": "Siku {{count}} hadi Kiwango {{level}}",
+    "daysToNextLevel_other": "Siku {{count}} hadi Kiwango {{level}}",
+    "levelUpToday": "Rudi kesho kwa Kiwango {{level}}.",
+    "priorityHint": "Endelea na mfululizo wako upewe kipaumbele kwa mechi bora.",
     "continue": "Endelea",
     "levelComplete": "🎉 Kiwango {{level}} kimekamilika!"
   }

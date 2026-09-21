@@ -1008,10 +1008,10 @@
   "streak": {
     "dayCount": "اليوم {{count}}",
     "levelLabel": "مستوى التتابع {{level}}",
-    "daysToNextLevel_one": "يوم واحد متبقٍ للمستوى {{level}}",
-    "daysToNextLevel_other": "{{count}} أيام متبقية للمستوى {{level}}",
-    "levelUpToday": "عد غدًا لبدء المستوى {{level}}",
-    "priorityHint": "كلما زاد تتابعك اليومي، زادت أولويتك للحصول على تطابقات مميزة.",
+    "daysToNextLevel_one": "يوم واحد للمستوى {{level}}",
+    "daysToNextLevel_other": "{{count}} أيام للمستوى {{level}}",
+    "levelUpToday": "عد غدًا للمستوى {{level}}.",
+    "priorityHint": "حافظ على تتابعك لتحظى بالأولوية في التطابقات المميزة.",
     "continue": "متابعة",
     "levelComplete": "🎉 اكتمل المستوى {{level}}!"
   }

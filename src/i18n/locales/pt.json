@@ -1007,10 +1007,10 @@
   "streak": {
     "dayCount": "Dia {{count}}",
     "levelLabel": "Nível de sequência {{level}}",
-    "daysToNextLevel_one": "Falta {{count}} dia para o nível {{level}}",
-    "daysToNextLevel_other": "Faltam {{count}} dias para o nível {{level}}",
-    "levelUpToday": "Volte amanhã para começar o nível {{level}}",
-    "priorityHint": "Quanto maior a sua sequência, mais prioridade você tem para matches de qualidade.",
+    "daysToNextLevel_one": "{{count}} dia para o nível {{level}}",
+    "daysToNextLevel_other": "{{count}} dias para o nível {{level}}",
+    "levelUpToday": "Volte amanhã para o nível {{level}}.",
+    "priorityHint": "Mantenha sua sequência para ter prioridade em matches de qualidade.",
     "continue": "Continuar",
     "levelComplete": "🎉 Nível {{level}} concluído!"
   }

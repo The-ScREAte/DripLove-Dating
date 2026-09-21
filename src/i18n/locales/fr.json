@@ -1026,10 +1026,10 @@
   "streak": {
     "dayCount": "Jour {{count}}",
     "levelLabel": "Série niveau {{level}}",
-    "daysToNextLevel_one": "Encore {{count}} jour pour le niveau {{level}}",
-    "daysToNextLevel_other": "Encore {{count}} jours pour le niveau {{level}}",
-    "levelUpToday": "Revenez demain pour commencer le niveau {{level}}",
-    "priorityHint": "Plus votre série est longue, plus vous êtes mis en avant pour des rencontres de qualité.",
+    "daysToNextLevel_one": "{{count}} jour pour le niveau {{level}}",
+    "daysToNextLevel_other": "{{count}} jours pour le niveau {{level}}",
+    "levelUpToday": "Revenez demain pour le niveau {{level}}.",
+    "priorityHint": "Continuez votre série pour être mis en avant pour des rencontres de qualité.",
     "continue": "Continuer",
     "levelComplete": "🎉 Niveau {{level}} terminé !"
   }
