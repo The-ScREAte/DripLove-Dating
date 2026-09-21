@@ -219,7 +219,7 @@ const LocationSection = ({
               variant="outline"
               size="sm"
               onClick={() => setShowCountryDialog(true)}
-              className="h-8 px-3 text-xs flex items-center justify-between gap-3 bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
+              className="h-8 px-2 text-xs flex items-center justify-between gap-2 bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
               disabled={!isEditing}
             >
               <span className="flex items-center gap-1.5">

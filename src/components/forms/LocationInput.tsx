@@ -493,7 +493,7 @@ const LocationInput = ({
               size="sm"
               onClick={handleAutoChangeCountry}
               disabled={isChangingCountry}
-              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white shrink-0"
+              className="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white shrink-0"
             >
               {isChangingCountry ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Change'}
             </Button>
