@@ -18,7 +18,7 @@ import { useActivityTracker } from '@/hooks/useActivityTracker';
 import { useDailyStreak } from '@/hooks/useDailyStreak';
 import StreakFlash from '@/components/StreakFlash';
 import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
-import { fetchCirclePool } from '@/utils/circlePoolFetch';
+import { fetchCirclePool, CIRCLE_CACHE_TTL_MS } from '@/utils/circlePoolFetch';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
@@ -698,9 +698,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // Global Circle preloader - mirrors preloadChatMatches/preloadLikedMeData
   // below so Circle gets the same "already warm by the time you tap the tab"
   // treatment instead of always starting from a blank loading spinner.
+  // Skips the fetch entirely when the cache is still fresh - this ran
+  // unconditionally on every single switch to the Circle tab (it's called
+  // from the activeTab effect below), re-fetching and overwriting
+  // window.circleCache even seconds after it was already populated, which
+  // is what made Circle look like it reloaded on every visit despite
+  // CirclePage's own cache-first read.
   const preloadCircleData = useCallback(async (targetUserId: string) => {
     ensureWindowCaches();
     if (!profile) return;
+    const cached = window.circleCache?.get(targetUserId);
+    if (cached && Date.now() - cached.timestamp < CIRCLE_CACHE_TTL_MS) return;
     try {
       const pool = await fetchCirclePool(profile, isPremium);
       window.circleCache?.set(targetUserId, { pool, timestamp: Date.now() });

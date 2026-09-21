@@ -23,7 +23,7 @@ interface DiscoverTopBarProps {
 // its "coming soon" overlay) so wiring the tab back in later is just adding
 // a row here, not rebuilding anything.
 const CATEGORIES: { key: DiscoverCategory; label: string }[] = [
-  { key: 'mine', label: 'For Me' },
+  { key: 'mine', label: 'For You' },
   { key: 'signMatch', label: 'Sign Match' },
 ];
 

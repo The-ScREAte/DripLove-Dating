@@ -27,6 +27,16 @@ const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 // check below (a bounding box is a rough pre-filter, not the real answer).
 const KM_PER_DEGREE_LATITUDE = 111.32;
 
+// How long a cached window.circleCache snapshot is trusted before a fresh
+// fetch replaces it - shared by CirclePage's own read and MainApp's
+// preloadCircleData, so both agree on what counts as "still fresh." Living
+// here (not duplicated in each file) is what MainApp's freshness check
+// actually depends on: without it, preloadCircleData used to re-fetch and
+// overwrite the cache unconditionally every time the Circle tab became
+// active, even seconds after CirclePage's own effect had just populated it -
+// which is what made Circle look like it "refreshed" on every single visit.
+export const CIRCLE_CACHE_TTL_MS = 2 * 60 * 1000;
+
 // Same distance-cap formula fetchCirclePool uses below, pulled out so any
 // other Circle query (category-tile counts, category browse) can filter by
 // the viewer's real distance/archived rules instead of silently ignoring

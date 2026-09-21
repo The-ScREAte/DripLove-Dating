@@ -726,7 +726,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             <div
               className="fixed left-4 flex space-x-1.5 z-[9999]"
               style={{
-                top: 'calc(var(--app-header-height, 72px) + 38px)',
+                top: 'calc(var(--app-header-height, 72px) + 52px)',
                 pointerEvents: 'none'
               }}
             >

@@ -17,6 +17,7 @@ import {
   getCircleDistanceParams,
   getCircleCountrySplit,
   isCircleProfileEligible,
+  CIRCLE_CACHE_TTL_MS,
 } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
@@ -76,11 +77,6 @@ const composeCircleBatch = <T extends { percent: number }>(rankedDescByScore: T[
 
   return [medium, ...highs];
 };
-
-// How long a cached pool snapshot (see window.circleCache, populated by
-// MainApp's preloadCircleData) is trusted before a fresh fetch replaces it -
-// same order of magnitude as Chat/Liked Me's own background refresh cadence.
-const CIRCLE_CACHE_TTL_MS = 2 * 60 * 1000;
 
 // Category tile counts run 12 separate count queries - cheap individually but
 // slow in aggregate, and identical on every remount within a short window.
@@ -793,6 +789,31 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // instantly with that snapshot and no spinner, then quietly refreshes -
   // Circle previously had no such cache at all, so every visit (even ones
   // seconds apart) started from a completely blank loading state.
+  //
+  // Depending on the whole `currentUser` object (below) was the actual bug
+  // behind "it refreshes every time I come back to Circle": MainApp hands
+  // down a fresh `profile` object reference on every fetchUserProfile()
+  // call even when nothing about it actually changed, and Circle stays
+  // mounted (display:none) rather than unmounting between tab switches - so
+  // this effect re-ran, re-fetched, and briefly clobbered the cached pool
+  // on every one of those unrelated re-renders, not just on real changes.
+  // Keying on the specific fields fetchCirclePool actually reads (same
+  // approach as the category-counts cache key below) makes the effect
+  // stable across reference-only changes while still refetching for any
+  // change that could really affect the results.
+  const poolFetchKey = useMemo(() => [
+    currentUser?.id || '',
+    currentUser?.country_code || '',
+    (currentUser?.unlocked_countries || []).join(','),
+    currentUser?.preference || '',
+    currentUser?.gender || '',
+    currentUser?.min_age ?? '',
+    currentUser?.max_age ?? '',
+    currentUser?.max_distance ?? currentUser?.distance_preference ?? '',
+    currentUser?.latitude ?? '',
+    currentUser?.longitude ?? '',
+  ].join('|'), [currentUser]);
+
   useEffect(() => {
     if (!currentUser?.id) return;
     let cancelled = false;
@@ -824,7 +845,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
     void load();
     return () => { cancelled = true; };
-  }, [currentUser, isPremium]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poolFetchKey, isPremium]);
 
   // Real counts for the category grid, filtered exactly the way the pool
   // above is: same country(ies), same reciprocal gender preference, active/
