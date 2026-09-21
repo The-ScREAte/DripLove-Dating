@@ -634,6 +634,22 @@ body.keyboard-open .chat-messages-container {
     margin-top: 0.5rem;
   }
 
+  /* The sheet's built-in close (X) button and top border are shared shadcn
+     Sheet styling (sheet.tsx) used by every sheet in the app - scoped here
+     the same way as everything else above so only this one sheet is
+     affected. :has() targets the close button specifically (it's the only
+     direct-child button carrying a lucide-x icon; "Save Preferences" is a
+     direct-child button too, but has no such icon) without needing to touch
+     the shared component. */
+  .discover-filters-compact {
+    border-top-width: 2px;
+    border-top-color: rgba(236, 72, 153, 0.45);
+  }
+  .discover-filters-compact > button:has(.lucide-x) {
+    top: 0.625rem;
+    color: rgb(236 72 153);
+  }
+
   /* ✅ Improve text readability on mobile */
   body {
     -webkit-text-size-adjust: 100%;

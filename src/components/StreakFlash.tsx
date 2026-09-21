@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Flame, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { getStreakLevel } from '@/utils/activityWeighting';
 
 interface StreakFlashProps {
@@ -12,7 +11,7 @@ interface StreakFlashProps {
 
 const ENTER_DURATION = 400; // ms
 const EXIT_DURATION = 300; // ms
-const AUTO_CLOSE_MS = 10_000; // "show it for about 10 seconds"
+const AUTO_CLOSE_MS = 30_000; // "make it 30 seconds"
 const LEVEL_SIZE = 5;
 
 // Shows once per calendar day, right after record_daily_login reports a
@@ -85,10 +84,10 @@ const StreakFlash: React.FC<StreakFlashProps> = ({ currentStreak, onClose }) => 
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold text-white mb-1">
+          <h1 className="text-3xl font-bold text-white mb-1.5">
             {t('streak.dayCount', { count: currentStreak })}
           </h1>
-          <div className="inline-block px-3 py-1 rounded-full bg-pink-500/15 border border-pink-500/40 text-pink-400 text-sm font-semibold mb-4">
+          <div className="inline-block px-3 py-1 rounded-full bg-pink-500/15 border border-pink-500/40 text-pink-400 text-base font-semibold mb-4">
             {t('streak.levelLabel', { level })}
           </div>
 
@@ -103,20 +102,13 @@ const StreakFlash: React.FC<StreakFlashProps> = ({ currentStreak, onClose }) => 
             ))}
           </div>
 
-          <p className="text-gray-400 text-sm mb-5">
+          <p className="text-gray-300 text-base mb-3">
             {daysToNextLevel > 0
               ? t('streak.daysToNextLevel', { count: daysToNextLevel, level: level + 1 })
               : t('streak.levelUpToday', { level: level + 1 })}
           </p>
 
-          <p className="text-gray-300 text-xs mb-5">{t('streak.priorityHint')}</p>
-
-          <Button
-            onClick={handleClose}
-            className="w-full bg-gradient-to-r from-orange-500 to-pink-600 text-white font-semibold py-3"
-          >
-            {t('streak.continue')}
-          </Button>
+          <p className="text-gray-300 text-sm">{t('streak.priorityHint')}</p>
         </CardContent>
       </Card>
 

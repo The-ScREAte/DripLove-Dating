@@ -35,105 +35,105 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
     // below 100% are missing just this, so it gets its own chip to flag that.
     {
       key: 'bio',
-      icon: <FileText className="w-3 h-3" />,
+      icon: <FileText className="w-3.5 h-3.5" />,
       label: editedProfile.bio?.trim() ? '✓' : '',
       section: 'basicInfo',
       border: 'border-green-500/50',
     },
     {
       key: 'location',
-      icon: <Home className="w-3 h-3" />,
+      icon: <Home className="w-3.5 h-3.5" />,
       label: editedProfile.city || '',
       section: 'location',
       border: 'border-blue-500/50',
     },
     {
       key: 'height',
-      icon: <Ruler className="w-3 h-3" />,
+      icon: <Ruler className="w-3.5 h-3.5" />,
       label: editedProfile.height_cm ? formatHeight(editedProfile.height_cm) : '',
       section: 'basicInfo',
       border: 'border-purple-500/50',
     },
     {
       key: 'job',
-      icon: <Briefcase className="w-3 h-3" />,
+      icon: <Briefcase className="w-3.5 h-3.5" />,
       label: (editedProfile.occupation === 'Other' ? editedProfile.occupationCustom : editedProfile.occupation) || '',
       section: 'workEducation',
       border: 'border-amber-500/50',
     },
     {
       key: 'education',
-      icon: <GraduationCap className="w-3 h-3" />,
+      icon: <GraduationCap className="w-3.5 h-3.5" />,
       label: (editedProfile.education_level === 'Other' ? editedProfile.education_level_custom : editedProfile.education_level) || '',
       section: 'workEducation',
       border: 'border-indigo-500/50',
     },
     {
       key: 'gender',
-      icon: <User className="w-3 h-3" />,
+      icon: <User className="w-3.5 h-3.5" />,
       label: editedProfile.gender || '',
       section: 'location',
       border: 'border-pink-500/50',
     },
     {
       key: 'lookingFor',
-      icon: <Heart className="w-3 h-3" />,
+      icon: <Heart className="w-3.5 h-3.5" />,
       label: editedProfile.preference || '',
       section: 'location',
       border: 'border-rose-500/50',
     },
     {
       key: 'intent',
-      icon: <Compass className="w-3 h-3" />,
+      icon: <Compass className="w-3.5 h-3.5" />,
       label: editedProfile.relationship_intent || '',
       section: 'lifestyle',
       border: 'border-cyan-500/50',
     },
     {
       key: 'lifestyle',
-      icon: <Wine className="w-3 h-3" />,
+      icon: <Wine className="w-3.5 h-3.5" />,
       label: lifestyle,
       section: 'lifestyle',
       border: 'border-emerald-500/50',
     },
     {
       key: 'languages',
-      icon: <Languages className="w-3 h-3" />,
+      icon: <Languages className="w-3.5 h-3.5" />,
       label: languages.length > 0 ? String(languages.length) : '',
       section: 'languages',
       border: 'border-teal-500/50',
     },
     {
       key: 'familyPlans',
-      icon: <Baby className="w-3 h-3" />,
+      icon: <Baby className="w-3.5 h-3.5" />,
       label: editedProfile.family_plans ? labelFor(FAMILY_PLANS_OPTIONS, editedProfile.family_plans) : '',
       section: 'lifestyle',
       border: 'border-fuchsia-500/50',
     },
     {
       key: 'communicationStyle',
-      icon: <MessageCircle className="w-3 h-3" />,
+      icon: <MessageCircle className="w-3.5 h-3.5" />,
       label: communicationStyle.length > 0 ? String(communicationStyle.length) : '',
       section: 'personality',
       border: 'border-sky-500/50',
     },
     {
       key: 'loveStyle',
-      icon: <Gift className="w-3 h-3" />,
+      icon: <Gift className="w-3.5 h-3.5" />,
       label: loveStyle.length > 0 ? String(loveStyle.length) : '',
       section: 'personality',
       border: 'border-red-500/50',
     },
     {
       key: 'pets',
-      icon: <PawPrint className="w-3 h-3" />,
+      icon: <PawPrint className="w-3.5 h-3.5" />,
       label: pets.length > 0 ? String(pets.length) : '',
       section: 'pets',
       border: 'border-orange-500/50',
     },
     {
       key: 'socialMedia',
-      icon: <Share2 className="w-3 h-3" />,
+      icon: <Share2 className="w-3.5 h-3.5" />,
       label: editedProfile.social_media ? labelFor(SOCIAL_MEDIA_OPTIONS, editedProfile.social_media) : '',
       section: 'socialMedia',
       border: 'border-violet-500/50',
@@ -142,21 +142,21 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
     // it isn't, so this shows "2/3" until the threshold is actually met.
     {
       key: 'interests',
-      icon: <Sparkles className="w-3 h-3" />,
+      icon: <Sparkles className="w-3.5 h-3.5" />,
       label: interests.length === 0 ? '' : interests.length < 3 ? `${interests.length}/3` : String(interests.length),
       section: 'interests',
       border: 'border-lime-500/50',
     },
     {
       key: 'favorites',
-      icon: <Star className="w-3 h-3" />,
+      icon: <Star className="w-3.5 h-3.5" />,
       label: favorites.length > 0 ? String(favorites.length) : '',
       section: 'favorites',
       border: 'border-yellow-500/50',
     },
     {
       key: 'funQuestions',
-      icon: <Lightbulb className="w-3 h-3" />,
+      icon: <Lightbulb className="w-3.5 h-3.5" />,
       label: hasFunQuestion ? '✓' : '',
       section: 'funQuestions',
       border: 'border-pink-400/50',
@@ -173,19 +173,19 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
       key={chip.key}
       type="button"
       onClick={() => onOpenSection(chip.section)}
-      style={{ height: 22, minHeight: 22, padding: '0 8px' }}
-      className={`flex items-center gap-1 rounded-full bg-neutral-900 border ${chip.border} text-white text-[11px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors capitalize shrink-0`}
+      style={{ height: 26, minHeight: 26, padding: '0 10px' }}
+      className={`flex items-center gap-1.5 rounded-full bg-neutral-900 border ${chip.border} text-white text-[12px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors capitalize shrink-0`}
     >
       {chip.icon}
-      {chip.label ? <span>{chip.label}</span> : <Plus className="w-2.5 h-2.5 opacity-70" />}
+      {chip.label ? <span>{chip.label}</span> : <Plus className="w-3 h-3 opacity-70" />}
     </button>
   );
 
   return (
-    <div className="overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-      <div className="flex flex-col gap-1.5 w-max mx-auto">
-        <div className="flex gap-1.5">{row1.map(renderChip)}</div>
-        <div className="flex gap-1.5">{row2.map(renderChip)}</div>
+    <div className="overflow-x-auto pt-2 pb-2 -mx-1 px-1 scrollbar-hide">
+      <div className="flex flex-col gap-2 w-max mx-auto">
+        <div className="flex gap-2">{row1.map(renderChip)}</div>
+        <div className="flex gap-2">{row2.map(renderChip)}</div>
       </div>
     </div>
   );

@@ -72,9 +72,9 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
           type="button"
           onClick={onFilterClick}
           aria-label="Discover filters"
-          className="shrink-0 w-6 h-6 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
+          className="shrink-0 w-7 h-7 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
         >
-          <SlidersHorizontal className="w-[15px] h-[15px]" />
+          <SlidersHorizontal className="w-[17px] h-[17px]" />
         </button>
 
         {/* Only this middle strip scrolls horizontally (for whenever more
@@ -90,7 +90,7 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
               key={key}
               type="button"
               onClick={() => onCategoryChange(key)}
-              className="shrink-0 h-6 min-h-0 flex flex-col items-center justify-center gap-0.5 text-[12px] leading-none font-semibold outline-none focus:outline-none focus-visible:outline-none"
+              className="shrink-0 h-7 min-h-0 flex flex-col items-center justify-center gap-0.5 text-[13px] leading-none font-semibold outline-none focus:outline-none focus-visible:outline-none"
             >
               <span className={activeCategory === key ? 'text-white' : 'text-white/70'}>
                 {label}
@@ -108,7 +108,7 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
             is the exact size of MatchCard's report button (24x24, see
             .reportButton in MatchCard.module.css), which visually occupies
             this slot at the same top offset. */}
-        <div className="w-6 h-6 shrink-0" aria-hidden="true" />
+        <div className="w-7 h-7 shrink-0" aria-hidden="true" />
       </div>
     </div>,
     document.body
