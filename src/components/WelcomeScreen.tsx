@@ -334,6 +334,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
           >
             {t('welcome.aboutLink')}
           </button>
+          <button
+            onClick={() => navigate('/links')}
+            className="text-white font-bold hover:text-white/80 transition-colors duration-200 bg-transparent border-none cursor-pointer whitespace-nowrap"
+          >
+            Connect
+          </button>
           <GlobalLanguageSelector variant="welcome" />
         </div>
       </div>
