@@ -3038,6 +3038,7 @@ export type Database = {
         Returns: Json
       }
       reset_badge_count: { Args: never; Returns: undefined }
+      send_recommendation_notifications: { Args: never; Returns: undefined }
       send_reengagement_notifications: { Args: never; Returns: undefined }
       send_streak_broken_notifications: { Args: never; Returns: undefined }
       send_streak_reminder_notifications: { Args: never; Returns: undefined }
