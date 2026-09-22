@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         console.log(`[check-dormant-chats] ⏰ Asking dormancy check question for match ${match.id}`);
         
         // Send system message to both users
-        const systemMessage = "💭 Are you two heading somewhere with this connection? Reply 'Yes' to continue or 'No' if you'd like to move on.";
+        const systemMessage = "Are you two heading somewhere with this connection? Reply 'Yes' to continue or 'No' if you'd like to move on.";
         
         const { error: msgError } = await supabaseClient
           .from('chats')

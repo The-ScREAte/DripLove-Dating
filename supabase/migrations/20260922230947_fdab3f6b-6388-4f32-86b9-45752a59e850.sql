@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.send_recommendation_notifications() FROM anon, authenticated, PUBLIC;

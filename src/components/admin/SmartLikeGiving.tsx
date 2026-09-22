@@ -212,7 +212,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
             try {
               await supabase.functions.invoke('send-push-notification', {
                 body: {
-                  title: 'Someone Likes You ✨',
+                  title: 'Someone likes you',
                   body: 'You caught someone\'s eye. Tap to see who\'s interested.',
                   userId: receiverId,
                   type: 'like',

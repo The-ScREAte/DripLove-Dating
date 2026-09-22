@@ -81,7 +81,7 @@ serve(async (req) => {
       )
     }
 
-    const title = "Welcome to DripLove 💕"
+    const title = "Welcome to DripLove"
     const body = "Your journey to something real starts now. We're glad you're here."
 
     // Get user's push tokens
