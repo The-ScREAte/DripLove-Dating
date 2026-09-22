@@ -143,7 +143,7 @@ export const usePushNotifications = (userId?: string) => {
     }
 
     const success = await sendNotification({
-      title: "It's a Match! 🔥",
+      title: "It's a match",
       body: `You and ${matchedUserName} caught each other's eye. Say hello!`,
       userId: targetUserId,
       type: 'match',
@@ -207,7 +207,7 @@ export const usePushNotifications = (userId?: string) => {
 
     if (shouldNotify && !isUserActive()) {
       const success = await sendNotification({
-        title: 'New Interest ✨',
+        title: 'New interest in your profile',
         body: "You're catching some eyes. See who's interested!",
         userId: targetUserId,
         type: 'like',
