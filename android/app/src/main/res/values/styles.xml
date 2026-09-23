@@ -23,5 +23,13 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Android 12+ (API 31+) System Splash Screen ignores android:background above and
+             instead reads this directly - without it, it falls back to this theme's
+             android:colorBackground (which resolves to the black appWindowBackground in
+             AppTheme), showing a black screen behind the masked launcher-icon circle instead
+             of the brand's pink. The circular masked icon itself is unaffected/unchanged -
+             that part already renders correctly. Matches iOS LaunchScreen.storyboard's fixed
+             #7a0a40 background. -->
+        <item name="android:windowSplashScreenBackground">@color/splashBackground</item>
     </style>
 </resources>

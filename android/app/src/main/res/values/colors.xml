@@ -10,4 +10,8 @@
 
     <!-- App is dark-themed everywhere; matches src/index.css's body background -->
     <color name="appWindowBackground">#000000</color>
+
+    <!-- Deep pink brand color used for the cold-start splash screen; matches
+         iOS LaunchScreen.storyboard's backgroundColor (#7a0a40). -->
+    <color name="splashBackground">#7A0A40</color>
 </resources>
