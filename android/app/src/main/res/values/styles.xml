@@ -31,5 +31,10 @@
              that part already renders correctly. Matches iOS LaunchScreen.storyboard's fixed
              #7a0a40 background. -->
         <item name="android:windowSplashScreenBackground">@color/splashBackground</item>
+        <!-- API 31+ splash icon: previously unset, so the system fell back to the app's
+             launcher icon (mipmap/ic_launcher). Pointed at the same logo artwork iOS's
+             LaunchScreen.storyboard uses (Splash.imageset) instead, sized smaller than the
+             launcher icon - splash-only, does not affect the home screen/app drawer icon. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
     </style>
 </resources>
