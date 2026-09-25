@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, User, Circle } from 'lucide-react';
@@ -104,6 +105,7 @@ const clearNotificationParams = (keys: string[]): void => {
 
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const userId = user?.id;
 
   // Keyed per-user (not a single global key) - otherwise a second account
@@ -1311,6 +1313,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange('dripcheck');
         return;
       }
+      if (action === 'open_games') {
+        // /games is its own top-level route, not a tab on "/" - a tab switch
+        // here would do nothing, since the app isn't even on "/" once this
+        // fires. Matches resolveNotificationRoute's '/games' for the
+        // cold-start/no-handler path (see navigateFromNotification).
+        navigate('/games');
+        return;
+      }
       if (action === 'open_circle_profile' && profileId) {
         setCircleDeepLinkProfileId(profileId);
         handleTabChange('circle');
@@ -1336,7 +1346,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       handleTabChange('dripcheck');
     });
     return () => setNotificationNavHandler(null);
-  }, [handleTabChange]);
+  }, [handleTabChange, navigate]);
 
   // Android's custom notification service updates the URL without reloading
   // the app. Consume that route immediately when the WebView is already open.
@@ -1808,4 +1818,5 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 };
 
 export default MainApp;
+
 

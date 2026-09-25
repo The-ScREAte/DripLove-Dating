@@ -47,12 +47,17 @@ const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
 //   like    -> Liked Me
 //   image_rejected -> Profile
 //   action open_circle_profile -> that person's profile inside Circle
+//   action open_games -> the Games hub (/games is its own top-level route,
+//     not a tab on "/" like everything else here - see navigateFromNotification
+//     and MainApp's nav handler for how a plain URL change alone isn't enough
+//     to move a mounted app there)
 //   anything else -> Discover, never Chat by default
 export const resolveNotificationRoute = (
   type: string | undefined,
   data: Record<string, unknown> | undefined
 ): string => {
   if (data?.action === 'open_discover') return '/';
+  if (data?.action === 'open_games') return '/games';
   if (data?.action === 'open_circle_profile' && data?.profileId) {
     return `/?tab=circle&circleUserId=${data.profileId}`;
   }
@@ -697,3 +702,4 @@ export const markNotificationRead = (notificationId: string) => pushNotification
 export const getUnreadNotifications = (userId: string) => pushNotificationService.getUnreadNotifications(userId);
 export const removePushToken = (userId: string) => pushNotificationService.removeToken(userId);
 export const cleanupPushNotifications = () => pushNotificationService.cleanup();
+

@@ -58,9 +58,13 @@ public class MainActivity extends BridgeActivity {
 
     // Mirrors resolveNotificationRoute() in src/services/pushNotifications.ts -
     // keep the two in sync. open_discover -> Discover (default, no route
-    // needed), open_circle_profile -> that one Circle profile, message ->
-    // the specific conversation, match -> the chat list, like -> Liked Me,
-    // image_rejected -> Profile, everything else -> Discover (default).
+    // needed), open_games -> the Games hub (a top-level route, not a tab on
+    // "/" - the replaceState+popstate dispatch below is what makes
+    // BrowserRouter itself switch which route renders, same mechanism as
+    // every tab-query-param case), open_circle_profile -> that one Circle
+    // profile, message -> the specific conversation, match -> the chat list,
+    // like -> Liked Me, image_rejected -> Profile, everything else ->
+    // Discover (default).
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getStringExtra("action");
@@ -74,6 +78,8 @@ public class MainActivity extends BridgeActivity {
         // is the one that says where a tap should actually go.
         if ("open_discover".equals(action)) {
             return;
+        } else if ("open_games".equals(action)) {
+            route = "/games";
         } else if ("open_circle_profile".equals(action) && profileId != null) {
             route = "/?tab=circle&circleUserId=" + profileId;
         } else if (type == null) {
@@ -294,3 +300,4 @@ public class MainActivity extends BridgeActivity {
         }
     }
 }
+
