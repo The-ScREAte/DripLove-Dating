@@ -54,6 +54,34 @@ export const preloadImageToBlob = async (url: string): Promise<string> => {
   }
 };
 
+// Drops a blob URL that no longer resolves, so the next request re-fetches
+// from the network instead of being handed the same dead string forever.
+//
+// A blob: URL is only valid while the document that created it is alive AND
+// the underlying blob is still held. When iOS backgrounds the WebView and
+// WebKit reclaims memory, those blobs can be purged while this module-level
+// Map (and the React state built from it) survive - leaving entries that
+// point at nothing. The card's text still renders from normal state, so the
+// symptom is "everything is there except the photo". Without this, both
+// preloadImageToBlob above and every other consumer keep serving the dead
+// URL for the rest of the session.
+//
+// `failedImages` is cleared for the same url too: a blob going stale says
+// nothing about whether the source image is fetchable, and leaving it in
+// that set would block the retry this exists to enable.
+export const dropBlobUrl = (url: string): void => {
+  const blobUrl = globalImageCache.get(url);
+  if (blobUrl) {
+    try {
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // Already revoked - the entry still has to go.
+    }
+    globalImageCache.delete(url);
+  }
+  failedImages.delete(url);
+};
+
 // Cleanup blob URLs when needed (optional, for memory management)
 // ⭐ ANDROID FIX: Lower threshold for Android to prevent memory pressure
 export const cleanupOldBlobUrls = () => {

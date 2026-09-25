@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAndroidPlatform } from '@/utils/platformUtils';
-import { preloadImageToBlob } from '@/utils/imageCache';
+import { preloadImageToBlob, dropBlobUrl } from '@/utils/imageCache';
 import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
@@ -716,7 +716,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       const profileBlobs = prev[profileId];
       if (profileBlobs) {
         // Revoke all blob URLs for this profile
-        for (const blobUrl of Object.values(profileBlobs)) {
+        for (const [imageUrl, blobUrl] of Object.entries(profileBlobs)) {
           try {
             if (blobUrl.startsWith('blob:')) {
               URL.revokeObjectURL(blobUrl);
@@ -724,6 +724,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           } catch {
             // ignore revoke errors
           }
+          // Revoking alone left the now-dead blob URL sitting in the shared
+          // module-level cache keyed by its source image url, so the next
+          // caller (Discover's own re-warm, Liked Me, chat avatars) was handed
+          // a URL that had just been explicitly revoked. Drop the entry too.
+          dropBlobUrl(imageUrl);
         }
       }
       const updated = { ...prev };

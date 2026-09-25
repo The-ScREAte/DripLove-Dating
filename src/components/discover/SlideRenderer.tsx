@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import styles from './MatchCard.module.css';
 import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
+import { dropBlobUrl } from '@/utils/imageCache';
 
 interface SlideRendererProps {
   slide: SlideContent;
@@ -59,6 +60,9 @@ const ImageSlide = React.memo<{
   const [transformSrc, setTransformSrc] = React.useState<string | null>(null);
   const [triedTransform, setTriedTransform] = React.useState(false);
   const [triedCache, setTriedCache] = React.useState(false);
+  // Set once an in-memory blob: src has failed, which makes this slide ignore
+  // the blob and render the real network URL instead. See handleError.
+  const [blobAbandoned, setBlobAbandoned] = React.useState(false);
   const fallbackObjectUrlRef = React.useRef<string | null>(null);
 
   // Reset error/fallback state the moment imageSrc changes, computed during
@@ -74,6 +78,7 @@ const ImageSlide = React.memo<{
     setTransformSrc(null);
     setTriedTransform(false);
     setTriedCache(false);
+    setBlobAbandoned(false);
   }
 
   // Cleanup only - revoking the previous fallback object URL, if any, once
@@ -88,8 +93,18 @@ const ImageSlide = React.memo<{
   }, [imageSrc]);
 
   const handleError = React.useCallback(async () => {
-    if (usingBlob) {
-      setHasError(true);
+    // A blob: src that fails almost always means the blob itself was purged
+    // while this session kept the URL string - iOS does exactly that when it
+    // reclaims memory from a backgrounded WebView, which is why the photo
+    // vanishes on resume while the rest of the card is fine. This used to
+    // give up immediately (no network retry, no cache tier), so that first
+    // photo stayed broken until the card was swiped away. Drop the dead blob
+    // from the shared cache - otherwise every other screen keeps being handed
+    // the same dead string - and fall through to the real network URL, which
+    // the tiers below can then retry normally if it fails too.
+    if (usingBlob && !blobAbandoned) {
+      setBlobAbandoned(true);
+      dropBlobUrl(originalUrl);
       return;
     }
 
@@ -115,7 +130,7 @@ const ImageSlide = React.memo<{
     }
 
     setHasError(true);
-  }, [imageSrc, originalUrl, triedCache, triedTransform, usingBlob]);
+  }, [blobAbandoned, imageSrc, originalUrl, triedCache, triedTransform, usingBlob]);
 
   const handleLoad = React.useCallback(() => {
     // Warm the persistent cache off the real (never blob:) originalUrl even
@@ -165,7 +180,10 @@ const ImageSlide = React.memo<{
         key={imageSrc}
         loading="eager"
         decoding="async"
-        src={fallbackSrc ?? transformSrc ?? imageSrc}
+        // blobAbandoned swaps a dead blob: preview for the real network URL
+        // (see handleError); originalUrl is never a blob, so this is always a
+        // genuinely different, re-fetchable source.
+        src={fallbackSrc ?? transformSrc ?? (blobAbandoned ? originalUrl : imageSrc)}
         alt={`${matchFirstName} ${matchLastName}`}
         className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
         draggable={false}
