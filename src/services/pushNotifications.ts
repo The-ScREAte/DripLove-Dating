@@ -91,13 +91,25 @@ export const navigateFromNotification = (
 ): void => {
   const normalized = normalizeNotificationData(data);
   const resolvedType = type || (typeof normalized.type === 'string' ? normalized.type : undefined);
+
+  // Write the destination into the URL FIRST, always - not just when no
+  // handler is mounted. The handler applies navigation as React state only
+  // (active tab + deep-link id), and on a cold start that state does not
+  // survive: Index flips `loading` immediately after MainApp's first mount,
+  // which unmounts and remounts MainApp, throwing away whatever the handler
+  // just set. The remounted instance then falls back to its default tab,
+  // which is why every deep-linked notification was landing on Discover.
+  // The URL is the one thing that does survive that remount - MainApp reads
+  // tab/matchId/circleUserId back out of it on mount - so setting it here
+  // makes the destination durable no matter when the remount lands.
+  const route = resolveNotificationRoute(resolvedType, normalized);
+  if (route !== '/') window.history.replaceState({}, '', route);
+
   if (inAppNavHandler) {
     inAppNavHandler(resolvedType, normalized);
     return;
   }
   pendingNavigation = { type: resolvedType, data: normalized };
-  const route = resolveNotificationRoute(resolvedType, normalized);
-  if (route !== '/') window.history.replaceState({}, '', route);
 };
 
 // Dismiss only the notifications belonging to ONE conversation/thread, called

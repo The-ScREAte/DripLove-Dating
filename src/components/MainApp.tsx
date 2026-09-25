@@ -83,6 +83,25 @@ interface MainAppProps {
   onLogout: () => void;
 }
 
+// Strips notification deep-link params once the destination screen has
+// actually consumed them. Deliberately NOT done on mount: on a cold start
+// MainApp mounts, unmounts (Index flips `loading` while it resolves the
+// profile) and remounts, and the remounted instance re-reads these params to
+// restore the destination - clearing them any earlier is what would send the
+// tap back to the default tab. Once the target screen has opened, they've
+// served their purpose and are removed so they can't re-apply later.
+const clearNotificationParams = (keys: string[]): void => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (!keys.some((key) => params.has(key))) return;
+    keys.forEach((key) => params.delete(key));
+    const query = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+  } catch {
+    // A failed URL tidy-up must never break navigation itself.
+  }
+};
+
 const MainApp = ({ user, onLogout }: MainAppProps) => {
   const { t, i18n } = useTranslation();
   const userId = user?.id;
@@ -1569,7 +1588,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   isPremium={isPremium}
                   isActiveTab={activeTab === 'circle'}
                   deepLinkProfileId={circleDeepLinkProfileId}
-                  onDeepLinkConsumed={() => setCircleDeepLinkProfileId(null)}
+                  onDeepLinkConsumed={() => {
+                    setCircleDeepLinkProfileId(null);
+                    clearNotificationParams(['tab', 'circleUserId']);
+                  }}
                 />
               </div>
             </Suspense>
@@ -1586,7 +1608,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   onUnreadChange={forceRefreshUnreadCount}
                   onDetailViewChange={setIsChatDetailOpen}
                   deepLinkMatchId={chatDeepLinkMatchId}
-                  onDeepLinkConsumed={() => setChatDeepLinkMatchId(null)}
+                  onDeepLinkConsumed={() => {
+                    setChatDeepLinkMatchId(null);
+                    clearNotificationParams(['tab', 'matchId']);
+                  }}
                 />
               </div>
             </Suspense>

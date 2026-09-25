@@ -21,6 +21,19 @@ import {
   getLikeQueueCount
 } from '@/services/notificationQueue';
 
+// cleanupPushNotifications() is a GLOBAL teardown - it calls
+// PushNotifications.removeAllListeners(), which kills the native
+// `pushNotificationActionPerformed` (tap) listener for the entire app, and
+// drops the realtime channel. Seven components call this hook (MainApp plus
+// every tab page and two admin screens), so having each one run that
+// teardown on its own unmount meant a single tab unmounting silently left
+// the app with ZERO tap listeners - the components still mounted never
+// re-register, since their effects don't re-run. Tapping a notification then
+// did nothing at all: the app just resumed on whatever tab was already open.
+// Counting live consumers and only tearing down when the last one goes keeps
+// the listeners alive for as long as anything still needs them.
+let activePushConsumers = 0;
+
 export const usePushNotifications = (userId?: string) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -109,11 +122,17 @@ export const usePushNotifications = (userId?: string) => {
       }
     };
 
+    activePushConsumers += 1;
     initializePushNotificationsAsync();
 
     // Cleanup on unmount
     return () => {
-      cleanupPushNotifications();
+      activePushConsumers = Math.max(0, activePushConsumers - 1);
+      // Only the last consumer standing tears down the shared listeners -
+      // see activePushConsumers above.
+      if (activePushConsumers === 0) {
+        cleanupPushNotifications();
+      }
       if (batchCheckIntervalRef.current) {
         clearInterval(batchCheckIntervalRef.current);
       }
