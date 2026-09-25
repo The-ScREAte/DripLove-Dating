@@ -125,6 +125,15 @@ export const clearThreadNotifications = async (threadKey: string): Promise<void>
 
 class SupabasePushNotificationService {
   private isInitialized = false;
+  // MainApp and whichever tab mounts alongside it (DiscoverPage, ChatPage,
+  // etc - all six call usePushNotifications independently) call initialize()
+  // in the same render. Without caching the in-flight promise, each call saw
+  // isInitialized still false and independently ran
+  // initializeNativePushNotifications, which registers native listeners with
+  // no dedup of its own - so a single real push fired
+  // handleNotificationAction/handleForegroundNotification once per
+  // concurrent caller (duplicate in-app toast on a foreground push).
+  private initPromise: Promise<boolean> | null = null;
   private deviceToken: string | null = null;
   private realtimeChannel: RealtimeChannel | null = null;
   private currentUserId: string | null = null;
@@ -163,7 +172,20 @@ class SupabasePushNotificationService {
 
   async initialize(userId: string): Promise<boolean> {
     if (this.isInitialized) return true;
+    // See initPromise's declaration above: this makes concurrent callers
+    // within the same render await the one real initialization instead of
+    // each independently registering their own native listeners.
+    if (this.initPromise) return this.initPromise;
 
+    this.initPromise = this.doInitialize(userId);
+    try {
+      return await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async doInitialize(userId: string): Promise<boolean> {
     try {
       this.currentUserId = userId;
 

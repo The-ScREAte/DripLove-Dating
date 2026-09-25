@@ -152,8 +152,35 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // A tapped notification, handled while the app is already running: these
   // carry the exact thing to open (a conversation, a person in Circle) into
   // the tab that owns it, which then clears them once consumed.
-  const [chatDeepLinkMatchId, setChatDeepLinkMatchId] = useState<string | null>(null);
-  const [circleDeepLinkProfileId, setCircleDeepLinkProfileId] = useState<string | null>(null);
+  //
+  // Also read directly from the URL on first mount, same as getInitialTab()
+  // above and for the same reason: on Android cold start, MainActivity
+  // injects history.replaceState + a manually-dispatched 'popstate' event
+  // into the WebView as soon as document.documentElement exists - which is
+  // far earlier than React mounting and this component's own popstate
+  // listener (below) attaching. That dispatched event fires into a page
+  // with no listener yet and is lost, but replaceState's URL change isn't
+  // transient - it's still sitting in window.location.search whenever this
+  // component's first render actually happens. Without reading it here too,
+  // a cold-started message/circle-profile tap landed on the right TAB (via
+  // getInitialTab's own URL read) but never opened the specific conversation
+  // or profile it pointed at.
+  const [chatDeepLinkMatchId, setChatDeepLinkMatchId] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('tab') === 'chat' ? params.get('matchId') : null;
+    } catch {
+      return null;
+    }
+  });
+  const [circleDeepLinkProfileId, setCircleDeepLinkProfileId] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('tab') === 'circle' ? params.get('circleUserId') : null;
+    } catch {
+      return null;
+    }
+  });
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -284,11 +311,20 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Bounded so a stalled request fails fast into the catch block below
+      // instead of hanging indefinitely. This left ChatPage's full-screen
+      // "Loading chats..." gate (it renders nothing else while currentUser
+      // is null) stuck forever with no feedback - most visible right after a
+      // notification tap wakes the app from the background, when the
+      // network/session needs a moment to reconnect and this request could
+      // just sit pending the whole time.
+      const PROFILE_FETCH_TIMEOUT_MS = 10000;
+      const { data, error } = await Promise.race([
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error('Profile fetch timed out')), PROFILE_FETCH_TIMEOUT_MS)
+        ),
+      ]);
 
       if (error) {
         console.error('[MainApp] Profile fetch error:', error);
@@ -963,6 +999,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       listenerPromise.then((listener) => listener.remove()).catch(() => {});
     };
   }, [userId]);
+
+  // If the initial profile load never completed (see the timeout in
+  // fetchUserProfile above), retry it the moment the app comes back to the
+  // foreground - the exact point the network/session has usually recovered.
+  // Without this, a stalled first attempt left the user stuck on whichever
+  // tab's loading gate depends on profile (e.g. ChatPage's full-screen
+  // "Loading chats...") with nothing to ever trigger a second try.
+  useEffect(() => {
+    if (!userId) return;
+    const retryIfStillMissing = () => {
+      if (!profile) void fetchUserProfile();
+    };
+    const listenerPromise = App.addListener('resume', retryIfStillMissing);
+    return () => {
+      listenerPromise.then((listener) => listener.remove()).catch(() => {});
+    };
+  }, [userId, profile, fetchUserProfile]);
 
     // Silent push notification initialization - no user notifications
   useEffect(() => {

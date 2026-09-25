@@ -1,0 +1,22 @@
+-- CRITICAL FIX: pg_net was fully uninstalled from this database at some
+-- point around 2026-09-16 23:11 UTC (cause unknown - not something this
+-- repo's migrations did; likely a manual action or a platform-side change).
+-- Every cron-triggered notification (welcome, streak reminder, streak
+-- broken, recommendation nudge, re-engagement nudge) calls net.http_post(...)
+-- to reach the send-push-notification edge function, and every one of them
+-- has been failing on every single run since with "schema net does not
+-- exist" - confirmed via cron.job_run_details. Two of the five jobs
+-- (recommendation, re-engagement) had never once succeeded since they were
+-- created, because they were created after the outage started.
+--
+-- Reinstalling into a schema explicitly named "net" (rather than the
+-- "extensions" schema some newer Supabase projects default to) because
+-- every existing function in this codebase already calls net.http_post
+-- unqualified - matching the schema name avoids rewriting ~15 functions.
+
+-- No WITH SCHEMA clause: pg_net's own install script creates and owns its
+-- "net" schema internally. Specifying WITH SCHEMA net explicitly conflicts
+-- with that (Postgres error 55000, "schema net is not a member of extension
+-- pg_net") because the extension insists on creating/owning that schema
+-- itself rather than adopting a pre-existing or externally-named one.
+CREATE EXTENSION IF NOT EXISTS pg_net;

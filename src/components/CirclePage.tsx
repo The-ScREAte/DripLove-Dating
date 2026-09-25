@@ -1236,15 +1236,39 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     if (params.get('circleUserId')) {
       window.history.replaceState({}, '', window.location.pathname);
     }
-    onDeepLinkConsumed?.();
+
+    let cancelled = false;
     void (async () => {
-      const [profile] = await fetchCircleProfilesByIds([circleUserId]);
-      if (profile && await isCircleProfileEligible(currentUser, profile, isPremium)) {
-        openCircleRowProfile('recommended', profile);
-      } else {
-        toast({ title: 'Profile unavailable', description: 'This profile is no longer available in your Circle.' });
+      // Up to 2 attempts with a short backoff before giving up - this used
+      // to call onDeepLinkConsumed() and fetch in one shot with no
+      // try/catch, so a thrown error (a plain network blip - most likely
+      // right when the app resumes from background, exactly when a
+      // notification tap wakes it) was an unhandled rejection that silently
+      // dropped the deep link with no retry and no feedback at all.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const [profile] = await fetchCircleProfilesByIds([circleUserId]);
+          if (cancelled) return;
+          if (profile && await isCircleProfileEligible(currentUser, profile, isPremium)) {
+            openCircleRowProfile('recommended', profile);
+          } else {
+            toast({ title: 'Profile unavailable', description: 'This profile is no longer available in your Circle.' });
+          }
+          break;
+        } catch (err) {
+          console.error('[CirclePage] Deep-link profile fetch failed:', err);
+          if (attempt === 2) {
+            if (!cancelled) {
+              toast({ title: 'Could not open profile', description: 'Check your connection and try tapping the notification again.' });
+            }
+            break;
+          }
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        }
       }
+      if (!cancelled) onDeepLinkConsumed?.();
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, deepLinkProfileId]);
 
