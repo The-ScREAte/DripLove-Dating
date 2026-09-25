@@ -1769,8 +1769,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       {/* Free trial offer - one-time bottom sheet, first eligible app open */}
       <FreeTrialBottomSheet userId={userId} />
 
-      {/* Daily login streak flash - once per calendar day, right after record_daily_login confirms a fresh day */}
-      {dailyStreak?.isNewDay && (
+      {/* Daily login streak flash - once per calendar day, right after record_daily_login
+          confirms a fresh day. Day 1 of a streak (a brand-new account's first login, or a
+          restart after a lapse) is deliberately excluded - record_daily_login still records
+          it as a real streak day (it feeds Discover's priority weighting either way), but
+          there's nothing to celebrate yet on day 1 itself. The flash starts once there's an
+          actual streak to show, from day 2 on. */}
+      {dailyStreak?.isNewDay && dailyStreak.currentStreak >= 2 && (
         <StreakFlash currentStreak={dailyStreak.currentStreak} onClose={dismissStreakFlash} />
       )}
     </div>

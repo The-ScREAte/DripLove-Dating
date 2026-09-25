@@ -49,7 +49,7 @@ import { trackLikedYouShown, trackLikedYouSwiped } from '@/utils/discoverTelemet
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, X, Crown, Gamepad2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Heart, X, Crown, Gamepad2, Hand, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -832,7 +832,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // updates profile/swipe state, which can re-run this effect (or briefly flip
   // the page into the loading/out-of-swipes/ad render branch) — the old
   // clearTimeout-on-cleanup let exactly that kill the guide mid-display. Only
-  // the 10s timeout (or an explicit dismiss below) hides the guide now.
+  // the 25s timeout (or an explicit dismiss below) hides the guide now.
   const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Dismisses the guide immediately (used when the user actually swipes it,
   // instead of only auto-hiding after the timer) and permanently marks it
@@ -862,7 +862,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     setShowSwipeGuide(true);
     swipeGuideTimerRef.current = setTimeout(() => {
       dismissSwipeGuide();
-    }, 10000); // 10 seconds
+    }, 25000); // 25 seconds
   }, [currentUser?.id, dismissSwipeGuide]);
 
   // The guide overlay is swipeable, but ONLY itself - it has its own fully
@@ -5471,7 +5471,24 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // center. Either way the real card is never touched, so this can never
     // count as an actual like/pass.
     <div
-      className="fixed inset-0 z-[9999]"
+      // Plain absolute inset-0, same pattern as the "Double Date coming
+      // soon" overlay a few lines below - both need to render as a child of
+      // discover-container (position: relative, h-full w-full), not fixed
+      // to the viewport. discover-container's own height already excludes
+      // MainApp's small paddingBottom gap above the nav (that gap only
+      // applies to the dripcheck tab - see the "Small breathing room"
+      // comment in MainApp.tsx), because it's sized via ordinary
+      // percentage-height inheritance through normal-flow ancestors, not a
+      // fixed/calc'd offset - so inset-0 here lands in exactly the same
+      // place the real card's own edges do, gap included, automatically.
+      //
+      // z-[10000], one above DiscoverTopBar's z-[9999]: DiscoverTopBar
+      // portals its filter icon/category tabs to document.body as a later
+      // DOM sibling of the whole app root, so on an equal z-index it wins
+      // the paint-order tie and shows through on top of this overlay's top
+      // strip. A strictly higher z-index here removes the tie instead of
+      // depending on DOM order.
+      className="absolute inset-0 z-[10000]"
       onTouchStart={handleGuideTouchStart}
       onTouchMove={handleGuideTouchMove}
       onTouchEnd={handleGuideTouchEnd}
@@ -5492,13 +5509,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           70% { box-shadow: 0 0 0 14px rgba(225, 29, 72, 0); }
           100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
         }
-        @keyframes arrowNudgeLeft {
-          0%, 100% { transform: translateX(0); opacity: 0.55; }
-          50% { transform: translateX(-6px); opacity: 1; }
-        }
-        @keyframes arrowNudgeRight {
-          0%, 100% { transform: translateX(0); opacity: 0.55; }
-          50% { transform: translateX(6px); opacity: 1; }
+        @keyframes handSwipeNudge {
+          0%, 100% { transform: translateX(-13px); opacity: 0.7; }
+          50% { transform: translateX(13px); opacity: 1; }
         }
         .swipe-guide-card {
           animation: swipeGuideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -5509,8 +5522,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         .swipe-guide-icon-right {
           animation: ringPulseRed 1.6s ease-out infinite;
         }
-        .swipe-guide-arrow-left { animation: arrowNudgeLeft 1.2s ease-in-out infinite; }
-        .swipe-guide-arrow-right { animation: arrowNudgeRight 1.2s ease-in-out infinite; }
+        .swipe-guide-hand-icon { animation: handSwipeNudge 1.8s ease-in-out infinite; }
       `}</style>
       {/* This is the whole "card" being swiped - the dark blurred scrim itself,
           with a visible border around it, not just the tagline/icons floating
@@ -5537,17 +5549,42 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               }),
         }}
       >
-      <div className="swipe-guide-card flex flex-col items-center gap-6">
+      <div className="swipe-guide-card flex flex-col items-center gap-5">
         <p
           className="font-brush text-center text-white font-bold px-8"
           style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)', maxWidth: 320, fontSize: '26px' }}
         >
           Love awaits — a beautiful journey begins by swiping on DripLove.
         </p>
+        {/* Subtle cue between the message and the buttons, replacing the
+            previous large side arrows: a thin curved double-headed arrow
+            with a small hand icon riding along it, nudging left-right, plus
+            a short caption. The X/heart pair below is unchanged - it's
+            teaching the real actions, not decoration. */}
+        <div className="flex flex-col items-center gap-2">
+          <div
+            className="relative flex items-center justify-center"
+            style={{ width: 72, height: 28, filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.45))' }}
+          >
+            <svg width="72" height="28" viewBox="0 0 72 28" fill="none" className="absolute inset-0 text-white/70">
+              <path d="M8 16 Q36 2 64 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M8 16 L13.5 12 M8 16 L13.5 20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M64 16 L58.5 12 M64 16 L58.5 20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <Hand
+              className="swipe-guide-hand-icon absolute w-4 h-4 text-white"
+              style={{ top: 0 }}
+              strokeWidth={2}
+            />
+          </div>
+          <p
+            className="text-white/85 text-[13px] font-medium tracking-wide"
+            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}
+          >
+            Swipe to connect
+          </p>
+        </div>
         <div className="flex flex-row items-center gap-6">
-          {/* Swipe Left - Nope. Arrow sits outboard (further left), pointing
-              further left - away from center, in the actual swipe direction. */}
-          <ChevronLeft className="swipe-guide-arrow-left w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
           <div
             className="swipe-guide-icon-left rounded-full flex items-center justify-center shrink-0"
             style={{
@@ -5560,8 +5597,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             <X className="w-9 h-9" style={{ color: '#ef4444' }} strokeWidth={3} />
           </div>
           <div className="w-4" />
-          {/* Swipe Right - Like. Arrow sits outboard (further right), pointing
-              further right - away from center, in the actual swipe direction. */}
           <div
             className="swipe-guide-icon-right rounded-full flex items-center justify-center shrink-0"
             style={{
@@ -5573,7 +5608,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           >
             <Heart className="w-9 h-9" style={{ color: 'white' }} strokeWidth={0} fill="white" />
           </div>
-          <ChevronRight className="swipe-guide-arrow-right w-6 h-6 text-white/70 shrink-0" strokeWidth={3} />
         </div>
       </div>
       </div>
@@ -5691,7 +5725,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     return (
       <>
-      {swipeGuideOverlay}
       <div className="h-full w-full relative overflow-hidden"
            style={{
              // Plain in-flow box: MainApp's content wrapper already reserves the header
@@ -5704,6 +5737,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
              WebkitUserSelect: 'none',
              WebkitTouchCallout: 'none'
            }}>
+        {/* Child of this div (not a preceding sibling) so its absolute
+            inset-0 resolves against this same relative, gap-inclusive box -
+            see swipeGuideOverlay's own definition for why. */}
+        {swipeGuideOverlay}
 
         <div ref={cardElRef} className="h-full w-full relative z-10 flex flex-col"
              style={{
