@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import UserNotifications
 
 @objc(SceneDelegate)
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -76,8 +77,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         // Called when the scene has moved from an inactive state to an active state.
-        // Clear badge count when scene becomes active
-        UIApplication.shared.applicationIconBadgeNumber = 0
+        // applicationIconBadgeNumber = 0 clears the icon badge but also wipes every
+        // delivered notification from Notification Center as a side effect - that's
+        // what was clearing the whole notification shade on every app open/resume.
+        // setBadgeCount only touches the icon number.
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(0)
+        }
     }
 
     func sceneWillResignActive(_ scene: UIScene) {

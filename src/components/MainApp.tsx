@@ -1338,7 +1338,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const action = data?.action as string | undefined;
       const profileId = data?.profileId as string | undefined;
       const chatId = data?.chatId as string | undefined;
-      const showStreakBanner = data?.showStreakBanner === true;
+      const showStreakBanner = data?.showStreakBanner === true || data?.showStreakBanner === 'true';
 
       // action wins over type (a broadcast can carry both - type there only
       // picks the notification's channel/sound) - matches

@@ -180,7 +180,14 @@ serve(async (req) => {
         .maybeSingle()
       resolvedImageUrl = senderImage?.image_url
     }
-    const notificationData = resolvedImageUrl ? { ...data, imageUrl: resolvedImageUrl } : data
+    const rawNotificationData = resolvedImageUrl ? { ...data, imageUrl: resolvedImageUrl } : data
+    // FCM's "data" payload only accepts string values - a boolean like
+    // showStreakBanner: true gets the whole send rejected with a 400,
+    // which is why streak-reminder pushes silently failed while every
+    // other type (plain strings only) went through fine.
+    const notificationData = Object.fromEntries(
+      Object.entries(rawNotificationData ?? {}).map(([key, value]) => [key, String(value)])
+    )
 
     // Get user's push tokens
     const { data: tokens, error: tokensError } = await supabase
