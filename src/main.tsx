@@ -57,8 +57,14 @@ if (import.meta.env.PROD) {
 }
 
 // Minimal branded loading screen used during bootstrap/session hydration.
+// Same background as the native splash screen (#7A0A40, both platforms) and
+// Index.tsx's own loading screen further down the boot sequence - three
+// different loading screens with three different colors used to fire in a
+// row on cold start (native splash -> this -> Index's), each swap reading
+// as a visible "blink" purely from the background color jumping, even
+// though nothing was actually broken. One consistent color removes that.
 const LoadingScreen = () => (
-  <div className="w-full h-screen flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-500 to-pink-500">
+  <div className="w-full h-screen flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e]">
     <HoppingLogo size={64} />
   </div>
 );

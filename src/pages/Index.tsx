@@ -47,7 +47,17 @@ const Index = ({
   const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(
     isAuthenticated ? 'app' : 'welcome'
   );
-  const [loading, setLoading] = useState(false);
+  // Starts true, matching currentView above, for an already-authenticated
+  // cold start: the effect below always sets this true anyway for that same
+  // case (to run checkUserTypeAndRedirect), but effects only run AFTER the
+  // first paint - so starting this false meant the real app tree (MainApp)
+  // painted once, then got swapped out for the loading screen a moment
+  // later, then swapped back in again once redirect-checking finished. That
+  // extra flash of real content sandwiched between two loading screens was
+  // one of the "blinks" on cold start. Starting already-loading here means
+  // the loading screen is what actually paints first, with no flash of the
+  // app in between.
+  const [loading, setLoading] = useState(isAuthenticated);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();

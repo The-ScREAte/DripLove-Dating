@@ -56,6 +56,12 @@ export const resolveNotificationRoute = (
   type: string | undefined,
   data: Record<string, unknown> | undefined
 ): string => {
+  // showStreakBanner (set only by the streak-reminder push, never the
+  // streak-broken one - current_streak is 0 by then, nothing to celebrate)
+  // needs to survive as a query param, same as circle/chat's ids below, so a
+  // cold start can still show the progress banner instead of just landing
+  // silently on Discover.
+  if (data?.action === 'open_discover' && data?.showStreakBanner) return '/?tab=dripcheck&showStreak=1';
   if (data?.action === 'open_discover') return '/';
   if (data?.action === 'open_games') return '/games';
   if (data?.action === 'open_circle_profile' && data?.profileId) {

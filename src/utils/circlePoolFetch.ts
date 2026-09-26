@@ -37,6 +37,65 @@ const KM_PER_DEGREE_LATITUDE = 111.32;
 // which is what made Circle look like it "refreshed" on every single visit.
 export const CIRCLE_CACHE_TTL_MS = 2 * 60 * 1000;
 
+// Persists the pool and the resolved Recommended/Similar rows to localStorage
+// (same TTL, same shape as the window.circleCache/window.circleRowsCache
+// in-memory Maps these mirror), so a genuine app restart - not just
+// switching tabs within the same session - can also hydrate Circle
+// instantly instead of starting from a blank loading state. The in-memory
+// Maps alone only ever solved "reopen the tab this session"; they're wiped
+// the moment the JS process restarts, which is exactly when the user
+// actually closes and reopens the app. Mirrors DiscoverPage's own
+// writeDeckCache/readDeckCache (localStorage, same TTL pattern) - Discover
+// already survives a restart this way, Circle never did.
+const CIRCLE_POOL_STORAGE_PREFIX = 'driplove_circle_pool_';
+const CIRCLE_ROWS_STORAGE_PREFIX = 'driplove_circle_rows_';
+
+export const readCirclePoolCache = (userId: string): unknown[] | null => {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(CIRCLE_POOL_STORAGE_PREFIX + userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ts: number; pool: unknown[] };
+    if (!parsed?.ts || !Array.isArray(parsed?.pool)) return null;
+    if (Date.now() - parsed.ts > CIRCLE_CACHE_TTL_MS) return null;
+    return parsed.pool;
+  } catch {
+    return null;
+  }
+};
+
+export const writeCirclePoolCache = (userId: string, pool: unknown[]): void => {
+  if (!userId || !Array.isArray(pool) || pool.length === 0) return;
+  try {
+    localStorage.setItem(CIRCLE_POOL_STORAGE_PREFIX + userId, JSON.stringify({ ts: Date.now(), pool }));
+  } catch {
+    // Storage full/unavailable - the in-memory cache still covers this session.
+  }
+};
+
+export const readCircleRowsCache = (userId: string): { recommended: unknown[]; similar: unknown[] } | null => {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(CIRCLE_ROWS_STORAGE_PREFIX + userId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ts: number; recommended: unknown[]; similar: unknown[] };
+    if (!parsed?.ts || !Array.isArray(parsed?.recommended) || !Array.isArray(parsed?.similar)) return null;
+    if (Date.now() - parsed.ts > CIRCLE_CACHE_TTL_MS) return null;
+    return { recommended: parsed.recommended, similar: parsed.similar };
+  } catch {
+    return null;
+  }
+};
+
+export const writeCircleRowsCache = (userId: string, recommended: unknown[], similar: unknown[]): void => {
+  if (!userId) return;
+  try {
+    localStorage.setItem(CIRCLE_ROWS_STORAGE_PREFIX + userId, JSON.stringify({ ts: Date.now(), recommended, similar }));
+  } catch {
+    // ignore
+  }
+};
+
 // Same distance-cap formula fetchCirclePool uses below, pulled out so any
 // other Circle query (category-tile counts, category browse) can filter by
 // the viewer's real distance/archived rules instead of silently ignoring

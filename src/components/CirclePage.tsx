@@ -18,6 +18,10 @@ import {
   getCircleCountrySplit,
   isCircleProfileEligible,
   CIRCLE_CACHE_TTL_MS,
+  readCirclePoolCache,
+  writeCirclePoolCache,
+  readCircleRowsCache,
+  writeCircleRowsCache,
 } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import PremiumUpgrade from './PremiumUpgrade';
@@ -599,8 +603,15 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // iOS/Android only read true once the actual store confirms a trial
   // offer is available for this account.
   const { eligibleForTrial } = useFreeTrialOffer(currentUser?.id);
-  const [pool, setPool] = useState<CircleProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Hydrated straight from localStorage (survives a real app restart, unlike
+  // window.circleCache below which is wiped the moment the JS process
+  // restarts) so reopening the app - not just switching back to this tab
+  // within the same session - can also show the same pool instantly instead
+  // of a blank loading state.
+  const [pool, setPool] = useState<CircleProfile[]>(
+    () => (readCirclePoolCache(currentUser?.id || '') as CircleProfile[] | null) ?? []
+  );
+  const [loading, setLoading] = useState(() => pool.length === 0);
   // Tiles render immediately with their label/icon and no count (count: null
   // already renders as no number - see the grid below) instead of the whole
   // grid staying blank until all 12 count queries finish. Real counts fill
@@ -630,12 +641,19 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // session already resolved it) so reopening Circle shows the same
   // Recommended/Similar rows instantly instead of going through the whole
   // stored-batch-fetch-and-reconcile dance - and its loading state - again.
-  const [recommendedBatch, setRecommendedBatch] = useState<CircleProfile[] | null>(
-    () => (window.circleRowsCache?.get(currentUser?.id || '')?.recommended as CircleProfile[] | undefined) ?? null
-  );
-  const [similarBatch, setSimilarBatch] = useState<CircleProfile[] | null>(
-    () => (window.circleRowsCache?.get(currentUser?.id || '')?.similar as CircleProfile[] | undefined) ?? null
-  );
+  // Falls back to the localStorage cache (survives a real app restart) when
+  // the in-memory window.circleRowsCache is empty, e.g. right after the app
+  // was actually closed and reopened rather than just switching tabs.
+  const [recommendedBatch, setRecommendedBatch] = useState<CircleProfile[] | null>(() => {
+    const fromMemory = window.circleRowsCache?.get(currentUser?.id || '')?.recommended as CircleProfile[] | undefined;
+    if (fromMemory) return fromMemory;
+    return (readCircleRowsCache(currentUser?.id || '')?.recommended as CircleProfile[] | undefined) ?? null;
+  });
+  const [similarBatch, setSimilarBatch] = useState<CircleProfile[] | null>(() => {
+    const fromMemory = window.circleRowsCache?.get(currentUser?.id || '')?.similar as CircleProfile[] | undefined;
+    if (fromMemory) return fromMemory;
+    return (readCircleRowsCache(currentUser?.id || '')?.similar as CircleProfile[] | undefined) ?? null;
+  });
   // Which row a currently-open profile preview came from, so a like/pass
   // removes it from the right batch instead of just the general pool.
   const [activeRowKey, setActiveRowKey] = useState<CircleRowKey | null>(null);
@@ -837,6 +855,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           setPool(withPhotos);
           setLoading(false);
           window.circleCache?.set(userId, { pool: withPhotos, timestamp: Date.now() });
+          writeCirclePoolCache(userId, withPhotos);
         }
       } catch {
         if (!cancelled && !cached) { setPool([]); setLoading(false); }
@@ -1105,16 +1124,21 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // Mirrors both batches into window.circleRowsCache on every change (however
   // they changed - freshly resolved, reconciled, or trimmed after a decision)
   // so the very next time this component mounts, the lazy useState
-  // initializers above find them ready and skip the load entirely.
+  // initializers above find them ready and skip the load entirely. Also
+  // mirrored to localStorage so that still holds after a real app restart,
+  // not just a same-session remount.
   useEffect(() => {
     if (!currentUser?.id) return;
     if (recommendedBatch === null && similarBatch === null) return;
     const existing = window.circleRowsCache?.get(currentUser.id);
+    const nextRecommended = recommendedBatch ?? existing?.recommended ?? [];
+    const nextSimilar = similarBatch ?? existing?.similar ?? [];
     window.circleRowsCache?.set(currentUser.id, {
-      recommended: recommendedBatch ?? existing?.recommended ?? [],
-      similar: similarBatch ?? existing?.similar ?? [],
+      recommended: nextRecommended,
+      similar: nextSimilar,
       timestamp: Date.now(),
     });
+    writeCircleRowsCache(currentUser.id, nextRecommended, nextSimilar);
   }, [currentUser?.id, recommendedBatch, similarBatch]);
 
   // Free: only index 0 is ever unlocked - that's the one "lucky swipe," and

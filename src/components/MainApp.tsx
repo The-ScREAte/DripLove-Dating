@@ -19,7 +19,7 @@ import { useActivityTracker } from '@/hooks/useActivityTracker';
 import { useDailyStreak } from '@/hooks/useDailyStreak';
 import StreakFlash from '@/components/StreakFlash';
 import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
-import { fetchCirclePool, CIRCLE_CACHE_TTL_MS } from '@/utils/circlePoolFetch';
+import { fetchCirclePool, CIRCLE_CACHE_TTL_MS, writeCirclePoolCache } from '@/utils/circlePoolFetch';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
@@ -202,6 +202,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       return null;
     }
   });
+  // Tapping a streak-reminder push (send_streak_reminder_notifications sets
+  // data.showStreakBanner) should show the same StreakFlash progress banner
+  // the app already shows automatically once a day - not just silently land
+  // on Discover with nothing to show for the tap. Same URL-read-on-mount
+  // pattern as the two deep-link ids above, for the same cold-start reason.
+  // Deliberately not offered for the "streak broken" push - current_streak
+  // is reset to 0 by then, and the banner has nothing meaningful to
+  // celebrate at that point.
+  const [showStreakBannerFromTap, setShowStreakBannerFromTap] = useState<boolean>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('tab') === 'dripcheck' && params.get('showStreak') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -248,8 +264,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const url = new URL(window.location.href);
-      if (url.searchParams.has('tab')) {
+      if (url.searchParams.has('tab') || url.searchParams.has('showStreak')) {
         url.searchParams.delete('tab');
+        url.searchParams.delete('showStreak');
         window.history.replaceState({}, '', url.pathname + url.search + url.hash);
       }
     }, 3000);
@@ -786,6 +803,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     try {
       const pool = await fetchCirclePool(profile, isPremium);
       window.circleCache?.set(targetUserId, { pool, timestamp: Date.now() });
+      writeCirclePoolCache(targetUserId, pool);
     } catch {
       // Silently handle preload errors - CirclePage falls back to its own
       // live fetch if no cache ends up populated.
@@ -1320,6 +1338,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const action = data?.action as string | undefined;
       const profileId = data?.profileId as string | undefined;
       const chatId = data?.chatId as string | undefined;
+      const showStreakBanner = data?.showStreakBanner === true;
 
       // action wins over type (a broadcast can carry both - type there only
       // picks the notification's channel/sound) - matches
@@ -1328,6 +1347,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // `type` happened to be instead of landing on Discover.
       if (action === 'open_discover') {
         handleTabChange('dripcheck');
+        if (showStreakBanner) setShowStreakBannerFromTap(true);
         return;
       }
       if (action === 'open_games') {
@@ -1829,6 +1849,19 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           actual streak to show, from day 2 on. */}
       {dailyStreak?.isNewDay && dailyStreak.currentStreak >= 2 && (
         <StreakFlash currentStreak={dailyStreak.currentStreak} onClose={dismissStreakFlash} />
+      )}
+
+      {/* Tapping the streak-reminder push shows this same banner with their
+          real current progress, instead of silently landing on Discover with
+          nothing to show for the tap - see showStreakBannerFromTap above. */}
+      {!dailyStreak?.isNewDay && showStreakBannerFromTap && (profile?.current_streak ?? 0) >= 1 && (
+        <StreakFlash
+          currentStreak={profile?.current_streak ?? 0}
+          onClose={() => {
+            setShowStreakBannerFromTap(false);
+            clearNotificationParams(['tab', 'showStreak']);
+          }}
+        />
       )}
     </div>
   );
