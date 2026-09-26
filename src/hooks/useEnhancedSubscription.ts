@@ -12,6 +12,14 @@ interface SubscriptionStatus {
   payment_method?: string
 }
 
+// Mirrors the grace period in get_current_subscription_status
+// (20260926230000_add_grace_period_to_subscription_expiry_check.sql). A
+// blind expires_at <= now() check here had no buffer for Apple/Google's
+// renewal webhook to land, so a user who WAS actually charged successfully
+// could get flipped to free the instant expires_at passed, purely because
+// this client-side check ran before the webhook update arrived.
+const SUBSCRIPTION_GRACE_PERIOD_MS = 30 * 60 * 1000
+
 // Check if we should verify with the native store
 const shouldVerifyWithStore = () => {
   return Capacitor.isNativePlatform() && 
@@ -76,7 +84,7 @@ export function useEnhancedSubscription() {
       // If DB says premium but store says not owned - subscription may have expired/been cancelled
       if (dbSubscription?.plan_name === 'premium' && dbSubscription?.status === 'active' && !hasActiveStoreSubscription) {
         // Check expiry date as final confirmation
-        if (dbSubscription.expires_at && new Date(dbSubscription.expires_at) <= new Date()) {
+        if (dbSubscription.expires_at && new Date(dbSubscription.expires_at).getTime() <= Date.now() - SUBSCRIPTION_GRACE_PERIOD_MS) {
           await supabase
             .from('user_subscriptions')
             .update({
@@ -141,8 +149,11 @@ export function useEnhancedSubscription() {
 
       if (quickCheck && quickCheck.plan_name === 'premium') {
         // Check if subscription has actually expired (regardless of status)
-        // Users should keep access until expires_at date, even if cancelled
-        const isExpired = quickCheck.expires_at && new Date(quickCheck.expires_at) <= new Date()
+        // Users should keep access until expires_at date, even if cancelled.
+        // Grace period matters here specifically: a renewal webhook landing
+        // even a few seconds after expires_at shouldn't cost the user a
+        // visible block in the meantime.
+        const isExpired = quickCheck.expires_at && new Date(quickCheck.expires_at).getTime() <= Date.now() - SUBSCRIPTION_GRACE_PERIOD_MS
         
         if (isExpired) {
           // Subscription has expired - update the database and set to free

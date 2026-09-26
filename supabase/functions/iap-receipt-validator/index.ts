@@ -242,6 +242,10 @@ serve(async (req) => {
           auto_renew: true,
           payment_method: 'apple',
           is_trial: isTrialTransaction,
+          // Lets subscription-checker actually re-verify this subscription
+          // with Apple later instead of only re-reading our own expires_at -
+          // see 20260926220000_store_apple_receipt_for_reverification.sql.
+          latest_receipt_data: receiptData,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
 

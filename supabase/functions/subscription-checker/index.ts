@@ -122,7 +122,8 @@ async function verifyGoogleSubscription(
   purchaseToken: string
 ): Promise<{ expiryTimeMillis: number; autoRenewing: boolean } | null> {
   const subscriptionIds = ['premium_monthly', 'monthly']
-  
+  const shortToken = purchaseToken.slice(0, 12)
+
   // Try v3 endpoint
   for (const subId of subscriptionIds) {
     try {
@@ -135,9 +136,15 @@ async function verifyGoogleSubscription(
           autoRenewing: data.autoRenewing === true,
         }
       }
-    } catch {}
+      // Was previously swallowed silently, so every failure just became a
+      // count with no way to tell a 404 (wrong subId, expected here since we
+      // try 2 guesses) apart from a 401/403 (bad credentials) or 5xx.
+      console.log(`[SUBSCRIPTION-CHECKER] Google v3/${subId} for token ${shortToken}...: ${response.status} ${await response.text()}`)
+    } catch (err) {
+      console.error(`[SUBSCRIPTION-CHECKER] Google v3/${subId} fetch threw for token ${shortToken}...:`, err)
+    }
   }
-  
+
   // Fallback to v2 endpoint
   try {
     const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${GOOGLE_PACKAGE_NAME}/purchases/subscriptionsv2/tokens/${purchaseToken}`
@@ -151,8 +158,11 @@ async function verifyGoogleSubscription(
         autoRenewing: !!firstLineItem?.autoRenewingPlan,
       }
     }
-  } catch {}
-  
+    console.error(`[SUBSCRIPTION-CHECKER] Google v2 for token ${shortToken}...: ${response.status} ${await response.text()}`)
+  } catch (err) {
+    console.error(`[SUBSCRIPTION-CHECKER] Google v2 fetch threw for token ${shortToken}...:`, err)
+  }
+
   return null
 }
 
@@ -398,48 +408,100 @@ serve(async (req) => {
     
     if (APPLE_SHARED_SECRET) {
       console.log('[SUBSCRIPTION-CHECKER] Syncing Apple App Store subscriptions...')
-      
-      // Get all Apple subscriptions that might need syncing
-      // NOTE: We need the receipt data stored somewhere - for now we'll just check expiry dates
-      // In the future, store the latest_receipt in the database for re-validation
+
+      // Only subscriptions with a stored receipt can be re-validated - older
+      // rows from before latest_receipt_data existed just fall through to
+      // the expiry-date check below, same as before.
       const { data: appleSubs } = await supabase
         .from('user_subscriptions')
-        .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew')
+        .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew, latest_receipt_data')
         .eq('payment_method', 'apple')
         .in('status', ['active', 'cancelled', 'payment_pending', 'expired', 'payment_failed'])
-      
+
       if (appleSubs && appleSubs.length > 0) {
         console.log(`[SUBSCRIPTION-CHECKER] Found ${appleSubs.length} Apple subscriptions to check`)
         appleSyncStats.checked = appleSubs.length
-        
-        // For Apple, we primarily rely on webhook notifications and expiry date checking
-        // Full receipt validation requires storing receipts, which we can add later if needed
+
         for (const sub of appleSubs) {
           try {
-            const dbExpiresAt = new Date(sub.expires_at).getTime()
-            const now = Date.now()
-            const isExpiredInDb = dbExpiresAt < now
+            const nowMs = Date.now()
+            const dbExpiresAtMs = sub.expires_at ? new Date(sub.expires_at).getTime() : NaN
+            const dbHasValidExpiry = Number.isFinite(dbExpiresAtMs)
+            const dbStillEntitled = dbHasValidExpiry && dbExpiresAtMs > nowMs
+            const isExpiredInDb = dbHasValidExpiry && dbExpiresAtMs < nowMs
             const isActiveInDb = sub.status === 'active'
-            
-            // Check for stuck subscriptions (expired but still active)
+
+            if (sub.latest_receipt_data) {
+              // Real re-verification against Apple's servers - the same
+              // receipt blob can be re-submitted indefinitely and always
+              // returns the subscription's current, live status.
+              const appleData = await validateAppleReceipt(sub.latest_receipt_data, true)
+
+              if (!appleData) {
+                console.log(`[SUBSCRIPTION-CHECKER] Could not verify Apple receipt for user ${sub.user_id}`)
+                appleSyncStats.errors++
+                continue
+              }
+
+              const isActiveOnApple = appleData.expiryTimeMillis > nowMs
+              const appleExpiresAt = new Date(appleData.expiryTimeMillis).toISOString()
+              const desiredStatus = isActiveOnApple
+                ? (appleData.autoRenewing ? 'active' : 'cancelled')
+                : sub.status
+
+              const statusMismatch = isActiveOnApple && sub.status !== desiredStatus
+              const expiryMismatch = isActiveOnApple && dbHasValidExpiry && Math.abs(dbExpiresAtMs - appleData.expiryTimeMillis) > 60000
+              const shouldBeExpired = !isActiveOnApple && sub.status === 'active' && !dbStillEntitled
+
+              if (statusMismatch || expiryMismatch) {
+                console.log(`[SUBSCRIPTION-CHECKER] 🔄 ${statusMismatch ? 'Activating' : 'Updating expiry for'} Apple subscription for user ${sub.user_id}`)
+                const { error } = await supabase
+                  .from('user_subscriptions')
+                  .update({
+                    status: desiredStatus,
+                    plan_name: 'premium',
+                    expires_at: appleExpiresAt,
+                    next_billing_date: appleExpiresAt,
+                    auto_renew: appleData.autoRenewing,
+                    provider_transaction_id: appleData.transactionId,
+                    payment_attempts: 0,
+                    is_trial: false,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', sub.id)
+
+                if (!error) {
+                  statusMismatch ? appleSyncStats.activated++ : appleSyncStats.updated++
+                } else {
+                  appleSyncStats.errors++
+                }
+              } else if (!isActiveOnApple && sub.status === 'active' && dbStillEntitled) {
+                console.warn(`[SUBSCRIPTION-CHECKER] 🛡️ Skipping Apple expiry for user ${sub.user_id} (DB still entitled, Apple says inactive)`)
+              } else if (shouldBeExpired) {
+                console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring Apple subscription for user ${sub.user_id}`)
+                const newStatus = sub.auto_renew ? 'payment_failed' : 'expired'
+                const { error } = await supabase
+                  .from('user_subscriptions')
+                  .update({ status: newStatus, plan_name: 'free', updated_at: new Date().toISOString() })
+                  .eq('id', sub.id)
+                if (!error) appleSyncStats.updated++
+                else appleSyncStats.errors++
+              }
+              continue
+            }
+
+            // No stored receipt (row predates latest_receipt_data, or the
+            // client never re-validated) - fall back to the old, honest
+            // "we can't check, just look at our own expiry" behavior.
             if (isExpiredInDb && isActiveInDb) {
-              console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring Apple subscription for user ${sub.user_id}`)
-              
+              console.log(`[SUBSCRIPTION-CHECKER] ⏰ Expiring Apple subscription for user ${sub.user_id} (no stored receipt to re-verify)`)
               const newStatus = sub.auto_renew ? 'payment_failed' : 'expired'
               const { error } = await supabase
                 .from('user_subscriptions')
-                .update({
-                  status: newStatus,
-                  plan_name: 'free',
-                  updated_at: new Date().toISOString(),
-                })
+                .update({ status: newStatus, plan_name: 'free', updated_at: new Date().toISOString() })
                 .eq('id', sub.id)
-              
-              if (!error) {
-                appleSyncStats.updated++
-              } else {
-                appleSyncStats.errors++
-              }
+              if (!error) appleSyncStats.updated++
+              else appleSyncStats.errors++
             }
           } catch (err) {
             console.error(`[SUBSCRIPTION-CHECKER] Error syncing Apple user ${sub.user_id}:`, err)
@@ -447,7 +509,7 @@ serve(async (req) => {
           }
         }
       }
-      
+
       console.log('[SUBSCRIPTION-CHECKER] Apple sync complete:', appleSyncStats)
     } else {
       console.log('[SUBSCRIPTION-CHECKER] Skipping Apple sync (no APPLE_SHARED_SECRET)')
@@ -459,10 +521,16 @@ serve(async (req) => {
     
     console.log('[SUBSCRIPTION-CHECKER] Syncing Paystack subscriptions...')
     
-    // Get all Paystack subscriptions that might need syncing
+    // Get all Paystack subscriptions that might need syncing. This was
+    // missing .eq('payment_method', 'paystack') entirely, so it re-scanned
+    // and re-processed every single subscription in the whole table on top
+    // of the dedicated Google/Apple loops above - most of the function's
+    // runtime (and a real contributor to this call exceeding pg_net's 5s
+    // default timeout) was this redundant full-table pass.
     const { data: paystackSubs } = await supabase
       .from('user_subscriptions')
       .select('id, user_id, provider_transaction_id, expires_at, status, plan_name, auto_renew, payment_attempts')
+      .eq('payment_method', 'paystack')
     if (paystackSubs && paystackSubs.length > 0) {
       console.log(`[SUBSCRIPTION-CHECKER] Found ${paystackSubs.length} Paystack subscriptions to check`)
       paystackSyncStats.checked = paystackSubs.length

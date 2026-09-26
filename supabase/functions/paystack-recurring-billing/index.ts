@@ -167,8 +167,7 @@ serve(async (req) => {
         status,
         auto_renew,
         next_billing_date,
-        payment_attempts,
-        
+        payment_attempts
       `)
       .eq('status', 'active')
       .eq('auto_renew', true)
