@@ -805,7 +805,10 @@ body.keyboard-open .chat-messages-container {
   [class*="flash"] {
     top: var(--toast-safe-top) !important;
     position: fixed !important;
-    z-index: 99999 !important;
+    /* MainApp's bottom nav bar is z-[99999] - matching that value here was
+       a tie decided by DOM order, so a toast/flash message could end up
+       stuck behind the nav depending on mount order. This must always win. */
+    z-index: 100000 !important;
     left: 16px !important;
     right: 16px !important;
     max-width: calc(100vw - 32px) !important;

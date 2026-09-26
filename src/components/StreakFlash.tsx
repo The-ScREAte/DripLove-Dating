@@ -51,7 +51,7 @@ const StreakFlash: React.FC<StreakFlashProps> = ({ currentStreak, onClose }) => 
   return (
     <div
       aria-live="polite"
-      className={`fixed inset-0 flex items-center justify-center z-50 p-4 ${
+      className={`fixed inset-0 flex items-center justify-center z-[100000] p-4 ${
         isVisible ? 'pointer-events-auto' : 'pointer-events-none'
       }`}
     >

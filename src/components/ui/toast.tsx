@@ -16,7 +16,7 @@ const ToastViewport = React.forwardRef<
     className={cn(
       // Make the viewport non-interactive so the container itself doesn't
       // intercept touches; individual toasts remain `pointer-events-auto`.
-      "toast-viewport-safe fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px] pointer-events-none",
+      "toast-viewport-safe fixed top-0 z-[100000] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px] pointer-events-none",
       className
     )}
     {...props}
