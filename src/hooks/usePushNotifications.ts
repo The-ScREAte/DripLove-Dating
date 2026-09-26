@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { 
+import { Capacitor } from '@capacitor/core';
+import {
   initializePushNotifications, 
   sendPushNotification, 
   requestNotificationPermission,
@@ -67,11 +68,25 @@ export const usePushNotifications = (userId?: string) => {
       if (!userId) return;
 
       try {
-        // Check if push notifications are supported
+        // Native push (Capacitor's own plugin, via initializePushNotifications
+        // below) has nothing to do with the web Notification API - WKWebView
+        // and Android's WebView both lack window.Notification, so gating
+        // initialization on it here meant initializeNativePushNotifications
+        // (which registers the pushNotificationActionPerformed TAP listener -
+        // see pushNotifications.ts) never ran on a real device. MainApp has
+        // its own separate, ungated effect that registers a device token, so
+        // tokens existing in the database was never actually evidence this
+        // gate was passing - it's a second, independent code path that
+        // deliberately does NOT register the tap listener (see its own
+        // comment: "do not re-add it"). That gap is exactly why a tap could
+        // deliver the push to the device (token path worked) while doing
+        // nothing when tapped (listener path never ran).
+        const nativeSupported = Capacitor.isNativePlatform();
         const webSupported = 'Notification' in window;
-        setIsSupported(webSupported);
-        
-        if (!webSupported) {
+        const supported = nativeSupported || webSupported;
+        setIsSupported(supported);
+
+        if (!supported) {
           return;
         }
 
@@ -163,7 +178,7 @@ export const usePushNotifications = (userId?: string) => {
 
     const success = await sendNotification({
       title: "It's a match",
-      body: `You and ${matchedUserName} caught each other's eye. Say hello!`,
+      body: `You and ${matchedUserName} matched — say hello`,
       userId: targetUserId,
       type: 'match',
       // senderId lets the edge function resolve this device's own photo
@@ -193,7 +208,7 @@ export const usePushNotifications = (userId?: string) => {
       return false;
     }
 
-    const preview = message.length > 100 ? message.substring(0, 100) + '...' : message;
+    const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
     const success = await sendNotification({
       title: senderName,
       body: preview,
@@ -227,7 +242,7 @@ export const usePushNotifications = (userId?: string) => {
     if (shouldNotify && !isUserActive()) {
       const success = await sendNotification({
         title: 'New interest in your profile',
-        body: "You're catching some eyes. See who's interested!",
+        body: "You're catching eyes — see who's interested",
         userId: targetUserId,
         type: 'like',
         // senderId (the most recent liker) lets the edge function resolve
@@ -325,4 +340,3 @@ export const usePushNotifications = (userId?: string) => {
     flushLikeNotifications
   };
 };
-

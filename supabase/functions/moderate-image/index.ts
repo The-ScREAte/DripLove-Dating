@@ -431,7 +431,7 @@ serve(async (req: Request) => {
       adminClient.functions.invoke('send-push-notification', {
         body: {
           title: 'Photo Removed',
-          body: "One of your photos didn't meet our guidelines and was removed. You can upload a new one anytime.",
+          body: 'A photo was removed — upload a new one anytime',
           userId,
           type: 'image_rejected',
         },
