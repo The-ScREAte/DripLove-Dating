@@ -1229,6 +1229,18 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // MainApp, no reload/URL involved); the URL param covers a cold start.
   useEffect(() => {
     if (!currentUser?.id) return;
+    // Wait for premium status to resolve before evaluating eligibility.
+    // isPremium starts undefined while the subscription RPC is still in
+    // flight (see MainApp's fetchUserProfile), and isCircleProfileEligible's
+    // country check only unlocks a premium user's extra countries once it's
+    // true - evaluating with it still undefined on a cold start could reject
+    // a legitimately-unlocked cross-border profile. This effect always calls
+    // onDeepLinkConsumed() by the end, so there was no second chance: the
+    // deep link was silently burned on a "Profile unavailable" toast that
+    // had nothing to do with the actual profile. Was previously missing from
+    // the dependency array below too, so even if isPremium resolved a moment
+    // later, this effect had no reason to run again.
+    if (isPremium === undefined) return;
     const params = new URLSearchParams(window.location.search);
     const circleUserId = deepLinkProfileId || params.get('circleUserId');
     if (!circleUserId) return;
@@ -1270,7 +1282,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id, deepLinkProfileId]);
+  }, [currentUser?.id, deepLinkProfileId, isPremium]);
 
   // Guards against a double-fire from the swipe gesture's own exit-animation
   // timeout landing while a second gesture is somehow already in flight.
@@ -1888,4 +1900,3 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 };
 
 export default CirclePage;
-

@@ -8,6 +8,17 @@ import { supabase } from "./integrations/supabase/client";
 import { clearChatCache } from "./cache/chatCache";
 import HoppingLogo from "./components/HoppingLogo";
 import { getPlatformSync } from "./utils/platformUtils";
+import { ensureNotificationTapListener } from "./services/pushNotifications";
+
+// Registers the OS notification-tap listener once, permanently, before
+// React even mounts - deliberately outside any component lifecycle. It used
+// to be registered/torn down alongside a per-session init/cleanup cycle
+// (SupabasePushNotificationService), which had a real race on the
+// cold-start remount (MainApp mounts, unmounts when Index flips `loading`,
+// remounts) that could leave the app with no tap listener at all for the
+// rest of the session - see ensureNotificationTapListener's own comment in
+// pushNotifications.ts for the exact mechanics. No-ops on web.
+ensureNotificationTapListener();
 
 // Mark web (browser) sessions before first paint so index.css can center the app in a
 // phone-width column on wide viewports. Runs synchronously off the capacitor:/file: URL

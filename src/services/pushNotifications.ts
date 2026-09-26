@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PushNotifications, Token, PushNotificationSchema, ActionPerformed } from '@capacitor/push-notifications';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface NotificationPayload {
@@ -117,6 +117,39 @@ export const navigateFromNotification = (
   pendingNavigation = { type: resolvedType, data: normalized };
 };
 
+// Registers the native OS-tap listener exactly once, permanently, for the
+// life of the app - call this at boot (see main.tsx), before React even
+// renders. Deliberately NOT owned by SupabasePushNotificationService's own
+// initialize()/cleanup() lifecycle, which used to register this same
+// listener inside initializeNativePushNotifications and tear it down via
+// cleanup()'s PushNotifications.removeAllListeners().
+//
+// That was a real, currently-reachable race on the cold-start remount: every
+// push consumer (MainApp + its initial tab) unmounts when Index flips
+// `loading` right after MainApp's first mount, which - once the last
+// consumer drops to zero - calls cleanup(). initializeNativePushNotifications
+// has a mandatory 1-2s delay before it even requests permission, so on any
+// reasonably fast connection cleanup() runs WHILE that first call is still
+// suspended mid-await. cleanup() has no way to know about or cancel it, so
+// when that stale call finishes later it unconditionally sets
+// isInitialized = true again with no listener actually present - and the
+// remount's own initialize() call sees isInitialized already true and
+// returns immediately without ever re-registering anything. Net effect: no
+// tap listener for the rest of the session, so a tap just resumed whatever
+// tab happened to already be on screen instead of navigating anywhere.
+// Decoupling this one listener from that whole state machine removes it from
+// the blast radius of that race entirely, rather than trying to patch the
+// race itself.
+let notificationTapListenerRegistered = false;
+export const ensureNotificationTapListener = (): void => {
+  if (notificationTapListenerRegistered || !Capacitor.isNativePlatform()) return;
+  notificationTapListenerRegistered = true;
+  PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+    const data = normalizeNotificationData(notification.notification.data);
+    navigateFromNotification(data?.type as string | undefined, data);
+  });
+};
+
 // Dismiss only the notifications belonging to ONE conversation/thread, called
 // when the user actually opens that conversation. Opening the app itself must
 // never wipe the shade - unread notifications stay until they're tapped or
@@ -148,12 +181,19 @@ class SupabasePushNotificationService {
   // isInitialized still false and independently ran
   // initializeNativePushNotifications, which registers native listeners with
   // no dedup of its own - so a single real push fired
-  // handleNotificationAction/handleForegroundNotification once per
-  // concurrent caller (duplicate in-app toast on a foreground push).
+  // handleForegroundNotification once per concurrent caller (duplicate
+  // in-app toast on a foreground push).
   private initPromise: Promise<boolean> | null = null;
   private deviceToken: string | null = null;
   private realtimeChannel: RealtimeChannel | null = null;
   private currentUserId: string | null = null;
+  // Own lifecycle, unlike the tap listener - see ensureNotificationTapListener
+  // above for why that one is registered separately and permanently instead
+  // of through this class at all. cleanup() removes exactly these three and
+  // nothing else, so the permanent tap listener can never be touched by it.
+  private receivedListenerHandle: PluginListenerHandle | null = null;
+  private registrationListenerHandle: PluginListenerHandle | null = null;
+  private registrationErrorListenerHandle: PluginListenerHandle | null = null;
   private static readonly PERMISSION_DENIAL_KEY = 'notification_permission_last_denied';
   private static readonly RETRY_DELAY_DAYS = 3;
 
@@ -238,13 +278,13 @@ class SupabasePushNotificationService {
         return;
       }
 
-      // Tap/foreground listeners must exist even when permission was denied
-      // recently; already-delivered notifications can still launch the app.
-      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+      // The tap listener (pushNotificationActionPerformed) is NOT registered
+      // here - see ensureNotificationTapListener in this file for why it's
+      // permanent and registered once at boot instead. This foreground
+      // listener stays tied to this instance's own lifecycle; it's fine for
+      // it to reset on cleanup()/re-initialize, unlike the tap listener.
+      this.receivedListenerHandle = await PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
         this.handleForegroundNotification(notification);
-      });
-      PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-        this.handleNotificationAction(notification);
       });
 
       // Check if we should request permission (respects 3-day delay)
@@ -279,7 +319,7 @@ class SupabasePushNotificationService {
         }
         
         // Set up event listeners
-        PushNotifications.addListener('registration', async (token: Token) => {
+        this.registrationListenerHandle = await PushNotifications.addListener('registration', async (token: Token) => {
           // For iOS, get FCM token from Firebase Messaging plugin
           if (Capacitor.getPlatform() === 'ios') {
             try {
@@ -299,7 +339,7 @@ class SupabasePushNotificationService {
           }
         });
 
-        PushNotifications.addListener('registrationError', (error: unknown) => {
+        this.registrationErrorListenerHandle = await PushNotifications.addListener('registrationError', (error: unknown) => {
           console.error('❌ Push notification registration error:', error);
           // Don't throw - let the app continue without push notifications
         });
@@ -393,13 +433,9 @@ class SupabasePushNotificationService {
   // Single source of truth for "where does tapping/clicking this
   // notification go" - the shared module-level resolveNotificationRoute /
   // navigateFromNotification at the top of this file, used by the OS
-  // notification tap (handleNotificationAction, below), the in-app toast's
-  // own click handler, and MainApp's in-app tab navigation alike.
-  private handleNotificationAction(notification: ActionPerformed): void {
-    const data = normalizeNotificationData(notification.notification.data);
-    navigateFromNotification(data?.type as string | undefined, data);
-  }
-
+  // notification tap (ensureNotificationTapListener, top of file), the
+  // in-app toast's own click handler, and MainApp's in-app tab navigation
+  // alike.
   private showInAppNotification(payload: NotificationPayload): void {
     // Compact, native-notification-style card (small, dark, title + body
     // only) instead of the previous full-width bright-purple "flash" banner
@@ -681,11 +717,20 @@ class SupabasePushNotificationService {
       supabase.removeChannel(this.realtimeChannel);
       this.realtimeChannel = null;
     }
-    
-    if (Capacitor.isNativePlatform()) {
-      PushNotifications.removeAllListeners();
-    }
-    
+
+    // Removes exactly the listeners this instance registered - NOT
+    // removeAllListeners(), which used to also strip the OS-tap listener
+    // every time this ran. That listener is now registered once, separately,
+    // and permanently by ensureNotificationTapListener (see its own comment
+    // for the cold-start remount race this fixes) and must never be touched
+    // here.
+    this.receivedListenerHandle?.remove();
+    this.receivedListenerHandle = null;
+    this.registrationListenerHandle?.remove();
+    this.registrationListenerHandle = null;
+    this.registrationErrorListenerHandle?.remove();
+    this.registrationErrorListenerHandle = null;
+
     this.isInitialized = false;
     this.currentUserId = null;
   }
@@ -702,4 +747,3 @@ export const markNotificationRead = (notificationId: string) => pushNotification
 export const getUnreadNotifications = (userId: string) => pushNotificationService.getUnreadNotifications(userId);
 export const removePushToken = (userId: string) => pushNotificationService.removeToken(userId);
 export const cleanupPushNotifications = () => pushNotificationService.cleanup();
-

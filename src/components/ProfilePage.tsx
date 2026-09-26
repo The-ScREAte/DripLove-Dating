@@ -1704,4 +1704,3 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 };
 
 export default React.memo(ProfilePage);
-
