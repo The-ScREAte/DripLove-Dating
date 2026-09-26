@@ -81,8 +81,8 @@ const Games = () => {
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pt-6 pb-8">
-        <div className="max-w-6xl mx-auto px-4 py-6 pb-32 pb-safe-offset-32">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-8">
+        <div className="max-w-6xl mx-auto px-4 pb-32 pb-safe-offset-32">
           <div className="mb-5">
             <h2 className="text-lg sm:text-xl font-semibold text-white">Pick Your Vibe</h2>
             <p className="text-sm text-gray-300">Quick, fun drills to boost your dating game.</p>
@@ -101,31 +101,31 @@ const Games = () => {
                   <img
                     src={game.image}
                     alt={`${game.title} artwork`}
-                    className="h-24 sm:h-28 w-full object-cover"
+                    className="h-16 sm:h-20 w-full object-cover"
                     loading="lazy"
                     decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  <div className={`absolute right-3 top-3 p-2.5 rounded-xl bg-gradient-to-br ${game.gradient} shadow-lg ring-2 ring-pink-500/40`}>
+                  <div className={`absolute right-2 top-2 p-2 rounded-xl bg-gradient-to-br ${game.gradient} shadow-lg ring-2 ring-pink-500/40`}>
                     <IconComponent className="w-4 h-4 text-white" />
                   </div>
                 </div>
 
-                <CardHeader className="pb-3">
+                <CardHeader className="p-3 pb-1.5">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
-                      <div className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-gray-200 mb-2">
+                      <div className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-gray-200 mb-1.5">
                         {game.subtitle}
                       </div>
-                      <CardTitle className="text-base sm:text-lg mb-0.5 text-white leading-tight">{game.title}</CardTitle>
-                      <p className="text-xs sm:text-sm font-medium text-gray-300">{game.tagline}</p>
+                      <CardTitle className="text-sm sm:text-base mb-0.5 text-white leading-tight">{game.title}</CardTitle>
+                      <p className="text-xs font-medium text-gray-300">{game.tagline}</p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0 pb-4 flex flex-col h-full">
-                  <p className="text-xs sm:text-sm text-gray-400 mb-4">{game.description}</p>
+                <CardContent className="p-3 pt-0 flex flex-col h-full">
+                  <p className="text-xs text-gray-400 mb-3">{game.description}</p>
                   <Button
-                    className={`mt-auto w-full bg-gradient-to-r ${game.gradient} hover:opacity-90 text-white font-medium`}
+                    className={`mt-auto w-full bg-gradient-to-r ${game.gradient} hover:opacity-90 text-white font-medium h-9 text-sm`}
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(game.path);

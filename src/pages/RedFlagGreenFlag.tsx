@@ -887,8 +887,8 @@ const RedFlagGreenFlag = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
+          <div className="max-w-2xl mx-auto px-4 pt-2 pb-6 space-y-4">
           <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
@@ -958,8 +958,8 @@ const RedFlagGreenFlag = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
-          <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
+          <div className="max-w-2xl mx-auto px-4 pt-2 pb-8">
           <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-8 pb-8">
               <div className="text-6xl mb-6">🎯</div>
@@ -1038,8 +1038,8 @@ const RedFlagGreenFlag = () => {
       </div>
 
       {/* Scrollable Game Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
+        <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
         {!showExplanation ? (
           <Card className="mb-6 bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-8 pb-8">

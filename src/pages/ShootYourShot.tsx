@@ -936,8 +936,8 @@ const ShootYourShot = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
+          <div className="max-w-2xl mx-auto px-4 pt-2 pb-6 space-y-4">
           <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
@@ -1008,7 +1008,7 @@ const ShootYourShot = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32">
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <div className="max-w-2xl mx-auto px-4 pt-2 pb-6 space-y-4">
           <Card className="bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6">
               <div className="text-center space-y-2">
@@ -1122,8 +1122,8 @@ const ShootYourShot = () => {
       )}
 
       {/* Scrollable Challenge Card */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pt-6 pb-8">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
+        <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
         {!result ? (
           <Card className="mb-6 bg-neutral-900 border-pink-500/30">
             <CardContent className="pt-6">
