@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mic, Video as VideoIcon, VideoOff, MicOff, Rows2, Columns2, PictureInPicture2, ChevronDown, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateAge } from '@/utils/discoverCache';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
