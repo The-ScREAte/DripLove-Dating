@@ -79,7 +79,6 @@ const CircleUpMatching = () => {
   const [countdown, setCountdown] = useState(CONNECT_COUNTDOWN_SECONDS);
   const [decideCountdown, setDecideCountdown] = useState(DECIDE_COUNTDOWN_SECONDS);
   const [pollAttempts, setPollAttempts] = useState(0);
-  const [isPremium, setIsPremium] = useState(false);
 
   // Who's actually browsable right now, replacing the old blind auto-pairing -
   // this is the live "who's available" grid.
@@ -234,16 +233,15 @@ const CircleUpMatching = () => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
-      const [{ data: profile }, { data: subRows }] = await Promise.all([
-        supabase.from('profiles').select('latitude,longitude').eq('id', user.id).single(),
-        supabase.rpc('get_current_subscription_status', { p_user_id: user.id }),
-      ]);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('latitude,longitude')
+        .eq('id', user.id)
+        .single();
       if (!activeRef.current) return;
       setUserId(user.id);
       setMyLat(profile?.latitude ?? null);
       setMyLon(profile?.longitude ?? null);
-      const subRow = Array.isArray(subRows) ? subRows[0] : subRows;
-      setIsPremium(!!subRow && subRow.plan_name === 'premium' && !!subRow.is_active);
 
       // "1, 2, 3" launch beat before the search itself starts - purely a
       // brief, deliberate transition so tapping Ready feels like it did
@@ -566,15 +564,6 @@ const CircleUpMatching = () => {
                 >
                   Expand your visibility in preferences
                 </button>
-                {!isPremium && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/?tab=profile')}
-                    className="w-full py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-medium"
-                  >
-                    Go Premium for a wider circle
-                  </button>
-                )}
               </div>
             )}
           </div>
