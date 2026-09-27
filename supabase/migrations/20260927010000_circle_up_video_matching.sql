@@ -71,6 +71,7 @@ SET search_path = ''
 AS $$
 DECLARE
   v_self public.profiles;
+  v_is_premium boolean;
   v_allowed_genders text[];
   v_min_age integer;
   v_max_age integer;
@@ -100,6 +101,17 @@ BEGIN
     RETURN;
   END IF;
 
+  -- Same premium check the rest of the app uses (get_current_subscription_status,
+  -- src/hooks/useEnhancedSubscription.ts). Drives the exact same home-country
+  -- (distance-bound) vs. unlocked-countries (not distance-bound) split
+  -- Discover/Circle already implement (getCircleDistanceParams/
+  -- getCircleCountrySplit in src/utils/circlePoolFetch.ts) - without this, a
+  -- premium user who explicitly unlocked another country still couldn't
+  -- Circle Up with anyone there, only with people literally near them.
+  SELECT (s.plan_name = 'premium' AND s.is_active) INTO v_is_premium
+  FROM public.get_current_subscription_status(p_user_id) s;
+  v_is_premium := coalesce(v_is_premium, false);
+
   v_allowed_genders := CASE lower(coalesce(v_self.preference, 'everyone'))
     WHEN 'male' THEN ARRAY['male']
     WHEN 'female' THEN ARRAY['female']
@@ -107,7 +119,13 @@ BEGIN
   END;
   v_min_age := coalesce(v_self.min_age, 18);
   v_max_age := coalesce(v_self.max_age, 99);
-  v_max_distance_km := coalesce(v_self.max_distance, v_self.distance_preference, 50);
+  -- Same cap Circle/Discover apply: your own distance setting, capped at
+  -- 600km free / 5000km premium - only meaningful within your home country
+  -- (see the WHERE clause below); unlocked countries ignore it entirely.
+  v_max_distance_km := least(
+    coalesce(v_self.max_distance, v_self.distance_preference, 50),
+    CASE WHEN v_is_premium THEN 5000 ELSE 600 END
+  );
 
   -- Same exclusion rules as fetchCircleExclusionIds (src/utils/circlePoolFetch.ts):
   -- liked/passed-in-last-30-days by me, matched with me, blocked either
@@ -153,17 +171,29 @@ BEGIN
       OR extract(year FROM age(cand.date_of_birth)) BETWEEN v_min_age AND v_max_age
     )
     AND (
-      v_self.latitude IS NULL OR v_self.longitude IS NULL
-      OR cand.latitude IS NULL OR cand.longitude IS NULL
-      OR (
-        6371 * acos(
-          least(1.0, greatest(-1.0,
-            cos(radians(v_self.latitude)) * cos(radians(cand.latitude)) *
-            cos(radians(cand.longitude) - radians(v_self.longitude)) +
-            sin(radians(v_self.latitude)) * sin(radians(cand.latitude))
-          ))
+      -- Home country: distance-bound, same as before.
+      (
+        v_self.country_code IS NOT NULL AND v_self.country_code <> ''
+        AND cand.country_code = v_self.country_code
+        AND (
+          v_self.latitude IS NULL OR v_self.longitude IS NULL
+          OR cand.latitude IS NULL OR cand.longitude IS NULL
+          OR (
+            6371 * acos(
+              least(1.0, greatest(-1.0,
+                cos(radians(v_self.latitude)) * cos(radians(cand.latitude)) *
+                cos(radians(cand.longitude) - radians(v_self.longitude)) +
+                sin(radians(v_self.latitude)) * sin(radians(cand.latitude))
+              ))
+            )
+          ) <= v_max_distance_km
         )
-      ) <= v_max_distance_km
+      )
+      -- Premium: also reachable in any country they've explicitly
+      -- unlocked, with no distance bound at all - this is exactly why a
+      -- premium user with an unlocked country still couldn't find anyone
+      -- there before this existed.
+      OR (v_is_premium AND cand.country_code = ANY(coalesce(v_self.unlocked_countries, ARRAY[]::text[])))
     )
   ORDER BY random()
   LIMIT 1
