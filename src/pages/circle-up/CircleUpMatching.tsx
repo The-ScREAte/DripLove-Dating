@@ -12,6 +12,7 @@ import { readCircleUpLayoutPref } from './CircleUpPrepare';
 import { fetchApprovedImages } from './circleUpProfileExtras';
 
 type Phase = 'launching' | 'searching' | 'connecting' | 'deciding' | 'waiting_other';
+type CandidateFilter = 'matched' | 'not_matched' | 'everyone';
 
 interface SessionRow {
   id: string;
@@ -23,13 +24,20 @@ interface SessionRow {
 }
 
 const POLL_INTERVAL_MS = 2500;
+const CANDIDATE_POLL_INTERVAL_MS = 4000;
 const CONNECT_COUNTDOWN_SECONDS = 5;
 const DECIDE_COUNTDOWN_SECONDS = 10;
 const WAITING_TIMEOUT_MS = 30000;
 const LAUNCH_STEP_MS = 550;
-// ~15s of searching with nobody found before offering a way out, instead of
+// ~15s of searching with nobody visible before offering a way out, instead of
 // leaving "Circling now..." spinning forever with no explanation.
 const NO_MATCH_HINT_AFTER_ATTEMPTS = 6;
+
+const FILTER_TABS: { key: CandidateFilter; label: string }[] = [
+  { key: 'matched', label: 'Matched' },
+  { key: 'not_matched', label: 'Not Matched' },
+  { key: 'everyone', label: 'Everyone' },
+];
 
 const CircleUpMatching = () => {
   const navigate = useNavigate();
@@ -47,7 +55,16 @@ const CircleUpMatching = () => {
   const [pollAttempts, setPollAttempts] = useState(0);
   const [isPremium, setIsPremium] = useState(false);
 
+  // Who's actually browsable right now, replacing the old blind auto-pairing -
+  // this is the live "who's available" grid.
+  const [candidates, setCandidates] = useState<CircleProfile[]>([]);
+  const [filter, setFilter] = useState<CandidateFilter>('everyone');
+  const [selectingId, setSelectingId] = useState<string | null>(null);
+  const [selectError, setSelectError] = useState<string | null>(null);
+  const filterRef = useRef<CandidateFilter>('everyone');
+
   const pollTimerRef = useRef<number | null>(null);
+  const candidatePollTimerRef = useRef<number | null>(null);
   const waitingTimeoutRef = useRef<number | null>(null);
   // Guards every async continuation (poll results, realtime callbacks)
   // against firing after cancel/unmount - this screen has several
@@ -57,12 +74,110 @@ const CircleUpMatching = () => {
   const clearPollTimer = () => {
     if (pollTimerRef.current) { window.clearTimeout(pollTimerRef.current); pollTimerRef.current = null; }
   };
+  const clearCandidatePollTimer = () => {
+    if (candidatePollTimerRef.current) { window.clearTimeout(candidatePollTimerRef.current); candidatePollTimerRef.current = null; }
+  };
   const clearWaitingTimeout = () => {
     if (waitingTimeoutRef.current) { window.clearTimeout(waitingTimeoutRef.current); waitingTimeoutRef.current = null; }
   };
 
+  // Shared by both the passive "someone else picked me" poll and the
+  // explicit "I picked them" action below - whichever gets a real session
+  // first wins, and both stop their own loops the moment this succeeds.
+  // Returns false (and does nothing else) if the matched profile can't be
+  // loaded yet, so the caller knows to keep polling instead of getting stuck.
+  const enterConnecting = useCallback(async (newSessionId: string, matchedUserId: string): Promise<boolean> => {
+    const [profiles, shareRes, imagesByUser] = await Promise.all([
+      fetchCircleProfilesByIds([matchedUserId]),
+      supabase.from('circle_up_queue').select('share_settings').eq('user_id', matchedUserId).single(),
+      fetchApprovedImages([matchedUserId]),
+    ]);
+    if (!activeRef.current) return true;
+    if (profiles.length === 0) return false;
+
+    clearPollTimer();
+    clearCandidatePollTimer();
+    setCandidate(profiles[0]);
+    setCandidateShareSettings((shareRes.data?.share_settings as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
+    // The first (main) photo is already the card's own background - only
+    // the rest count as "extra" for the gallery.
+    setCandidateExtraPhotos((imagesByUser[matchedUserId] || []).slice(1));
+    setSessionId(newSessionId);
+    setPhase('connecting');
+    return true;
+  }, []);
+
+  // Passive check only - does NOT auto-pick anyone. Lets someone sitting in
+  // the browse grid still get pulled in the instant another user's
+  // handleSelectCandidate picks them.
+  const checkSession = useCallback(async (uid: string) => {
+    if (!activeRef.current) return;
+    const { data, error } = await supabase.rpc('circle_up_check_session', { p_user_id: uid });
+    if (!activeRef.current) return;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!error && row?.session_id && row?.matched_user_id) {
+      const entered = await enterConnecting(row.session_id, row.matched_user_id);
+      if (entered) return;
+    }
+    setPollAttempts((n) => n + 1);
+    pollTimerRef.current = window.setTimeout(() => checkSession(uid), POLL_INTERVAL_MS);
+  }, [enterConnecting]);
+
+  // Live "who's available" grid - always reads the latest filter via
+  // filterRef so a tab switch takes effect on the very next tick instead of
+  // a stale closure from when the loop started.
+  const fetchCandidates = useCallback(async (uid: string) => {
+    if (!activeRef.current) return;
+    const { data, error } = await supabase.rpc('circle_up_list_candidates', {
+      p_user_id: uid,
+      p_filter: filterRef.current,
+    });
+    if (!activeRef.current) return;
+    const rows = Array.isArray(data) ? data : [];
+    if (!error && rows.length > 0) {
+      const ids = rows.map((r: { candidate_id: string }) => r.candidate_id);
+      const profiles = await fetchCircleProfilesByIds(ids);
+      if (!activeRef.current) return;
+      setCandidates(profiles);
+    } else {
+      setCandidates([]);
+    }
+    candidatePollTimerRef.current = window.setTimeout(() => fetchCandidates(uid), CANDIDATE_POLL_INTERVAL_MS);
+  }, []);
+
+  const changeFilter = (next: CandidateFilter) => {
+    if (next === filterRef.current || !userId) return;
+    setFilter(next);
+    filterRef.current = next;
+    if (phase === 'searching') {
+      clearCandidatePollTimer();
+      fetchCandidates(userId);
+    }
+  };
+
+  const handleSelectCandidate = async (target: CircleProfile) => {
+    if (!userId || selectingId) return;
+    setSelectingId(target.id);
+    setSelectError(null);
+    const { data, error } = await supabase.rpc('circle_up_request_session', {
+      p_user_id: userId,
+      p_target_id: target.id,
+    });
+    if (!activeRef.current) return;
+    setSelectingId(null);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!error && row?.session_id && row?.matched_user_id) {
+      const entered = await enterConnecting(row.session_id, row.matched_user_id);
+      if (entered) return;
+    }
+    // Target left, got picked by someone else first, or went stale - the
+    // background grid poll will refresh the list on its own next tick.
+    setSelectError(`${target.first_name} is no longer available.`);
+    window.setTimeout(() => { if (activeRef.current) setSelectError(null); }, 3000);
+  };
+
   // Resets my own queue row to a fresh 'waiting' state (session_id cleared)
-  // so the next circle_up_find_match call actually searches for someone
+  // so the checkSession/fetchCandidates loops actually search for someone
   // new instead of just handing back the pairing that just ended.
   const resetOwnQueueAndSearch = useCallback(async (uid: string) => {
     if (!activeRef.current) return;
@@ -74,39 +189,9 @@ const CircleUpMatching = () => {
     setSessionId(null);
     setPollAttempts(0);
     setPhase('searching');
-    pollForMatch(uid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const pollForMatch = useCallback(async (uid: string) => {
-    if (!activeRef.current) return;
-    const { data, error } = await supabase.rpc('circle_up_find_match', { p_user_id: uid });
-    if (!activeRef.current) return;
-    const row = Array.isArray(data) ? data[0] : data;
-    if (!error && row?.session_id && row?.matched_user_id) {
-      const [profiles, shareRes, imagesByUser] = await Promise.all([
-        fetchCircleProfilesByIds([row.matched_user_id]),
-        supabase.from('circle_up_queue').select('share_settings').eq('user_id', row.matched_user_id).single(),
-        fetchApprovedImages([row.matched_user_id]),
-      ]);
-      if (!activeRef.current) return;
-      if (profiles.length === 0) {
-        setPollAttempts((n) => n + 1);
-        pollTimerRef.current = window.setTimeout(() => pollForMatch(uid), POLL_INTERVAL_MS);
-        return;
-      }
-      setCandidate(profiles[0]);
-      setCandidateShareSettings((shareRes.data?.share_settings as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
-      // The first (main) photo is already the card's own background - only
-      // the rest count as "extra" for the gallery.
-      setCandidateExtraPhotos((imagesByUser[row.matched_user_id] || []).slice(1));
-      setSessionId(row.session_id);
-      setPhase('connecting');
-      return;
-    }
-    setPollAttempts((n) => n + 1);
-    pollTimerRef.current = window.setTimeout(() => pollForMatch(uid), POLL_INTERVAL_MS);
-  }, []);
+    checkSession(uid);
+    fetchCandidates(uid);
+  }, [checkSession, fetchCandidates]);
 
   useEffect(() => {
     activeRef.current = true;
@@ -134,15 +219,17 @@ const CircleUpMatching = () => {
       }
       if (!activeRef.current) return;
       setPhase('searching');
-      pollForMatch(user.id);
+      checkSession(user.id);
+      fetchCandidates(user.id);
     })();
 
     return () => {
       activeRef.current = false;
       clearPollTimer();
+      clearCandidatePollTimer();
       clearWaitingTimeout();
     };
-  }, [navigate, pollForMatch]);
+  }, [navigate, checkSession, fetchCandidates]);
 
   // 5-second "Finding Your Match" countdown, purely cosmetic
   // anticipation-building once a candidate is found - not the search itself.
@@ -261,6 +348,7 @@ const CircleUpMatching = () => {
 
   const handleCancel = async () => {
     clearPollTimer();
+    clearCandidatePollTimer();
     clearWaitingTimeout();
     const uid = userId;
     const sid = sessionId;
@@ -286,7 +374,7 @@ const CircleUpMatching = () => {
     <div className="h-[100dvh] w-full bg-black flex flex-col">
       <CircleUpHeader onBack={handleCancel} backLabel="Cancel" />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 py-4">
         {phase === 'launching' && (
           <div className="flex flex-col items-center gap-3">
             <span key={launchCount} className="text-6xl font-bold text-white animate-in zoom-in-50 duration-300">
@@ -297,16 +385,69 @@ const CircleUpMatching = () => {
         )}
 
         {phase === 'searching' && (
-          <div className="flex flex-col items-center gap-5">
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-2 border-pink-500/25 border-t-pink-500 animate-spin" />
-              <HoppingLogo size={44} />
-            </div>
-            <p className="text-white font-semibold">Circling now to find you a match…</p>
-            <p className="text-white/40 text-sm text-center">We'll connect you the moment someone who fits your preferences is online.</p>
+          <div className="flex flex-col items-center gap-4 w-full max-w-sm">
+            {candidates.length === 0 ? (
+              <>
+                <div className="relative w-24 h-24 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-2 border-pink-500/25 border-t-pink-500 animate-spin" />
+                  <HoppingLogo size={44} />
+                </div>
+                <p className="text-white font-semibold text-center">Circling now to find you a match…</p>
+                <p className="text-white/40 text-sm text-center">We'll connect you the moment someone who fits your preferences is online.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-white font-semibold text-center">
+                  {candidates.length} {candidates.length === 1 ? 'person is' : 'people are'} circling right now
+                </p>
+                <p className="text-white/40 text-xs text-center -mt-2">Tap someone to say hi</p>
+                <div className="grid grid-cols-4 gap-3 w-full max-h-64 overflow-y-auto py-1">
+                  {candidates.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleSelectCandidate(c)}
+                      disabled={!!selectingId}
+                      className="flex flex-col items-center gap-1 disabled:opacity-40"
+                    >
+                      <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-pink-500/40 bg-neutral-800">
+                        {c.firstImage ? (
+                          <img src={getDetailImageUrl(c.firstImage)} alt={c.first_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-pink-500/30 to-purple-600/30" />
+                        )}
+                        {selectingId === c.id && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-white/70 text-[11px] truncate w-16 text-center">{c.first_name}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
-            {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS && (
-              <div className="w-full max-w-xs rounded-2xl border border-pink-500/20 bg-white/[0.03] p-4 mt-2 flex flex-col items-center gap-3">
+            {selectError && <p className="text-pink-400 text-xs text-center">{selectError}</p>}
+
+            <div className="flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-full p-1">
+              {FILTER_TABS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => changeFilter(key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                    filter === key ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'text-white/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS && candidates.length === 0 && (
+              <div className="w-full rounded-2xl border border-pink-500/20 bg-white/[0.03] p-4 mt-1 flex flex-col items-center gap-3">
                 <p className="text-white/60 text-xs text-center">No one nearby yet. Still looking, but you can also:</p>
                 <button
                   type="button"
