@@ -591,12 +591,23 @@ serve(async (req) => {
           return json(200, { message: 'Subscription not found' })
         }
         
-        // Mark as payment pending but DON'T immediately revoke access
-        // Grace period means user still has access while payment retries
+        // Mark as payment pending but DON'T immediately revoke access.
+        // Google extends expiryTimeMillis to the real grace-period end date
+        // once a subscription enters grace/hold - previously this comment
+        // claimed "grace period extends access" but nothing here actually
+        // read that extended date, so expires_at stayed at its original
+        // value and get_current_subscription_status's status-list check
+        // (before payment_pending was added to it) cut access immediately.
+        let holdExpiresAt = subscription.expires_at
+        if (googleData && googleData.expiryTimeMillis > Date.now()) {
+          holdExpiresAt = new Date(googleData.expiryTimeMillis).toISOString()
+        }
+
         const { error: holdError } = await updateSubscriptionByToken(supabase, purchaseToken, {
           status: 'payment_pending',
+          plan_name: 'premium',
+          expires_at: holdExpiresAt,
           payment_attempts: (subscription.payment_attempts || 0) + 1,
-          // Keep current expiry - grace period extends access
         })
         
         if (holdError) {

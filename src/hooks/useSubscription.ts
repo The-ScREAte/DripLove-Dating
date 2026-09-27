@@ -22,13 +22,37 @@ interface UsageInfo {
   limit: number;
 }
 
-// Shared entitlement check: premium plan, active or cancelled-but-in-grace-period
-// status, and not past expires_at. Used both to answer isPremium() and to decide
-// what gets written to the per-device premium cache.
+// Mirrors the grace period in get_current_subscription_status
+// (20260926230000_add_grace_period_to_subscription_expiry_check.sql) and
+// useEnhancedSubscription.ts. This hook was recomputing entitlement from
+// expires_at itself instead of trusting the RPC's own is_active, and that
+// recomputation had no buffer - so even after payment_pending was added to
+// entitledByStatus below, a subscription 10 minutes past expires_at (webhook
+// not landed yet) still failed this plain `> new Date()` check and got
+// treated as not premium. Adding payment_pending to the status list without
+// also buffering this date comparison didn't actually close the gap.
+const SUBSCRIPTION_GRACE_PERIOD_MS = 30 * 60 * 1000;
+
+// Shared entitlement check: premium plan, active/cancelled-but-in-grace-period/
+// payment_pending status, and not past expires_at (plus grace). Used both to
+// answer isPremium() and to decide what gets written to the per-device
+// premium cache.
+//
+// payment_pending is written only by google-play-webhook (SUBSCRIPTION_ON_HOLD/
+// SUBSCRIPTION_IN_GRACE_PERIOD) and apple-app-store-webhook (DID_FAIL_TO_RENEW
+// with a real gracePeriodExpiresDate) - both mean "renewal charge failed, the
+// platform is actively retrying, keep access until expires_at" (which those
+// webhooks set to the platform's real grace-period end date). No payment
+// method ever writes this status to mean "awaiting a first payment," so this
+// can't grant premium to someone who hasn't actually paid. Without this,
+// DiscoverPage's swipe-limit gate (the main consumer of isPremium() here)
+// would cap a subscriber Apple/Google were still actively retrying for down
+// to the free daily limit, the same instant get_current_subscription_status
+// used to wrongly demote them.
 const isEntitledToPremium = (sub: SubscriptionInfo | null | undefined): boolean => {
   if (!sub) return false;
-  const entitledByStatus = sub.status === 'active' || sub.status === 'cancelled';
-  const notExpired = !sub.expires_at || new Date(sub.expires_at) > new Date();
+  const entitledByStatus = sub.status === 'active' || sub.status === 'cancelled' || sub.status === 'payment_pending';
+  const notExpired = !sub.expires_at || new Date(sub.expires_at).getTime() > Date.now() - SUBSCRIPTION_GRACE_PERIOD_MS;
   return sub.plan_name === 'premium' && entitledByStatus && notExpired;
 };
 

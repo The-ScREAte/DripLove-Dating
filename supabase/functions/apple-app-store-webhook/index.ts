@@ -64,6 +64,14 @@ interface JWSRenewalInfoDecodedPayload {
   originalTransactionId: string
   autoRenewProductId?: string
   autoRenewStatus?: number // 0 = off, 1 = on
+  // Present when Apple has put a failed renewal into Billing Grace Period -
+  // the real date access should be kept until, while Apple keeps retrying
+  // the charge. DID_FAIL_TO_RENEW used to just log and do nothing with
+  // this, leaving expires_at at its original (already-passed-or-passing)
+  // value, so a subscriber Apple was still actively retrying for could get
+  // cut off by our own expiry check well before Apple's own grace period
+  // ended.
+  gracePeriodExpiresDate?: number
 }
 
 // deno-lint-ignore no-explicit-any
@@ -289,9 +297,37 @@ serve(async (req) => {
       }
 
       case 'DID_FAIL_TO_RENEW': {
-        // Billing issue - Apple is retrying (possibly in a grace period).
-        // Don't downgrade yet; wait for GRACE_PERIOD_EXPIRED or EXPIRED.
         console.log(`[APPLE-WEBHOOK] ⚠️ Renewal billing issue for user ${userId} (subtype: ${subtype})`)
+
+        // Apple only puts this into Billing Grace Period when App Store
+        // Connect has one configured, in which case gracePeriodExpiresDate
+        // is the real date access should be kept until while Apple keeps
+        // retrying the charge. No grace period configured -> no date -> do
+        // nothing here, same as before (wait for GRACE_PERIOD_EXPIRED/EXPIRED).
+        const gracePeriodEndMs = renewalInfo?.gracePeriodExpiresDate
+        if (gracePeriodEndMs && gracePeriodEndMs > Date.now()) {
+          const graceExpiresAt = new Date(gracePeriodEndMs)
+          const { error: graceError } = await supabase
+            .from('user_subscriptions')
+            .update({
+              // payment_pending, not 'active': mirrors google-play-webhook's
+              // ON_HOLD/IN_GRACE_PERIOD handling of the identical situation -
+              // both need get_current_subscription_status to treat this as
+              // still-entitled-until-expires_at, same as active/cancelled.
+              status: 'payment_pending',
+              plan_name: 'premium',
+              expires_at: graceExpiresAt.toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', userId)
+
+          if (graceError) {
+            console.error('[APPLE-WEBHOOK] Error extending grace period:', graceError)
+          } else {
+            console.log(`[APPLE-WEBHOOK] 🕒 Grace period active for user ${userId} until ${graceExpiresAt.toISOString()}`)
+          }
+        }
+
         return json(200, { message: 'Renewal failure noted', user_id: userId })
       }
 
