@@ -9,6 +9,7 @@ import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 import CircleUpHeader from './CircleUpHeader';
 import { readCircleUpLayoutPref } from './CircleUpPrepare';
+import { fetchApprovedImages } from './circleUpProfileExtras';
 
 type Phase = 'launching' | 'searching' | 'connecting' | 'deciding' | 'waiting_other';
 
@@ -35,6 +36,7 @@ const CircleUpMatching = () => {
   const [launchCount, setLaunchCount] = useState(1);
   const [candidate, setCandidate] = useState<CircleProfile | null>(null);
   const [candidateShareSettings, setCandidateShareSettings] = useState<CircleUpShareSettings>(DEFAULT_SHARE_SETTINGS);
+  const [candidateExtraPhotos, setCandidateExtraPhotos] = useState<string[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(CONNECT_COUNTDOWN_SECONDS);
 
@@ -61,6 +63,7 @@ const CircleUpMatching = () => {
     if (!activeRef.current) return;
     setCandidate(null);
     setCandidateShareSettings(DEFAULT_SHARE_SETTINGS);
+    setCandidateExtraPhotos([]);
     setSessionId(null);
     setPhase('searching');
     pollForMatch(uid);
@@ -73,9 +76,10 @@ const CircleUpMatching = () => {
     if (!activeRef.current) return;
     const row = Array.isArray(data) ? data[0] : data;
     if (!error && row?.session_id && row?.matched_user_id) {
-      const [profiles, shareRes] = await Promise.all([
+      const [profiles, shareRes, imagesByUser] = await Promise.all([
         fetchCircleProfilesByIds([row.matched_user_id]),
         supabase.from('circle_up_queue').select('share_settings').eq('user_id', row.matched_user_id).single(),
+        fetchApprovedImages([row.matched_user_id]),
       ]);
       if (!activeRef.current) return;
       if (profiles.length === 0) {
@@ -84,6 +88,9 @@ const CircleUpMatching = () => {
       }
       setCandidate(profiles[0]);
       setCandidateShareSettings((shareRes.data?.share_settings as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
+      // The first (main) photo is already the card's own background - only
+      // the rest count as "extra" for the gallery.
+      setCandidateExtraPhotos((imagesByUser[row.matched_user_id] || []).slice(1));
       setSessionId(row.session_id);
       setPhase('connecting');
       return;
@@ -289,7 +296,12 @@ const CircleUpMatching = () => {
           <div className="w-full flex flex-col items-center gap-5">
             <h2 className="text-white font-bold text-lg">New Match</h2>
             <p className="text-white/40 text-sm -mt-3">Do you want to connect?</p>
-            <MatchPreviewCard profile={candidate} distanceKm={distanceKm} shareSettings={candidateShareSettings} />
+            <MatchPreviewCard
+              profile={candidate}
+              distanceKm={distanceKm}
+              shareSettings={candidateShareSettings}
+              extraPhotos={candidateExtraPhotos}
+            />
             <div className="flex items-center gap-6 mt-2">
               <button
                 type="button"

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { MapPin, BadgeCheck, ChevronDown, Briefcase } from 'lucide-react';
+import { MapPin, BadgeCheck, ChevronDown, Briefcase, GraduationCap, Languages, PawPrint } from 'lucide-react';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
 const formatRelationshipIntent = (intent?: string | null) => {
   if (!intent) return '';
@@ -18,8 +19,13 @@ export interface ProfileInfoOverlayProps {
   bio?: string;
   occupation?: string;
   relationshipIntent?: string;
-  /** Shows a chevron that reveals bio/occupation/relationship intent - same
-      "show more" interaction as Discover's info overlay. */
+  education?: string;
+  languages?: string[];
+  pets?: string[];
+  /** Additional approved photos beyond the one already showing as the
+      card's own background - rendered as a thumbnail strip when expanded. */
+  extraPhotos?: string[];
+  /** Shows a chevron that reveals the fuller "About" section below. */
   expandable?: boolean;
   size?: 'full' | 'compact';
 }
@@ -40,13 +46,17 @@ const ProfileInfoOverlay = ({
   bio,
   occupation,
   relationshipIntent,
+  education,
+  languages = [],
+  pets = [],
+  extraPhotos = [],
   expandable = false,
   size = 'full',
 }: ProfileInfoOverlayProps) => {
   const [expanded, setExpanded] = useState(false);
   const chips = interests.slice(0, 3);
   const intentLabel = formatRelationshipIntent(relationshipIntent);
-  const hasExpandedContent = !!(bio || occupation || intentLabel);
+  const hasExpandedContent = !!(bio || occupation || intentLabel || education || languages.length > 0 || pets.length > 0 || extraPhotos.length > 0);
   const compact = size === 'compact';
 
   return (
@@ -91,11 +101,41 @@ const ProfileInfoOverlay = ({
           )}
 
           {!compact && expanded && hasExpandedContent && (
-            <div className="mt-3 pt-3 border-t border-white/10 max-h-32 overflow-y-auto pr-1 space-y-1.5 overscroll-contain">
+            <div className="mt-3 pt-3 border-t border-white/10 max-h-56 overflow-y-auto pr-1 space-y-2.5 overscroll-contain">
+              {extraPhotos.length > 0 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5">
+                  {extraPhotos.map((url) => (
+                    <img
+                      key={url}
+                      src={getDetailImageUrl(url)}
+                      alt=""
+                      className="w-14 h-14 rounded-lg object-cover flex-shrink-0 border border-white/10"
+                    />
+                  ))}
+                </div>
+              )}
               {occupation && (
                 <div className="flex items-center text-xs text-white/75">
                   <Briefcase className="w-3.5 h-3.5 mr-1.5 shrink-0" />
                   <span className="truncate">{occupation}</span>
+                </div>
+              )}
+              {education && (
+                <div className="flex items-center text-xs text-white/75">
+                  <GraduationCap className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                  <span className="truncate">{education.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {languages.length > 0 && (
+                <div className="flex items-center text-xs text-white/75">
+                  <Languages className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                  <span className="truncate">{languages.join(', ')}</span>
+                </div>
+              )}
+              {pets.length > 0 && (
+                <div className="flex items-center text-xs text-white/75">
+                  <PawPrint className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                  <span className="truncate">{pets.join(', ')}</span>
                 </div>
               )}
               {intentLabel && <p className="text-xs text-white/75">{intentLabel}</p>}

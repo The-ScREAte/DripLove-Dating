@@ -12,21 +12,33 @@ export interface CircleUpShareSettings {
   bio: boolean;
   occupation: boolean;
   relationshipIntent: boolean;
+  photos: boolean;
+  education: boolean;
+  languages: boolean;
+  pets: boolean;
 }
 
+// Only 4 true at a time is enforced in CircleUpPrepare's UI (a hard cap on
+// how much of your profile Circle Up hands to a stranger before you've even
+// talked) - these are just the 4 that ship on by default.
 export const DEFAULT_SHARE_SETTINGS: CircleUpShareSettings = {
   age: true,
   location: true,
   interests: true,
-  bio: true,
   occupation: true,
-  relationshipIntent: true,
+  relationshipIntent: false,
+  bio: false,
+  photos: false,
+  education: false,
+  languages: false,
+  pets: false,
 };
 
 interface MatchPreviewCardProps {
   profile: CircleProfile;
   distanceKm: number | null;
   shareSettings?: CircleUpShareSettings;
+  extraPhotos?: string[];
   /** 'full' for the match-reveal moment, 'compact' for a small thumbnail. */
   size?: 'full' | 'compact';
   /** Shows the "show more info" chevron, like Discover's own card. */
@@ -40,6 +52,7 @@ const MatchPreviewCard = ({
   profile,
   distanceKm,
   shareSettings = DEFAULT_SHARE_SETTINGS,
+  extraPhotos = [],
   size = 'full',
   expandable = true,
 }: MatchPreviewCardProps) => {
@@ -78,6 +91,10 @@ const MatchPreviewCard = ({
         bio={shareSettings.bio ? profile.bio : undefined}
         occupation={shareSettings.occupation ? profile.occupation : undefined}
         relationshipIntent={shareSettings.relationshipIntent ? profile.relationship_intent : undefined}
+        education={shareSettings.education ? profile.education_level : undefined}
+        languages={shareSettings.languages ? profile.languages || [] : []}
+        pets={shareSettings.pets ? profile.pets || [] : []}
+        extraPhotos={shareSettings.photos ? extraPhotos : []}
         expandable={expandable}
         size={size}
       />

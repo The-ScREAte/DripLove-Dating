@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Video as VideoIcon, VideoOff, MicOff, Rows2, Columns2, PictureInPicture2, ChevronDown } from 'lucide-react';
+import { Mic, Video as VideoIcon, VideoOff, MicOff, Rows2, Columns2, PictureInPicture2, ChevronDown, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateAge } from '@/utils/discoverCache';
@@ -8,7 +8,10 @@ import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CircleUpHeader from './CircleUpHeader';
 import ProfileInfoOverlay from './ProfileInfoOverlay';
 import SlimSwitch from './SlimSwitch';
+import { fetchApprovedImages } from './circleUpProfileExtras';
 import { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
+
+const MAX_SHARED_FIELDS = 4;
 
 export type CircleUpLayoutPref = 'floating' | 'split-h' | 'split-v';
 const LAYOUT_PREF_KEY = 'driplove_circle_up_layout_pref';
@@ -36,11 +39,16 @@ const LayoutMock = ({ type, myPhoto }: { type: CircleUpLayoutPref; myPhoto?: str
       )}
     </div>
   );
-  const themPane = <div className="w-full h-full bg-neutral-700" />;
+  const themPane = (
+    <div className="w-full h-full bg-neutral-700 flex items-center justify-center">
+      <User className="w-1/3 h-1/3 text-white/25" />
+    </div>
+  );
 
   if (type === 'floating') {
     return (
-      <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-neutral-700">
+      <div className="relative w-full aspect-video rounded-lg overflow-hidden">
+        {themPane}
         <div className="absolute bottom-1 right-1 w-5 h-7 rounded-[4px] overflow-hidden ring-1 ring-white/40">{mePane}</div>
       </div>
     );
@@ -64,12 +72,17 @@ const LayoutMock = ({ type, myPhoto }: { type: CircleUpLayoutPref; myPhoto?: str
 // Every toggle here is conditional on the field actually being set on the
 // user's own profile - no point offering to hide something that's already
 // empty, and it keeps the list scoped to what's genuinely theirs to share.
+// 'photos' is checked separately (it depends on the fetched extra-images
+// list, not a plain CircleProfile field), so it's appended after the fact.
 const SHARE_FIELD_DEFS: { key: keyof CircleUpShareSettings; label: string; has: (p: CircleProfile) => boolean }[] = [
   { key: 'age', label: 'Age', has: (p) => !!p.date_of_birth },
   { key: 'location', label: 'Location & distance', has: (p) => !!(p.city || p.country) },
   { key: 'interests', label: 'Interests', has: (p) => (p.interests || []).length > 0 },
   { key: 'occupation', label: 'Occupation', has: (p) => !!p.occupation },
   { key: 'relationshipIntent', label: 'What I\'m looking for', has: (p) => !!p.relationship_intent },
+  { key: 'education', label: 'Education', has: (p) => !!p.education_level },
+  { key: 'languages', label: 'Languages', has: (p) => (p.languages || []).length > 0 },
+  { key: 'pets', label: 'Pets', has: (p) => (p.pets || []).length > 0 },
   { key: 'bio', label: 'About me', has: (p) => !!p.bio },
 ];
 
@@ -83,6 +96,7 @@ const CircleUpPrepare = () => {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [myProfile, setMyProfile] = useState<CircleProfile | null>(null);
+  const [myExtraPhotos, setMyExtraPhotos] = useState<string[]>([]);
   const [permissionState, setPermissionState] = useState<'checking' | 'granted' | 'denied'>('checking');
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
@@ -111,6 +125,11 @@ const CircleUpPrepare = () => {
 
       const profiles = await fetchCircleProfilesByIds([user.id]);
       if (!cancelled && profiles.length > 0) setMyProfile(profiles[0]);
+
+      const imagesByUser = await fetchApprovedImages([user.id]);
+      // The first (main) photo is already the card's own background - only
+      // the rest count as "extra" for the gallery/Photos toggle.
+      if (!cancelled) setMyExtraPhotos((imagesByUser[user.id] || []).slice(1));
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -173,7 +192,18 @@ const CircleUpPrepare = () => {
     navigate('/circle-up/matching');
   };
 
-  const availableFields = myProfile ? SHARE_FIELD_DEFS.filter((f) => f.has(myProfile)) : [];
+  const availableFields = myProfile
+    ? [
+        ...SHARE_FIELD_DEFS.filter((f) => f.has(myProfile)),
+        ...(myExtraPhotos.length > 0 ? [{ key: 'photos' as const, label: 'More photos' }] : []),
+      ]
+    : [];
+  const sharedCount = Object.values(shareSettings).filter(Boolean).length;
+
+  const handleToggleShare = (key: keyof CircleUpShareSettings, next: boolean) => {
+    if (next && sharedCount >= MAX_SHARED_FIELDS) return;
+    setShareSettings((s) => ({ ...s, [key]: next }));
+  };
 
   return (
     <div className="h-[100dvh] w-full bg-black flex flex-col">
@@ -219,6 +249,10 @@ const CircleUpPrepare = () => {
                 bio={shareSettings.bio ? myProfile.bio : undefined}
                 occupation={shareSettings.occupation ? myProfile.occupation : undefined}
                 relationshipIntent={shareSettings.relationshipIntent ? myProfile.relationship_intent : undefined}
+                education={shareSettings.education ? myProfile.education_level : undefined}
+                languages={shareSettings.languages ? myProfile.languages || [] : []}
+                pets={shareSettings.pets ? myProfile.pets || [] : []}
+                extraPhotos={shareSettings.photos ? myExtraPhotos : []}
                 expandable
               />
             )}
@@ -263,25 +297,29 @@ const CircleUpPrepare = () => {
                 className="w-full flex items-center justify-between px-4 py-3"
               >
                 <span className="text-left">
-                  <span className="block text-white text-sm font-medium">Share with your match</span>
+                  <span className="block text-white text-sm font-medium">Share with others</span>
                   <span className="block text-white/40 text-xs">
-                    {Object.values(shareSettings).filter(Boolean).length} of {availableFields.length} shared
+                    {sharedCount} of {MAX_SHARED_FIELDS} used
                   </span>
                 </span>
                 <ChevronDown className={`w-4 h-4 text-white/50 transition-transform flex-shrink-0 ${shareSectionOpen ? 'rotate-180' : ''}`} />
               </button>
               {shareSectionOpen && (
-                <div className="divide-y divide-white/[0.06] border-t border-white/[0.06]">
-                  {availableFields.map(({ key, label }) => (
-                    <div key={key} className="flex items-center justify-between px-4 py-2.5">
-                      <span className="text-white/85 text-sm">{label}</span>
-                      <SlimSwitch
-                        checked={shareSettings[key]}
-                        onCheckedChange={(v) => setShareSettings((s) => ({ ...s, [key]: v }))}
-                        aria-label={label}
-                      />
-                    </div>
-                  ))}
+                <div className="border-t border-white/[0.06]">
+                  <p className="px-4 pt-2.5 pb-1 text-[11px] text-white/35">Choose up to {MAX_SHARED_FIELDS} details to share</p>
+                  <div className="divide-y divide-white/[0.06]">
+                    {availableFields.map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-white/85 text-sm">{label}</span>
+                        <SlimSwitch
+                          checked={shareSettings[key]}
+                          onCheckedChange={(v) => handleToggleShare(key, v)}
+                          disabled={!shareSettings[key] && sharedCount >= MAX_SHARED_FIELDS}
+                          aria-label={label}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
