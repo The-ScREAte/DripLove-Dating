@@ -123,6 +123,8 @@ import {
   RefreshCw,
   Crown,
   Heart,
+  Video,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -1827,6 +1829,20 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           )}
         </div>
         <p className="text-white/40 text-xs px-6">Made easy to spot and find who's right for you.</p>
+        <button
+          type="button"
+          onClick={() => navigate('/circle-up')}
+          className="mx-6 mt-3 w-[calc(100%-3rem)] flex items-center gap-3 rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-500/15 via-purple-500/10 to-transparent px-4 py-3 text-left transition-colors hover:border-pink-500/50"
+        >
+          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600">
+            <Video className="h-5 w-5 text-white" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-white">Circle Up Live</span>
+            <span className="block truncate text-xs text-white/50">Go live and meet someone new, right now</span>
+          </span>
+          <ChevronRight className="h-4 w-4 flex-shrink-0 text-white/40" />
+        </button>
       </div>
       <div>
         {loading ? (

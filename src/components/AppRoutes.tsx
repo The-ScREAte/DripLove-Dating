@@ -30,6 +30,10 @@ const TestYourToast = lazy(() => import('../pages/TestYourToast'));
 const ShootYourShot = lazy(() => import('../pages/ShootYourShot'));
 const RedFlagGreenFlag = lazy(() => import('../pages/RedFlagGreenFlag'));
 const LinksPage = lazy(() => import('../pages/LinksPage'));
+const CircleUpPrepare = lazy(() => import('../pages/circle-up/CircleUpPrepare'));
+const CircleUpMatching = lazy(() => import('../pages/circle-up/CircleUpMatching'));
+const CircleUpCall = lazy(() => import('../pages/circle-up/CircleUpCall'));
+const CircleUpEnded = lazy(() => import('../pages/circle-up/CircleUpEnded'));
 
 // Shown while a lazy route's chunk is being fetched. A blank screen here reads as "the tap did
 // nothing" on a slow mobile connection — a visible spinner confirms the navigation registered.
@@ -84,6 +88,10 @@ const AppRoutes = ({
       <Route path="/games/test-your-toast" element={<TestYourToast />} />
       <Route path="/games/shoot-your-shot" element={<ShootYourShot />} />
       <Route path="/games/red-flag-green-flag" element={<RedFlagGreenFlag />} />
+      <Route path="/circle-up" element={<CircleUpPrepare />} />
+      <Route path="/circle-up/matching" element={<CircleUpMatching />} />
+      <Route path="/circle-up/call" element={<CircleUpCall />} />
+      <Route path="/circle-up/ended" element={<CircleUpEnded />} />
       <Route path="/links" element={<LinksPage />} />
       <Route path="/r/:id" element={<RedirectHandler />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
