@@ -126,7 +126,7 @@ const CircleUpMatching = () => {
     clearPollTimer();
     clearCandidatePollTimer();
     setCandidate(profiles[0]);
-    setCandidateShareSettings((shareRes.data?.share_settings as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
+    setCandidateShareSettings((shareRes.data?.share_settings as unknown as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
     // The first (main) photo is already the card's own background - only
     // the rest count as "extra" for the gallery.
     setCandidateExtraPhotos((imagesByUser[matchedUserId] || []).slice(1));
