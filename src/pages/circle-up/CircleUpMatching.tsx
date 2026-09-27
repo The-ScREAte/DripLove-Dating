@@ -27,6 +27,9 @@ const CONNECT_COUNTDOWN_SECONDS = 5;
 const DECIDE_COUNTDOWN_SECONDS = 10;
 const WAITING_TIMEOUT_MS = 30000;
 const LAUNCH_STEP_MS = 550;
+// ~15s of searching with nobody found before offering a way out, instead of
+// leaving "Circling now..." spinning forever with no explanation.
+const NO_MATCH_HINT_AFTER_ATTEMPTS = 6;
 
 const CircleUpMatching = () => {
   const navigate = useNavigate();
@@ -41,6 +44,8 @@ const CircleUpMatching = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(CONNECT_COUNTDOWN_SECONDS);
   const [decideCountdown, setDecideCountdown] = useState(DECIDE_COUNTDOWN_SECONDS);
+  const [pollAttempts, setPollAttempts] = useState(0);
+  const [isPremium, setIsPremium] = useState(false);
 
   const pollTimerRef = useRef<number | null>(null);
   const waitingTimeoutRef = useRef<number | null>(null);
@@ -67,6 +72,7 @@ const CircleUpMatching = () => {
     setCandidateShareSettings(DEFAULT_SHARE_SETTINGS);
     setCandidateExtraPhotos([]);
     setSessionId(null);
+    setPollAttempts(0);
     setPhase('searching');
     pollForMatch(uid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,6 +91,7 @@ const CircleUpMatching = () => {
       ]);
       if (!activeRef.current) return;
       if (profiles.length === 0) {
+        setPollAttempts((n) => n + 1);
         pollTimerRef.current = window.setTimeout(() => pollForMatch(uid), POLL_INTERVAL_MS);
         return;
       }
@@ -97,6 +104,7 @@ const CircleUpMatching = () => {
       setPhase('connecting');
       return;
     }
+    setPollAttempts((n) => n + 1);
     pollTimerRef.current = window.setTimeout(() => pollForMatch(uid), POLL_INTERVAL_MS);
   }, []);
 
@@ -105,11 +113,16 @@ const CircleUpMatching = () => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate('/'); return; }
-      const { data: profile } = await supabase.from('profiles').select('latitude,longitude').eq('id', user.id).single();
+      const [{ data: profile }, { data: subRows }] = await Promise.all([
+        supabase.from('profiles').select('latitude,longitude').eq('id', user.id).single(),
+        supabase.rpc('get_current_subscription_status', { p_user_id: user.id }),
+      ]);
       if (!activeRef.current) return;
       setUserId(user.id);
       setMyLat(profile?.latitude ?? null);
       setMyLon(profile?.longitude ?? null);
+      const subRow = Array.isArray(subRows) ? subRows[0] : subRows;
+      setIsPremium(!!subRow && subRow.plan_name === 'premium' && !!subRow.is_active);
 
       // "1, 2, 3" launch beat before the search itself starts - purely a
       // brief, deliberate transition so tapping Ready feels like it did
@@ -291,6 +304,26 @@ const CircleUpMatching = () => {
             </div>
             <p className="text-white font-semibold">Circling now to find you a match…</p>
             <p className="text-white/40 text-sm text-center">We'll connect you the moment someone who fits your preferences is online.</p>
+
+            {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS && (
+              <div className="w-full max-w-xs rounded-2xl border border-pink-500/20 bg-white/[0.03] p-4 mt-2 flex flex-col items-center gap-3">
+                <p className="text-white/60 text-xs text-center">No one nearby yet. Still looking, but you can also:</p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/?tab=profile')}
+                  className="w-full py-2.5 rounded-full border border-white/20 text-white text-sm font-medium"
+                >
+                  Expand your visibility in preferences
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/?tab=profile')}
+                  className="w-full py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-medium"
+                >
+                  {isPremium ? 'Unlock more countries to see' : 'Go Premium to see overseas'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
