@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, X, Heart } from 'lucide-react';
+import { X, Heart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import HoppingLogo from '@/components/HoppingLogo';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
-import MatchPreviewCard from './MatchPreviewCard';
+import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
+import CircleUpHeader from './CircleUpHeader';
+import { readCircleUpLayoutPref } from './CircleUpPrepare';
 
-type Phase = 'searching' | 'connecting' | 'deciding' | 'waiting_other';
+type Phase = 'launching' | 'searching' | 'connecting' | 'deciding' | 'waiting_other';
 
 interface SessionRow {
   id: string;
@@ -21,14 +24,17 @@ interface SessionRow {
 const POLL_INTERVAL_MS = 2500;
 const CONNECT_COUNTDOWN_SECONDS = 5;
 const WAITING_TIMEOUT_MS = 30000;
+const LAUNCH_STEP_MS = 550;
 
 const CircleUpMatching = () => {
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
   const [myLat, setMyLat] = useState<number | null>(null);
   const [myLon, setMyLon] = useState<number | null>(null);
-  const [phase, setPhase] = useState<Phase>('searching');
+  const [phase, setPhase] = useState<Phase>('launching');
+  const [launchCount, setLaunchCount] = useState(1);
   const [candidate, setCandidate] = useState<CircleProfile | null>(null);
+  const [candidateShareSettings, setCandidateShareSettings] = useState<CircleUpShareSettings>(DEFAULT_SHARE_SETTINGS);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(CONNECT_COUNTDOWN_SECONDS);
 
@@ -54,6 +60,7 @@ const CircleUpMatching = () => {
     await supabase.from('circle_up_queue').upsert({ user_id: uid, status: 'waiting', session_id: null }, { onConflict: 'user_id' });
     if (!activeRef.current) return;
     setCandidate(null);
+    setCandidateShareSettings(DEFAULT_SHARE_SETTINGS);
     setSessionId(null);
     setPhase('searching');
     pollForMatch(uid);
@@ -66,13 +73,17 @@ const CircleUpMatching = () => {
     if (!activeRef.current) return;
     const row = Array.isArray(data) ? data[0] : data;
     if (!error && row?.session_id && row?.matched_user_id) {
-      const profiles = await fetchCircleProfilesByIds([row.matched_user_id]);
+      const [profiles, shareRes] = await Promise.all([
+        fetchCircleProfilesByIds([row.matched_user_id]),
+        supabase.from('circle_up_queue').select('share_settings').eq('user_id', row.matched_user_id).single(),
+      ]);
       if (!activeRef.current) return;
       if (profiles.length === 0) {
         pollTimerRef.current = window.setTimeout(() => pollForMatch(uid), POLL_INTERVAL_MS);
         return;
       }
       setCandidate(profiles[0]);
+      setCandidateShareSettings((shareRes.data?.share_settings as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
       setSessionId(row.session_id);
       setPhase('connecting');
       return;
@@ -90,6 +101,17 @@ const CircleUpMatching = () => {
       setUserId(user.id);
       setMyLat(profile?.latitude ?? null);
       setMyLon(profile?.longitude ?? null);
+
+      // "1, 2, 3" launch beat before the search itself starts - purely a
+      // brief, deliberate transition so tapping Ready feels like it did
+      // something, not an instant jump into a spinner.
+      for (const n of [1, 2, 3]) {
+        if (!activeRef.current) return;
+        setLaunchCount(n);
+        await new Promise((resolve) => window.setTimeout(resolve, LAUNCH_STEP_MS));
+      }
+      if (!activeRef.current) return;
+      setPhase('searching');
       pollForMatch(user.id);
     })();
 
@@ -100,7 +122,7 @@ const CircleUpMatching = () => {
     };
   }, [navigate, pollForMatch]);
 
-  // 5-second "Finding your connection..." countdown, purely cosmetic
+  // 5-second "Finding Your Match" countdown, purely cosmetic
   // anticipation-building once a candidate is found - not the search itself.
   useEffect(() => {
     if (phase !== 'connecting') return;
@@ -141,7 +163,7 @@ const CircleUpMatching = () => {
           }
           if (myDecision === 'accept' && otherDecision === 'accept') {
             clearWaitingTimeout();
-            navigate(`/circle-up/call?session=${sessionId}`);
+            navigate(`/circle-up/call?session=${sessionId}&layout=${readCircleUpLayoutPref()}`);
           }
         }
       )
@@ -182,7 +204,7 @@ const CircleUpMatching = () => {
         .update({ status: 'accepted', accepted_at: new Date().toISOString(), livekit_room_name: `circleup-${sessionId}` })
         .eq('id', sessionId)
         .eq('status', 'pending_accept');
-      navigate(`/circle-up/call?session=${sessionId}`);
+      navigate(`/circle-up/call?session=${sessionId}&layout=${readCircleUpLayoutPref()}`);
       return;
     }
 
@@ -218,18 +240,26 @@ const CircleUpMatching = () => {
 
   return (
     <div className="h-[100dvh] w-full bg-black flex flex-col">
-      <div className="flex items-center px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
-        <button type="button" onClick={handleCancel} className="p-2 -ml-2 text-white/70 hover:text-white" aria-label="Cancel">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-      </div>
+      <CircleUpHeader onBack={handleCancel} backLabel="Cancel" />
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0">
+        {phase === 'launching' && (
+          <div className="flex flex-col items-center gap-3">
+            <span key={launchCount} className="text-6xl font-bold text-white animate-in zoom-in-50 duration-300">
+              {launchCount}
+            </span>
+            <p className="text-white/40 text-sm">Going live…</p>
+          </div>
+        )}
+
         {phase === 'searching' && (
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-14 h-14 rounded-full border-2 border-pink-500/30 border-t-pink-500 animate-spin" />
-            <p className="text-white font-semibold">Finding your connection…</p>
-            <p className="text-white/40 text-sm text-center">We're matching you with someone who fits your preferences.</p>
+          <div className="flex flex-col items-center gap-5">
+            <div className="relative w-24 h-24 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-pink-500/25 border-t-pink-500 animate-spin" />
+              <HoppingLogo size={44} />
+            </div>
+            <p className="text-white font-semibold">Circling now to find you a match…</p>
+            <p className="text-white/40 text-sm text-center">We'll connect you the moment someone who fits your preferences is online.</p>
           </div>
         )}
 
@@ -259,7 +289,7 @@ const CircleUpMatching = () => {
           <div className="w-full flex flex-col items-center gap-5">
             <h2 className="text-white font-bold text-lg">New Match</h2>
             <p className="text-white/40 text-sm -mt-3">Do you want to connect?</p>
-            <MatchPreviewCard profile={candidate} distanceKm={distanceKm} />
+            <MatchPreviewCard profile={candidate} distanceKm={distanceKm} shareSettings={candidateShareSettings} />
             <div className="flex items-center gap-6 mt-2">
               <button
                 type="button"
