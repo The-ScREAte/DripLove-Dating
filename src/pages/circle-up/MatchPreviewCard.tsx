@@ -1,40 +1,53 @@
-import { MapPin, BadgeCheck } from 'lucide-react';
 import { CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateAge } from '@/utils/discoverCache';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
-import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import { formatDistance } from '@/utils/distanceUnits';
+import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
+import ProfileInfoOverlay from './ProfileInfoOverlay';
 
 export interface CircleUpShareSettings {
   age: boolean;
   location: boolean;
   interests: boolean;
+  bio: boolean;
+  occupation: boolean;
+  relationshipIntent: boolean;
 }
 
 export const DEFAULT_SHARE_SETTINGS: CircleUpShareSettings = {
   age: true,
   location: true,
   interests: true,
+  bio: true,
+  occupation: true,
+  relationshipIntent: true,
 };
 
 interface MatchPreviewCardProps {
   profile: CircleProfile;
   distanceKm: number | null;
   shareSettings?: CircleUpShareSettings;
-  /** 'full' for the match-reveal moment, 'compact' for the "your profile" preview on Prepare. */
+  /** 'full' for the match-reveal moment, 'compact' for a small thumbnail. */
   size?: 'full' | 'compact';
+  /** Shows the "show more info" chevron, like Discover's own card. */
+  expandable?: boolean;
 }
 
-// The exact visual language of Discover's info overlay (ProfilePreviewModal.tsx /
-// MatchCard.tsx: a bottom-pinned black gradient over the photo, name+age+online
-// dot+verified badge, location+distance, a couple of interest chips) - reused
-// here, not reinvented, so a Circle Up match reads as unmistakably "the same
-// app" the instant it appears, per the user's explicit instruction that this
-// should look like Discover's info area.
-const MatchPreviewCard = ({ profile, distanceKm, shareSettings = DEFAULT_SHARE_SETTINGS, size = 'full' }: MatchPreviewCardProps) => {
+// Photo + Discover's own info-overlay style on top of it (see
+// ProfileInfoOverlay) - reused, not reinvented, so a Circle Up match reads
+// as unmistakably "the same app" the instant it appears.
+const MatchPreviewCard = ({
+  profile,
+  distanceKm,
+  shareSettings = DEFAULT_SHARE_SETTINGS,
+  size = 'full',
+  expandable = true,
+}: MatchPreviewCardProps) => {
+  const locationLabel = shareSettings.location
+    ? [profile.city, profile.country].filter(Boolean).join(', ') +
+      (typeof distanceKm === 'number' ? ` • ${formatDistance(distanceKm, profile.country_code)}` : '')
+    : undefined;
   const online = isRecentlyOnline(profile.last_login_at, SWIPE_ONLINE_WINDOW_MS);
-  const chips = shareSettings.interests ? (profile.interests || []).slice(0, 3) : [];
-  const showLocationLine = shareSettings.location && (profile.city || profile.country || typeof distanceKm === 'number');
 
   return (
     <div
@@ -55,53 +68,19 @@ const MatchPreviewCard = ({ profile, distanceKm, shareSettings = DEFAULT_SHARE_S
         </div>
       )}
 
-      <div
-        className={`absolute inset-x-0 bottom-0 z-10 px-5 ${size === 'compact' ? 'pt-8 pb-3' : 'pt-16 pb-5'}`}
-        style={{
-          background:
-            'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 45%, rgba(0,0,0,0.94) 58%, rgba(0,0,0,1) 70%)',
-        }}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <h2 className={size === 'compact' ? 'text-xs font-bold text-white' : 'text-lg font-bold text-white'}>
-            {profile.first_name}
-            {shareSettings.age ? `, ${calculateAge(profile.date_of_birth)}` : ''}
-          </h2>
-          {online && (
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-black shrink-0" aria-label="Online now" />
-          )}
-          {profile.is_verified && (
-            <BadgeCheck className="w-4 h-4 text-sky-400 shrink-0" aria-label="Verified profile" />
-          )}
-        </div>
-
-        {size === 'full' && showLocationLine && (
-          <div className="flex items-center text-sm text-white/80 mb-2">
-            <MapPin className="w-3.5 h-3.5 mr-1 shrink-0" />
-            <span>
-              {profile.city}
-              {profile.city && profile.country ? ', ' : ''}
-              {profile.country}
-              {typeof distanceKm === 'number' && (
-                <span className="ml-2">• {formatDistance(distanceKm, profile.country_code)}</span>
-              )}
-            </span>
-          </div>
-        )}
-
-        {size === 'full' && chips.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {chips.map((interest) => (
-              <span
-                key={interest}
-                className="text-xs font-medium text-white/85 bg-white/10 border border-pink-500/30 px-2 py-0.5 rounded-full truncate max-w-[120px]"
-              >
-                {interest}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <ProfileInfoOverlay
+        firstName={profile.first_name}
+        age={shareSettings.age ? calculateAge(profile.date_of_birth) : undefined}
+        online={online}
+        verified={profile.is_verified}
+        locationLabel={locationLabel}
+        interests={shareSettings.interests ? profile.interests : []}
+        bio={shareSettings.bio ? profile.bio : undefined}
+        occupation={shareSettings.occupation ? profile.occupation : undefined}
+        relationshipIntent={shareSettings.relationshipIntent ? profile.relationship_intent : undefined}
+        expandable={expandable}
+        size={size}
+      />
     </div>
   );
 };

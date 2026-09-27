@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, Video as VideoIcon, VideoOff, MicOff, Columns2, PictureInPicture2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
+import { calculateAge } from '@/utils/discoverCache';
 import { Switch } from '@/components/ui/switch';
 import CircleUpHeader from './CircleUpHeader';
-import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
+import ProfileInfoOverlay from './ProfileInfoOverlay';
+import { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 
 export type CircleUpLayoutPref = 'floating' | 'split';
 const LAYOUT_PREF_KEY = 'driplove_circle_up_layout_pref';
@@ -18,6 +20,18 @@ export const readCircleUpLayoutPref = (): CircleUpLayoutPref => {
     return 'floating';
   }
 };
+
+// Every toggle here is conditional on the field actually being set on the
+// user's own profile - no point offering to hide something that's already
+// empty, and it keeps the list scoped to what's genuinely theirs to share.
+const SHARE_FIELD_DEFS: { key: keyof CircleUpShareSettings; label: string; has: (p: CircleProfile) => boolean }[] = [
+  { key: 'age', label: 'Age', has: (p) => !!p.date_of_birth },
+  { key: 'location', label: 'Location & distance', has: (p) => !!(p.city || p.country) },
+  { key: 'interests', label: 'Interests', has: (p) => (p.interests || []).length > 0 },
+  { key: 'occupation', label: 'Occupation', has: (p) => !!p.occupation },
+  { key: 'relationshipIntent', label: 'What I\'m looking for', has: (p) => !!p.relationship_intent },
+  { key: 'bio', label: 'About me', has: (p) => !!p.bio },
+];
 
 // Standalone route (like /games) - no props from MainApp, so it resolves
 // its own current user the same way useSubscription/useEnhancedSubscription
@@ -64,7 +78,6 @@ const CircleUpPrepare = () => {
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
         setPermissionState('granted');
       } catch {
         if (!cancelled) setPermissionState('denied');
@@ -76,6 +89,18 @@ const CircleUpPrepare = () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [navigate]);
+
+  // The <video> element only mounts once permissionState flips to
+  // 'granted' (it's conditionally rendered below), so videoRef.current
+  // was still null at the moment the effect above obtained the stream -
+  // assigning srcObject there silently did nothing, which is why the
+  // preview rendered solid black. Attaching it here, once the element
+  // actually exists, is what makes the live feed show up.
+  useEffect(() => {
+    if (permissionState === 'granted' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [permissionState, camOn]);
 
   const toggleCam = () => {
     const next = !camOn;
@@ -107,15 +132,14 @@ const CircleUpPrepare = () => {
     navigate('/circle-up/matching');
   };
 
+  const availableFields = myProfile ? SHARE_FIELD_DEFS.filter((f) => f.has(myProfile)) : [];
+
   return (
     <div className="h-[100dvh] w-full bg-black flex flex-col">
       <CircleUpHeader onBack={() => navigate('/?tab=circle')} backLabel="Back to Circle" />
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col items-center px-6 pt-2 pb-4">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center mb-3 shadow-lg shadow-pink-500/30">
-            <VideoIcon className="w-7 h-7 text-white" />
-          </div>
+        <div className="flex flex-col items-center px-6 pt-4 pb-3">
           <p className="text-white/50 text-sm text-center">Go live and meet someone new in real time.</p>
         </div>
 
@@ -141,12 +165,37 @@ const CircleUpPrepare = () => {
               </div>
             )}
 
+            {/* What your match will actually see, overlaid on your own live
+                preview - same overlay Discover uses on a photo, just over
+                video here, exactly like a real call's self-view name tag. */}
+            {permissionState === 'granted' && camOn && myProfile && (
+              <ProfileInfoOverlay
+                firstName={myProfile.first_name}
+                age={shareSettings.age ? calculateAge(myProfile.date_of_birth) : undefined}
+                verified={myProfile.is_verified}
+                locationLabel={shareSettings.location ? [myProfile.city, myProfile.country].filter(Boolean).join(', ') : undefined}
+                interests={shareSettings.interests ? myProfile.interests : []}
+                bio={shareSettings.bio ? myProfile.bio : undefined}
+                occupation={shareSettings.occupation ? myProfile.occupation : undefined}
+                relationshipIntent={shareSettings.relationshipIntent ? myProfile.relationship_intent : undefined}
+                expandable
+              />
+            )}
+
             {permissionState === 'granted' && (
-              <div className="absolute bottom-4 inset-x-0 flex items-center justify-center gap-3">
+              <div className="absolute top-3 inset-x-0 flex items-center justify-center">
+                <span className="px-3 py-1 rounded-full bg-black/50 text-white/70 text-[11px] font-medium border border-white/10">
+                  What your match will see
+                </span>
+              </div>
+            )}
+
+            {permissionState === 'granted' && (
+              <div className="absolute bottom-4 right-4 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={toggleMic}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center border ${micOn ? 'bg-white/10 border-white/20 text-white' : 'bg-white text-black border-white'}`}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center border ${micOn ? 'bg-white/10 border-white/20 text-white' : 'bg-white text-black border-white'} focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400`}
                   aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
                 >
                   {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
@@ -154,7 +203,7 @@ const CircleUpPrepare = () => {
                 <button
                   type="button"
                   onClick={toggleCam}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center border ${camOn ? 'bg-white/10 border-white/20 text-white' : 'bg-white text-black border-white'}`}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center border ${camOn ? 'bg-white/10 border-white/20 text-white' : 'bg-white text-black border-white'} focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400`}
                   aria-label={camOn ? 'Turn camera off' : 'Turn camera on'}
                 >
                   {camOn ? <VideoIcon className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
@@ -164,50 +213,23 @@ const CircleUpPrepare = () => {
           </div>
         </div>
 
-        {myProfile && (
+        {availableFields.length > 0 && (
           <div className="px-6 pb-6">
-            <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Your profile</p>
-            <div className="flex items-center gap-3 rounded-2xl border border-pink-500/20 bg-white/[0.03] p-3">
-              <div className="w-14 flex-shrink-0">
-                <MatchPreviewCard profile={myProfile} distanceKm={null} shareSettings={shareSettings} size="compact" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-white text-sm font-semibold truncate">This is what your match will see</p>
-                <p className="text-white/40 text-xs">Based on the sharing choices below</p>
-              </div>
+            <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Share with your match</p>
+            <div className="rounded-2xl border border-pink-500/20 bg-white/[0.03] divide-y divide-white/[0.06]">
+              {availableFields.map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-white text-sm">{label}</span>
+                  <Switch
+                    checked={shareSettings[key]}
+                    onCheckedChange={(v) => setShareSettings((s) => ({ ...s, [key]: v }))}
+                    className="data-[state=checked]:bg-pink-500"
+                  />
+                </div>
+              ))}
             </div>
           </div>
         )}
-
-        <div className="px-6 pb-6">
-          <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Share with your match</p>
-          <div className="rounded-2xl border border-pink-500/20 bg-white/[0.03] divide-y divide-white/[0.06]">
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-white text-sm">Age</span>
-              <Switch
-                checked={shareSettings.age}
-                onCheckedChange={(v) => setShareSettings((s) => ({ ...s, age: v }))}
-                className="data-[state=checked]:bg-pink-500"
-              />
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-white text-sm">Location &amp; distance</span>
-              <Switch
-                checked={shareSettings.location}
-                onCheckedChange={(v) => setShareSettings((s) => ({ ...s, location: v }))}
-                className="data-[state=checked]:bg-pink-500"
-              />
-            </div>
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-white text-sm">Interests</span>
-              <Switch
-                checked={shareSettings.interests}
-                onCheckedChange={(v) => setShareSettings((s) => ({ ...s, interests: v }))}
-                className="data-[state=checked]:bg-pink-500"
-              />
-            </div>
-          </div>
-        </div>
 
         <div className="px-6 pb-6">
           <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Video call view</p>
