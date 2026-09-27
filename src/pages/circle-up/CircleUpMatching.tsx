@@ -13,6 +13,30 @@ import { fetchApprovedImages } from './circleUpProfileExtras';
 
 type Phase = 'launching' | 'searching' | 'connecting' | 'deciding' | 'waiting_other';
 type CandidateFilter = 'matched' | 'not_matched' | 'everyone';
+// How far out the search had to reach to find this person. The pool widens
+// automatically: nearby first, then unlocked countries, then the rest of
+// your country, then abroad - so the screen never sits empty while people
+// are live somewhere in the world.
+type CandidateScope = 'nearby' | 'unlocked' | 'national' | 'abroad';
+
+interface CandidateRow {
+  candidate_id: string;
+  is_matched: boolean;
+  scope: CandidateScope;
+  distance_km: number | null;
+}
+
+interface CandidateMeta {
+  scope: CandidateScope;
+  distanceKm: number | null;
+}
+
+const SCOPE_LABEL: Record<CandidateScope, string> = {
+  nearby: 'Nearby',
+  unlocked: 'Unlocked country',
+  national: 'Elsewhere in your country',
+  abroad: 'Abroad',
+};
 
 interface SessionRow {
   id: string;
