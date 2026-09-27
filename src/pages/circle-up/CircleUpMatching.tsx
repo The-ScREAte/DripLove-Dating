@@ -6,6 +6,8 @@ import HoppingLogo from '@/components/HoppingLogo';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
+import { calculateAge } from '@/utils/discoverCache';
+import { formatDistance } from '@/utils/distanceUnits';
 import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 import CircleUpHeader from './CircleUpHeader';
 import { readCircleUpLayoutPref } from './CircleUpPrepare';
