@@ -39,6 +39,8 @@
 	<string>Driplove needs access to your camera to let you take profile photos and pictures to upload within the app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>DripLove uses your location to help set your country and improve match accuracy.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>DripLove needs access to your microphone for Circle Up live video calls with your matches.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Driplove may save edited or generated images to your photo library when you choose to save them from the app.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
