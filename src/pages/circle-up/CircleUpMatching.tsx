@@ -6,6 +6,8 @@ import HoppingLogo from '@/components/HoppingLogo';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
+import { calculateAge } from '@/utils/discoverCache';
+import { formatDistance } from '@/utils/distanceUnits';
 import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 import CircleUpHeader from './CircleUpHeader';
 import { readCircleUpLayoutPref } from './CircleUpPrepare';
@@ -13,6 +15,30 @@ import { fetchApprovedImages } from './circleUpProfileExtras';
 
 type Phase = 'launching' | 'searching' | 'connecting' | 'deciding' | 'waiting_other';
 type CandidateFilter = 'matched' | 'not_matched' | 'everyone';
+// How far out the search had to reach to find this person. The pool widens
+// automatically: nearby first, then unlocked countries, then the rest of
+// your country, then abroad - so the screen never sits empty while people
+// are live somewhere in the world.
+type CandidateScope = 'nearby' | 'unlocked' | 'national' | 'abroad';
+
+interface CandidateRow {
+  candidate_id: string;
+  is_matched: boolean;
+  scope: CandidateScope;
+  distance_km: number | null;
+}
+
+interface CandidateMeta {
+  scope: CandidateScope;
+  distanceKm: number | null;
+}
+
+const SCOPE_LABEL: Record<CandidateScope, string> = {
+  nearby: 'Nearby',
+  unlocked: 'Unlocked country',
+  national: 'Elsewhere in your country',
+  abroad: 'Abroad',
+};
 
 interface SessionRow {
   id: string;
@@ -58,6 +84,8 @@ const CircleUpMatching = () => {
   // Who's actually browsable right now, replacing the old blind auto-pairing -
   // this is the live "who's available" grid.
   const [candidates, setCandidates] = useState<CircleProfile[]>([]);
+  const [candidateMeta, setCandidateMeta] = useState<Record<string, CandidateMeta>>({});
+  const [featuredIndex, setFeaturedIndex] = useState(0);
   const [filter, setFilter] = useState<CandidateFilter>('everyone');
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [selectError, setSelectError] = useState<string | null>(null);
@@ -98,7 +126,7 @@ const CircleUpMatching = () => {
     clearPollTimer();
     clearCandidatePollTimer();
     setCandidate(profiles[0]);
-    setCandidateShareSettings((shareRes.data?.share_settings as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
+    setCandidateShareSettings((shareRes.data?.share_settings as unknown as CircleUpShareSettings) || DEFAULT_SHARE_SETTINGS);
     // The first (main) photo is already the card's own background - only
     // the rest count as "extra" for the gallery.
     setCandidateExtraPhotos((imagesByUser[matchedUserId] || []).slice(1));
@@ -133,14 +161,22 @@ const CircleUpMatching = () => {
       p_filter: filterRef.current,
     });
     if (!activeRef.current) return;
-    const rows = Array.isArray(data) ? data : [];
+    const rows = (Array.isArray(data) ? data : []) as CandidateRow[];
     if (!error && rows.length > 0) {
-      const ids = rows.map((r: { candidate_id: string }) => r.candidate_id);
+      const ids = rows.map((r) => r.candidate_id);
       const profiles = await fetchCircleProfilesByIds(ids);
       if (!activeRef.current) return;
-      setCandidates(profiles);
+      // The RPC already returns nearest-tier-first (nearby, then unlocked
+      // countries, then rest of country, then abroad); fetchCircleProfilesByIds
+      // doesn't preserve that order, so it's reapplied here.
+      const order = new Map(ids.map((id, i) => [id, i]));
+      const meta: Record<string, CandidateMeta> = {};
+      rows.forEach((r) => { meta[r.candidate_id] = { scope: r.scope, distanceKm: r.distance_km }; });
+      setCandidateMeta(meta);
+      setCandidates([...profiles].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)));
     } else {
       setCandidates([]);
+      setCandidateMeta({});
     }
     candidatePollTimerRef.current = window.setTimeout(() => fetchCandidates(uid), CANDIDATE_POLL_INTERVAL_MS);
   }, []);
@@ -370,6 +406,25 @@ const CircleUpMatching = () => {
       ? Math.round(calculateDistance(myLat, myLon, candidate.latitude, candidate.longitude))
       : null;
 
+  // The person shown large in the circle right now. featuredIndex just keeps
+  // counting up as you tap "show someone else", wrapping around the live
+  // list, so it stays valid however the list shrinks or grows between polls.
+  const featured = candidates.length > 0 ? candidates[featuredIndex % candidates.length] : null;
+  const featuredAge = featured ? calculateAge(featured.date_of_birth) : null;
+  const featuredMeta = featured ? candidateMeta[featured.id] : undefined;
+  const featuredWhere = featured
+    ? [
+        featuredMeta?.distanceKm != null
+          ? `${formatDistance(featuredMeta.distanceKm, featured.country_code)} away`
+          : [featured.city, featured.country].filter(Boolean).join(', '),
+        featuredMeta && featuredMeta.scope !== 'nearby' ? SCOPE_LABEL[featuredMeta.scope] : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+
+
+
   return (
     <div className="h-[100dvh] w-full bg-black flex flex-col">
       <CircleUpHeader onBack={handleCancel} backLabel="Cancel" />
@@ -386,46 +441,99 @@ const CircleUpMatching = () => {
 
         {phase === 'searching' && (
           <div className="flex flex-col items-center gap-4 w-full max-w-sm">
-            {candidates.length === 0 ? (
+            {!featured ? (
               <>
                 <div className="relative w-24 h-24 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-full border-2 border-pink-500/25 border-t-pink-500 animate-spin" />
                   <HoppingLogo size={44} />
                 </div>
                 <p className="text-white font-semibold text-center">Circling now to find you a match…</p>
-                <p className="text-white/40 text-sm text-center">We'll connect you the moment someone who fits your preferences is online.</p>
+                <p className="text-white/40 text-sm text-center">
+                  We start with people near you and keep widening the search — across your country, then abroad.
+                </p>
               </>
             ) : (
               <>
-                <p className="text-white font-semibold text-center">
-                  {candidates.length} {candidates.length === 1 ? 'person is' : 'people are'} circling right now
-                </p>
-                <p className="text-white/40 text-xs text-center -mt-2">Tap someone to say hi</p>
-                <div className="grid grid-cols-4 gap-3 w-full max-h-64 overflow-y-auto py-1">
-                  {candidates.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => handleSelectCandidate(c)}
-                      disabled={!!selectingId}
-                      className="flex flex-col items-center gap-1 disabled:opacity-40"
-                    >
-                      <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-pink-500/40 bg-neutral-800">
-                        {c.firstImage ? (
-                          <img src={getDetailImageUrl(c.firstImage)} alt={c.first_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-pink-500/30 to-purple-600/30" />
-                        )}
-                        {selectingId === c.id && (
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          </div>
-                        )}
+                {/* The person themselves fills the circle now, instead of a
+                    logo spinning over an empty ring - you see who you're
+                    about to meet before you accept. */}
+                <div className="relative w-40 h-40">
+                  <div className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 opacity-70 blur-[2px]" />
+                  <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-white/20 bg-neutral-800">
+                    {featured.firstImage ? (
+                      <img
+                        src={getDetailImageUrl(featured.firstImage)}
+                        alt={featured.first_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-pink-500/30 to-purple-600/30" />
+                    )}
+                    {selectingId === featured.id && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       </div>
-                      <span className="text-white/70 text-[11px] truncate w-16 text-center">{c.first_name}</span>
-                    </button>
-                  ))}
+                    )}
+                  </div>
+                  <span className="absolute bottom-1 right-1 px-2 py-0.5 rounded-full bg-black/70 border border-white/15 text-[10px] text-white/80">
+                    Live
+                  </span>
                 </div>
+
+                <div className="flex flex-col items-center gap-1 -mt-1">
+                  <p className="text-white font-bold text-lg">
+                    {featured.first_name}
+                    {featuredAge ? `, ${featuredAge}` : ''}
+                  </p>
+                  <p className="text-white/45 text-xs text-center">{featuredWhere}</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectCandidate(featured)}
+                  disabled={!!selectingId}
+                  className="w-full py-3.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50"
+                >
+                  Accept
+                </button>
+
+                {candidates.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setFeaturedIndex((i) => i + 1)}
+                    disabled={!!selectingId}
+                    className="text-white/50 text-xs underline disabled:opacity-40"
+                  >
+                    Show someone else ({candidates.length - 1} more live)
+                  </button>
+                )}
+
+                {candidates.length > 1 && (
+                  <div className="flex items-center gap-3 w-full overflow-x-auto py-1">
+                    {candidates.map((c, i) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setFeaturedIndex(i)}
+                        disabled={!!selectingId}
+                        className="flex flex-col items-center gap-1 shrink-0 disabled:opacity-40"
+                      >
+                        <div
+                          className={`w-12 h-12 rounded-full overflow-hidden border-2 bg-neutral-800 ${
+                            c.id === featured.id ? 'border-pink-500' : 'border-white/15'
+                          }`}
+                        >
+                          {c.firstImage ? (
+                            <img src={getDetailImageUrl(c.firstImage)} alt={c.first_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-pink-500/30 to-purple-600/30" />
+                          )}
+                        </div>
+                        <span className="text-white/60 text-[10px] truncate w-12 text-center">{c.first_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
@@ -448,7 +556,9 @@ const CircleUpMatching = () => {
 
             {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS && candidates.length === 0 && (
               <div className="w-full rounded-2xl border border-pink-500/20 bg-white/[0.03] p-4 mt-1 flex flex-col items-center gap-3">
-                <p className="text-white/60 text-xs text-center">No one nearby yet. Still looking, but you can also:</p>
+                <p className="text-white/60 text-xs text-center">
+                  No one is live right now — near you or abroad. Still looking, and you can also:
+                </p>
                 <button
                   type="button"
                   onClick={() => navigate('/?tab=profile')}
@@ -456,13 +566,15 @@ const CircleUpMatching = () => {
                 >
                   Expand your visibility in preferences
                 </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/?tab=profile')}
-                  className="w-full py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-medium"
-                >
-                  {isPremium ? 'Unlock more countries to see' : 'Go Premium to see overseas'}
-                </button>
+                {!isPremium && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/?tab=profile')}
+                    className="w-full py-2.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-medium"
+                  >
+                    Go Premium for a wider circle
+                  </button>
+                )}
               </div>
             )}
           </div>

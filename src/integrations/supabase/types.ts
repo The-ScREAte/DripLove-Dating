@@ -2634,7 +2634,9 @@ export type Database = {
         Args: { p_filter?: string; p_user_id: string }
         Returns: {
           candidate_id: string
+          distance_km: number
           is_matched: boolean
+          scope: string
         }[]
       }
       circle_up_request_session: {

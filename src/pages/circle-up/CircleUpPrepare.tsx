@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mic, Video as VideoIcon, VideoOff, MicOff, Rows2, Columns2, PictureInPicture2, ChevronDown, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateAge } from '@/utils/discoverCache';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
@@ -184,7 +185,16 @@ const CircleUpPrepare = () => {
     setGoingLive(true);
     const { error } = await supabase
       .from('circle_up_queue')
-      .upsert({ user_id: userId, status: 'waiting', session_id: null, share_settings: shareSettings }, { onConflict: 'user_id' });
+      .upsert(
+        {
+          user_id: userId,
+          status: 'waiting',
+          session_id: null,
+          updated_at: new Date().toISOString(),
+          share_settings: shareSettings as unknown as Json,
+        },
+        { onConflict: 'user_id' }
+      );
     if (error) {
       setGoingLive(false);
       return;
