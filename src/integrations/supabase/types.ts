@@ -589,6 +589,105 @@ export type Database = {
         }
         Relationships: []
       }
+      circle_up_queue: {
+        Row: {
+          created_at: string
+          session_id: string | null
+          share_settings: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          session_id?: string | null
+          share_settings?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          session_id?: string | null
+          share_settings?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_up_queue_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "circle_up_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "circle_up_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      circle_up_sessions: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          ended_at: string | null
+          ended_reason: string | null
+          id: string
+          livekit_room_name: string | null
+          status: string
+          user_a: string
+          user_a_decision: string
+          user_b: string
+          user_b_decision: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          livekit_room_name?: string | null
+          status?: string
+          user_a: string
+          user_a_decision?: string
+          user_b: string
+          user_b_decision?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          livekit_room_name?: string | null
+          status?: string
+          user_a?: string
+          user_a_decision?: string
+          user_b?: string
+          user_b_decision?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_up_sessions_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "circle_up_sessions_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_active_stats: {
         Row: {
           active_count: number
@@ -1439,10 +1538,15 @@ export type Database = {
           is_custom_city: boolean | null
           is_verified: boolean
           languages: string[] | null
+          last_game_notification_sent_week: string | null
           last_googled: string | null
           last_login_at: string | null
           last_name: string
+          last_recommendation_sent_at: string | null
+          last_recommendation_sent_date: string | null
+          last_recommended_profile_id: string | null
           last_reengagement_sent_at: string | null
+          last_similar_sent_date: string | null
           last_streak_date: string | null
           last_streak_reminder_sent_date: string | null
           latitude: number | null
@@ -1463,6 +1567,7 @@ export type Database = {
           profile_completion: number
           promo_code_used: string | null
           rated_app_at: string | null
+          recommendation_sends_today: number
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
@@ -1513,10 +1618,15 @@ export type Database = {
           is_custom_city?: boolean | null
           is_verified?: boolean
           languages?: string[] | null
+          last_game_notification_sent_week?: string | null
           last_googled?: string | null
           last_login_at?: string | null
           last_name: string
+          last_recommendation_sent_at?: string | null
+          last_recommendation_sent_date?: string | null
+          last_recommended_profile_id?: string | null
           last_reengagement_sent_at?: string | null
+          last_similar_sent_date?: string | null
           last_streak_date?: string | null
           last_streak_reminder_sent_date?: string | null
           latitude?: number | null
@@ -1537,6 +1647,7 @@ export type Database = {
           profile_completion?: number
           promo_code_used?: string | null
           rated_app_at?: string | null
+          recommendation_sends_today?: number
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -1587,10 +1698,15 @@ export type Database = {
           is_custom_city?: boolean | null
           is_verified?: boolean
           languages?: string[] | null
+          last_game_notification_sent_week?: string | null
           last_googled?: string | null
           last_login_at?: string | null
           last_name?: string
+          last_recommendation_sent_at?: string | null
+          last_recommendation_sent_date?: string | null
+          last_recommended_profile_id?: string | null
           last_reengagement_sent_at?: string | null
+          last_similar_sent_date?: string | null
           last_streak_date?: string | null
           last_streak_reminder_sent_date?: string | null
           latitude?: number | null
@@ -1611,6 +1727,7 @@ export type Database = {
           profile_completion?: number
           promo_code_used?: string | null
           rated_app_at?: string | null
+          recommendation_sends_today?: number
           relationship_intent?: string | null
           sleeping_schedule?: string | null
           smoking?: string | null
@@ -2242,6 +2359,7 @@ export type Database = {
           flutterwave_transaction_id: string | null
           id: string
           is_trial: boolean
+          latest_receipt_data: string | null
           next_billing_date: string | null
           original_transaction_id: string | null
           payment_attempts: number | null
@@ -2261,6 +2379,7 @@ export type Database = {
           flutterwave_transaction_id?: string | null
           id?: string
           is_trial?: boolean
+          latest_receipt_data?: string | null
           next_billing_date?: string | null
           original_transaction_id?: string | null
           payment_attempts?: number | null
@@ -2280,6 +2399,7 @@ export type Database = {
           flutterwave_transaction_id?: string | null
           id?: string
           is_trial?: boolean
+          latest_receipt_data?: string | null
           next_billing_date?: string | null
           original_transaction_id?: string | null
           payment_attempts?: number | null
@@ -2470,6 +2590,15 @@ export type Database = {
         Returns: boolean
       }
       auto_archive_inactive_users: { Args: never; Returns: undefined }
+      build_profile_push_body: {
+        Args: {
+          p_age: number
+          p_city: string
+          p_first_name: string
+          p_trait: string
+        }
+        Returns: string
+      }
       bump_admin_stat: {
         Args: { p_delta: number; p_metric: string }
         Returns: undefined
@@ -2479,13 +2608,6 @@ export type Database = {
         Returns: number
       }
       cancel_user_subscription: { Args: never; Returns: undefined }
-      check_and_dissolve_expired_matches: {
-        Args: never
-        Returns: {
-          dissolved_count: number
-          notified_count: number
-        }[]
-      }
       circle_like_and_usage_batched: {
         Args: {
           liked_id_param: string
@@ -2493,6 +2615,34 @@ export type Database = {
           premium_param?: boolean
         }
         Returns: Json
+      }
+      circle_up_check_session: {
+        Args: { p_user_id: string }
+        Returns: {
+          matched_user_id: string
+          session_id: string
+        }[]
+      }
+      circle_up_find_match: {
+        Args: { p_user_id: string }
+        Returns: {
+          matched_user_id: string
+          session_id: string
+        }[]
+      }
+      circle_up_list_candidates: {
+        Args: { p_filter?: string; p_user_id: string }
+        Returns: {
+          candidate_id: string
+          is_matched: boolean
+        }[]
+      }
+      circle_up_request_session: {
+        Args: { p_target_id: string; p_user_id: string }
+        Returns: {
+          matched_user_id: string
+          session_id: string
+        }[]
       }
       claim_broadcast_recipients: {
         Args: {
@@ -2622,10 +2772,15 @@ export type Database = {
               is_custom_city: boolean | null
               is_verified: boolean
               languages: string[] | null
+              last_game_notification_sent_week: string | null
               last_googled: string | null
               last_login_at: string | null
               last_name: string
+              last_recommendation_sent_at: string | null
+              last_recommendation_sent_date: string | null
+              last_recommended_profile_id: string | null
               last_reengagement_sent_at: string | null
+              last_similar_sent_date: string | null
               last_streak_date: string | null
               last_streak_reminder_sent_date: string | null
               latitude: number | null
@@ -2646,6 +2801,7 @@ export type Database = {
               profile_completion: number
               promo_code_used: string | null
               rated_app_at: string | null
+              recommendation_sends_today: number
               relationship_intent: string | null
               sleeping_schedule: string | null
               smoking: string | null
@@ -2722,10 +2878,15 @@ export type Database = {
               is_custom_city: boolean | null
               is_verified: boolean
               languages: string[] | null
+              last_game_notification_sent_week: string | null
               last_googled: string | null
               last_login_at: string | null
               last_name: string
+              last_recommendation_sent_at: string | null
+              last_recommendation_sent_date: string | null
+              last_recommended_profile_id: string | null
               last_reengagement_sent_at: string | null
+              last_similar_sent_date: string | null
               last_streak_date: string | null
               last_streak_reminder_sent_date: string | null
               latitude: number | null
@@ -2746,6 +2907,7 @@ export type Database = {
               profile_completion: number
               promo_code_used: string | null
               rated_app_at: string | null
+              recommendation_sends_today: number
               relationship_intent: string | null
               sleeping_schedule: string | null
               smoking: string | null
@@ -2868,10 +3030,15 @@ export type Database = {
           is_custom_city: boolean | null
           is_verified: boolean
           languages: string[] | null
+          last_game_notification_sent_week: string | null
           last_googled: string | null
           last_login_at: string | null
           last_name: string
+          last_recommendation_sent_at: string | null
+          last_recommendation_sent_date: string | null
+          last_recommended_profile_id: string | null
           last_reengagement_sent_at: string | null
+          last_similar_sent_date: string | null
           last_streak_date: string | null
           last_streak_reminder_sent_date: string | null
           latitude: number | null
@@ -2892,6 +3059,7 @@ export type Database = {
           profile_completion: number
           promo_code_used: string | null
           rated_app_at: string | null
+          recommendation_sends_today: number
           relationship_intent: string | null
           sleeping_schedule: string | null
           smoking: string | null
@@ -2999,6 +3167,19 @@ export type Database = {
         }
         Returns: Json
       }
+      pick_shared_trait: {
+        Args: {
+          p_candidate_intent: string
+          p_candidate_interests: string[]
+          p_candidate_languages: string[]
+          p_candidate_pets: string[]
+          p_viewer_intent: string
+          p_viewer_interests: string[]
+          p_viewer_languages: string[]
+          p_viewer_pets: string[]
+        }
+        Returns: string
+      }
       process_pending_welcome_notifications: { Args: never; Returns: undefined }
       process_referral_commission: {
         Args: {
@@ -3038,7 +3219,14 @@ export type Database = {
         Returns: Json
       }
       reset_badge_count: { Args: never; Returns: undefined }
-      send_recommendation_notifications: { Args: never; Returns: undefined }
+      send_game_notifications: {
+        Args: { p_remaining_days?: number }
+        Returns: undefined
+      }
+      send_recommendation_notifications: {
+        Args: { p_row_key?: string }
+        Returns: undefined
+      }
       send_reengagement_notifications: { Args: never; Returns: undefined }
       send_streak_broken_notifications: { Args: never; Returns: undefined }
       send_streak_reminder_notifications: { Args: never; Returns: undefined }
