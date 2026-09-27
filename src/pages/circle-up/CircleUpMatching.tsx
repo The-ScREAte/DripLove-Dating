@@ -133,14 +133,22 @@ const CircleUpMatching = () => {
       p_filter: filterRef.current,
     });
     if (!activeRef.current) return;
-    const rows = Array.isArray(data) ? data : [];
+    const rows = (Array.isArray(data) ? data : []) as CandidateRow[];
     if (!error && rows.length > 0) {
-      const ids = rows.map((r: { candidate_id: string }) => r.candidate_id);
+      const ids = rows.map((r) => r.candidate_id);
       const profiles = await fetchCircleProfilesByIds(ids);
       if (!activeRef.current) return;
-      setCandidates(profiles);
+      // The RPC already returns nearest-tier-first (nearby, then unlocked
+      // countries, then rest of country, then abroad); fetchCircleProfilesByIds
+      // doesn't preserve that order, so it's reapplied here.
+      const order = new Map(ids.map((id, i) => [id, i]));
+      const meta: Record<string, CandidateMeta> = {};
+      rows.forEach((r) => { meta[r.candidate_id] = { scope: r.scope, distanceKm: r.distance_km }; });
+      setCandidateMeta(meta);
+      setCandidates([...profiles].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0)));
     } else {
       setCandidates([]);
+      setCandidateMeta({});
     }
     candidatePollTimerRef.current = window.setTimeout(() => fetchCandidates(uid), CANDIDATE_POLL_INTERVAL_MS);
   }, []);
