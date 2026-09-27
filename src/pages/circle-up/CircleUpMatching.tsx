@@ -82,6 +82,8 @@ const CircleUpMatching = () => {
   // Who's actually browsable right now, replacing the old blind auto-pairing -
   // this is the live "who's available" grid.
   const [candidates, setCandidates] = useState<CircleProfile[]>([]);
+  const [candidateMeta, setCandidateMeta] = useState<Record<string, CandidateMeta>>({});
+  const [featuredIndex, setFeaturedIndex] = useState(0);
   const [filter, setFilter] = useState<CandidateFilter>('everyone');
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [selectError, setSelectError] = useState<string | null>(null);
