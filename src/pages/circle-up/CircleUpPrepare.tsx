@@ -1,24 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, Video as VideoIcon, VideoOff, MicOff, Columns2, PictureInPicture2 } from 'lucide-react';
+import { Mic, Video as VideoIcon, VideoOff, MicOff, Rows2, Columns2, PictureInPicture2, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateAge } from '@/utils/discoverCache';
-import { Switch } from '@/components/ui/switch';
+import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CircleUpHeader from './CircleUpHeader';
 import ProfileInfoOverlay from './ProfileInfoOverlay';
+import SlimSwitch from './SlimSwitch';
 import { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 
-export type CircleUpLayoutPref = 'floating' | 'split';
+export type CircleUpLayoutPref = 'floating' | 'split-h' | 'split-v';
 const LAYOUT_PREF_KEY = 'driplove_circle_up_layout_pref';
+const VALID_LAYOUT_PREFS: CircleUpLayoutPref[] = ['floating', 'split-h', 'split-v'];
 
 export const readCircleUpLayoutPref = (): CircleUpLayoutPref => {
   try {
     const raw = window.localStorage.getItem(LAYOUT_PREF_KEY);
-    return raw === 'split' ? 'split' : 'floating';
+    return (VALID_LAYOUT_PREFS as string[]).includes(raw || '') ? (raw as CircleUpLayoutPref) : 'floating';
   } catch {
     return 'floating';
   }
+};
+
+// Small mockup of each layout using the user's own photo in the "you" slot
+// and a plain placeholder for "them" (unknown until actually matched) - so
+// choosing a view means seeing roughly what it'll look like, not just an icon.
+const LayoutMock = ({ type, myPhoto }: { type: CircleUpLayoutPref; myPhoto?: string | null }) => {
+  const mePane = (
+    <div className="w-full h-full overflow-hidden">
+      {myPhoto ? (
+        <img src={myPhoto} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-pink-500/50 to-purple-600/50" />
+      )}
+    </div>
+  );
+  const themPane = <div className="w-full h-full bg-neutral-700" />;
+
+  if (type === 'floating') {
+    return (
+      <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-neutral-700">
+        <div className="absolute bottom-1 right-1 w-5 h-7 rounded-[4px] overflow-hidden ring-1 ring-white/40">{mePane}</div>
+      </div>
+    );
+  }
+  if (type === 'split-h') {
+    return (
+      <div className="w-full aspect-video rounded-lg overflow-hidden flex flex-col gap-[2px]">
+        <div className="flex-1">{themPane}</div>
+        <div className="flex-1">{mePane}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full aspect-video rounded-lg overflow-hidden flex gap-[2px]">
+      <div className="flex-1">{themPane}</div>
+      <div className="flex-1">{mePane}</div>
+    </div>
+  );
 };
 
 // Every toggle here is conditional on the field actually being set on the
@@ -48,6 +88,7 @@ const CircleUpPrepare = () => {
   const [micOn, setMicOn] = useState(true);
   const [goingLive, setGoingLive] = useState(false);
   const [shareSettings, setShareSettings] = useState<CircleUpShareSettings>(DEFAULT_SHARE_SETTINGS);
+  const [shareSectionOpen, setShareSectionOpen] = useState(false);
   const [layoutPref, setLayoutPref] = useState<CircleUpLayoutPref>('floating');
 
   useEffect(() => {
@@ -215,49 +256,65 @@ const CircleUpPrepare = () => {
 
         {availableFields.length > 0 && (
           <div className="px-6 pb-6">
-            <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Share with your match</p>
-            <div className="rounded-2xl border border-pink-500/20 bg-white/[0.03] divide-y divide-white/[0.06]">
-              {availableFields.map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between px-4 py-3">
-                  <span className="text-white text-sm">{label}</span>
-                  <Switch
-                    checked={shareSettings[key]}
-                    onCheckedChange={(v) => setShareSettings((s) => ({ ...s, [key]: v }))}
-                    className="data-[state=checked]:bg-pink-500"
-                  />
+            <div className="rounded-2xl border border-pink-500/20 bg-white/[0.03] overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShareSectionOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3"
+              >
+                <span className="text-left">
+                  <span className="block text-white text-sm font-medium">Share with your match</span>
+                  <span className="block text-white/40 text-xs">
+                    {Object.values(shareSettings).filter(Boolean).length} of {availableFields.length} shared
+                  </span>
+                </span>
+                <ChevronDown className={`w-4 h-4 text-white/50 transition-transform flex-shrink-0 ${shareSectionOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {shareSectionOpen && (
+                <div className="divide-y divide-white/[0.06] border-t border-white/[0.06]">
+                  {availableFields.map(({ key, label }) => (
+                    <div key={key} className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-white/85 text-sm">{label}</span>
+                      <SlimSwitch
+                        checked={shareSettings[key]}
+                        onCheckedChange={(v) => setShareSettings((s) => ({ ...s, [key]: v }))}
+                        aria-label={label}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
 
         <div className="px-6 pb-6">
           <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Video call view</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => chooseLayout('floating')}
-              className={`flex flex-col items-center gap-2 rounded-2xl border px-4 py-3 ${
-                layoutPref === 'floating' ? 'border-pink-500 bg-pink-500/10' : 'border-white/15 bg-white/[0.03]'
-              }`}
-            >
-              <PictureInPicture2 className={`w-5 h-5 ${layoutPref === 'floating' ? 'text-pink-400' : 'text-white/50'}`} />
-              <span className={`text-xs font-medium ${layoutPref === 'floating' ? 'text-white' : 'text-white/60'}`}>
-                Little on top
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => chooseLayout('split')}
-              className={`flex flex-col items-center gap-2 rounded-2xl border px-4 py-3 ${
-                layoutPref === 'split' ? 'border-pink-500 bg-pink-500/10' : 'border-white/15 bg-white/[0.03]'
-              }`}
-            >
-              <Columns2 className={`w-5 h-5 ${layoutPref === 'split' ? 'text-pink-400' : 'text-white/50'}`} />
-              <span className={`text-xs font-medium ${layoutPref === 'split' ? 'text-white' : 'text-white/60'}`}>
-                Split screen
-              </span>
-            </button>
+          <div className="grid grid-cols-3 gap-2.5">
+            {(
+              [
+                { pref: 'floating' as const, label: 'Little on top', Icon: PictureInPicture2 },
+                { pref: 'split-h' as const, label: 'Split horizontal', Icon: Rows2 },
+                { pref: 'split-v' as const, label: 'Split vertical', Icon: Columns2 },
+              ]
+            ).map(({ pref, label, Icon }) => (
+              <button
+                key={pref}
+                type="button"
+                onClick={() => chooseLayout(pref)}
+                className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 ${
+                  layoutPref === pref ? 'border-pink-500 bg-pink-500/10' : 'border-white/15 bg-white/[0.03]'
+                }`}
+              >
+                <LayoutMock type={pref} myPhoto={myProfile?.firstImage ? getDetailImageUrl(myProfile.firstImage) : null} />
+                <span className="flex items-center gap-1">
+                  <Icon className={`w-3 h-3 ${layoutPref === pref ? 'text-pink-400' : 'text-white/50'}`} />
+                  <span className={`text-[10px] font-medium leading-tight ${layoutPref === pref ? 'text-white' : 'text-white/60'}`}>
+                    {label}
+                  </span>
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

@@ -91,7 +91,7 @@ const ProfileInfoOverlay = ({
           )}
 
           {!compact && expanded && hasExpandedContent && (
-            <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5">
+            <div className="mt-3 pt-3 border-t border-white/10 max-h-32 overflow-y-auto pr-1 space-y-1.5 overscroll-contain">
               {occupation && (
                 <div className="flex items-center text-xs text-white/75">
                   <Briefcase className="w-3.5 h-3.5 mr-1.5 shrink-0" />
@@ -99,7 +99,7 @@ const ProfileInfoOverlay = ({
                 </div>
               )}
               {intentLabel && <p className="text-xs text-white/75">{intentLabel}</p>}
-              {bio && <p className="text-xs text-white/75 line-clamp-3">{bio}</p>}
+              {bio && <p className="text-xs text-white/75 whitespace-pre-wrap">{bio}</p>}
             </div>
           )}
         </div>
