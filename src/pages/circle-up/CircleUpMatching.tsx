@@ -24,6 +24,7 @@ interface SessionRow {
 
 const POLL_INTERVAL_MS = 2500;
 const CONNECT_COUNTDOWN_SECONDS = 5;
+const DECIDE_COUNTDOWN_SECONDS = 10;
 const WAITING_TIMEOUT_MS = 30000;
 const LAUNCH_STEP_MS = 550;
 
@@ -39,6 +40,7 @@ const CircleUpMatching = () => {
   const [candidateExtraPhotos, setCandidateExtraPhotos] = useState<string[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(CONNECT_COUNTDOWN_SECONDS);
+  const [decideCountdown, setDecideCountdown] = useState(DECIDE_COUNTDOWN_SECONDS);
 
   const pollTimerRef = useRef<number | null>(null);
   const waitingTimeoutRef = useRef<number | null>(null);
@@ -147,6 +149,27 @@ const CircleUpMatching = () => {
     return () => window.clearInterval(interval);
   }, [phase]);
 
+  // 10-second Accept/Pass window - not responding counts as a Pass, same as
+  // the other person moving on if you never answer. handlePassRef always
+  // points at the latest handlePass (defined further down, closes over
+  // sessionId/userId) so this effect doesn't need it as a dependency.
+  const handlePassRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (phase !== 'deciding') return;
+    setDecideCountdown(DECIDE_COUNTDOWN_SECONDS);
+    const interval = window.setInterval(() => {
+      setDecideCountdown((c) => {
+        if (c <= 1) {
+          window.clearInterval(interval);
+          handlePassRef.current();
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [phase]);
+
   // Source of truth for the other side's decision once matched - both
   // Pass and Accept race against this exact same subscription on the
   // other person's device.
@@ -190,6 +213,7 @@ const CircleUpMatching = () => {
       .eq('id', sessionId);
     resetOwnQueueAndSearch(userId);
   };
+  handlePassRef.current = handlePass;
 
   const handleAccept = async () => {
     if (!sessionId || !userId) return;
@@ -293,7 +317,7 @@ const CircleUpMatching = () => {
         )}
 
         {phase === 'deciding' && candidate && (
-          <div className="w-full flex flex-col items-center gap-5">
+          <div className="w-full flex flex-col items-center gap-4">
             <h2 className="text-white font-bold text-lg">New Match</h2>
             <p className="text-white/40 text-sm -mt-3">Do you want to connect?</p>
             <MatchPreviewCard
@@ -302,23 +326,28 @@ const CircleUpMatching = () => {
               shareSettings={candidateShareSettings}
               extraPhotos={candidateExtraPhotos}
             />
-            <div className="flex items-center gap-6 mt-2">
-              <button
-                type="button"
-                onClick={handlePass}
-                className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/15"
-                aria-label="Pass"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              <button
-                type="button"
-                onClick={handleAccept}
-                className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-pink-500/30"
-                aria-label="Accept"
-              >
-                <Heart className="w-6 h-6 fill-white" />
-              </button>
+            <div className="flex items-center gap-6 mt-1">
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handlePass}
+                  className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/15"
+                  aria-label="Pass"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <span className="text-white/50 text-xs font-medium tabular-nums w-5 text-center">{decideCountdown}s</span>
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleAccept}
+                  className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-pink-500/30"
+                  aria-label="Accept"
+                >
+                  <Heart className="w-6 h-6 fill-white" />
+                </button>
+              </div>
             </div>
           </div>
         )}

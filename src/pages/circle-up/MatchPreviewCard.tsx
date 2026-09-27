@@ -18,9 +18,9 @@ export interface CircleUpShareSettings {
   pets: boolean;
 }
 
-// Only 4 true at a time is enforced in CircleUpPrepare's UI (a hard cap on
-// how much of your profile Circle Up hands to a stranger before you've even
-// talked) - these are just the 4 that ship on by default.
+// CircleUpPrepare's UI enforces a floor of 4 true at a time (a minimum
+// amount of your profile a stranger gets before you've even talked) - these
+// are just the 4 that ship on by default; a user can turn on more.
 export const DEFAULT_SHARE_SETTINGS: CircleUpShareSettings = {
   age: true,
   location: true,

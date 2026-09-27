@@ -101,7 +101,10 @@ const ProfileInfoOverlay = ({
           )}
 
           {!compact && expanded && hasExpandedContent && (
-            <div className="mt-3 pt-3 border-t border-white/10 max-h-56 overflow-y-auto pr-1 space-y-2.5 overscroll-contain">
+            <div
+              className="mt-3 pt-3 border-t border-white/10 max-h-56 overflow-y-auto pr-1 space-y-2.5 overscroll-contain"
+              style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+            >
               {extraPhotos.length > 0 && (
                 <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5">
                   {extraPhotos.map((url) => (

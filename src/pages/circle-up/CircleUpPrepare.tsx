@@ -11,7 +11,7 @@ import SlimSwitch from './SlimSwitch';
 import { fetchApprovedImages } from './circleUpProfileExtras';
 import { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 
-const MAX_SHARED_FIELDS = 4;
+const MIN_SHARED_FIELDS = 4;
 
 export type CircleUpLayoutPref = 'floating' | 'split-h' | 'split-v';
 const LAYOUT_PREF_KEY = 'driplove_circle_up_layout_pref';
@@ -200,8 +200,11 @@ const CircleUpPrepare = () => {
     : [];
   const sharedCount = Object.values(shareSettings).filter(Boolean).length;
 
+  // A floor, not a ceiling: at least MIN_SHARED_FIELDS must stay on (turning
+  // one off is blocked once exactly that many remain), but there's no cap
+  // on how many more a user can choose to share beyond that.
   const handleToggleShare = (key: keyof CircleUpShareSettings, next: boolean) => {
-    if (next && sharedCount >= MAX_SHARED_FIELDS) return;
+    if (!next && sharedCount <= MIN_SHARED_FIELDS) return;
     setShareSettings((s) => ({ ...s, [key]: next }));
   };
 
@@ -298,15 +301,13 @@ const CircleUpPrepare = () => {
               >
                 <span className="text-left">
                   <span className="block text-white text-sm font-medium">Share with others</span>
-                  <span className="block text-white/40 text-xs">
-                    {sharedCount} of {MAX_SHARED_FIELDS} used
-                  </span>
+                  <span className="block text-white/40 text-xs">{sharedCount} shared</span>
                 </span>
                 <ChevronDown className={`w-4 h-4 text-white/50 transition-transform flex-shrink-0 ${shareSectionOpen ? 'rotate-180' : ''}`} />
               </button>
               {shareSectionOpen && (
                 <div className="border-t border-white/[0.06]">
-                  <p className="px-4 pt-2.5 pb-1 text-[11px] text-white/35">Choose up to {MAX_SHARED_FIELDS} details to share</p>
+                  <p className="px-4 pt-2.5 pb-1 text-[11px] text-white/35">At least {MIN_SHARED_FIELDS} details must stay shared</p>
                   <div className="divide-y divide-white/[0.06]">
                     {availableFields.map(({ key, label }) => (
                       <div key={key} className="flex items-center justify-between px-4 py-2.5">
@@ -314,7 +315,7 @@ const CircleUpPrepare = () => {
                         <SlimSwitch
                           checked={shareSettings[key]}
                           onCheckedChange={(v) => handleToggleShare(key, v)}
-                          disabled={!shareSettings[key] && sharedCount >= MAX_SHARED_FIELDS}
+                          disabled={shareSettings[key] && sharedCount <= MIN_SHARED_FIELDS}
                           aria-label={label}
                         />
                       </div>
@@ -357,12 +358,12 @@ const CircleUpPrepare = () => {
         </div>
       </div>
 
-      <div className="flex-shrink-0 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 bg-black border-t border-white/5">
+      <div className="flex-shrink-0 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 bg-black border-t border-white/5">
         <button
           type="button"
           onClick={handleReady}
           disabled={permissionState !== 'granted' || goingLive}
-          className="w-full py-3.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-base disabled:opacity-40 transition-opacity"
+          className="w-full h-11 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-sm disabled:opacity-40 transition-opacity"
         >
           {goingLive ? 'Getting ready…' : 'Ready'}
         </button>
