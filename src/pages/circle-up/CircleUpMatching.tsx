@@ -404,6 +404,25 @@ const CircleUpMatching = () => {
       ? Math.round(calculateDistance(myLat, myLon, candidate.latitude, candidate.longitude))
       : null;
 
+  // The person shown large in the circle right now. featuredIndex just keeps
+  // counting up as you tap "show someone else", wrapping around the live
+  // list, so it stays valid however the list shrinks or grows between polls.
+  const featured = candidates.length > 0 ? candidates[featuredIndex % candidates.length] : null;
+  const featuredAge = featured ? calculateAge(featured.date_of_birth) : null;
+  const featuredMeta = featured ? candidateMeta[featured.id] : undefined;
+  const featuredWhere = featured
+    ? [
+        featuredMeta?.distanceKm != null
+          ? `${formatDistance(featuredMeta.distanceKm, featured.country_code)} away`
+          : [featured.city, featured.country].filter(Boolean).join(', '),
+        featuredMeta && featuredMeta.scope !== 'nearby' ? SCOPE_LABEL[featuredMeta.scope] : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+
+
+
   return (
     <div className="h-[100dvh] w-full bg-black flex flex-col">
       <CircleUpHeader onBack={handleCancel} backLabel="Cancel" />
