@@ -445,10 +445,21 @@ const CircleUpMatching = () => {
                   <div className="absolute inset-0 rounded-full border-2 border-pink-500/25 border-t-pink-500 animate-spin" />
                   <HoppingLogo size={44} />
                 </div>
-                <p className="text-white font-semibold text-center">Circling now to find you a match…</p>
-                <p className="text-white/40 text-sm text-center">
-                  We start with people near you and keep widening the search — across your country, then abroad.
-                </p>
+                {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS ? (
+                  <>
+                    <p className="text-white font-semibold text-center">No profile available</p>
+                    <p className="text-white/40 text-sm text-center">
+                      Nobody's live right now. We'll keep looking and connect you the moment someone comes online.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-white font-semibold text-center">We're finding you someone</p>
+                    <p className="text-white/40 text-sm text-center">
+                      We start with people near you and keep widening the search — across your country, then abroad.
+                    </p>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -551,21 +562,6 @@ const CircleUpMatching = () => {
                 </button>
               ))}
             </div>
-
-            {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS && candidates.length === 0 && (
-              <div className="w-full rounded-2xl border border-pink-500/20 bg-white/[0.03] p-4 mt-1 flex flex-col items-center gap-3">
-                <p className="text-white/60 text-xs text-center">
-                  No one is live right now — near you or abroad. Still looking, and you can also:
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate('/?tab=profile')}
-                  className="w-full py-2.5 rounded-full border border-white/20 text-white text-sm font-medium"
-                >
-                  Expand your visibility in preferences
-                </button>
-              </div>
-            )}
           </div>
         )}
 
