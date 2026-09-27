@@ -184,7 +184,16 @@ const CircleUpPrepare = () => {
     setGoingLive(true);
     const { error } = await supabase
       .from('circle_up_queue')
-      .upsert({ user_id: userId, status: 'waiting', session_id: null, share_settings: shareSettings }, { onConflict: 'user_id' });
+      .upsert(
+        {
+          user_id: userId,
+          status: 'waiting',
+          session_id: null,
+          updated_at: new Date().toISOString(),
+          share_settings: shareSettings as unknown as Json,
+        },
+        { onConflict: 'user_id' }
+      );
     if (error) {
       setGoingLive(false);
       return;
