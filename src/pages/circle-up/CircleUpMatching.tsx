@@ -10,7 +10,7 @@ import { calculateAge } from '@/utils/discoverCache';
 import { formatDistance } from '@/utils/distanceUnits';
 import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 import CircleUpHeader from './CircleUpHeader';
-import { readCircleUpLayoutPref } from './CircleUpPrepare';
+import { readCircleUpLayoutPref, readCircleUpFilterPref } from './CircleUpPrepare';
 import { fetchApprovedImages } from './circleUpProfileExtras';
 
 type Phase = 'launching' | 'searching' | 'deciding' | 'waiting_other';
@@ -58,12 +58,6 @@ const LAUNCH_STEP_MS = 550;
 // leaving "Circling now..." spinning forever with no explanation.
 const NO_MATCH_HINT_AFTER_ATTEMPTS = 6;
 
-const FILTER_TABS: { key: CandidateFilter; label: string }[] = [
-  { key: 'matched', label: 'Matched' },
-  { key: 'not_matched', label: 'Not Matched' },
-  { key: 'everyone', label: 'Everyone' },
-];
-
 const CircleUpMatching = () => {
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
@@ -83,10 +77,11 @@ const CircleUpMatching = () => {
   const [candidates, setCandidates] = useState<CircleProfile[]>([]);
   const [candidateMeta, setCandidateMeta] = useState<Record<string, CandidateMeta>>({});
   const [featuredIndex, setFeaturedIndex] = useState(0);
-  const [filter, setFilter] = useState<CandidateFilter>('everyone');
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [selectError, setSelectError] = useState<string | null>(null);
-  const filterRef = useRef<CandidateFilter>('everyone');
+  // Chosen once on the Prepare screen, before going live - not editable
+  // mid-search, so it's read once into a ref rather than kept as state.
+  const filterRef = useRef<CandidateFilter>(readCircleUpFilterPref());
 
   const pollTimerRef = useRef<number | null>(null);
   const candidatePollTimerRef = useRef<number | null>(null);
@@ -166,9 +161,8 @@ const CircleUpMatching = () => {
     pollTimerRef.current = window.setTimeout(() => checkSession(uid), POLL_INTERVAL_MS);
   }, [enterSession]);
 
-  // Live "who's available" grid - always reads the latest filter via
-  // filterRef so a tab switch takes effect on the very next tick instead of
-  // a stale closure from when the loop started.
+  // Live "who's available" grid, scoped by the filter chosen back on the
+  // Prepare screen (filterRef, read once - see readCircleUpFilterPref).
   const fetchCandidates = useCallback(async (uid: string) => {
     if (!activeRef.current) return;
     const { data, error } = await supabase.rpc('circle_up_list_candidates', {
@@ -195,16 +189,6 @@ const CircleUpMatching = () => {
     }
     candidatePollTimerRef.current = window.setTimeout(() => fetchCandidates(uid), CANDIDATE_POLL_INTERVAL_MS);
   }, []);
-
-  const changeFilter = (next: CandidateFilter) => {
-    if (next === filterRef.current || !userId) return;
-    setFilter(next);
-    filterRef.current = next;
-    if (phase === 'searching') {
-      clearCandidatePollTimer();
-      fetchCandidates(userId);
-    }
-  };
 
   const handleSelectCandidate = async (target: CircleProfile) => {
     if (!userId || selectingId) return;
@@ -554,21 +538,6 @@ const CircleUpMatching = () => {
             )}
 
             {selectError && <p className="text-pink-400 text-xs text-center">{selectError}</p>}
-
-            <div className="flex items-center gap-1 bg-white/[0.04] border border-white/10 rounded-full p-1">
-              {FILTER_TABS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => changeFilter(key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                    filter === key ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'text-white/50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 

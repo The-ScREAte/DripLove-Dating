@@ -84,7 +84,7 @@ const CircleUpCall = () => {
           .eq('id', sid)
           .neq('status', 'ended');
       }
-      navigate('/circle-up/ended');
+      navigate('/circle-up/matching');
     },
     [sessionId, cleanup, navigate]
   );

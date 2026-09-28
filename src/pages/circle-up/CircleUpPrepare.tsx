@@ -27,6 +27,28 @@ export const readCircleUpLayoutPref = (): CircleUpLayoutPref => {
   }
 };
 
+// Who to see once live - chosen here, before going live, instead of as an
+// in-session toggle, so it sits alongside the other "before you go live"
+// choices (what to share, how the call looks) rather than cluttering the
+// searching screen itself.
+export type CircleUpCandidateFilter = 'matched' | 'not_matched' | 'everyone';
+const FILTER_PREF_KEY = 'driplove_circle_up_filter_pref';
+const VALID_FILTER_PREFS: CircleUpCandidateFilter[] = ['matched', 'not_matched', 'everyone'];
+const FILTER_PREF_OPTIONS: { key: CircleUpCandidateFilter; label: string }[] = [
+  { key: 'matched', label: 'Matched' },
+  { key: 'not_matched', label: 'Not Matched' },
+  { key: 'everyone', label: 'Everyone' },
+];
+
+export const readCircleUpFilterPref = (): CircleUpCandidateFilter => {
+  try {
+    const raw = window.localStorage.getItem(FILTER_PREF_KEY);
+    return (VALID_FILTER_PREFS as string[]).includes(raw || '') ? (raw as CircleUpCandidateFilter) : 'everyone';
+  } catch {
+    return 'everyone';
+  }
+};
+
 // Small mockup of each layout using the user's own photo in the "you" slot
 // and a plain placeholder for "them" (unknown until actually matched) - so
 // choosing a view means seeing roughly what it'll look like, not just an icon.
@@ -105,9 +127,11 @@ const CircleUpPrepare = () => {
   const [shareSettings, setShareSettings] = useState<CircleUpShareSettings>(DEFAULT_SHARE_SETTINGS);
   const [shareSectionOpen, setShareSectionOpen] = useState(false);
   const [layoutPref, setLayoutPref] = useState<CircleUpLayoutPref>('floating');
+  const [candidateFilter, setCandidateFilter] = useState<CircleUpCandidateFilter>('everyone');
 
   useEffect(() => {
     setLayoutPref(readCircleUpLayoutPref());
+    setCandidateFilter(readCircleUpFilterPref());
 
     let cancelled = false;
 
@@ -180,6 +204,11 @@ const CircleUpPrepare = () => {
     try { window.localStorage.setItem(LAYOUT_PREF_KEY, pref); } catch { /* device storage unavailable, not critical */ }
   };
 
+  const chooseFilter = (pref: CircleUpCandidateFilter) => {
+    setCandidateFilter(pref);
+    try { window.localStorage.setItem(FILTER_PREF_KEY, pref); } catch { /* device storage unavailable, not critical */ }
+  };
+
   const handleReady = async () => {
     if (!userId || goingLive) return;
     setGoingLive(true);
@@ -223,11 +252,7 @@ const CircleUpPrepare = () => {
       <CircleUpHeader onBack={() => navigate('/?tab=circle')} backLabel="Back to Circle" />
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex flex-col items-center px-6 pt-4 pb-3">
-          <p className="text-white/50 text-sm text-center">Go live and meet someone new in real time.</p>
-        </div>
-
-        <div className="flex items-center justify-center px-6 pb-6">
+        <div className="flex items-center justify-center px-6 pt-4 pb-6">
           <div className="relative w-full max-w-sm aspect-[3/4] rounded-3xl overflow-hidden bg-neutral-900 border border-pink-500/20">
             {permissionState === 'granted' && camOn && (
               <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover scale-x-[-1]" />
@@ -336,6 +361,24 @@ const CircleUpPrepare = () => {
             </div>
           </div>
         )}
+
+        <div className="px-6 pb-6">
+          <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Who you'll see</p>
+          <div className="flex items-center gap-1 bg-white/[0.03] border border-pink-500/20 rounded-full p-1">
+            {FILTER_PREF_OPTIONS.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => chooseFilter(key)}
+                className={`flex-1 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                  candidateFilter === key ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' : 'text-white/50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="px-6 pb-6">
           <p className="text-white/40 text-xs font-medium uppercase tracking-wide mb-2">Video call view</p>
