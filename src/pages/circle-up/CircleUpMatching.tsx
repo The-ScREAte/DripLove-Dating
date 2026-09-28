@@ -13,7 +13,7 @@ import CircleUpHeader from './CircleUpHeader';
 import { readCircleUpLayoutPref } from './CircleUpPrepare';
 import { fetchApprovedImages } from './circleUpProfileExtras';
 
-type Phase = 'launching' | 'searching' | 'connecting' | 'deciding' | 'waiting_other';
+type Phase = 'launching' | 'searching' | 'deciding' | 'waiting_other';
 type CandidateFilter = 'matched' | 'not_matched' | 'everyone';
 // How far out the search had to reach to find this person. The pool widens
 // automatically: nearby first, then unlocked countries, then the rest of
@@ -51,7 +51,6 @@ interface SessionRow {
 
 const POLL_INTERVAL_MS = 2500;
 const CANDIDATE_POLL_INTERVAL_MS = 4000;
-const CONNECT_COUNTDOWN_SECONDS = 5;
 const DECIDE_COUNTDOWN_SECONDS = 10;
 const WAITING_TIMEOUT_MS = 30000;
 const LAUNCH_STEP_MS = 550;
@@ -76,7 +75,6 @@ const CircleUpMatching = () => {
   const [candidateShareSettings, setCandidateShareSettings] = useState<CircleUpShareSettings>(DEFAULT_SHARE_SETTINGS);
   const [candidateExtraPhotos, setCandidateExtraPhotos] = useState<string[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(CONNECT_COUNTDOWN_SECONDS);
   const [decideCountdown, setDecideCountdown] = useState(DECIDE_COUNTDOWN_SECONDS);
   const [pollAttempts, setPollAttempts] = useState(0);
 
@@ -113,14 +111,21 @@ const CircleUpMatching = () => {
   // first wins, and both stop their own loops the moment this succeeds.
   // Returns false (and does nothing else) if the matched profile can't be
   // loaded yet, so the caller knows to keep polling instead of getting stuck.
-  const enterConnecting = useCallback(async (newSessionId: string, matchedUserId: string): Promise<boolean> => {
-    const [profiles, shareRes, imagesByUser] = await Promise.all([
+  //
+  // The picker's own tap already IS their consent (circle_up_request_session
+  // sets their decision to 'accept' server-side at creation) - making them
+  // confirm again on a second reveal screen was the redundant step. So the
+  // picker skips straight to "waiting for the other side"; only the
+  // recipient, who hasn't decided yet, sees the invite/accept screen.
+  const enterSession = useCallback(async (newSessionId: string, matchedUserId: string, callerUid: string): Promise<boolean> => {
+    const [profiles, shareRes, imagesByUser, sessionRes] = await Promise.all([
       fetchCircleProfilesByIds([matchedUserId]),
       supabase.from('circle_up_queue').select('share_settings').eq('user_id', matchedUserId).single(),
       fetchApprovedImages([matchedUserId]),
+      supabase.from('circle_up_sessions').select('user_a,user_a_decision,user_b_decision').eq('id', newSessionId).single(),
     ]);
     if (!activeRef.current) return true;
-    if (profiles.length === 0) return false;
+    if (profiles.length === 0 || !sessionRes.data) return false;
 
     clearPollTimer();
     clearCandidatePollTimer();
@@ -130,7 +135,18 @@ const CircleUpMatching = () => {
     // the rest count as "extra" for the gallery.
     setCandidateExtraPhotos((imagesByUser[matchedUserId] || []).slice(1));
     setSessionId(newSessionId);
-    setPhase('connecting');
+
+    const iAmUserA = sessionRes.data.user_a === callerUid;
+    const myDecision = iAmUserA ? sessionRes.data.user_a_decision : sessionRes.data.user_b_decision;
+    if (myDecision === 'accept') {
+      setPhase('waiting_other');
+      waitingTimeoutRef.current = window.setTimeout(() => {
+        if (!activeRef.current) return;
+        resetOwnQueueAndSearch(callerUid);
+      }, WAITING_TIMEOUT_MS);
+    } else {
+      setPhase('deciding');
+    }
     return true;
   }, []);
 
@@ -143,12 +159,12 @@ const CircleUpMatching = () => {
     if (!activeRef.current) return;
     const row = Array.isArray(data) ? data[0] : data;
     if (!error && row?.session_id && row?.matched_user_id) {
-      const entered = await enterConnecting(row.session_id, row.matched_user_id);
+      const entered = await enterSession(row.session_id, row.matched_user_id, uid);
       if (entered) return;
     }
     setPollAttempts((n) => n + 1);
     pollTimerRef.current = window.setTimeout(() => checkSession(uid), POLL_INTERVAL_MS);
-  }, [enterConnecting]);
+  }, [enterSession]);
 
   // Live "who's available" grid - always reads the latest filter via
   // filterRef so a tab switch takes effect on the very next tick instead of
@@ -202,7 +218,7 @@ const CircleUpMatching = () => {
     setSelectingId(null);
     const row = Array.isArray(data) ? data[0] : data;
     if (!error && row?.session_id && row?.matched_user_id) {
-      const entered = await enterConnecting(row.session_id, row.matched_user_id);
+      const entered = await enterSession(row.session_id, row.matched_user_id, userId);
       if (entered) return;
     }
     // Target left, got picked by someone else first, or went stale - the
@@ -243,6 +259,15 @@ const CircleUpMatching = () => {
       setMyLat(profile?.latitude ?? null);
       setMyLon(profile?.longitude ?? null);
 
+      // Re-establishes a 'waiting' queue row if one doesn't already exist -
+      // needed because this screen can now be entered directly (e.g. "Return
+      // to Circle Up" after a call ends) without going through Prepare's own
+      // upsert first. A no-op if a row is already there from Prepare.
+      await supabase
+        .from('circle_up_queue')
+        .upsert({ user_id: user.id, status: 'waiting', session_id: null }, { onConflict: 'user_id' });
+      if (!activeRef.current) return;
+
       // "1, 2, 3" launch beat before the search itself starts - purely a
       // brief, deliberate transition so tapping Ready feels like it did
       // something, not an instant jump into a spinner.
@@ -264,24 +289,6 @@ const CircleUpMatching = () => {
       clearWaitingTimeout();
     };
   }, [navigate, checkSession, fetchCandidates]);
-
-  // 5-second "Finding Your Match" countdown, purely cosmetic
-  // anticipation-building once a candidate is found - not the search itself.
-  useEffect(() => {
-    if (phase !== 'connecting') return;
-    setCountdown(CONNECT_COUNTDOWN_SECONDS);
-    const interval = window.setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          window.clearInterval(interval);
-          if (activeRef.current) setPhase('deciding');
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(interval);
-  }, [phase]);
 
   // 10-second Accept/Pass window - not responding counts as a Pass, same as
   // the other person moving on if you never answer. handlePassRef always
@@ -561,28 +568,6 @@ const CircleUpMatching = () => {
                   {label}
                 </button>
               ))}
-            </div>
-          </div>
-        )}
-
-        {phase === 'connecting' && candidate && (
-          <div className="flex flex-col items-center gap-6 w-full">
-            <h2 className="text-white font-bold text-lg">Finding Your Match</h2>
-            <p className="text-white/40 text-sm text-center -mt-4">We're connecting you with someone who fits your preferences.</p>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-pink-500/40 bg-neutral-800">
-                <div className="w-full h-full bg-gradient-to-br from-pink-500/30 to-purple-600/30" />
-              </div>
-              <Heart className="w-6 h-6 text-pink-500 fill-pink-500" />
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-pink-500/40 bg-neutral-800">
-                {candidate.firstImage && (
-                  <img src={getDetailImageUrl(candidate.firstImage)} alt={candidate.first_name} className="w-full h-full object-cover" />
-                )}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-pink-500/20 bg-white/[0.03] px-6 py-3 flex items-center gap-3">
-              <span className="text-white/60 text-sm">Connecting…</span>
-              <span className="text-2xl font-bold text-pink-400 tabular-nums">{String(countdown).padStart(2, '0')}</span>
             </div>
           </div>
         )}

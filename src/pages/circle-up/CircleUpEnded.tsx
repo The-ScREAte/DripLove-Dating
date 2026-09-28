@@ -35,7 +35,7 @@ const CircleUpEnded = () => {
       <div className="w-full max-w-xs flex flex-col gap-3 mt-4">
         <button
           type="button"
-          onClick={() => navigate('/circle-up')}
+          onClick={() => navigate('/circle-up/matching')}
           className="w-full py-3.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold"
         >
           Return to Circle Up
