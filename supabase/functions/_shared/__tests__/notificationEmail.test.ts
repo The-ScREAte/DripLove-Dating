@@ -41,6 +41,32 @@ describe('composeLikeMatchEmail', () => {
     expect(email.html).not.toContain('<img>');
   });
 
+  it('messages: says who and how many, never what was written', () => {
+    const one = composeLikeMatchEmail({ firstName: 'Kofi', likeCount: 0, matchCount: 0, messageCount: 2, messageNames: ['ama', 'Ama'] });
+    expect(one.subject).toBe('Ama sent you 2 messages on DripLove');
+    expect(one.html).toContain('https://www.driplove.love/?tab=chat');
+    const many = composeLikeMatchEmail({ likeCount: 1, matchCount: 0, messageCount: 3, messageNames: ['Ama', 'Esi'] });
+    expect(many.subject).toBe('You have 3 new messages on DripLove');
+    expect(many.text).toContain('You have 3 new messages from Ama and Esi.');
+    expect(many.text).toContain('And 1 more person liked your profile.');
+  });
+
+  it('a match email also mentions new messages', () => {
+    const email = composeLikeMatchEmail({ likeCount: 0, matchCount: 1, matchNames: ['Esi'], messageCount: 1, messageNames: ['Esi'] });
+    expect(email.subject).toBe('You matched with Esi on DripLove');
+    expect(email.text).toContain('Esi sent you a message.');
+  });
+
+  it('account notices use the notice text, without emoji in the subject', () => {
+    const email = composeLikeMatchEmail({
+      likeCount: 0, matchCount: 0,
+      notices: [{ title: 'Photo not approved 📸', body: 'Please upload a clear photo of your face.' }],
+    });
+    expect(email.subject).toBe('Photo not approved');
+    expect(email.text).toContain('Please upload a clear photo of your face.');
+    expect(email.html).toContain('Open DripLove');
+  });
+
   it('keeps subjects free of emoji and shouting', () => {
     for (const input of [
       { likeCount: 5, matchCount: 0 },
@@ -95,5 +121,15 @@ describe('buildDripLoveHtml', () => {
   it('is unchanged for callers that pass no options', () => {
     const html = buildDripLoveHtml('Hello', '<p>Hi</p>');
     expect(html).not.toContain('Unsubscribe');
+  });
+});
+
+describe('composeBroadcastEmail', () => {
+  it('turns an admin push into a clean email', async () => {
+    const { composeBroadcastEmail } = await import('../notification-email');
+    const email = composeBroadcastEmail('Weekend special 🎉', 'Line one\n<b>Line two</b>');
+    expect(email.subject).toBe('Weekend special');
+    expect(email.html).toContain('Line one<br>&lt;b&gt;Line two&lt;/b&gt;');
+    expect(email.html).toContain('Open DripLove');
   });
 });

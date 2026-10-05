@@ -3,14 +3,14 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 import { DAILY_LIMIT_PER_ACCOUNT, kickEmailQueue, loadAccounts, loadPausedAccounts } from '../_shared/email-utils.ts';
 import { composeLikeMatchEmail } from '../_shared/notification-email.ts';
 
-// Likes and matches that couldn't be announced the moment they happened -
-// night-time, grouped with an earlier like push, daily cap, no device,
-// notifications off, push failed - wait in notification_email_queue.
-// Every 15 minutes (see 20261005120000_missed_like_match_notifications.sql)
-// this sends what's due:
-//   phone can show notifications -> one push ("3 people liked you")
-//   notifications blocked / app deleted -> one email (max 2 a day, daytime)
-// The rules for who gets what, and when, live in claim_missed_notifications.
+// Likes and matches the phone couldn't show - no app, notifications off, or
+// the push failed - land in notification_email_queue. send-push-notification
+// starts a run for that person immediately; a schedule every 5 minutes is the
+// safety net (see 20261005130000_send_when_it_happens_and_local_time_schedules.sql).
+//   phone works again -> the push is retried
+//   no app / notifications blocked -> an email right away, at most 2 a day;
+//     anything beyond that is counted into their next email
+// The rules live in claim_missed_notifications.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +33,36 @@ type Due = {
   match_count: number;
   match_sender_ids: string[] | null;
   item_ids: number[];
+};
+
+type Item = { id: number; user_id: string; kind: string; title: string | null; body: string | null; data: Record<string, string> | null };
+
+/** What one person is owed, read from the held items themselves. */
+type Summary = {
+  likes: number;
+  matches: number;
+  matchSenders: string[];
+  messages: number;
+  messageSenders: string[];
+  notices: Array<{ title: string; body: string | null }>;
+};
+
+const summarize = (items: Item[]): Summary => {
+  const sum: Summary = { likes: 0, matches: 0, matchSenders: [], messages: 0, messageSenders: [], notices: [] };
+  for (const item of items) {
+    const sender = item.data?.senderId;
+    if (item.kind === 'like') sum.likes += 1;
+    else if (item.kind === 'match') {
+      sum.matches += 1;
+      if (sender) sum.matchSenders.push(sender);
+    } else if (item.kind === 'message') {
+      sum.messages += 1;
+      if (sender) sum.messageSenders.push(sender);
+    } else if (item.title) {
+      sum.notices.push({ title: item.title, body: item.body });
+    }
+  }
+  return sum;
 };
 
 async function setItems(supabase: SupabaseClient, ids: number[], fields: Record<string, unknown>) {
@@ -60,26 +90,39 @@ async function emailBudget(supabase: SupabaseClient): Promise<number> {
   return Math.max(0, accounts.length * DAILY_LIMIT_PER_ACCOUNT - used - (pending || 0));
 }
 
-async function sendPush(supabase: SupabaseClient, due: Due, names: Map<string, string>): Promise<boolean> {
+// Retry for pushes that failed (the person's phone can get pushes again).
+async function sendPush(supabase: SupabaseClient, due: Due, sum: Summary, names: Map<string, string>): Promise<boolean> {
   const pushes: Array<Record<string, unknown>> = [];
-  if (due.match_count > 0) {
-    const name = due.match_count === 1 ? names.get(due.match_sender_ids?.[0] ?? '') : undefined;
+  if (sum.matches > 0) {
+    const name = sum.matches === 1 ? names.get(sum.matchSenders[0] ?? '') : undefined;
     pushes.push({
       title: "It's a match! 💕",
-      body: name ? `You and ${name} liked each other. Say hello!` : `You have ${due.match_count} new matches. Say hello!`,
-      type: 'match',
-      kind: 'match',
-      data: { catchup: 'true', ...(due.match_count === 1 && due.match_sender_ids?.[0] ? { senderId: due.match_sender_ids[0] } : {}) },
+      body: name ? `You and ${name} liked each other. Say hello!` : `You have ${sum.matches} new matches. Say hello!`,
+      type: 'match', kind: 'match', category: 'event',
+      data: { catchup: 'true', ...(sum.matches === 1 && sum.matchSenders[0] ? { senderId: sum.matchSenders[0] } : {}) },
     });
   }
-  if (due.like_count > 0) {
-    // send-push-notification turns this into "N people liked you" from the
-    // real count since their last like push.
+  if (sum.messages > 0) {
+    const senders = Array.from(new Set(sum.messageSenders));
+    const name = senders.length === 1 ? names.get(senders[0]) : undefined;
     pushes.push({
-      title: due.like_count > 1 ? `${due.like_count} people liked you 👀` : 'Someone liked you 👀',
+      title: name ?? 'New messages 💬',
+      body: name ? (sum.messages > 1 ? `Sent you ${sum.messages} messages` : 'Sent you a message') : `You have ${sum.messages} new messages`,
+      type: 'message', kind: 'message', category: 'event',
+      data: { catchup: 'true' },
+    });
+  }
+  if (sum.likes > 0) {
+    pushes.push({
+      title: sum.likes > 1 ? `${sum.likes} people liked you 👀` : 'Someone liked you 👀',
       body: "See who's interested in you",
-      type: 'like',
-      kind: 'like',
+      type: 'like', kind: 'like', category: 'event',
+      data: { catchup: 'true' },
+    });
+  }
+  for (const notice of sum.notices) {
+    pushes.push({
+      title: notice.title, body: notice.body ?? '', type: 'system', kind: 'notice', category: 'transactional',
       data: { catchup: 'true' },
     });
   }
@@ -87,7 +130,7 @@ async function sendPush(supabase: SupabaseClient, due: Due, names: Map<string, s
   let delivered = false;
   for (const push of pushes) {
     const { data, error } = await supabase.functions.invoke('send-push-notification', {
-      body: { userId: due.user_id, category: 'event', ...push },
+      body: { userId: due.user_id, ...push },
     });
     if (error) {
       console.error(`Catch-up push failed for ${due.user_id}:`, error);
@@ -109,8 +152,23 @@ async function run(supabase: SupabaseClient, supabaseUrl: string, serviceKey: st
   if (error) throw error;
   const dueList = (data || []) as Due[];
 
-  // First names of new matches (for "You matched with Ama").
-  const senderIds = Array.from(new Set(dueList.flatMap((d) => d.match_sender_ids || []).filter(Boolean)));
+  // The held items themselves (likes, matches, messages, notices).
+  const allIds = dueList.flatMap((d) => d.item_ids);
+  const itemsByUser = new Map<string, Item[]>();
+  for (let i = 0; i < allIds.length; i += 200) {
+    const { data: rows, error: itemsError } = await supabase
+      .from('notification_email_queue')
+      .select('id, user_id, kind, title, body, data')
+      .in('id', allIds.slice(i, i + 200));
+    if (itemsError) throw itemsError;
+    (rows || []).forEach((row: Item) => itemsByUser.set(row.user_id, [...(itemsByUser.get(row.user_id) || []), row]));
+  }
+  const summaries = new Map(dueList.map((d) => [d.user_id, summarize(itemsByUser.get(d.user_id) || [])]));
+
+  // First names of new matches and of people who sent messages.
+  const senderIds = Array.from(new Set(
+    Array.from(summaries.values()).flatMap((sum) => [...sum.matchSenders, ...sum.messageSenders]),
+  ));
   const names = new Map<string, string>();
   if (senderIds.length > 0) {
     const { data: profiles } = await supabase.from('profiles').select('id, first_name').in('id', senderIds);
@@ -123,15 +181,15 @@ async function run(supabase: SupabaseClient, supabaseUrl: string, serviceKey: st
   const tally = { pushed: 0, pushRetry: 0, emailed: 0, emailFailed: 0, budget };
   for (const due of dueList) {
     const now = new Date().toISOString();
+    const sum = summaries.get(due.user_id) ?? summarize([]);
     if (due.route === 'push') {
-      const ok = await sendPush(supabase, due, names);
+      const ok = await sendPush(supabase, due, sum, names);
       if (ok) {
         tally.pushed += 1;
         await setItems(supabase, due.item_ids, { status: 'pushed', handled_at: now, sent_at: now });
       } else {
-        // Held again (rules changed since the check) or the push failed:
-        // back in the queue; if the device turned out to be gone, the next
-        // run sends an email instead.
+        // The push failed again: back in the queue; if the device turned out
+        // to be gone, the next run emails them instead.
         tally.pushRetry += 1;
         await setItems(supabase, due.item_ids, { status: 'pending', handled_at: null, channel: null });
       }
@@ -144,9 +202,12 @@ async function run(supabase: SupabaseClient, supabaseUrl: string, serviceKey: st
     }
     const content = composeLikeMatchEmail({
       firstName: due.first_name,
-      likeCount: due.like_count,
-      matchCount: due.match_count,
-      matchNames: (due.match_sender_ids || []).map((id) => names.get(id)).filter(Boolean) as string[],
+      likeCount: sum.likes,
+      matchCount: sum.matches,
+      matchNames: sum.matchSenders.map((id) => names.get(id)).filter(Boolean) as string[],
+      messageCount: sum.messages,
+      messageNames: sum.messageSenders.map((id) => names.get(id)).filter(Boolean) as string[],
+      notices: sum.notices,
     });
     const { error: queueError } = await supabase.from('email_send_queue').insert({
       kind: 'notification',
@@ -185,15 +246,9 @@ serve(async (req) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status });
 
-  const { data: gotLock, error: lockError } = await supabase.rpc('try_acquire_worker_lock', {
-    p_name: LOCK_NAME,
-    p_seconds: 300,
-  });
-  if (lockError) return json({ error: 'Could not take the lock' }, 500);
-  if (!gotLock) return json({ message: 'Another run is in progress' });
-
-  // Optional { onlyUserIds: [...] } limits a run to those people - used to
-  // test on test accounts without touching anyone else's queued items.
+  // Optional { onlyUserIds: [...] } limits a run to those people - the
+  // instant run for one person (from send-push-notification) and tests on
+  // test accounts.
   let onlyUserIds: string[] | null = null;
   try {
     const body = await req.json();
@@ -205,12 +260,22 @@ serve(async (req) => {
     // no body - normal scheduled run
   }
 
+  // One full run at a time; a one-person run only waits for that person
+  // (the database also locks per person, so the two can't double-send).
+  const lockName = onlyUserIds && onlyUserIds.length === 1 ? `${LOCK_NAME}:${onlyUserIds[0]}` : LOCK_NAME;
+  const { data: gotLock, error: lockError } = await supabase.rpc('try_acquire_worker_lock', {
+    p_name: lockName,
+    p_seconds: 300,
+  });
+  if (lockError) return json({ error: 'Could not take the lock' }, 500);
+  if (!gotLock) return json({ message: 'Another run is in progress' });
+
   const work = run(supabase, supabaseUrl, serviceKey, onlyUserIds)
     .catch((error) => {
       console.error('process-missed-notifications error:', error);
       return { error: error instanceof Error ? error.message : 'Unknown error' };
     })
-    .finally(() => supabase.rpc('release_worker_lock', { p_name: LOCK_NAME }));
+    .finally(() => supabase.rpc('release_worker_lock', { p_name: lockName }));
 
   // Answer straight away and keep working in the background, so the
   // scheduler's request timeout can't cut a run off part-way.

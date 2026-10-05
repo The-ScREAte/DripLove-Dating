@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {
   initializePushNotifications, 
@@ -11,15 +11,10 @@ import {
 } from '@/services/pushNotifications';
 import { handlePushNotificationError, logPushNotificationError, shouldRetryPushNotificationSetup } from '@/utils/pushNotificationErrorHandler';
 import {
-  queueLikeEvent,
   recordNotificationSent,
-  shouldSendMatchNotification,
   shouldSendMessageNotification,
   recordUserActivity,
-  isUserActive,
   hasGlobalCooldownPassed,
-  checkAndSendBatchedLikeNotification,
-  getLikeQueueCount
 } from '@/services/notificationQueue';
 
 // cleanupPushNotifications() is a GLOBAL teardown - it calls
@@ -41,27 +36,6 @@ export const usePushNotifications = (userId?: string) => {
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const batchCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Core notification sender
-  const sendNotificationInternal = useCallback(async (
-    title: string,
-    body: string,
-    targetUserId: string,
-    type: string
-  ): Promise<boolean> => {
-    try {
-      const success = await sendPushNotification({
-        title,
-        body,
-        userId: targetUserId,
-        type: type as 'match' | 'message' | 'like' | 'system' | 'admin'
-      });
-      return success;
-    } catch (err) {
-      return false;
-    }
-  }, []);
 
   useEffect(() => {
     const initializePushNotificationsAsync = async () => {
@@ -123,12 +97,6 @@ export const usePushNotifications = (userId?: string) => {
             }
           }
         }
-        
-        // Set up periodic check for batched like notifications (every 5 minutes)
-        batchCheckIntervalRef.current = setInterval(() => {
-          checkAndSendBatchedLikeNotification(userId, sendNotificationInternal);
-        }, 5 * 60 * 1000);
-        
       } catch (err) {
         const errorInfo = handlePushNotificationError(err);
         logPushNotificationError(errorInfo);
@@ -148,11 +116,8 @@ export const usePushNotifications = (userId?: string) => {
       if (activePushConsumers === 0) {
         cleanupPushNotifications();
       }
-      if (batchCheckIntervalRef.current) {
-        clearInterval(batchCheckIntervalRef.current);
-      }
     };
-  }, [userId, sendNotificationInternal]);
+  }, [userId]);
 
   const sendNotification = async (notification: NotificationPayload) => {
     try {
@@ -164,34 +129,17 @@ export const usePushNotifications = (userId?: string) => {
   };
 
   /**
-   * Send match notification - instant but respects suppression rules
+   * Matches are announced by the server the moment they're created (database
+   * trigger notify_match_created -> send-push-notification, with an email
+   * when the person can't get pushes). This used to send from the phone of
+   * whoever completed the match and skipped it if they'd swiped in the last
+   * minute - i.e. almost always - so it's now a no-op kept for callers.
    */
   const sendMatchNotification = async (
-    matchedUserName: string, 
-    targetUserId: string,
-    currentTab?: string
-  ) => {
-    // Check if we should send
-    if (!shouldSendMatchNotification(currentTab)) {
-      return false;
-    }
-
-    const success = await sendNotification({
-      title: "It's a match",
-      body: `You and ${matchedUserName} matched — say hello`,
-      userId: targetUserId,
-      type: 'match',
-      // senderId lets the edge function resolve this device's own photo
-      // server-side, once, for the recipient's notification avatar.
-      data: { matchedUserName, senderId: userId }
-    });
-
-    if (success) {
-      recordNotificationSent('match');
-    }
-
-    return success;
-  };
+    _matchedUserName: string,
+    _targetUserId: string,
+    _currentTab?: string
+  ) => true;
 
   /**
    * Send message notification - always instant, only suppressed if in same chat
@@ -227,38 +175,14 @@ export const usePushNotifications = (userId?: string) => {
   };
 
   /**
-   * Queue a like event - batched notification system
-   * Sends notification when: 3+ likes OR 2 hours since first unseen like
-   * Respects: 2hr like cooldown, 2min global cooldown, activity suppression
+   * Likes are announced by the server the moment they're saved (database
+   * trigger notify_like_received -> send-push-notification, with an email
+   * when the person can't get pushes). This used to be decided on the
+   * LIKER's phone - after the liker had liked 3 people or 2 hours, and only
+   * if the liker wasn't using the app - so most likes were never announced.
+   * Now a no-op kept for callers.
    */
-  /**
-   * Send batched like notification - call this to force check/send
-   * Used when conditions are met (3 likes OR 2hr timeout)
-   */
-  const sendMultipleLikesNotification = async (targetUserId: string, likeCount: number, likerId?: string) => {
-    // Queue the like event instead of sending immediately
-    const { shouldNotify, likeCount: currentCount } = queueLikeEvent();
-
-    if (shouldNotify && !isUserActive()) {
-      const success = await sendNotification({
-        title: 'New interest in your profile',
-        body: "You're catching eyes — see who's interested",
-        userId: targetUserId,
-        type: 'like',
-        // senderId (the most recent liker) lets the edge function resolve
-        // their photo server-side for the notification avatar.
-        data: { likeCount: currentCount.toString(), senderId: likerId }
-      });
-
-      if (success) {
-        recordNotificationSent('like');
-      }
-
-      return success;
-    }
-
-    return true;
-  };
+  const sendMultipleLikesNotification = async (_targetUserId: string, _likeCount: number, _likerId?: string) => true;
 
   /**
    * Send admin notification - respects global cooldown
@@ -307,20 +231,9 @@ export const usePushNotifications = (userId?: string) => {
     }
   };
 
-  /**
-   * Get queued like count (for debugging/display)
-   */
-  const getQueuedLikeCount = (): number => {
-    return getLikeQueueCount();
-  };
-
-  /**
-   * Force check and send batched like notification
-   */
-  const flushLikeNotifications = async () => {
-    if (!userId) return false;
-    return checkAndSendBatchedLikeNotification(userId, sendNotificationInternal);
-  };
+  // Likes are no longer batched on the phone (see sendMultipleLikesNotification).
+  const getQueuedLikeCount = (): number => 0;
+  const flushLikeNotifications = async () => false;
 
   return {
     isInitialized,

@@ -30,9 +30,22 @@ interface NotificationPayload {
 
 type Category = 'transactional' | 'event' | 'engagement' | 'broadcast'
 
-// Why a like/match push was held back - these wait in the missed-
-// notifications queue instead of being dropped.
-const HOLD_REASONS = new Set(['no_device', 'notifications_off', 'quiet_hours', 'like_grouped', 'like_cap'])
+// Everything is pushed the moment it happens. These are the only reasons a
+// push can't reach someone: the person is then emailed instead (straight
+// away, max 2 a day) via process-missed-notifications.
+const HOLD_REASONS = new Set(['no_device', 'notifications_off'])
+
+// What gets an email when the push can't reach the person: real-person
+// events and account notices. Automatic reminders (recommendations, streaks,
+// games) stay push-only - emailing those daily to everyone without the app
+// would blow through the daily sending limit and land us in spam. The
+// welcome notice already has its own signup email. Admin broadcasts get
+// their email copy from process-broadcast-queue.
+function emailsWhenUnreachable(category: string, kind: string): boolean {
+  if (category === 'event') return kind === 'like' || kind === 'match' || kind === 'message'
+  if (category === 'transactional') return kind !== 'welcome'
+  return false
+}
 
 function inferCategory(type: string): Category {
   if (type === 'message' || type === 'match' || type === 'like') return 'event'
@@ -193,10 +206,9 @@ serve(async (req) => {
   console.log('🔔 send-push-notification edge function called')
   
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabase = createClient(supabaseUrl, serviceKey)
 
     const payload: NotificationPayload = await req.json()
     const { userId, type = 'system', data = {} } = payload
@@ -204,10 +216,13 @@ serve(async (req) => {
     const category: Category = payload.category ?? inferCategory(type)
     const kind = (payload.kind || type || 'system').toLowerCase()
     const rawSender = (data as Record<string, unknown>)?.senderId
-    // Default dedupe for matches so an older app version and the server
-    // announcing the same match only produce one push.
+    // Likes and matches are announced by the server (database triggers); an
+    // older app version may announce the same one - same key within 30
+    // minutes = sent once.
     const dedupeKey = payload.dedupeKey
-      ?? (kind === 'match' && typeof rawSender === 'string' && rawSender ? `match:${rawSender}` : undefined)
+      ?? ((kind === 'match' || kind === 'like') && typeof rawSender === 'string' && rawSender
+        ? `${kind}:${rawSender}`
+        : undefined)
 
     // Sent by process-missed-notifications for items already in the inbox and
     // already queued once - never store or queue them again.
@@ -266,16 +281,27 @@ serve(async (req) => {
       return !error
     }
 
-    // Likes and matches that can't be pushed right now wait in the missed-
-    // notifications queue; process-missed-notifications sends them later by
-    // push (daytime / after grouping) or email (notifications blocked, app
-    // deleted). See 20261005120000_missed_like_match_notifications.sql.
+    // Something the phone can't show (no app / notifications off / push
+    // failed): hand it to process-missed-notifications right now, which emails
+    // the person straight away (max 2 a day) or retries the push.
     const holdForLater = async (holdReason: string, stringData: Record<string, string>) => {
-      if (isCatchup || (kind !== 'like' && kind !== 'match')) return
+      if (isCatchup || !emailsWhenUnreachable(category, kind)) return
       const { error } = await supabase.from('notification_email_queue').insert({
         user_id: userId, kind, title, body, data: stringData, reason: holdReason,
       })
-      if (error) console.error('❌ Error queueing missed notification:', error)
+      if (error) {
+        console.error('❌ Error queueing missed notification:', error)
+        return
+      }
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/process-missed-notifications`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onlyUserIds: [userId] }),
+        })
+      } catch (kickError) {
+        console.warn('Could not start process-missed-notifications (5-minute schedule will):', kickError)
+      }
     }
 
     if (!allowed) {

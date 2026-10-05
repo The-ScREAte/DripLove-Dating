@@ -69,8 +69,49 @@ async function updateRow(supabase: SupabaseClient, id: string, fields: Record<st
   if (error) console.error(`Failed to update queue row ${id}:`, error);
 }
 
+/**
+ * Scheduled emails carry a send-by time (expires_at): when the daily sending
+ * limit means one can't go out near its local time, it's dropped instead of
+ * arriving hours late or piling up day after day.
+ */
+async function expireLateScheduledEmails(supabase: SupabaseClient) {
+  const { data: expired, error } = await supabase
+    .from('email_send_queue')
+    .update({
+      status: 'failed',
+      failure_type: 'expired',
+      error: 'Not sent: the daily sending limit was reached before its scheduled time passed',
+    })
+    .eq('status', 'pending')
+    .lt('expires_at', new Date().toISOString())
+    .select('broadcast_id');
+  if (error) {
+    console.error('Could not expire late scheduled emails:', error);
+    return 0;
+  }
+  const perBroadcast = new Map<string, number>();
+  (expired || []).forEach((r: { broadcast_id: string | null }) => {
+    if (r.broadcast_id) perBroadcast.set(r.broadcast_id, (perBroadcast.get(r.broadcast_id) || 0) + 1);
+  });
+  for (const [broadcastId, n] of perBroadcast) {
+    const { data: history } = await supabase
+      .from('email_broadcast_history')
+      .select('failed_sends')
+      .eq('id', broadcastId)
+      .maybeSingle();
+    if (history) {
+      await supabase
+        .from('email_broadcast_history')
+        .update({ failed_sends: (history.failed_sends || 0) + n })
+        .eq('id', broadcastId);
+    }
+  }
+  return expired?.length || 0;
+}
+
 async function runQueue(supabase: SupabaseClient, supabaseUrl: string) {
-  const summary = { sent: 0, failed: 0, retrying: 0, suppressed: 0, pausedNow: [] as string[], message: '' };
+  const summary = { sent: 0, failed: 0, retrying: 0, suppressed: 0, expired: 0, pausedNow: [] as string[], message: '' };
+  summary.expired = await expireLateScheduledEmails(supabase);
 
   const smtp = smtpConfig();
   const configured = loadAccounts();

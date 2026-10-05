@@ -94,17 +94,25 @@ export default function ScheduledBroadcasts() {
   const loadCountries = async () => {
     setIsLoadingCountries(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('country, id')
-        .not('country', 'is', null)
-        .eq('account_status', 'active')
-        .eq('is_admin', false);
-
-      if (error) throw error;
+      // Page through everyone - a single select stops at 1,000 rows, which
+      // left countries (and counts) missing from this list.
+      const data: Array<{ country: string }> = [];
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error } = await supabase
+          .from('profiles')
+          .select('country')
+          .not('country', 'is', null)
+          .eq('account_status', 'active')
+          .eq('is_admin', false)
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        data.push(...((page || []) as Array<{ country: string }>));
+        if (!page || page.length < PAGE) break;
+      }
 
       const countryMap = new Map<string, number>();
-      data?.forEach((profile) => {
+      data.forEach((profile) => {
         const count = countryMap.get(profile.country) || 0;
         countryMap.set(profile.country, count + 1);
       });
@@ -174,53 +182,41 @@ export default function ScheduledBroadcasts() {
     setShowDialog(true);
   };
 
-  const calculateNextSendTime = (repeatType: string, specificDay: string, timeToSend: string): Date => {
+  // Next day the schedule runs, at its time - the same rule the server uses
+  // (schedule_runs_on). Each person gets it at this time in their own time
+  // zone, so this is shown as a date plus a local time, not one instant.
+  // every_2_days counts from the day the schedule was created (UTC).
+  const calculateNextSendTime = (
+    repeatType: string,
+    specificDay: string,
+    timeToSend: string,
+    createdAt?: string,
+  ): Date => {
     const now = new Date();
     const [hours, minutes] = timeToSend.split(':').map(Number);
+    const anchor = createdAt ? new Date(createdAt) : now;
+    const anchorDay = Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate());
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    const runsOn = (d: Date) => {
+      const weekday = d.getDay();
+      switch (repeatType) {
+        case 'daily': return true;
+        case 'every_2_days': {
+          const diff = Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - anchorDay) / 86_400_000);
+          return diff >= 0 && diff % 2 === 0;
+        }
+        case 'weekdays': return weekday >= 1 && weekday <= 5;
+        case 'weekends': return weekday === 0 || weekday === 6;
+        case 'specific_day': return dayNames[weekday] === specificDay;
+        default: return false;
+      }
+    };
+
     const next = new Date();
     next.setHours(hours, minutes, 0, 0);
-
-    // If time has passed today, start from tomorrow
-    if (next <= now) {
-      next.setDate(next.getDate() + 1);
-    }
-
-    switch (repeatType) {
-      case 'daily':
-        // Already set to tomorrow if needed
-        break;
-      
-      case 'every_2_days':
-        // Set to 2 days from now
-        next.setDate(next.getDate() + 1);
-        break;
-      
-      case 'weekends':
-        // Find next Saturday or Sunday
-        while (next.getDay() !== 0 && next.getDay() !== 6) {
-          next.setDate(next.getDate() + 1);
-        }
-        break;
-      
-      case 'weekdays':
-        // Find next Monday-Friday
-        while (next.getDay() === 0 || next.getDay() === 6) {
-          next.setDate(next.getDate() + 1);
-        }
-        break;
-      
-      case 'specific_day':
-        const dayMap: { [key: string]: number } = {
-          sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-          thursday: 4, friday: 5, saturday: 6
-        };
-        const targetDay = dayMap[specificDay];
-        while (next.getDay() !== targetDay) {
-          next.setDate(next.getDate() + 1);
-        }
-        break;
-    }
-
+    if (next <= now) next.setDate(next.getDate() + 1);
+    for (let i = 0; i < 14 && !runsOn(next); i++) next.setDate(next.getDate() + 1);
     return next;
   };
 
@@ -238,7 +234,7 @@ export default function ScheduledBroadcasts() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const nextSendAt = calculateNextSendTime(repeatType, specificDay, timeToSend);
+    const nextSendAt = calculateNextSendTime(repeatType, specificDay, timeToSend, editingBroadcast?.created_at);
 
     const broadcastData = {
       channel,
@@ -442,7 +438,7 @@ export default function ScheduledBroadcasts() {
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{broadcast.time_to_send}</span>
+                        <span>{broadcast.time_to_send} their local time</span>
                       </div>
                       {broadcast.target_countries && broadcast.target_countries.length > 0 ? (
                         <Collapsible>
@@ -471,8 +467,17 @@ export default function ScheduledBroadcasts() {
                     </div>
 
                     <div className="text-xs text-gray-500 mb-3 space-y-0.5">
-                      {broadcast.next_send_at && (
-                        <p>Next send: {new Date(broadcast.next_send_at).toLocaleString()}</p>
+                      {broadcast.is_active && (
+                        <p>
+                          Next send:{' '}
+                          {calculateNextSendTime(
+                            broadcast.repeat_type,
+                            broadcast.specific_day || 'monday',
+                            broadcast.time_to_send,
+                            broadcast.created_at,
+                          ).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}{' '}
+                          at {broadcast.time_to_send} (each person's local time)
+                        </p>
                       )}
                       <p>
                         Last sent: {broadcast.last_sent_at ? new Date(broadcast.last_sent_at).toLocaleString() : 'Never'}
@@ -616,13 +621,23 @@ export default function ScheduledBroadcasts() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="time">Time to Send *</Label>
+              <Label htmlFor="time">Time to Send (each person's local time) *</Label>
               <Input
                 id="time"
                 type="time"
                 value={timeToSend}
                 onChange={(e) => setTimeToSend(e.target.value)}
               />
+              <p className="text-xs text-gray-500">
+                Everyone gets it at this time in their own time zone - {timeToSend || '09:00'} in Accra is{' '}
+                {timeToSend || '09:00'} Accra time, in Chicago it's {timeToSend || '09:00'} Chicago time.
+              </p>
+              {channel === 'email' && (
+                <p className="text-xs text-amber-600">
+                  Our Gmail sending accounts can send about 450 emails a day each. Anyone we can't reach within
+                  4 hours of their time is skipped for that day rather than emailed late.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

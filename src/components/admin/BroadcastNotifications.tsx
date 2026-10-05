@@ -59,6 +59,7 @@ interface Campaign {
   // Night-time in their time zone, or already had 2 broadcasts in 24h - sent
   // automatically later.
   waiting_sends?: number;
+  emailed_sends?: number;
   created_at: string;
   admin_id: string;
   status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
@@ -89,6 +90,7 @@ interface HistoryItem {
   failed: number;
   skipped?: number;
   waiting?: number;
+  emailed?: number;
   targetCountries: string[] | null;
   status: string;
   createdAt: string;
@@ -138,6 +140,7 @@ interface Recipient {
   status: 'pending' | 'sent' | 'failed' | 'skipped' | 'cancelled' | 'processing';
   error_message: string | null;
   sent_at: string | null;
+  next_attempt_at?: string | null;
   user?: {
     first_name: string;
     last_name: string;
@@ -382,6 +385,7 @@ export default function BroadcastNotifications() {
         failed: c.failed_sends,
         skipped: c.skipped_sends ?? 0,
         waiting: c.waiting_sends ?? 0,
+        emailed: c.emailed_sends ?? 0,
         targetCountries: c.target_countries,
         status: c.status,
         createdAt: c.created_at,
@@ -442,6 +446,7 @@ export default function BroadcastNotifications() {
           status,
           error_message,
           sent_at,
+          next_attempt_at,
           user:profiles(first_name, last_name, email)
         `)
         .eq('campaign_id', campaignId);
@@ -454,6 +459,7 @@ export default function BroadcastNotifications() {
         status: item.status as Recipient['status'],
         error_message: item.error_message,
         sent_at: item.sent_at,
+        next_attempt_at: item.next_attempt_at,
         user: item.user,
       }));
 
@@ -1227,9 +1233,17 @@ export default function BroadcastNotifications() {
                             {(item.waiting ?? 0) > 0 && (
                               <span
                                 className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded"
-                                title="Night-time where they are, or they already had 2 broadcasts today - sent automatically later"
+                                title="Scheduled for their own local time (or retrying after a failed attempt) - sent automatically"
                               >
-                                ⏳ {item.waiting} waiting
+                                ⏳ {item.waiting} scheduled
+                              </span>
+                            )}
+                            {(item.emailed ?? 0) > 0 && (
+                              <span
+                                className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded"
+                                title="No app or notifications off (or the push failed) - sent the same message by email"
+                              >
+                                ✉ {item.emailed} by email
                               </span>
                             )}
                             {(item.skipped ?? 0) > 0 && (
@@ -1393,7 +1407,9 @@ export default function BroadcastNotifications() {
                           )}
                           {(recipient.status === 'pending' || recipient.status === 'processing') && (
                             <Badge variant="outline" className="text-[10px] h-4">
-                              {recipient.error_message?.startsWith('Waiting') || recipient.error_message?.startsWith('Already had') ? 'Waiting' : 'Pending'}
+                              {recipient.status === 'pending' && recipient.next_attempt_at && new Date(recipient.next_attempt_at) > new Date()
+                                ? `Scheduled ${new Date(recipient.next_attempt_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                : 'Pending'}
                             </Badge>
                           )}
                           {recipient.status === 'skipped' && (

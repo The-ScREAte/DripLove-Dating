@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { isValidEmail, kickEmailQueue } from '../_shared/email-utils.ts';
+import { composeBroadcastEmail } from '../_shared/notification-email.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,13 +14,16 @@ const corsHeaders = {
 // same way, and nothing ever picked the campaign up again. Now each run sends
 // a modest number in parallel for up to RUN_BUDGET_MS, and a once-a-minute
 // cron job (see 20261005100000_broadcast_delivery_fix.sql) starts the next run
-// for as long as a campaign has work left.
+// whenever someone is due.
+//
+// Admin pushes go out the moment they're sent. Scheduled pushes reach this
+// queue with next_attempt_at set to each person's own local time (see
+// process-scheduled-broadcasts) and are sent at that minute.
 const CLAIM_SIZE = 40;
 const SEND_CONCURRENCY = 8;
 const RUN_BUDGET_MS = 50_000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MINUTES = 2;
-const BROADCAST_CAP_RETRY_HOURS = 6;
 const STALE_PROCESSING_MINUTES = 10;
 const LOCK_NAME = 'process-broadcast-queue';
 const LOCK_SECONDS = 90;
@@ -27,20 +32,30 @@ const LOCK_SECONDS = 90;
 // failure. They still see the message in their in-app inbox if the campaign
 // was saved to profiles.
 const SKIP_REASONS = new Set(['no_device', 'notifications_off', 'account_not_active', 'no_profile']);
+// ...and these people get the message by email instead (as do people whose
+// push kept failing). Closed/missing accounts get nothing.
+const EMAIL_INSTEAD_REASONS = new Set(['no_device', 'notifications_off']);
+// An email copy that can't go out in time (daily sending limit) is dropped
+// rather than arriving days late: scheduled ones within 4h of their local
+// time, others within 3 days.
+const EMAIL_COPY_HOURS_SCHEDULED = 4;
+const EMAIL_COPY_HOURS = 72;
 
 // Supabase Edge Runtime: keeps a task running after the response is sent.
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
 
 type Recipient = { id: string; user_id: string; retry_count?: number };
-type Campaign = { id: string; title: string; message: string; notification_type: string | null; status: string };
-type Outcome = 'sent' | 'skipped' | 'deferred' | 'retry' | 'failed';
-
-const hoursUntilLocalMorning = (localHour: number | null | undefined): number => {
-  const h = typeof localHour === 'number' ? localHour : 0;
-  if (h >= 22) return 24 - h + 8;
-  if (h < 8) return 8 - h;
-  return 1;
+type Campaign = {
+  id: string;
+  title: string;
+  message: string;
+  notification_type: string | null;
+  status: string;
+  admin_id: string | null;
+  scheduled_broadcast_id: string | null;
 };
+type Outcome = 'sent' | 'skipped' | 'retry' | 'failed';
+type Delivery = { outcome: Outcome; emailInstead: boolean };
 
 const minutesFromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 
@@ -56,14 +71,14 @@ async function deliverToRecipient(
   supabase: SupabaseClient,
   campaign: Campaign,
   recipient: Recipient,
-): Promise<Outcome> {
+): Promise<Delivery> {
   const retryCount = recipient.retry_count ?? 0;
 
-  const retryOrFail = async (message: string): Promise<Outcome> => {
+  const retryOrFail = async (message: string): Promise<Delivery> => {
     const next = retryCount + 1;
     if (next >= MAX_RETRIES) {
       await updateRecipient(supabase, recipient.id, { status: 'failed', error_message: message, retry_count: next });
-      return 'failed';
+      return { outcome: 'failed', emailInstead: true };
     }
     await updateRecipient(supabase, recipient.id, {
       status: 'pending',
@@ -71,39 +86,20 @@ async function deliverToRecipient(
       retry_count: next,
       next_attempt_at: minutesFromNow(RETRY_DELAY_MINUTES * next),
     });
-    return 'retry';
+    return { outcome: 'retry', emailInstead: false };
   };
 
-  const handleNotAllowed = async (reason: string, localHour: number | null | undefined): Promise<Outcome> => {
+  const handleNotAllowed = async (reason: string): Promise<Delivery> => {
     if (SKIP_REASONS.has(reason)) {
       await updateRecipient(supabase, recipient.id, { status: 'skipped', error_message: reason });
-      return 'skipped';
-    }
-    if (reason === 'quiet_hours') {
-      // Night-time where they are: wait until about 8am their time (spread
-      // over half an hour so everyone isn't sent in the same second).
-      const minutes = hoursUntilLocalMorning(localHour) * 60 + Math.floor(Math.random() * 30);
-      await updateRecipient(supabase, recipient.id, {
-        status: 'pending',
-        error_message: 'Waiting for daytime in their time zone',
-        next_attempt_at: minutesFromNow(minutes),
-      });
-      return 'deferred';
-    }
-    if (reason === 'broadcast_cap' || reason === 'duplicate') {
-      await updateRecipient(supabase, recipient.id, {
-        status: 'pending',
-        error_message: 'Already had 2 broadcasts in the last 24h - waiting',
-        next_attempt_at: minutesFromNow(BROADCAST_CAP_RETRY_HOURS * 60),
-      });
-      return 'deferred';
+      return { outcome: 'skipped', emailInstead: EMAIL_INSTEAD_REASONS.has(reason) };
     }
     return retryOrFail(`Not delivered: ${reason}`);
   };
 
   try {
-    // Check first, so people outside daytime (or without a device) don't
-    // cost a send call at all.
+    // Check first, so people without a device (or with notifications off)
+    // don't cost a send call at all.
     const { data: rows, error: eligibilityError } = await supabase.rpc('push_eligibility', {
       p_user_id: recipient.user_id,
       p_category: 'broadcast',
@@ -113,7 +109,7 @@ async function deliverToRecipient(
     if (eligibilityError) return retryOrFail(`Eligibility check failed: ${eligibilityError.message}`);
     const eligibility = Array.isArray(rows) ? rows[0] : rows;
     if (!eligibility?.allowed) {
-      return handleNotAllowed(eligibility?.reason ?? 'unknown', eligibility?.local_hour);
+      return handleNotAllowed(eligibility?.reason ?? 'unknown');
     }
 
     const { data, error } = await supabase.functions.invoke('send-push-notification', {
@@ -136,21 +132,105 @@ async function deliverToRecipient(
         sent_at: new Date().toISOString(),
         next_attempt_at: null,
       });
-      return 'sent';
+      return { outcome: 'sent', emailInstead: false };
     }
     if (data?.suppressed) {
-      // Rules changed between the check and the send (e.g. another broadcast landed).
-      return handleNotAllowed(String(data.reason ?? 'unknown'), eligibility?.local_hour);
+      // Something changed between the check and the send (e.g. app deleted).
+      return handleNotAllowed(String(data.reason ?? 'unknown'));
     }
     if (data?.reason === 'no_device') {
       // Every device token turned out to be dead (app deleted) and was removed.
       await updateRecipient(supabase, recipient.id, { status: 'skipped', error_message: 'no_device' });
-      return 'skipped';
+      return { outcome: 'skipped', emailInstead: true };
     }
     return retryOrFail('Push notification failed');
   } catch (error) {
     return retryOrFail(error instanceof Error ? error.message : 'Unknown error');
   }
+}
+
+/** The campaign's email History entry (created the first time someone needs the email). */
+function emailCopyHistory(supabase: SupabaseClient, campaign: Campaign) {
+  let pending: Promise<string | null> | null = null;
+  const find = async () => {
+    const { data } = await supabase
+      .from('email_broadcast_history')
+      .select('id')
+      .eq('push_campaign_id', campaign.id)
+      .maybeSingle();
+    return (data?.id as string | undefined) ?? null;
+  };
+  return () => (pending ??= (async () => {
+    const existing = await find();
+    if (existing) return existing;
+    const content = composeBroadcastEmail(campaign.title, campaign.message);
+    const { data, error } = await supabase
+      .from('email_broadcast_history')
+      .insert({
+        subject: content.subject,
+        message: content.html,
+        recipient_count: 0,
+        successful_sends: 0,
+        failed_sends: 0,
+        status: 'partial',
+        admin_id: campaign.admin_id,
+        recipient_filter: 'push_email_copy',
+        push_campaign_id: campaign.id,
+      })
+      .select('id')
+      .single();
+    if (error) return find(); // created a moment ago by another run
+    return data.id as string;
+  })());
+}
+
+/** Email the push to the people it couldn't reach. Returns how many were queued. */
+async function queueEmailCopies(
+  supabase: SupabaseClient,
+  campaign: Campaign,
+  userIds: string[],
+  historyId: () => Promise<string | null>,
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const { data: profiles } = await supabase.from('profiles').select('id, email').in('id', userIds);
+  const people = (profiles || [])
+    .map((p: { id: string; email: string | null }) => ({ id: p.id, email: String(p.email || '').trim().toLowerCase() }))
+    .filter((p) => isValidEmail(p.email));
+  if (people.length === 0) return 0;
+
+  const id = await historyId();
+  if (!id) return 0;
+  const content = composeBroadcastEmail(campaign.title, campaign.message);
+  const hours = campaign.scheduled_broadcast_id ? EMAIL_COPY_HOURS_SCHEDULED : EMAIL_COPY_HOURS;
+  const expiresAt = new Date(Date.now() + hours * 3600_000).toISOString();
+  const { error } = await supabase.from('email_send_queue').insert(people.map((p) => ({
+    broadcast_id: id,
+    recipient: p.email,
+    user_id: p.id,
+    kind: 'broadcast',
+    priority: 4,
+    preheader: content.preheader,
+    attempt_count: 0,
+    expires_at: expiresAt,
+  })));
+  if (error) {
+    console.error(`Could not queue email copies for campaign ${campaign.id}:`, error);
+    return 0;
+  }
+
+  const [{ data: history }, { data: current }] = await Promise.all([
+    supabase.from('email_broadcast_history').select('recipient_count').eq('id', id).maybeSingle(),
+    supabase.from('broadcast_campaigns').select('emailed_sends').eq('id', campaign.id).maybeSingle(),
+  ]);
+  await Promise.all([
+    supabase.from('email_broadcast_history')
+      .update({ recipient_count: (history?.recipient_count || 0) + people.length, status: 'partial' })
+      .eq('id', id),
+    supabase.from('broadcast_campaigns')
+      .update({ emailed_sends: (current?.emailed_sends || 0) + people.length })
+      .eq('id', campaign.id),
+  ]);
+  return people.length;
 }
 
 async function syncCampaign(supabase: SupabaseClient, campaignId: string) {
@@ -203,7 +283,7 @@ async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | 
 
     let campaignsQuery = supabase
       .from('broadcast_campaigns')
-      .select('id, title, message, notification_type, status')
+      .select('id, title, message, notification_type, status, admin_id, scheduled_broadcast_id')
       .in('status', ['queued', 'processing'])
       .order('created_at', { ascending: true });
     campaignsQuery = requestedCampaignId
@@ -218,7 +298,8 @@ async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | 
         await supabase.from('broadcast_campaigns').update({ status: 'processing' }).eq('id', campaign.id);
       }
 
-      const tally: Record<Outcome, number> = { sent: 0, skipped: 0, deferred: 0, retry: 0, failed: 0 };
+      const tally: Record<Outcome | 'emailed', number> = { sent: 0, skipped: 0, retry: 0, failed: 0, emailed: 0 };
+      const historyId = emailCopyHistory(supabase, campaign);
       while (Date.now() - startedAt < RUN_BUDGET_MS) {
         const { data: claimed, error: claimError } = await supabase.rpc('claim_broadcast_recipients', {
           p_campaign_id: campaign.id,
@@ -232,14 +313,22 @@ async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | 
         const recipients = (claimed ?? []) as Recipient[];
         if (recipients.length === 0) break;
 
+        const emailInstead: string[] = [];
         for (let i = 0; i < recipients.length; i += SEND_CONCURRENCY) {
-          const outcomes = await Promise.all(
-            recipients.slice(i, i + SEND_CONCURRENCY).map((r) => deliverToRecipient(supabase, campaign, r)),
-          );
-          outcomes.forEach((o) => { tally[o] += 1; });
+          const batch = recipients.slice(i, i + SEND_CONCURRENCY);
+          const deliveries = await Promise.all(batch.map((r) => deliverToRecipient(supabase, campaign, r)));
+          deliveries.forEach((d, idx) => {
+            tally[d.outcome] += 1;
+            if (d.emailInstead) emailInstead.push(batch[idx].user_id);
+          });
         }
+        tally.emailed += await queueEmailCopies(supabase, campaign, emailInstead, historyId);
       }
 
+      // Start sending the email copies now rather than at the next 5-minute run.
+      if (tally.emailed > 0) {
+        await kickEmailQueue(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+      }
       const totals = await syncCampaign(supabase, campaign.id);
       console.log(`Campaign ${campaign.id}: this run ${JSON.stringify(tally)}; totals ${JSON.stringify(totals)}`);
       results.push({ campaignId: campaign.id, title: campaign.title, thisRun: tally, totals });
