@@ -858,7 +858,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <button
                     onClick={() => handlePaymentTypeSelection('iap')}
                     disabled={iapLoading}
-                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
+                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-full border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
                   >
                     <div className="flex items-center justify-center gap-2 text-sm sm:text-base">
                       {iapLoading ? (
@@ -914,7 +914,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {showPaystackOption && (
                 <button
                   onClick={() => handlePaymentTypeSelection('subscription')}
-                  className="w-full p-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg border-2 border-emerald-300/40 hover:border-emerald-300/70 shadow-lg shadow-emerald-900/30 hover:shadow-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 font-semibold"
+                  className="w-full p-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full border-2 border-emerald-300/40 hover:border-emerald-300/70 shadow-lg shadow-emerald-900/30 hover:shadow-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 font-semibold"
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
                   <div className="text-xs opacity-90 mt-0.5">{paystackButtonSubtitle}</div>
@@ -927,7 +927,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   <button
                     onClick={() => handlePaymentTypeSelection('google_iap')}
                     disabled={googleIapLoading || !canBuyGoogle}
-                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-lg border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
+                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-full border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
                   >
                     <div className="text-sm sm:text-base flex items-center justify-center gap-2">
                       {googleIapLoading ? (

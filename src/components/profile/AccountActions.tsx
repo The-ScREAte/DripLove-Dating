@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { LogOut, AlertTriangle, Mail, Loader2, MessageCircle } from 'lucide-react';
+import { LogOut, AlertTriangle, Mail, Loader2, MessageCircle, ChevronDown, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import RateAppButton from '@/components/RateAppButton';
@@ -21,6 +21,7 @@ interface AccountActionsProps {
   onLogout: () => void;
   onShowTerms?: () => void;
   onShowPrivacy?: () => void;
+  /** Hides the Terms/Privacy links. (Log out is always shown, last.) */
   hideLogoutTermsPrivacy?: boolean;
   preferredLanguage?: string;
   onLanguageChange?: (language: string) => void;
@@ -62,7 +63,19 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
     }
   };
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // Delete Account sits behind this collapsed "Manage account" row, so it
+  // can't be tapped by accident while scrolling settings.
+  const [showManageAccount, setShowManageAccount] = useState(false);
+
+  // Same condition the old always-visible Cancel button used.
+  const canCancelSubscription =
+    (isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium' && subscriptionStatus.is_active)) &&
+    subscriptionStatus?.status === 'active';
+
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     try {
       // Clear chat caches before sign-out to prevent cross-account stale render.
       const { clearChatCache } = await import('@/cache/chatCache');
@@ -75,25 +88,16 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         w.chatMatchesCache?.clear();
         w.chatMessagesCache?.clear();
       }
-
-      // Remove push token before logging out
-      if (currentUser?.id) {
-        const { removePushToken } = await import('@/services/pushNotifications');
-        await removePushToken(currentUser.id);
-      }
-      
-      // Clear all IAP state to prevent it leaking to next logged-in user
-      const { clearAllIapState } = await import('@/iap-google');
-      clearAllIapState();
-      
-      await supabase.auth.signOut();
-      onLogout();
-      toast({
-        title: "Logged out",
-        description: "See you again soon!",
-      });
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error('Error clearing chat cache on logout:', error);
+    }
+    try {
+      // The app-level logout (push token removal, IAP reset, sign-out and
+      // routing back to the welcome screen) - the same one the old
+      // standalone Log Out button at the bottom of the profile called.
+      await Promise.resolve(onLogout());
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -150,6 +154,14 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
         if (!listError && files && files.length > 0) {
           const filePaths = files.map((file) => `${currentUser.id}/${file.name}`);
           await supabase.storage.from('user-photos').remove(filePaths);
+        }
+        // Photo thumbnails live in a thumbs/ sub-folder, which the listing
+        // above doesn't descend into.
+        const { data: thumbFiles } = await supabase.storage
+          .from('user-photos')
+          .list(`${currentUser.id}/thumbs`, { limit: 1000 });
+        if (thumbFiles && thumbFiles.length > 0) {
+          await supabase.storage.from('user-photos').remove(thumbFiles.map((file) => `${currentUser.id}/thumbs/${file.name}`));
         }
       } catch (storageError) {
         console.error('Error deleting photos from storage:', storageError);
@@ -271,19 +283,6 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </div>
         )}
 
-        {/* 5. Logout Button - Session action */}
-        {!hideLogoutTermsPrivacy && (
-          <Button 
-            onClick={handleLogout}
-            variant="outline"
-            size={isAndroidNative ? 'sm' : 'default'}
-            className={`w-full flex items-center justify-center space-x-2 border-pink-500/30 text-white hover:bg-pink-500/10 ${isAndroidNative ? 'text-xs' : ''}`}
-          >
-            <LogOut className="w-4 h-4" />
-            <span>{t('common.logout')}</span>
-          </Button>
-        )}
-
         {/* 6. Subscription Management - Cancel or Resume */}
         {(isPremium || (subscriptionStatus && subscriptionStatus.plan_name === 'premium' && subscriptionStatus.is_active)) && (
           <div className="space-y-3">
@@ -311,18 +310,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               </div>
             )}
 
-            {/* Cancel button for active subscriptions only (not cancelled) */}
+            {/* Renewal date for active subscriptions. (Cancel lives under
+                "Manage account" below, alongside Delete account.) */}
             {subscriptionStatus && subscriptionStatus.status === 'active' && (
               <>
-                <Button
-                  variant="outline"
-                  size={isAndroidNative ? 'sm' : 'default'}
-                  className={`w-full flex items-center justify-center space-x-2 border-orange-300 text-orange-600 hover:bg-orange-50 ${isAndroidNative ? 'text-xs' : ''}`}
-                  onClick={() => navigate('/unsubscribe')}
-                >
-                  {t('settings.cancelSubscription')}
-                </Button>
-                
                 {/* Show expiration date for active subscriptions */}
                 {subscriptionStatus.expires_at && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -508,53 +499,98 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             )}
           </div>
         )}
-        {/* Delete Account always visible */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="destructive"
-                size={isAndroidNative ? 'sm' : 'default'}
-                className={`flex items-center justify-center space-x-2 w-full sm:w-auto ${isAndroidNative ? 'text-xs' : ''}`}
-              >
-                <AlertTriangle className="w-4 h-4" />
-                <span>Delete Account</span>
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="sm:max-w-lg bg-black border border-pink-500/30 text-white">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="text-white">Delete Account</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="text-white/80">
-                    <p>
-                      Are you sure you want to permanently delete your account? This action will:
-                    </p>
-                    <ul className="list-disc ml-6 mt-2 space-y-1">
-                      <li>Delete your profile and all personal information</li>
-                      <li>Remove all your photos</li>
-                      <li>Delete all your matches and conversations</li>
-                      <li>Remove all likes given and received</li>
-                    </ul>
-                    <p className="mt-2">
-                      <strong className="text-white">
-                        This action cannot be undone and your profile won't exist anymore.
-                      </strong>
-                    </p>
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="bg-black border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white">No, Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDeleteAccountRequest}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Yes, Delete My Account
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+        {/* Manage account - collapsed by default. Delete Account lives in here
+            (plus its two confirmation steps) instead of sitting out in the open. */}
+        <div className="rounded-lg border border-white/10 bg-black">
+          <button
+            type="button"
+            onClick={() => setShowManageAccount(v => !v)}
+            aria-expanded={showManageAccount}
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-white/60 hover:text-white/80"
+          >
+            <span className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Manage account
+            </span>
+            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showManageAccount ? 'rotate-180' : ''}`} />
+          </button>
+          {showManageAccount && (
+            <div className="space-y-3 border-t border-white/10 px-4 pb-4 pt-3 dl-fade-in">
+              {canCancelSubscription && (
+                <div className="space-y-2 border-b border-white/10 pb-3">
+                  <p className="text-xs leading-relaxed text-white/50">
+                    Cancelling stops auto-renew. You keep Premium until the end of your current billing period.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full rounded-full border-orange-400/40 bg-transparent text-sm font-medium text-orange-300 hover:bg-orange-500/10 hover:text-orange-200"
+                    onClick={() => navigate('/unsubscribe')}
+                  >
+                    {t('settings.cancelSubscription')}
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs leading-relaxed text-white/50">
+                Deleting your account permanently removes your profile, photos, matches and chats. Taking a break? Just log out instead - your profile stays safe.
+              </p>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 w-full rounded-full border-red-500/40 bg-transparent text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  >
+                    Delete account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="sm:max-w-lg bg-black border border-pink-500/30 text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-white">Delete Account</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="text-white/80">
+                        <p>
+                          Are you sure you want to permanently delete your account? This action will:
+                        </p>
+                        <ul className="list-disc ml-6 mt-2 space-y-1">
+                          <li>Delete your profile and all personal information</li>
+                          <li>Remove all your photos</li>
+                          <li>Delete all your matches and conversations</li>
+                          <li>Remove all likes given and received</li>
+                        </ul>
+                        <p className="mt-2">
+                          <strong className="text-white">
+                            This action cannot be undone and your profile won't exist anymore.
+                          </strong>
+                        </p>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="bg-black border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white">No, Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccountRequest}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Yes, Delete My Account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
         </div>
+
+        {/* Log out - always the last item */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] text-[15px] font-semibold text-red-500 transition-colors hover:bg-red-500/10 disabled:opacity-60"
+        >
+          {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          {t('common.logout')}
+        </button>
 
         {/* Delete Account Confirmation Dialog */}
         <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>

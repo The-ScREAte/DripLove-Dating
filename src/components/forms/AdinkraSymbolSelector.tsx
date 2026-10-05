@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
  
-import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
+import { AFRICAN_SYMBOL_GROUPS, MAX_CULTURAL_SIGNS } from '@/constants/africanSymbols';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, Info } from 'lucide-react';
@@ -84,7 +84,7 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
   const toggleSymbol = (symbolName: string) => {
     if (selectedSymbols.includes(symbolName)) {
       onChange(selectedSymbols.filter(s => s !== symbolName));
-    } else if (selectedSymbols.length < 10) {
+    } else if (selectedSymbols.length < MAX_CULTURAL_SIGNS) {
       onChange([...selectedSymbols, symbolName]);
     }
   };
@@ -101,23 +101,23 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
       <div>
         <div className="flex items-center justify-between gap-3 mb-1">
           <div className="flex items-center gap-2">
-            <Label className="text-base font-medium">Cultural Signs *</Label>
+            <Label className="text-[15px] font-semibold tracking-tight text-white">Cultural Signs <span className="text-pink-400">*</span></Label>
             <div className="relative info-tooltip-container">
               <button
                 type="button"
-                className="w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-md flex-shrink-0 border border-pink-600"
+                aria-label="About Cultural Signs" className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0"
                 onClick={() => setShowInfoTooltip(!showInfoTooltip)}
               >
-                <span className="text-white text-sm font-bold leading-none">!</span>
+                <span className="text-white/80 text-[11px] font-bold leading-none">i</span>
               </button>
               {showInfoTooltip && (
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-30 w-64">
                   <div className="bg-popover text-popover-foreground p-2.5 rounded-lg shadow-lg border">
                     <p className="text-xs">
-                      <span className="font-semibold text-purple-700"> Cultural Signs</span>
+                      <span className="font-semibold text-pink-400">Cultural Signs</span>
                       <br />
                       <span className="text-muted-foreground">
-                        Select symbols that resonate with you and reflect your personality and values.
+                        Pick up to {MAX_CULTURAL_SIGNS} symbols that resonate with you and reflect your personality and values.
                       </span>
                     </p>
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 -mb-1">
@@ -131,8 +131,8 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
           <div className="flex items-center gap-3 text-sm shrink-0">
             <div className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full ${selectedSymbols.length > 0 ? 'bg-green-500' : 'bg-gray-300'}`} />
-              <span className="font-medium text-gray-700">{selectedSymbols.length} / 10</span>
+              <div className={`w-2 h-2 rounded-full ${selectedSymbols.length > 0 ? 'bg-emerald-400' : 'bg-white/25'}`} />
+              <span className="font-medium text-white/70">{selectedSymbols.length} / {MAX_CULTURAL_SIGNS}</span>
             </div>
           </div>
         </div>
@@ -143,25 +143,25 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
         {/* Default Groups (Western/Chinese Zodiac) - Show when user's country is not in our list */}
         {!userCountryGroup && defaultGroups.length > 0 && defaultGroups.map((group) => (
           <div key={group.id} className="space-y-1.5">
-            <Card className="overflow-visible border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
-              <div className="p-1.5 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
+            <Card className="overflow-visible rounded-xl border border-white/10 bg-transparent text-white">
+              <div className="px-2.5 py-2 border-b border-white/10">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{group.flag}</span>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-sm text-primary">{group.country}</h3>
+                    <h3 className="font-semibold text-sm text-white">{group.country}</h3>
                   </div>
                   {(selectedCounts[group.id] || 0) > 0 && (
-                    <span className="text-xs text-primary font-medium">
+                    <span className="text-xs text-pink-400 font-medium">
                       {selectedCounts[group.id]} selected
                     </span>
                   )}
                   <div className="relative info-tooltip-container">
                     <button
                       type="button"
-                      className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-600"
+                      aria-label="About this group" className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0"
                       onClick={() => setGroupTooltip(groupTooltip === group.id ? null : group.id)}
                     >
-                      <span className="text-white text-[10px] font-bold leading-none">!</span>
+                      <span className="text-white/80 text-[11px] font-bold leading-none">i</span>
                     </button>
                     {groupTooltip === group.id && (
                       <div className="absolute bottom-full right-0 mb-3 z-[9999] w-72">
@@ -176,11 +176,11 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                   </div>
                 </div>
               </div>
-              <div className="px-1.5 pb-1.5 pt-1.5">
+              <div className="p-2">
                 <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                   {group.symbols.map((symbol, index) => {
                     const isSelected = selectedSymbols.includes(symbol.name);
-                    const canSelect = selectedSymbols.length < 10 || isSelected;
+                    const canSelect = selectedSymbols.length < MAX_CULTURAL_SIGNS || isSelected;
                     const showTooltip = tooltipSymbol === symbol.name;
                     const totalCols = 8;
                     const colIndex = index % totalCols;
@@ -192,18 +192,18 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                     return (
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
-                          className={`bg-white text-black cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14 ${
-                            isSelected ? 'border-primary border-2 bg-primary/10 shadow-md' : canSelect ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105' : 'border-border opacity-50 cursor-not-allowed'
+                          className={`bg-white/[0.06] text-white cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-1 relative h-16 rounded-lg ${
+                            isSelected ? 'border-pink-500 border-2 bg-pink-500/15' : canSelect ? 'border-white/10 hover:border-pink-500/50' : 'border-white/10 opacity-40 cursor-not-allowed'
                           }`}
                           onClick={() => canSelect && toggleSymbol(symbol.name)}
                         >
-                          <button type="button" className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-600"
+                          <button type="button" aria-label="Symbol meaning" className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center z-10 transition-colors flex-shrink-0"
                             onClick={(e) => { e.stopPropagation(); setTooltipSymbol(showTooltip ? null : symbol.name); }}>
-                            <span className="text-white text-[7px] font-bold leading-none">!</span>
+                            <span className="text-white/85 text-[8px] font-bold leading-none">i</span>
                           </button>
                           <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6" dangerouslySetInnerHTML={{ __html: symbol.svg }} />
-                          <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
-                          {isSelected && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />}
+                          <p className="text-[9px] font-medium leading-tight text-center px-1 line-clamp-1 text-white/85">{symbol.name}</p>
+                          {isSelected && <div className="absolute bottom-0 left-0 right-0 h-1 bg-pink-500" />}
                         </Card>
                         {showTooltip && (
                           <div className={`absolute bottom-full ${tooltipPositionClass} mb-2 z-[9999] w-44 max-w-[calc(100vw-3rem)]`}>
@@ -229,26 +229,26 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
         {userCountryGroup && (
                           
           <div className="space-y-1.5">
-            <Card className="overflow-visible border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-purple-500/5">
+            <Card className="overflow-visible rounded-xl border border-white/10 bg-transparent text-white">
               {/* User's Country Header - Always Expanded */}
-              <div className="p-1.5 bg-gradient-to-r from-primary/10 to-purple-500/10 border-b border-primary/20">
+              <div className="px-2.5 py-2 border-b border-white/10">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{userCountryGroup.flag}</span>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-sm text-primary">{userCountryGroup.country}</h3>
+                    <h3 className="font-semibold text-sm text-white">{userCountryGroup.country}</h3>
                   </div>
                   {(selectedCounts[userCountryGroup.id] || 0) > 0 && (
-                    <span className="text-xs text-primary font-medium">
+                    <span className="text-xs text-pink-400 font-medium">
                       {selectedCounts[userCountryGroup.id]} selected
                     </span>
                   )}
                   <div className="relative info-tooltip-container">
                     <button
                       type="button"
-                      className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-600"
+                      aria-label="About this group" className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0"
                       onClick={() => setGroupTooltip(groupTooltip === userCountryGroup.id ? null : userCountryGroup.id)}
                     >
-                      <span className="text-white text-[10px] font-bold leading-none">!</span>
+                      <span className="text-white/80 text-[11px] font-bold leading-none">i</span>
                     </button>
                     {groupTooltip === userCountryGroup.id && (
                       <div className="absolute bottom-full right-0 mb-3 z-[9999] w-72">
@@ -265,11 +265,11 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
               </div>
 
               {/* User's Country Symbols - Always Visible */}
-              <div className="px-1.5 pb-1.5 pt-1.5">
+              <div className="p-2">
                 <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                   {userCountryGroup.symbols.map((symbol, index) => {
                     const isSelected = selectedSymbols.includes(symbol.name);
-                    const canSelect = selectedSymbols.length < 10 || isSelected;
+                    const canSelect = selectedSymbols.length < MAX_CULTURAL_SIGNS || isSelected;
                     const showTooltip = tooltipSymbol === symbol.name;
 
                     const totalCols = 8;
@@ -288,34 +288,34 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                       <div key={symbol.name} className="relative info-tooltip-container">
                         <Card
                           className={`
-                            bg-white text-black cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
+                            bg-white/[0.06] text-white cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-1 relative h-16 rounded-lg
                             ${isSelected
-                              ? 'border-primary border-2 bg-primary/10 shadow-md'
+                              ? 'border-pink-500 border-2 bg-pink-500/15'
                               : canSelect
-                                ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105'
-                                : 'border-border opacity-50 cursor-not-allowed'
+                                ? 'border-white/10 hover:border-pink-500/50'
+                                : 'border-white/10 opacity-40 cursor-not-allowed'
                             }
                           `}
                           onClick={() => canSelect && toggleSymbol(symbol.name)}
                         >
                           <button
                             type="button"
-                            className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-600"
+                            aria-label="Symbol meaning" className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center z-10 transition-colors flex-shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               setTooltipSymbol(showTooltip ? null : symbol.name);
                             }}
                           >
-                            <span className="text-white text-[7px] font-bold leading-none">!</span>
+                            <span className="text-white/85 text-[8px] font-bold leading-none">i</span>
                           </button>
 
                           <div
                             className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6"
                             dangerouslySetInnerHTML={{ __html: symbol.svg }}
                           />
-                          <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
+                          <p className="text-[9px] font-medium leading-tight text-center px-1 line-clamp-1 text-white/85">{symbol.name}</p>
                           {isSelected && (
-                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-pink-500" />
                           )}
                         </Card>
 
@@ -344,11 +344,11 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
           <button
             type="button"
             onClick={() => setShowOtherCountries(!showOtherCountries)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 rounded-lg border border-purple-500/20 transition-all shadow-sm"
+            className="w-full flex items-center justify-between px-4 h-12 rounded-full border border-white/15 bg-white/[0.04] text-white hover:bg-white/[0.08] transition-colors"
           >
             <div className="flex items-center gap-2">
               <span className="text-xl">🌍</span>
-              <span className="font-semibold text-sm">Browse Other Sign</span>
+              <span className="font-medium text-sm">Browse other signs</span>
             </div>
             {showOtherCountries ? (
               <ChevronUp className="w-5 h-5" />
@@ -364,11 +364,11 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                 const selectedInGroup = selectedCounts[group.id] || 0;
                 
                 return (
-                  <Card key={group.id} className="overflow-visible bg-white text-black">
+                  <Card key={group.id} className="overflow-visible rounded-xl border border-white/10 bg-transparent text-white">
                     <button
                       type="button"
                       onClick={() => toggleGroup(group.id)}
-                      className="w-full p-2.5 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                      className="w-full p-2.5 flex items-center justify-between rounded-xl hover:bg-white/[0.05] transition-colors"
                     >
                       <div className="flex items-center gap-2 text-left flex-1">
                         <span className="text-xl">{group.flag}</span>
@@ -376,20 +376,20 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                           <h3 className="font-semibold text-sm">{group.country}</h3>
                         </div>
                         {selectedInGroup > 0 && (
-                          <span className="text-xs text-primary font-medium mr-2">
+                          <span className="text-xs text-pink-400 font-medium mr-2">
                             {selectedInGroup} selected
                           </span>
                         )}
                         <div className="relative info-tooltip-container mr-2">
                           <button
                             type="button"
-                            className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center transition-colors shadow-sm flex-shrink-0 border border-pink-600"
+                            aria-label="About this group" className="w-5 h-5 min-w-5 min-h-5 p-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors flex-shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               setGroupTooltip(groupTooltip === group.id ? null : group.id);
                             }}
                           >
-                            <span className="text-white text-[10px] font-bold leading-none">!</span>
+                            <span className="text-white/80 text-[11px] font-bold leading-none">i</span>
                           </button>
                           {groupTooltip === group.id && (
                             <div className="absolute bottom-full right-0 mb-3 z-[9999] w-72">
@@ -404,18 +404,18 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                         </div>
                       </div>
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <ChevronUp className="w-4 h-4 text-white/50 flex-shrink-0" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <ChevronDown className="w-4 h-4 text-white/50 flex-shrink-0" />
                       )}
                     </button>
 
                     {isExpanded && (
-                      <div className="px-1.5 pb-1.5 pt-1 border-t bg-muted/20">
+                      <div className="p-2 border-t border-white/10">
                         <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                           {group.symbols.map((symbol, index) => {
                             const isSelected = selectedSymbols.includes(symbol.name);
-                            const canSelect = selectedSymbols.length < 10 || isSelected;
+                            const canSelect = selectedSymbols.length < MAX_CULTURAL_SIGNS || isSelected;
                             const showTooltip = tooltipSymbol === symbol.name;
 
                             const totalCols = 8;
@@ -434,12 +434,12 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
                               <div key={symbol.name} className="relative info-tooltip-container">
                                 <Card
                                   className={`
-                                    bg-white text-black cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-0.5 relative h-14
+                                    bg-white/[0.06] text-white cursor-pointer transition-all p-1 flex flex-col items-center justify-center gap-1 relative h-16 rounded-lg
                                     ${isSelected
-                                      ? 'border-primary border-2 bg-primary/10 shadow-md'
+                                      ? 'border-pink-500 border-2 bg-pink-500/15'
                                       : canSelect
-                                        ? 'border-border hover:border-primary/50 hover:shadow-sm hover:scale-105'
-                                        : 'border-border opacity-50 cursor-not-allowed'
+                                        ? 'border-white/10 hover:border-pink-500/50'
+                                        : 'border-white/10 opacity-40 cursor-not-allowed'
                                     }
                                   `}
                                   onClick={() => canSelect && toggleSymbol(symbol.name)}
@@ -447,22 +447,22 @@ const AdinkraSymbolSelector: React.FC<AdinkraSymbolSelectorProps> = ({ selectedS
 
                                   <button
                                     type="button"
-                                    className="absolute top-0.5 right-0.5 w-3.5 h-3.5 min-w-3.5 min-h-3.5 p-0 rounded-full bg-pink-600 hover:bg-pink-700 flex items-center justify-center z-10 transition-colors shadow-sm flex-shrink-0 border border-pink-600"
+                                    aria-label="Symbol meaning" className="absolute top-0.5 right-0.5 w-4 h-4 min-w-4 min-h-4 p-0 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center z-10 transition-colors flex-shrink-0"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setTooltipSymbol(showTooltip ? null : symbol.name);
                                     }}
                                   >
-                                    <span className="text-white text-[7px] font-bold leading-none">!</span>
+                                    <span className="text-white/85 text-[8px] font-bold leading-none">i</span>
                                   </button>
 
                                   <div
                                     className="w-6 h-6 flex-shrink-0 flex items-center justify-center [&_svg]:w-6 [&_svg]:h-6"
                                     dangerouslySetInnerHTML={{ __html: symbol.svg }}
                                   />
-                                  <p className="text-[8px] font-medium leading-tight text-center px-1 line-clamp-1">{symbol.name}</p>
+                                  <p className="text-[9px] font-medium leading-tight text-center px-1 line-clamp-1 text-white/85">{symbol.name}</p>
                                   {isSelected && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
+                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-pink-500" />
                                   )}
                                 </Card>
 

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Gift, Loader2 } from 'lucide-react';
+import { formLabel, formInput, formError } from '@/components/forms/formTheme';
 
 interface PromoCodeInputProps {
   value: string;
@@ -70,10 +71,10 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <Label htmlFor="promoCode" className="text-sm font-medium flex items-center gap-2">
-        <Gift className="w-4 h-4 text-pink-500" />
+      <Label htmlFor="promoCode" className={`${formLabel} flex items-center gap-2`}>
+        <Gift className="w-4 h-4 text-pink-400" />
         Promo Code
-        <span className="text-xs font-normal text-black">(optional)</span>
+        <span className="text-xs font-normal text-white/50">(optional)</span>
       </Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -84,22 +85,21 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
               onChange(e.target.value.toUpperCase());
               setValidationResult(null);
             }}
-            placeholder="Enter promo code"
+            placeholder="Code"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
             disabled={disabled || validationResult?.valid}
-            className={`pr-10 text-black placeholder:text-black ${
-              validationResult?.valid
-                ? 'border-green-500 bg-green-50'
-                : validationResult?.valid === false
-                  ? 'border-red-500 bg-red-50'
-                  : 'bg-white border-black'
+            className={`${formInput(validationResult?.valid === false)} pr-10 uppercase tracking-wide ${
+              validationResult?.valid ? '!border-emerald-400/70 disabled:opacity-100' : ''
             }`}
           />
           {validationResult && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               {validationResult.valid ? (
-                <CheckCircle className="w-4 h-4 text-green-500" />
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-500" />
+                <XCircle className="w-4 h-4 text-red-400" />
               )}
             </div>
           )}
@@ -110,7 +110,7 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
             variant="outline" 
             onClick={validatePromoCode}
             disabled={validating || !value.trim()}
-            className="shrink-0"
+            className="shrink-0 h-12 rounded-full border-white/20 bg-transparent px-5 text-white hover:bg-white/[0.06] hover:text-white"
           >
             {validating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -124,14 +124,14 @@ const PromoCodeInput = ({ value, onChange, disabled, className }: PromoCodeInput
             type="button" 
             variant="ghost" 
             onClick={handleClear}
-            className="shrink-0 text-black"
+            className="shrink-0 h-12 rounded-full px-4 text-white/80 hover:bg-white/[0.06] hover:text-white"
           >
             Clear
           </Button>
         )}
       </div>
       {validationResult && !validationResult.valid && (
-        <p className="text-xs text-red-600">{validationResult.error}</p>
+        <p className={formError}>{validationResult.error}</p>
       )}
     </div>
   );

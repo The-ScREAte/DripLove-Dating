@@ -24,6 +24,7 @@ import {
   traitLabel,
 } from '@/constants/profileTraits';
 import { favoriteEmoji, formatFavoriteLabel, parseFavorites } from '@/constants/favorites';
+import { withThumbnailPaths } from '@/utils/photoThumbnails';
 
 const formatHeightLabel = (cm: number) => {
   const totalInches = Math.round(cm / 2.54);
@@ -92,7 +93,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
         const filePath = urlParts.slice(bucketIndex + 1).join('/');
         const { error: storageError } = await supabase.storage
           .from('user-photos')
-          .remove([filePath]);
+          .remove(withThumbnailPaths([filePath]));
         if (storageError) throw storageError;
       }
 

@@ -938,3 +938,45 @@ body.keyboard-open .chat-messages-container {
     display: none;
   }
 
+
+/* ---- Onboarding (Sign Up / Complete Profile / Terms) ---------------------
+   Shared with src/components/forms/formTheme.ts. */
+
+/* Screen/step entrance: a short fade + 6px rise, so moving between steps and
+   screens reads as one continuous flow instead of a hard swap. */
+@keyframes dl-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.dl-fade-in {
+  animation: dl-fade-in 0.28s ease-out both;
+}
+/* Same, but held back briefly - for loading text that should only show up
+   when a wait is actually long enough to need explaining. */
+.dl-fade-in-delayed {
+  animation: dl-fade-in 0.4s ease-out 0.35s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-fade-in,
+  .dl-fade-in-delayed {
+    animation: none;
+  }
+}
+
+/* Browser/password-manager autofill paints its own light-blue background and
+   dark text over a field (and over the field's leading icon). Keep autofilled
+   fields looking exactly like typed-in ones on the dark form surface. */
+.dl-form input:-webkit-autofill,
+.dl-form input:-webkit-autofill:hover,
+.dl-form input:-webkit-autofill:focus,
+.dl-form input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  -webkit-box-shadow: 0 0 0 1000px #1a1a1f inset;
+  box-shadow: 0 0 0 1000px #1a1a1f inset;
+  transition: background-color 99999s ease-out 0s;
+}
+.dl-form input:autofill {
+  -webkit-text-fill-color: #ffffff;
+  box-shadow: 0 0 0 1000px #1a1a1f inset;
+}

@@ -60,7 +60,7 @@ class ChunkLoadBoundary extends React.Component<Props, State> {
             <p className="text-gray-300 mb-4">This page didn't load. Check your connection and try again.</p>
             <button
               onClick={() => window.location.reload()}
-              className="bg-pink-600 hover:bg-pink-700 text-white px-5 py-2 rounded-lg font-medium"
+              className="bg-pink-600 hover:bg-pink-700 text-white px-5 py-2 rounded-full font-medium"
             >
               Reload
             </button>

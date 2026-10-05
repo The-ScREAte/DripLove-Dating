@@ -44,6 +44,15 @@ const CAMERA_SIZE = 280;
 
 type CaptureStep = 'front' | 'side';
 
+// Buttons sit inside the sign-up / complete-profile <form>s, so every one is
+// type="button" - a bare <button> defaults to "submit", which made "Take
+// Photo" submit the surrounding form and pop the browser's "Please fill out
+// this field" bubble.
+const PRIMARY_BUTTON =
+  'w-full h-12 rounded-full font-semibold text-white bg-gradient-to-r from-[#9d0d52] to-[#e0187a] hover:opacity-95 shadow-[0_8px_24px_-10px_rgba(224,24,122,0.7)] disabled:opacity-50';
+const SECONDARY_BUTTON =
+  'h-12 rounded-full border border-white/20 bg-transparent text-white hover:bg-white/[0.06] hover:text-white';
+
 export default function FaceVerification({ onVerified, disabled }: FaceVerificationProps) {
   const [step, setStep] = useState(0); // 0=start, 1=camera-front, 2=camera-side, 3=review, 4=verifying, 5=done
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +66,15 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
   const cameraContainerRef = useRef<HTMLDivElement>(null);
 
   const isNative = Capacitor.isNativePlatform();
+  // The live view should behave like a mirror (move left, image moves left).
+  // Web camera streams and Android's live preview frames arrive un-mirrored;
+  // iOS preview frames are already mirrored by the camera plugin. Captured
+  // photos are mirrored on every platform (the plugin does it natively, the
+  // web capture below does it on the canvas) so the review matches what the
+  // user saw.
+  const mirrorLivePreview = !isNative || Capacitor.getPlatform() === 'android';
+  // Starts verification automatically once both photos are in (see effect below).
+  const autoVerifyTimerRef = useRef<number | null>(null);
 
   // Native live preview
   const [nativeLiveFrame, setNativeLiveFrame] = useState<string | null>(null);
@@ -187,13 +205,24 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
         const result = await CameraPreview.capture({ quality: 90 });
         base64 = result.value.startsWith('data:') ? result.value : `data:image/jpeg;base64,${result.value}`;
       } else {
-        if (videoRef.current) {
+        const video = videoRef.current;
+        if (video) {
+          // Centre-crop the camera frame to a square (most webcams are 16:9 or
+          // 4:3 - drawing the whole frame into a square used to squash the
+          // face), and mirror it to match the live view.
+          const vw = video.videoWidth || 640;
+          const vh = video.videoHeight || 640;
+          const side = Math.min(vw, vh);
+          const sx = (vw - side) / 2;
+          const sy = (vh - side) / 2;
           const canvas = document.createElement('canvas');
           canvas.width = 640;
           canvas.height = 640;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.drawImage(videoRef.current, 0, 0, 640, 640);
+            ctx.translate(640, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, sx, sy, side, side, 0, 0, 640, 640);
             base64 = canvas.toDataURL('image/jpeg', 0.9);
           }
         }
@@ -228,6 +257,10 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
   }
 
   async function retakePhoto(which: 'front' | 'side' | 'all') {
+    if (autoVerifyTimerRef.current) {
+      clearTimeout(autoVerifyTimerRef.current);
+      autoVerifyTimerRef.current = null;
+    }
     setVerificationResult('none');
     setErrorMessage(null);
     
@@ -362,6 +395,25 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
     setStep(3);
   }
 
+  // Both photos captured -> give the user a beat to see them, then verify
+  // automatically. Only for a fresh pair (verificationResult 'none'): after a
+  // failed attempt the user retakes or taps "Try again" themselves.
+  useEffect(() => {
+    if (step !== 3 || verificationResult !== 'none' || !capturedImages.front || !capturedImages.side) return;
+    autoVerifyTimerRef.current = window.setTimeout(() => {
+      autoVerifyTimerRef.current = null;
+      void submitVerification();
+    }, 1000);
+    return () => {
+      if (autoVerifyTimerRef.current) {
+        clearTimeout(autoVerifyTimerRef.current);
+        autoVerifyTimerRef.current = null;
+      }
+    };
+    // submitVerification reads the same capturedImages this effect keys on
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, verificationResult, capturedImages.front, capturedImages.side]);
+
   function getInstruction(): string {
     if (currentCapture === 'front') {
       return "Look straight at the camera";
@@ -394,8 +446,8 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
 
           {/* Progress indicator */}
           <div className="flex justify-center gap-2 mb-2">
-            <div className={`w-3 h-3 rounded-full ${step >= 1 ? 'bg-purple-500' : 'bg-white/30'}`} />
-            <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-purple-500' : 'bg-white/30'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full ${step >= 1 ? 'bg-pink-500' : 'bg-white/25'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full ${step >= 2 ? 'bg-pink-500' : 'bg-white/25'}`} />
           </div>
 
           <p className="text-center text-gray-200 text-sm font-medium">{getCaptureLabel()}</p>
@@ -404,7 +456,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             {/* Native preview */}
             {isNative && (
               <div
-                className="rounded-full overflow-hidden border-4 border-purple-200 shadow-2xl bg-black"
+                className="rounded-full overflow-hidden border-4 border-pink-500/40 shadow-2xl bg-black"
                 style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
               >
                 {nativeLiveFrame ? (
@@ -412,6 +464,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
                     src={nativeLiveFrame}
                     alt="Camera preview"
                     className="w-full h-full object-cover rounded-full"
+                    style={mirrorLivePreview ? { transform: 'scaleX(-1)' } : undefined}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -426,7 +479,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
               <div
                 id="cameraPreview"
                 ref={cameraContainerRef}
-                className="camera-feed rounded-full overflow-hidden border-4 border-purple-200 shadow-2xl bg-black"
+                className="camera-feed rounded-full overflow-hidden border-4 border-pink-500/40 shadow-2xl bg-black"
                 style={{ width: CAMERA_SIZE, height: CAMERA_SIZE, position: 'relative', margin: '0 auto', borderRadius: '50%' }}
               >
                 <video
@@ -435,14 +488,14 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
                   playsInline
                   muted
                   className="w-full h-full object-cover rounded-full"
-
+                  style={mirrorLivePreview ? { transform: 'scaleX(-1)' } : undefined}
                 />
               </div>
             )}
 
             {/* Face guide overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 10 }}>
-              <div className="w-48 h-64 border-2 border-purple-400/60 rounded-full" />
+              <div className="w-48 h-64 border-2 border-white/40 border-dashed rounded-full" />
             </div>
 
             {/* Instruction */}
@@ -479,9 +532,10 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
 
           {/* Capture Button */}
           <Button
+            type="button"
             onClick={capturePhoto}
             disabled={isLoading}
-            className="w-full font-semibold py-5 rounded-xl shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+            className={PRIMARY_BUTTON}
           >
             <CameraIcon className="mr-2 h-5 w-5" />
             {isLoading ? "Capturing..." : "Take Photo"}
@@ -492,11 +546,13 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
       {/* Review Captured Images */}
       {step === 3 && (
         <div className="space-y-4 animate-fade-in">
-          <p className="text-center text-gray-200 text-sm font-medium">Review your photos</p>
+          <p className="text-center text-gray-200 text-sm font-medium">
+            {verificationResult === 'none' ? 'Looks good - verifying in a moment…' : 'Review your photos'}
+          </p>
 
           <div className="flex justify-center gap-4">
             <div className="flex flex-col items-center">
-              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-400/50'}`}>
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-pink-500/40'}`}>
                 {capturedImages.front && (
                   <img src={capturedImages.front} alt="Front" className="w-full h-full object-cover" />
                 )}
@@ -504,7 +560,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
               <span className="text-xs text-gray-400 mt-2">Front</span>
             </div>
             <div className="flex flex-col items-center">
-              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-purple-400/50'}`}>
+              <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-lg ${verificationResult === 'error' || verificationResult === 'duplicate' ? 'border-red-400' : 'border-pink-500/40'}`}>
                 {capturedImages.side && (
                   <img src={capturedImages.side} alt="Side" className="w-full h-full object-cover" />
                 )}
@@ -523,20 +579,26 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
           {/* Action Buttons */}
           <div className="flex gap-3">
             <Button
+              type="button"
               onClick={() => retakePhoto('all')}
               variant="outline"
-              className="flex-1 border-pink-500/40 bg-transparent text-gray-100 hover:bg-neutral-800 hover:text-white"
+              className={`flex-1 ${SECONDARY_BUTTON}`}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Retake
             </Button>
-            <Button
-              onClick={submitVerification}
-              disabled={isLoading}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-            >
-              {isLoading ? "Verifying..." : "Verify Face"}
-            </Button>
+            {/* Verification starts on its own after capture; this is only
+                needed to retry after a failed attempt. */}
+            {verificationResult !== 'none' && (
+              <Button
+                type="button"
+                onClick={submitVerification}
+                disabled={isLoading}
+                className={`flex-1 ${PRIMARY_BUTTON}`}
+              >
+                {isLoading ? "Verifying..." : "Try again"}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -544,7 +606,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
       {/* Verifying */}
       {step === 4 && (
         <div className="text-center space-y-4 animate-fade-in py-8">
-          <div className="animate-spin h-12 w-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto" />
+          <div className="animate-spin h-12 w-12 border-4 border-pink-500 border-t-transparent rounded-full mx-auto" />
           <p className="text-gray-100 font-medium">Verifying your identity...</p>
           <p className="text-sm text-gray-400">This may take a moment</p>
         </div>
@@ -567,9 +629,10 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
       {step === 0 && (
         <div className="space-y-3">
           <Button
+            type="button"
             onClick={() => startCamera('front')}
             disabled={isLoading || disabled}
-            className="w-full font-semibold py-5 rounded-xl shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50"
+            className={PRIMARY_BUTTON}
           >
             <CameraIcon className="mr-2 h-5 w-5" />
             {isLoading ? "Opening Camera..." : "Start Verification"}

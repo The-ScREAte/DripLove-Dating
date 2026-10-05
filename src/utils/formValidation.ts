@@ -84,3 +84,28 @@ export const transformFormDataForSubmission = (formData: any) => {
     last_googled: formData.lastGoogled
   };
 };
+
+export const MINIMUM_AGE = 18;
+
+/** Latest date of birth that still makes someone MINIMUM_AGE today, as the
+ *  YYYY-MM-DD string a date input's `max` expects. */
+export const getLatestAllowedDateOfBirth = (): string => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - MINIMUM_AGE);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Error to show for a picked date of birth, or '' if it's fine. Used to
+ *  flag an under-age date the moment it's picked, not only on submit. */
+export const getDateOfBirthError = (dateOfBirth: string): string => {
+  if (!dateOfBirth) return '';
+  const birthDate = new Date(dateOfBirth);
+  if (Number.isNaN(birthDate.getTime())) return 'Please enter a valid date';
+  const today = new Date();
+  if (birthDate > today) return 'Date of birth can\'t be in the future';
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age < MINIMUM_AGE ? `You must be at least ${MINIMUM_AGE} years old` : '';
+};

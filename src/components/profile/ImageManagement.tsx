@@ -17,6 +17,8 @@ import { PHOTO_LABEL_OPTIONS } from '@/constants/photoLabels';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { compressImage } from '@/utils/imageCompression';
+import { isSupportedImageFile, getPhotoAcceptAttribute, MAX_SOURCE_PHOTO_BYTES } from '@/utils/imageNormalizer';
+import { Capacitor } from '@capacitor/core';
 import FaceVerification from '@/components/FaceVerification';
 import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
@@ -29,6 +31,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { uploadPhotoThumbnail, withThumbnailPaths, thumbnailUrlFor, isThumbnailKnownMissing, markThumbnailMissing } from '@/utils/photoThumbnails';
 
 interface ImageManagementProps {
   currentUser: {
@@ -72,6 +75,11 @@ interface SortablePhotoThumbProps {
   onDiscardWarning: (url: string) => void;
   onSaveCrop: (url: string) => void;
 }
+
+const stripThumbSrc = (photoUrl: string): string => {
+  const thumb = thumbnailUrlFor(photoUrl);
+  return thumb && !isThumbnailKnownMissing(thumb) ? thumb : getDetailImageUrl(photoUrl);
+};
 
 const SortablePhotoThumb = ({
   userImage,
@@ -119,7 +127,10 @@ const SortablePhotoThumb = ({
           loading="lazy"
           decoding="async"
           draggable={false}
-          src={pending ? pending.previewUrl : getDetailImageUrl(userImage.image_url)}
+          // Small strip tile: the photo's thumbnail when it has one, else the full photo.
+          src={pending ? pending.previewUrl : stripThumbSrc(userImage.image_url)}
+          fallbackSrc={pending ? undefined : getDetailImageUrl(userImage.image_url)}
+          onFallback={() => markThumbnailMissing(thumbnailUrlFor(userImage.image_url))}
           alt={`User Image ${index + 1}`}
           className="w-full h-full object-cover rounded-xl shadow-sm pointer-events-none select-none"
           onLoadError={() => onImageError(userImage.image_url)}
@@ -442,13 +453,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (!isSupportedImageFile(file)) {
       toast({ title: "Invalid file type", description: "Please upload an image file.", variant: "destructive" });
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Please upload an image smaller than 10MB.", variant: "destructive" });
+    if (file.size > MAX_SOURCE_PHOTO_BYTES) {
+      toast({ title: "File too large", description: "Please upload an image smaller than 80MB.", variant: "destructive" });
       return;
     }
 
@@ -466,8 +477,17 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
     setModerating(true);
     setModerationResult(null);
 
-    // Compress image
-    const compressedFile = await compressImage(file);
+    // Compress image (RAW/HEIC photos are converted to JPEG here first)
+    let compressedFile: File;
+    try {
+      compressedFile = await compressImage(file);
+    } catch (error) {
+      console.error('Could not read photo:', error);
+      setModerating(false);
+      toast({ title: "Couldn't read this photo", description: "Try exporting it as a JPG and uploading that.", variant: "destructive" });
+      event.target.value = '';
+      return;
+    }
     
     // Generate hash AFTER compression for accurate duplicate detection
     const newFileHash = await getFileHash(compressedFile);
@@ -540,6 +560,8 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
       if (!storedPath) {
         throw new Error("Upload succeeded but no path returned from storage");
       }
+      // Small copy for grids/cards (best-effort, doesn't block).
+      void uploadPhotoThumbnail(storedPath, safeFile);
 
       const { data: urlData } = await supabase.storage
         .from('user-photos')
@@ -572,7 +594,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
           const filePath = urlParts.slice(bucketIndex + 1).join('/');
           await supabase.storage
             .from('user-photos')
-            .remove([filePath]);
+            .remove(withThumbnailPaths([filePath]));
         }
 
         // Delete old image from database
@@ -785,7 +807,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
         const filePath = urlParts.slice(bucketIndex + 1).join('/');
         const { error: storageError } = await supabase.storage
           .from('user-photos')
-          .remove([filePath]);
+          .remove(withThumbnailPaths([filePath]));
         
         if (storageError) {
           // Don't throw here as database deletion succeeded
@@ -886,7 +908,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
           <Input
             type="file"
             id="image_upload"
-            accept="image/*"
+            accept={getPhotoAcceptAttribute(Capacitor.isNativePlatform())}
             onChange={handleImageUpload}
             disabled={uploading || moderating}
             className="hidden"

@@ -40,7 +40,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             </p>
             <button 
               onClick={() => window.location.reload()}
-              className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium"
+              className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-full font-medium"
             >
               Restart App
             </button>

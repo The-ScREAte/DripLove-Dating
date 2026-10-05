@@ -848,7 +848,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                           key={reason}
                           onClick={() => setSelectedReportReason(reason)}
                           disabled={reporting}
-                          className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
+                          className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-full border-2 transition-all duration-200 flex items-center justify-between ${
                             selectedReportReason === reason
                               ? 'border-pink-500 bg-pink-500/20 text-white'
                               : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
@@ -865,7 +865,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                     </div>
 
                     <button
-                      className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-full shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                       onClick={handleReportImage}
                       disabled={reporting || !selectedReportReason}
                     >

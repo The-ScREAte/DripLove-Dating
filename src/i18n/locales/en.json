@@ -378,6 +378,8 @@
     "blockUser": "Block User",
     "peopleWhoLikedYou": "People who liked you",
     "peopleCount": "{{count}} people",
+    "peopleCount_one": "{{count}} person",
+    "peopleCount_other": "{{count}} people",
     "upgrade": "Upgrade",
     "upgradeToPremium": "Upgrade to Premium to see who liked you and interact with them",
     "noNewLikes": "No new likes",

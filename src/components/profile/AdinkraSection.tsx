@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { AFRICAN_SYMBOL_GROUPS } from '@/constants/africanSymbols';
+import { AFRICAN_SYMBOL_GROUPS, MAX_CULTURAL_SIGNS } from '@/constants/africanSymbols';
 import { X, ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 // Flatten all symbols for easy lookup
@@ -49,8 +49,8 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
     if (currentSymbols.includes(symbolName)) {
       updatedSymbols = currentSymbols.filter((s: string) => s !== symbolName);
     } else {
-      if (currentSymbols.length >= 10) {
-        return; // Max 10 symbols
+      if (currentSymbols.length >= MAX_CULTURAL_SIGNS) {
+        return;
       }
       updatedSymbols = [...currentSymbols, symbolName];
     }
@@ -72,7 +72,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
           {/* Selected Symbols */}
           {selectedSymbols.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-white/60">{t('profile.selected')} ({selectedSymbols.length}/10)</p>
+              <p className="text-sm text-white/60">{t('profile.selected')} ({selectedSymbols.length}/{MAX_CULTURAL_SIGNS})</p>
               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-1.5">
                 {selectedSymbols.map((symbolName: string, index: number) => {
                   const symbol = ALL_SYMBOLS.find(s => s.name === symbolName);
@@ -157,7 +157,7 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
                 <button
                   type="button"
                   onClick={() => setShowOtherCountries(!showOtherCountries)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 rounded-lg border border-pink-500/20 transition-all text-white"
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 rounded-full border border-pink-500/20 transition-all text-white"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🌍</span>

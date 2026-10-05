@@ -6,10 +6,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
 import { withRetry } from '@/utils/withRetry';
 import { useToast } from '@/hooks/use-toast';
-import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
+import { Heart, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock, X } from 'lucide-react';
 const PhotoCropModal = lazy(() => import('@/components/profile/PhotoCropModal'));
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { initialFormData } from '@/constants/formData';
@@ -18,15 +17,33 @@ import { occupationOptions, industryOptions } from '@/constants/professionOption
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import PromoCodeInput from '@/components/forms/PromoCodeInput';
+import {
+  FORM_PAGE_BG,
+  formSection,
+  formSectionTitle,
+  formLabel,
+  formRequired,
+  formError,
+  formInput,
+  formSelectTrigger,
+  formSelectContent,
+  formPrimaryButton,
+  formSecondaryButton,
+} from '@/components/forms/formTheme';
 import { compressImage } from '@/utils/imageCompression';
 import { fileToBase64 } from '@/utils/faceVerificationUtils';
 import { getLanguageForCountry } from '@/i18n/config';
 import { videoPreloader } from '@/utils/videoPreloader';
 import FaceVerification from '@/components/FaceVerification';
 import HoppingLogo from '@/components/HoppingLogo';
+import OnboardingTransition from '@/components/forms/OnboardingTransition';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 import { getFaceReferenceCode } from '@/utils/faceReference';
 import { getCapitalCoordinates } from '@/utils/countryCapitals';
+import { isSupportedImageFile, getPhotoAcceptAttribute, MAX_SOURCE_PHOTO_BYTES } from '@/utils/imageNormalizer';
+import { Capacitor } from '@capacitor/core';
+import { getDateOfBirthError, getLatestAllowedDateOfBirth } from '@/utils/formValidation';
+import { uploadPhotoThumbnail, withThumbnailPaths } from '@/utils/photoThumbnails';
 
 const TermsAcceptance = lazy(() => import('./TermsAcceptance'));
 
@@ -95,7 +112,27 @@ function formatDuplicateFaceMessage(details?: DuplicateFaceDetails | null): stri
   return `User already exists. Reference code: ${code}.`
 }
 
-const ProfileCompletionPage = () => {
+// Fields that live on step 1 - a final-submit error on any of these sends the
+// user back to that step so the message is actually visible.
+const STEP_ONE_FIELDS = ['firstName', 'lastName', 'dateOfBirth', 'faceVerification', 'occupation', 'industry', 'educationLevel', 'city', 'country', 'zipCode'];
+
+const isUnder18 = (dateOfBirth: string) => {
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age < 18;
+};
+
+interface ProfileCompletionPageProps {
+  /** Called once terms are accepted, to hand straight over to the main app
+   *  in place. Without it (the standalone /complete-profile route) the page
+   *  navigates home instead, which routes into the app the same way. */
+  onComplete?: () => void;
+}
+
+const ProfileCompletionPage = ({ onComplete }: ProfileCompletionPageProps = {}) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
@@ -113,6 +150,25 @@ const ProfileCompletionPage = () => {
   const [faceVerified, setFaceVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isFinalizingTerms, setIsFinalizingTerms] = useState(false);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [isCheckingStep, setIsCheckingStep] = useState(false);
+  const formTopRef = React.useRef<HTMLDivElement>(null);
+  const isMountedRef = React.useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    // Warm the terms screen's code now, so it's ready the moment the profile
+    // saves instead of loading behind a blank frame.
+    void import('./TermsAcceptance');
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Each step starts at its own top, not wherever the previous one was scrolled to.
+  useEffect(() => {
+    formTopRef.current?.scrollIntoView({ block: 'start' });
+  }, [currentStep]);
 
   // Restore face verification from localStorage on mount
   useEffect(() => {
@@ -308,6 +364,13 @@ const ProfileCompletionPage = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+    // Date of birth is checked the moment it's picked, so an under-18 date
+    // is flagged right away instead of only after tapping Continue.
+    if (e.target.name === 'dateOfBirth') {
+      const dobError = getDateOfBirthError(e.target.value);
+      setErrors(prev => ({ ...prev, dateOfBirth: dobError }));
+      return;
+    }
     // Clear error when user starts typing
     if (errors[e.target.name]) {
       setErrors(prev => ({ ...prev, [e.target.name]: '' }));
@@ -404,6 +467,8 @@ const ProfileCompletionPage = () => {
             .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
           if (uploadError) throw uploadError;
         });
+        // Small copy for grids/cards (best-effort, doesn't block).
+        void uploadPhotoThumbnail(filePath, file);
 
         const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
 
@@ -496,7 +561,7 @@ const ProfileCompletionPage = () => {
     let orderCounter = images.length;
 
     for (const file of files) {
-      if (!file.type.startsWith('image/')) {
+      if (!isSupportedImageFile(file)) {
         toast({
           title: t('profileCompletion.invalidFileType'),
           description: t('profileCompletion.notAnImageFile', { filename: file.name }),
@@ -505,17 +570,29 @@ const ProfileCompletionPage = () => {
         continue;
       }
 
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > MAX_SOURCE_PHOTO_BYTES) {
         toast({
           title: t('profileCompletion.fileTooLarge'),
-          description: t('profileCompletion.largerThan10MB', { filename: file.name }),
+          description: `${file.name} is larger than 80MB.`,
           variant: "destructive"
         });
         continue;
       }
 
-      // Compress (typically to JPEG) to keep uploads small and consistent
-      const compressedFile = await compressImage(file);
+      // Compress (typically to JPEG) to keep uploads small and consistent.
+      // RAW/HEIC photos are converted to JPEG here first.
+      let compressedFile: File;
+      try {
+        compressedFile = await compressImage(file);
+      } catch (error) {
+        console.error('Could not read photo:', error);
+        toast({
+          title: "Couldn't read this photo",
+          description: `${file.name} couldn't be opened. Try exporting it as a JPG and uploading that.`,
+          variant: "destructive"
+        });
+        continue;
+      }
       
       // Generate hash AFTER compression for accurate duplicate detection
       const fileHash = await getFileHash(compressedFile);
@@ -564,7 +641,7 @@ const ProfileCompletionPage = () => {
         .then(({ error }) => { if (error) console.error('Failed to remove photo row:', error); });
     }
     if (removed?.filePath) {
-      supabase.storage.from('user-photos').remove([removed.filePath])
+      supabase.storage.from('user-photos').remove(withThumbnailPaths([removed.filePath]))
         .then(({ error }) => { if (error) console.error('Failed to remove photo file:', error); });
     }
   };
@@ -599,7 +676,7 @@ const ProfileCompletionPage = () => {
         .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo row:', error); });
     }
     if (original?.filePath) {
-      supabase.storage.from('user-photos').remove([original.filePath])
+      supabase.storage.from('user-photos').remove(withThumbnailPaths([original.filePath]))
         .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo file:', error); });
     }
     uploadAndModerateImage(croppedFile, previewUrl, order > 0 ? order : images.length + 1);
@@ -653,7 +730,7 @@ const ProfileCompletionPage = () => {
       title: "Welcome to DripLove!",
       description: "Your profile has been completed and terms accepted. Welcome to the community!",
     });
-    
+
     // Queue the welcome push for 10 minutes from now instead of sending it
     // instantly - a client-side setTimeout can't survive the app being
     // backgrounded/killed for that long, so this writes to a table a cron
@@ -661,36 +738,37 @@ const ProfileCompletionPage = () => {
     // due. Replaces the old send-signup-welcome edge function, which tried
     // to await a 20-minute in-function setTimeout - Supabase Edge Functions
     // get killed well before that completes, so it never actually fired.
-    try {
-      await supabase.from('pending_welcome_notifications').insert({
-        user_id: user.id,
-        send_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      });
-    } catch (error) {
-      console.error('Failed to schedule welcome notification:', error);
-      // Don't block user flow if this fails
+    // Fire-and-forget: the user shouldn't wait on this to reach Discover.
+    void (async () => {
+      try {
+        await supabase.from('pending_welcome_notifications').insert({
+          user_id: user.id,
+          send_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        });
+      } catch (error) {
+        console.error('Failed to schedule welcome notification:', error);
+      }
+    })();
+
+    // Hand over to the main app in place - no full page reload, so the
+    // Discover profiles TermsAcceptance preloaded in memory are still there
+    // and the app doesn't cold-start again from the splash screen.
+    if (onComplete) {
+      onComplete();
+    } else {
+      navigate('/');
     }
-    
-    // ANDROID FIX: Update session storage before navigation
-    sessionStorage.setItem('driplove_user_session', 'authenticated');
-    sessionStorage.removeItem('driplove_current_view');
-    
-    // Navigate to home which will load the main app
-    navigate('/');
-    
-    // ANDROID FIX: Force reload after navigation to ensure proper app loading
+
+    // Safety net (was an unconditional reload, the old Android fix): only if
+    // this screen is somehow still showing a few seconds later does it fall
+    // back to a full reload.
     setTimeout(() => {
-      window.location.reload();
-    }, 300);
+      if (isMountedRef.current) window.location.reload();
+    }, 4000);
   };
 
   if (isFinalizingTerms) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-center gap-4">
-        <HoppingLogo size={72} />
-        <p className="text-white text-sm font-medium tracking-wide">Loading your DripLove experience...</p>
-      </div>
-    );
+    return <OnboardingTransition title="Getting Discover ready" subtitle="Finding people near you…" />;
   }
 
   const handleCancel = async () => {
@@ -702,11 +780,63 @@ const ProfileCompletionPage = () => {
     navigate('/');
   };
 
+  const handleContinue = async () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    const stepErrors: Record<string, string> = {};
+    if (!formData.firstName.trim()) stepErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) stepErrors.lastName = 'Last name is required';
+    if (!formData.dateOfBirth) stepErrors.dateOfBirth = 'Date of birth is required';
+    else if (isUnder18(formData.dateOfBirth)) stepErrors.dateOfBirth = 'You must be at least 18 years old';
+    if (!formData.city) stepErrors.city = 'City is required';
+    if (!formData.occupation) stepErrors.occupation = t('profileCompletion.errors.occupationRequired');
+    if (!formData.industry) stepErrors.industry = t('profileCompletion.errors.industryRequired');
+    if (!formData.educationLevel) stepErrors.educationLevel = t('profileCompletion.errors.educationRequired');
+
+    // Same rule as the final submit: a face verified now, or one already on file.
+    if (!faceVerified && user) {
+      setIsCheckingStep(true);
+      let hasFaceOnFile = false;
+      try {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('face_descriptor')
+          .eq('id', user.id)
+          .maybeSingle();
+        hasFaceOnFile = !!existingProfile?.face_descriptor;
+      } catch {
+        hasFaceOnFile = false;
+      } finally {
+        setIsCheckingStep(false);
+      }
+      if (!hasFaceOnFile) {
+        stepErrors.faceVerification = 'Face verification is required to continue';
+        toast({
+          title: "Face Verification Required",
+          description: "Please verify your face to complete your profile.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      return;
+    }
+    setErrors({});
+    setCurrentStep(2);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Prevent double submission
-    if (isSubmitting) return;
+    if (isSubmitting || isCheckingStep) return;
+
+    if (currentStep === 1) {
+      void handleContinue();
+      return;
+    }
 
     // Dismiss the keyboard BEFORE swapping to the loading/terms screens
     // below, not at the same time as it - on iOS's WKWebView, a big DOM
@@ -727,7 +857,6 @@ const ProfileCompletionPage = () => {
       return;
     }
 
-    setLoading(true);
     setIsSubmitting(true);
 
     // Validate required fields (excluding password fields since it's OAuth)
@@ -801,8 +930,15 @@ const ProfileCompletionPage = () => {
       setErrors(validationErrors);
       setLoading(false);
       setIsSubmitting(false);
+      if (Object.keys(validationErrors).some(key => STEP_ONE_FIELDS.includes(key))) {
+        setCurrentStep(1);
+      }
       return;
     }
+
+    // Only now swap to the saving screen - validation above runs with the form
+    // still showing, so a missing field never flashes the loading screen.
+    setLoading(true);
 
     try {
       // Clear sessionStorage after successful completion
@@ -936,7 +1072,7 @@ const ProfileCompletionPage = () => {
         if (oldStoragePaths.length > 0) {
           const { error: removeOldStorageError } = await supabase.storage
             .from('user-photos')
-            .remove(oldStoragePaths);
+            .remove(withThumbnailPaths(oldStoragePaths));
 
           if (removeOldStorageError) {
             console.warn('Old image cleanup warning:', removeOldStorageError);
@@ -1025,6 +1161,7 @@ const ProfileCompletionPage = () => {
               });
             if (uploadError) throw uploadError;
           });
+          void uploadPhotoThumbnail(filePath, image.file as File);
 
           const {
             data: { publicUrl }
@@ -1135,22 +1272,14 @@ const ProfileCompletionPage = () => {
   };
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-        <HoppingLogo size={64} />
-      </div>
-    );
+    return <OnboardingTransition />;
   }
 
   // Show terms acceptance after profile completion
   if (showTermsAcceptance) {
     return (
       <Suspense
-        fallback={
-          <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-            <HoppingLogo size={64} />
-          </div>
-        }
+        fallback={<OnboardingTransition />}
       >
         <TermsAcceptance
           user={user}
@@ -1161,190 +1290,153 @@ const ProfileCompletionPage = () => {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-        <HoppingLogo size={64} />
-      </div>
-    );
+    return isSubmitting
+      ? <OnboardingTransition title="Saving your profile" subtitle="Uploading your photos - this only takes a moment." />
+      : <OnboardingTransition />;
   }
 
+  const selectedPhotoCount = images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length;
+
   return (
-    <div className="keyboard-safe-form input-scroll-container h-[100dvh] overflow-hidden">
-      <div 
-        className="h-full bg-gradient-to-br from-purple-500 to-pink-500 relative overflow-hidden"
-        style={{
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)"
-        }}
-      >
+    <div
+      className="dl-form keyboard-safe-form input-scroll-container h-[100dvh] w-full overflow-hidden"
+      style={{ background: FORM_PAGE_BG }}
+    >
       {/* Scrollable form container */}
-      <div 
-        className="h-full px-2 sm:px-4 pb-[calc(env(safe-area-inset-bottom,0px)+28px)] pt-4 overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y relative z-10"
-        style={{
-          WebkitOverflowScrolling: 'touch'
-        }}
+      <div
+        className="h-full overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y relative z-10"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="w-full max-w-full sm:max-w-2xl mx-auto">
-          <Card className="w-full backdrop-blur-sm bg-white/40 rounded-none shadow-none border border-white/40 relative animate-fade-in">
-            <CardContent className="px-4 sm:px-6 py-5 sm:py-6 pb-6 sm:pb-8">
-              {/* Title inside white card */}
-              <h1 className="text-2xl sm:text-3xl font-bold text-black mb-5 sm:mb-6 text-center">
-                {t('profileCompletion.title')}
-              </h1>
-              
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-black">{t('profileCompletion.basicInformation')}</h3>
-                    
-                    <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-black">{t('profileCompletion.firstName')} *</label>
-                        <input
-                          name="firstName"
-                          type="text"
-                          value={formData.firstName}
-                          onChange={handleInputChange}
-                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-black rounded-md focus:border-pink-400 focus:ring-pink-400"
-                          placeholder={t('profileCompletion.enterYourFirstName')}
-                          required
-                        />
-                        {errors.firstName && <p className="text-sm text-red-500">{errors.firstName}</p>}
-                      </div>
+        <div className="mx-auto w-full max-w-xl px-5 sm:px-8 pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-[calc(env(safe-area-inset-bottom,0px)+32px)] dl-fade-in">
+          <div ref={formTopRef} aria-hidden="true" />
+          <header className="mb-7 text-center">
+            <div className="mb-4 flex justify-center">
+              <HoppingLogo size={52} />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              {t('profileCompletion.title')}
+            </h1>
+            <p className="mt-1.5 text-sm text-white/60">
+              Step {currentStep} of 2
+            </p>
+            <div className="mx-auto mt-4 flex max-w-[200px] gap-1.5" aria-hidden="true">
+              {[1, 2].map(step => (
+                <span
+                  key={step}
+                  className={`h-1 flex-1 rounded-full transition-colors duration-300 ${step <= currentStep ? 'bg-pink-500' : 'bg-white/15'}`}
+                />
+              ))}
+            </div>
+          </header>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-black">{t('profileCompletion.lastName')} *</label>
-                        <input
-                          name="lastName"
-                          type="text"
-                          value={formData.lastName}
-                          onChange={handleInputChange}
-                          className="w-full px-2.5 py-2 bg-white text-black placeholder:text-black border border-black rounded-md focus:border-pink-400 focus:ring-pink-400"
-                          placeholder={t('profileCompletion.enterYourLastName')}
-                          required
-                        />
-                        {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
-                      </div>
-                    </div>
+          {/* noValidate: our own inline errors handle validation - the browser's
+              native "Please fill out this field" bubbles only got in the way. */}
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
+            {currentStep === 1 && (
+              <div className="space-y-6 dl-fade-in">
+                <section className={formSection}>
+                  <h2 className={formSectionTitle}>{t('profileCompletion.basicInformation')}</h2>
 
-                    {/* Face Verification Section - Right after name fields */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-5 h-5 text-purple-600" />
-                        <label className="text-sm font-medium text-black">Face Verification *</label>
-                      </div>
-
-                      {showFaceVerification ? (
-                        <div className="space-y-3 bg-black border border-white/10 rounded-lg p-3">
-                          <FaceVerification onVerified={handleFaceVerified} disabled={isVerifying} />
-                        </div>
-                      ) : faceVerified ? (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                            <p className="font-medium text-green-800 text-sm">Verified</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className={`bg-purple-50 border rounded-lg p-3 ${errors.faceVerification ? 'border-red-300' : 'border-purple-200'}`}>
-                          <div className="flex flex-col min-[390px]:flex-row min-[390px]:items-center min-[390px]:justify-between gap-2">
-                            <p className="text-sm text-purple-800 leading-tight">Verify your face to continue</p>
-                            <Button
-                              type="button"
-                              onClick={() => setShowFaceVerification(true)}
-                              className="h-6 px-2 self-start min-[390px]:self-auto shrink-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-[10px]"
-                              size="sm"
-                              disabled={isVerifying}
-                            >
-                              <Camera className="w-2.5 h-2.5 mr-1" />
-                              Verify now
-                            </Button>
-                          </div>
-                          {errors.faceVerification && <p className="text-red-500 text-xs mt-2">{errors.faceVerification}</p>}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-black">{t('profileCompletion.dateOfBirth')} *</label>
+                  <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label htmlFor="pc-firstName" className={formLabel}>{t('profileCompletion.firstName')} <span className={formRequired}>*</span></label>
                       <input
-                        name="dateOfBirth"
-                        type="date"
-                        value={formData.dateOfBirth}
+                        id="pc-firstName"
+                        name="firstName"
+                        type="text"
+                        autoComplete="given-name"
+                        autoCapitalize="words"
+                        value={formData.firstName}
                         onChange={handleInputChange}
-                        className="compact-date-input w-full px-2.5 pr-7 py-2 text-sm bg-white text-black border border-black rounded-md focus:border-pink-400 focus:ring-pink-400"
+                        className={formInput(!!errors.firstName)}
+                        placeholder="First"
                         required
                       />
-                      {errors.dateOfBirth && <p className="text-sm text-red-500">{errors.dateOfBirth}</p>}
+                      {errors.firstName && <p className={formError}>{errors.firstName}</p>}
                     </div>
 
-                    <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-black">Gender *</label>
-                        <Select
-                          value={formData.gender}
-                          onValueChange={(value) => handleSelectChange('gender', value)}
-                        >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
-                            <SelectValue placeholder="Select your gender" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white text-black">
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {errors.gender && <p className="text-sm text-red-500">{errors.gender}</p>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-black">Looking for *</label>
-                        <Select
-                          value={formData.preference}
-                          onValueChange={(value) => handleSelectChange('preference', value)}
-                        >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
-                            <SelectValue placeholder="Select your preference" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white text-black">
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="everyone">Both</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {errors.preference && <p className="text-sm text-red-500">{errors.preference}</p>}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-black">Relationship Intent *</label>
-                      <Select
-                        value={formData.relationshipIntent}
-                        onValueChange={(value) => handleSelectChange('relationshipIntent', value)}
-                      >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
-                          <SelectValue placeholder="What are you looking for?" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white text-black">
-                          <SelectItem value="casual">Casual</SelectItem>
-                          <SelectItem value="serious">Serious</SelectItem>
-                          <SelectItem value="open_to_anything">Open to Anything</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {errors.relationshipIntent && <p className="text-sm text-red-500">{errors.relationshipIntent}</p>}
+                    <div className="space-y-1.5">
+                      <label htmlFor="pc-lastName" className={formLabel}>{t('profileCompletion.lastName')} <span className={formRequired}>*</span></label>
+                      <input
+                        id="pc-lastName"
+                        name="lastName"
+                        type="text"
+                        autoComplete="family-name"
+                        autoCapitalize="words"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
+                        className={formInput(!!errors.lastName)}
+                        placeholder="Last"
+                        required
+                      />
+                      {errors.lastName && <p className={formError}>{errors.lastName}</p>}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-black">{t('profileCompletion.occupation')} *</label>
+                  {/* Face Verification Section - Right after name fields */}
+                  <div className="space-y-1.5">
+                    <label className={`${formLabel} flex items-center gap-1.5`}>
+                      <Shield className="w-4 h-4 text-pink-400" />
+                      Face Verification <span className={formRequired}>*</span>
+                    </label>
+
+                    {showFaceVerification ? (
+                      <div className="space-y-3 rounded-xl border border-white/10 p-3">
+                        <FaceVerification onVerified={handleFaceVerified} disabled={isVerifying} />
+                      </div>
+                    ) : faceVerified ? (
+                      <div className="flex items-center gap-2.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                        <p className="text-sm font-medium text-emerald-300">Face verified</p>
+                      </div>
+                    ) : (
+                      <div className={`flex items-center justify-between gap-3 rounded-xl border bg-white/[0.06] px-3.5 py-2.5 ${errors.faceVerification ? 'border-red-400/80' : 'border-white/15'}`}>
+                        <p className="text-sm text-white/75 leading-snug">Verify your face to continue</p>
+                        <Button
+                          type="button"
+                          onClick={() => setShowFaceVerification(true)}
+                          className="h-9 shrink-0 rounded-full bg-gradient-to-r from-[#9d0d52] to-[#e0187a] px-4 text-[13px] font-semibold text-white hover:opacity-95"
+                          disabled={isVerifying}
+                        >
+                          <Camera className="w-4 h-4" />
+                          Verify now
+                        </Button>
+                      </div>
+                    )}
+                    {errors.faceVerification && !faceVerified && !showFaceVerification && <p className={formError}>{errors.faceVerification}</p>}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="pc-dateOfBirth" className={formLabel}>{t('profileCompletion.dateOfBirth')} <span className={formRequired}>*</span></label>
+                    <input
+                      id="pc-dateOfBirth"
+                      name="dateOfBirth"
+                      type="date"
+                      autoComplete="bday"
+                      max={getLatestAllowedDateOfBirth()}
+                      value={formData.dateOfBirth}
+                      onChange={handleInputChange}
+                      className={`[color-scheme:dark] ${formInput(!!errors.dateOfBirth)}`}
+                      style={formData.dateOfBirth ? undefined : { color: 'rgba(255,255,255,0.4)' }}
+                      required
+                    />
+                    {errors.dateOfBirth && <p className={formError}>{errors.dateOfBirth}</p>}
+                  </div>
+                </section>
+
+                <section className={formSection}>
+                  <h2 className={formSectionTitle}>{t('profileCompletion.workEducation')}</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className={formLabel}>{t('profileCompletion.occupation')} <span className={formRequired}>*</span></label>
                       <Select
                         value={formData.occupation}
                         onValueChange={(value) => handleSelectChange('occupation', value)}
                       >
-                          <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
+                        <SelectTrigger className={formSelectTrigger(!!errors.occupation)}>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white text-black">
+                        <SelectContent className={formSelectContent}>
                           {occupationOptions.map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}
@@ -1352,19 +1444,19 @@ const ProfileCompletionPage = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      {errors.occupation && <p className="text-sm text-red-500">{errors.occupation}</p>}
+                      {errors.occupation && <p className={formError}>{errors.occupation}</p>}
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-black">{t('profileCompletion.industry')} *</label>
+                    <div className="space-y-1.5">
+                      <label className={formLabel}>{t('profileCompletion.industry')} <span className={formRequired}>*</span></label>
                       <Select
                         value={formData.industry}
                         onValueChange={(value) => handleSelectChange('industry', value)}
                       >
-                        <SelectTrigger className="pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400">
+                        <SelectTrigger className={formSelectTrigger(!!errors.industry)}>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
-                        <SelectContent className="bg-white text-black">
+                        <SelectContent className={formSelectContent}>
                           {industryOptions.map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}
@@ -1372,20 +1464,20 @@ const ProfileCompletionPage = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      {errors.industry && <p className="text-sm text-red-500">{errors.industry}</p>}
+                      {errors.industry && <p className={formError}>{errors.industry}</p>}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-black">{t('profileCompletion.education')} *</label>
+                  <div className="space-y-1.5">
+                    <label className={formLabel}>{t('profileCompletion.education')} <span className={formRequired}>*</span></label>
                     <Select
                       value={formData.educationLevel}
                       onValueChange={(value) => handleSelectChange('educationLevel', value)}
                     >
-                      <SelectTrigger className="bg-white text-black border-black focus:border-pink-400">
+                      <SelectTrigger className={formSelectTrigger(!!errors.educationLevel)}>
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white text-black">
+                      <SelectContent className={formSelectContent}>
                         <SelectItem value="High School">High School</SelectItem>
                         <SelectItem value="Some College">Some College</SelectItem>
                         <SelectItem value="Associate Degree">Associate Degree</SelectItem>
@@ -1395,103 +1487,176 @@ const ProfileCompletionPage = () => {
                         <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
-                    {errors.educationLevel && <p className="text-sm text-red-500">{errors.educationLevel}</p>}
+                    {errors.educationLevel && <p className={formError}>{errors.educationLevel}</p>}
                   </div>
+                </section>
 
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-black">Location</h3>
-                    <LocationInput
-                      country={formData.country}
-                      city={formData.city}
-                      zipCode={formData.zipCode}
-                      onLocationChange={handleLocationChange}
-                      errors={errors}
-                      required={false}
-                      autoDetect={true}
-                    />
-                  </div>
+                <section className={formSection}>
+                  <h2 className={formSectionTitle}>{t('profileCompletion.location')}</h2>
+                  <LocationInput
+                    country={formData.country}
+                    city={formData.city}
+                    zipCode={formData.zipCode}
+                    onLocationChange={handleLocationChange}
+                    errors={errors}
+                    required={false}
+                    autoDetect={true}
+                    tone="dark"
+                  />
+                </section>
+              </div>
+            )}
 
-                  {/* Adinkra Symbols Selector */}
-                  <div className="space-y-4 mt-6">
-                    <AdinkraSymbolSelector
-                      selectedSymbols={formData.adinkraSymbols}
-                      onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
-                      userCountry={formData.country}
-                    />
-                    {errors.adinkraSymbols && <p className="text-sm text-red-500">{errors.adinkraSymbols}</p>}
-                  </div>
-
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-black">{t('profileCompletion.profilePhotos')} *</h3>
-                      <p className="text-[11px] text-black whitespace-nowrap">2+ photos required</p>
+            {currentStep === 2 && (
+              <div className="space-y-6 dl-fade-in">
+                <section className={formSection}>
+                  <h2 className={formSectionTitle}>About you</h2>
+                  <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className={formLabel}>Gender <span className={formRequired}>*</span></label>
+                      <Select
+                        value={formData.gender}
+                        onValueChange={(value) => handleSelectChange('gender', value)}
+                      >
+                        <SelectTrigger className={formSelectTrigger(!!errors.gender)}>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className={formSelectContent}>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.gender && <p className={formError}>{errors.gender}</p>}
                     </div>
-                    
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-pink-400 transition-colors">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        id="image-upload"
-                      />
-                      <Label htmlFor="image-upload" className="cursor-pointer block">
-                        <Upload className="mx-auto h-5 w-5 text-gray-400 mb-1" />
-                        <p className="text-xs text-black">Upload photos</p>
-                        <p className="text-[11px] text-black">JPG/PNG up to 10MB</p>
-                      </Label>
+
+                    <div className="space-y-1.5">
+                      <label className={formLabel}>Looking for <span className={formRequired}>*</span></label>
+                      <Select
+                        value={formData.preference}
+                        onValueChange={(value) => handleSelectChange('preference', value)}
+                      >
+                        <SelectTrigger className={formSelectTrigger(!!errors.preference)}>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className={formSelectContent}>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="everyone">Both</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.preference && <p className={formError}>{errors.preference}</p>}
                     </div>
-                    {images.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {images.map((image, index) => (
-                          <div key={index} className="relative">
-                            <img
-                              src={image.preview}
-                              alt={`Upload ${index + 1}`}
-                              className="w-full h-28 object-cover rounded-lg"
-                            />
-                            <div className="absolute top-2 right-2 flex gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => setCroppingImage({ preview: image.preview })}
-                                className="h-6 w-6 p-0 bg-pink-600 hover:bg-pink-700 rounded-full shadow-md"
-                                title="Crop photo"
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="destructive"
-                                className="h-6 w-6 p-0"
-                                onClick={() => removeImage(image.preview)}
-                              >
-                                ×
-                              </Button>
-                            </div>
-                            {renderImageStatus(image)}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className={formLabel}>Relationship Intent <span className={formRequired}>*</span></label>
+                    <Select
+                      value={formData.relationshipIntent}
+                      onValueChange={(value) => handleSelectChange('relationshipIntent', value)}
+                    >
+                      <SelectTrigger className={formSelectTrigger(!!errors.relationshipIntent)}>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className={formSelectContent}>
+                        <SelectItem value="casual">Casual</SelectItem>
+                        <SelectItem value="serious">Serious</SelectItem>
+                        <SelectItem value="open_to_anything">Open to Anything</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.relationshipIntent && <p className={formError}>{errors.relationshipIntent}</p>}
+                  </div>
+                </section>
+
+                {/* Adinkra Symbols Selector */}
+                <section className={formSection}>
+                  <AdinkraSymbolSelector
+                    selectedSymbols={formData.adinkraSymbols}
+                    onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
+                    userCountry={formData.country}
+                  />
+                  {errors.adinkraSymbols && <p className={formError}>{errors.adinkraSymbols}</p>}
+                </section>
+
+                <section className={formSection}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h2 className={formSectionTitle}>{t('profileCompletion.profilePhotos')} <span className={formRequired}>*</span></h2>
+                    <p className={`text-xs font-medium whitespace-nowrap ${selectedPhotoCount >= 2 ? 'text-emerald-400' : 'text-white/55'}`}>
+                      {selectedPhotoCount} / 2 minimum
+                    </p>
+                  </div>
+
+                  <Input
+                    type="file"
+                    accept={getPhotoAcceptAttribute(Capacitor.isNativePlatform())}
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <Label
+                    htmlFor="image-upload"
+                    className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/25 bg-white/[0.03] px-4 py-5 text-center transition-colors hover:border-pink-500/70 active:border-pink-500"
+                  >
+                    <span className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/15">
+                      <Upload className="h-5 w-5 text-pink-400" />
+                    </span>
+                    <span className="text-sm font-medium text-white">Upload photos</span>
+                    <span className="text-xs text-white/50">JPG, PNG, HEIC or camera RAW</span>
+                  </Label>
+                  {images.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {images.map((image, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={image.preview}
+                            alt={`Upload ${index + 1}`}
+                            className="w-full aspect-[4/5] object-cover rounded-xl border border-white/10"
+                          />
+                          <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setCroppingImage({ preview: image.preview })}
+                              className="h-8 w-8 p-0 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md"
+                              title="Crop photo"
+                              aria-label="Crop photo"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 w-8 p-0 rounded-full bg-black/70 text-white hover:bg-red-600 shadow-md"
+                              onClick={() => removeImage(image.preview)}
+                              title="Remove photo"
+                              aria-label="Remove photo"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          {renderImageStatus(image)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-                    {croppingImage && (
-                      <Suspense fallback={null}>
-                        <PhotoCropModal
-                          imageUrl={croppingImage.preview}
-                          userId={user?.id || ''}
-                          onClose={() => setCroppingImage(null)}
-                          onApply={handleCroppedImage}
-                        />
-                      </Suspense>
-                    )}
+                  {croppingImage && (
+                    <Suspense fallback={null}>
+                      <PhotoCropModal
+                        imageUrl={croppingImage.preview}
+                        userId={user?.id || ''}
+                        onClose={() => setCroppingImage(null)}
+                        onApply={handleCroppedImage}
+                      />
+                    </Suspense>
+                  )}
 
-                    {errors.images && <p className="text-sm text-red-500">{errors.images}</p>}
-                  </div>
+                  {errors.images && <p className={formError}>{errors.images}</p>}
+                </section>
 
-                  {promoCodeEnabled && (
+                {promoCodeEnabled && (
+                  <section className={formSection}>
                     <PromoCodeInput
                       value={formData.promoCode}
                       onChange={(value, promoCodeId) => {
@@ -1502,43 +1667,62 @@ const ProfileCompletionPage = () => {
                         }));
                       }}
                     />
-                  )}
+                  </section>
+                )}
+              </div>
+            )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                        type="submit"
-                        disabled={
-                          isSubmitting ||
-                          images.some(img => img.status === 'moderating') ||
-                          images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length < 2
-                        }
-                        className="w-full h-8 text-xs px-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isSubmitting ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>{t('profileCompletion.completingProfile')}</span>
-                          </div>
-                        ) : images.some(img => img.status === 'moderating') ? (
-                          'Checking photos…'
-                        ) : t('profileCompletion.completeProfile')}
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancel}
-                        disabled={isSubmitting}
-                        className="w-full h-8 text-xs px-2 bg-white border-gray-300 text-black hover:bg-gray-50 font-medium rounded-lg transition-all duration-200"
-                      >
-                        {t('profileCompletion.cancel')}
-                      </Button>
-                    </div>
-                </form>
-              </CardContent>
-            </Card>
+            <div className="flex flex-row gap-3 pt-2">
+              {currentStep === 1 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isSubmitting || isCheckingStep}
+                  className={`${formSecondaryButton} flex-1`}
+                >
+                  {t('profileCompletion.cancel')}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCurrentStep(1)}
+                  disabled={isSubmitting}
+                  className={`${formSecondaryButton} flex-1`}
+                >
+                  {t('profileCompletion.back')}
+                </Button>
+              )}
+              <Button
+                type="submit"
+                disabled={
+                  isSubmitting ||
+                  isCheckingStep ||
+                  (currentStep === 2 && (
+                    images.some(img => img.status === 'moderating') ||
+                    selectedPhotoCount < 2
+                  ))
+                }
+                className={`${formPrimaryButton} flex-[2]`}
+              >
+                {isSubmitting || isCheckingStep ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>{isSubmitting ? t('profileCompletion.completingProfile') : 'Checking…'}</span>
+                  </span>
+                ) : currentStep === 1 ? (
+                  t('registration.continue')
+                ) : images.some(img => img.status === 'moderating') ? (
+                  'Checking photos…'
+                ) : t('profileCompletion.completeProfile')}
+              </Button>
+            </div>
+            {currentStep === 2 && selectedPhotoCount < 2 && !images.some(img => img.status === 'moderating') && (
+              <p className="-mt-3 text-center text-xs text-white/50">Add at least 2 photos to complete your profile.</p>
+            )}
+          </form>
         </div>
-      </div>
       </div>
     </div>
   );

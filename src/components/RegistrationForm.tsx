@@ -6,18 +6,30 @@ import { withRetry } from '@/utils/withRetry';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { MapPin, Briefcase, GraduationCap, Upload, Shield, CheckCircle, AlertTriangle, Camera, Pencil, Clock } from 'lucide-react';
+import { Upload, Shield, CheckCircle, AlertTriangle, Pencil, Clock, X } from 'lucide-react';
 import HoppingLogo from '@/components/HoppingLogo';
+import OnboardingTransition from '@/components/forms/OnboardingTransition';
 const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 import BasicInfoSection from '@/components/forms/BasicInfoSection';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import PromoCodeInput from '@/components/forms/PromoCodeInput';
-import { validateRegistrationForm, transformFormDataForSubmission } from '@/utils/formValidation';
+import {
+  FORM_PAGE_BG,
+  formSection,
+  formSectionTitle,
+  formLabel,
+  formRequired,
+  formError,
+  formSelectTrigger,
+  formSelectContent,
+  formPrimaryButton,
+  formSecondaryButton,
+} from '@/components/forms/formTheme';
+import { validateRegistrationForm, transformFormDataForSubmission, getDateOfBirthError } from '@/utils/formValidation';
 import { initialFormData } from '@/constants/formData';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import { compressImage } from '@/utils/imageCompression';
@@ -27,6 +39,10 @@ import { useTranslation } from 'react-i18next';
 import FaceVerification from '@/components/FaceVerification';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 import { getFaceReferenceCode } from '@/utils/faceReference';
+import { isSupportedImageFile, getPhotoAcceptAttribute, MAX_SOURCE_PHOTO_BYTES } from '@/utils/imageNormalizer';
+import { Capacitor } from '@capacitor/core';
+import { getCapitalCoordinates } from '@/utils/countryCapitals';
+import { uploadPhotoThumbnail, withThumbnailPaths } from '@/utils/photoThumbnails';
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -94,6 +110,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
   // 'pending' and get uploaded for real during the final submit's own loop.
   const [accountUserId, setAccountUserId] = useState<string | null>(null);
   const [creatingAccount, setCreatingAccount] = useState(false);
+  // Photos are saved and we're handing over to the terms screen - keeps the
+  // "creating your account" screen up through that last step so the form
+  // never flashes back in between.
+  const [isFinishing, setIsFinishing] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [faceVerified, setFaceVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -229,6 +249,13 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
       ...formData,
       [e.target.name]: e.target.value
     });
+    // Date of birth is checked the moment it's picked, so an under-18 date
+    // is flagged right away instead of only after tapping Continue.
+    if (e.target.name === 'dateOfBirth') {
+      const dobError = getDateOfBirthError(e.target.value);
+      setErrors(prev => ({ ...prev, dateOfBirth: dobError }));
+      return;
+    }
     // Clear error when user starts typing
     if (errors[e.target.name]) {
       setErrors(prev => ({ ...prev, [e.target.name]: '' }));
@@ -333,6 +360,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
             .upload(filePath, file, { contentType: file.type, cacheControl: '3600', upsert: false });
           if (uploadError) throw uploadError;
         });
+        // Small copy for grids/cards (best-effort, doesn't block).
+        void uploadPhotoThumbnail(filePath, file);
 
         const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
 
@@ -426,7 +455,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
     let orderCounter = images.length;
 
     for (const file of files) {
-      if (!file.type.startsWith('image/')) {
+      if (!isSupportedImageFile(file)) {
         toast({
           title: "Invalid file type",
           description: `${file.name} is not an image file.`,
@@ -435,17 +464,29 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
         continue;
       }
 
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > MAX_SOURCE_PHOTO_BYTES) {
         toast({
           title: "File too large",
-          description: `${file.name} is larger than 10MB.`,
+          description: `${file.name} is larger than 80MB.`,
           variant: "destructive"
         });
         continue;
       }
 
-      // Compress (typically to JPEG) to keep uploads small and consistent
-      const compressedFile = await compressImage(file);
+      // Compress (typically to JPEG) to keep uploads small and consistent.
+      // RAW/HEIC photos are converted to JPEG here first.
+      let compressedFile: File;
+      try {
+        compressedFile = await compressImage(file);
+      } catch (error) {
+        console.error('Could not read photo:', error);
+        toast({
+          title: "Couldn't read this photo",
+          description: `${file.name} couldn't be opened. Try exporting it as a JPG and uploading that.`,
+          variant: "destructive"
+        });
+        continue;
+      }
 
       // Generate hash AFTER compression for accurate duplicate detection
       const fileHash = await getFileHash(compressedFile);
@@ -489,7 +530,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
         .then(({ error }) => { if (error) console.error('Failed to remove photo row:', error); });
     }
     if (removed?.filePath) {
-      supabase.storage.from('user-photos').remove([removed.filePath])
+      supabase.storage.from('user-photos').remove(withThumbnailPaths([removed.filePath]))
         .then(({ error }) => { if (error) console.error('Failed to remove photo file:', error); });
     }
   };
@@ -521,7 +562,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
         .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo row:', error); });
     }
     if (original?.filePath) {
-      supabase.storage.from('user-photos').remove([original.filePath])
+      supabase.storage.from('user-photos').remove(withThumbnailPaths([original.filePath]))
         .then(({ error }) => { if (error) console.error('Failed to remove pre-crop photo file:', error); });
     }
     uploadAndModerateImage(croppedFile, previewUrl, order > 0 ? order : images.length + 1);
@@ -633,6 +674,9 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
 
     // Prevent double submission
     if (isSubmitting || creatingAccount) return;
+
+    // Close the keyboard before the full-screen progress state appears.
+    (document.activeElement as HTMLElement | null)?.blur();
 
     if (currentStep === 1) {
       handleContinue();
@@ -787,6 +831,14 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
           .eq('id', userId)
           .single();
 
+        // Same fallback Complete Profile uses: a typed city we couldn't
+        // geocode used to be saved with no coordinates at all, which left the
+        // person with no distance to anyone. The country's capital is at
+        // least an approximate location until they set a real one.
+        const resolvedCoords = (formData.latitude == null || formData.longitude == null)
+          ? getCapitalCoordinates(formData.countryCode)
+          : undefined;
+
         const profileData = {
           id: userId,
           email: formData.email,
@@ -804,8 +856,8 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
           education_level: formData.educationLevel,
           bio: formData.bio || '',
           interests: formData.interests || [],
-          latitude: formData.latitude,
-          longitude: formData.longitude,
+          latitude: formData.latitude ?? resolvedCoords?.latitude ?? null,
+          longitude: formData.longitude ?? resolvedCoords?.longitude ?? null,
           is_custom_city: formData.isCustomCity || false,
           max_distance: formData.maxDistance || 250,
           country_code: formData.countryCode || '',
@@ -926,6 +978,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
               .upload(filePath, image.file as File, { contentType: (image.file as File).type, cacheControl: '3600' });
             if (uploadError) throw uploadError;
           });
+          void uploadPhotoThumbnail(filePath, image.file as File);
 
           const { data: { publicUrl } } = supabase.storage.from('user-photos').getPublicUrl(filePath);
           const thisOrder = imageOrder;
@@ -999,6 +1052,7 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
     }
 
     localStorage.removeItem('pending_face_verification');
+    setIsFinishing(true);
 
     // Photos are actually saved now - safe to hand routing back to the
     // parent (it explicitly moves to terms-acceptance in response to
@@ -1012,224 +1066,275 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
     } catch (error) {
       onSubmit({ ...formData, images: approvedImages });
     }
+    // Normally the parent has already switched to the terms screen in the same
+    // render; if it didn't, drop back to the form rather than hang here.
+    setIsFinishing(false);
   };
 
+  // Each step starts at its own top, not wherever the previous one was scrolled to.
+  const formTopRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    formTopRef.current?.scrollIntoView({ block: 'start' });
+  }, [currentStep]);
+
+  const selectedPhotoCount = images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length;
+
+  const progressScreen = currentStep === 2 && (creatingAccount || isSubmitting || isFinishing)
+    ? creatingAccount
+      ? { title: 'Creating your account', subtitle: 'Setting up your profile…' }
+      : isSubmitting
+        ? { title: 'Uploading your photos', subtitle: 'This only takes a moment.' }
+        : { title: 'Almost there', subtitle: 'Getting your welcome screen ready…' }
+    : null;
+
   return (
-    <div className="keyboard-safe-form input-scroll-container relative min-h-[100dvh] overflow-x-visible touch-pan-y">
-      <div className="relative z-10 px-2 sm:px-0 py-4 sm:py-8 pb-[calc(env(safe-area-inset-bottom,0px)+28px)]">
-        <Card className="w-full max-w-full sm:max-w-xl mx-auto rounded-none backdrop-blur-sm bg-white/40 shadow-none border border-white/40 animate-fade-in">
-      <CardHeader className="text-center px-3 sm:px-6 pb-5 sm:pb-6">
-        <div className="flex justify-center mb-4">
-          <HoppingLogo size={64} />
-        </div>
-        <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent animate-fade-in">
-          {currentStep === 1 ? t('registration.createAccount') : t('registration.tellUsMore')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="animate-fade-in px-3 sm:px-6 pb-5 sm:pb-8">
-        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
+    <>
+    {progressScreen && <OnboardingTransition title={progressScreen.title} subtitle={progressScreen.subtitle} />}
+    <div
+      className="dl-form keyboard-safe-form input-scroll-container relative min-h-[100dvh] w-full touch-pan-y"
+      style={{ background: FORM_PAGE_BG }}
+    >
+      <div className="relative z-10 mx-auto w-full max-w-xl px-5 sm:px-8 pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-[calc(env(safe-area-inset-bottom,0px)+32px)] dl-fade-in">
+        <div ref={formTopRef} aria-hidden="true" />
+        <header className="mb-7 text-center">
+          <div className="mb-4 flex justify-center">
+            <HoppingLogo size={52} />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {currentStep === 1 ? t('registration.createAccount') : t('registration.tellUsMore')}
+          </h1>
+          <p className="mt-1.5 text-sm text-white/60">
+            Step {currentStep} of 2
+          </p>
+          <div className="mx-auto mt-4 flex max-w-[200px] gap-1.5" aria-hidden="true">
+            {[1, 2].map(step => (
+              <span
+                key={step}
+                className={`h-1 flex-1 rounded-full transition-colors duration-300 ${step <= currentStep ? 'bg-pink-500' : 'bg-white/15'}`}
+              />
+            ))}
+          </div>
+        </header>
+
+        {/* noValidate: our own inline errors handle validation - the browser's
+            native "Please fill out this field" bubbles only got in the way. */}
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           {currentStep === 1 && (
-            <div className="space-y-6 animate-fade-in">
-          <BasicInfoSection
-            formData={formData}
-            errors={errors}
-            showPassword={showPassword}
-            showConfirmPassword={showConfirmPassword}
-            onInputChange={handleInputChange}
-            onSelectChange={handleSelectChange}
-            onTogglePassword={() => setShowPassword(!showPassword)}
-            onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
-            showFaceVerification={showFaceVerification}
-            setShowFaceVerification={setShowFaceVerification}
-            faceVerified={faceVerified}
-            isVerifying={isVerifying}
-            onFaceVerified={handleFaceVerified}
-            faceError={errors.faceVerification}
-          />
+            <div className="space-y-6 dl-fade-in">
+              <section className={formSection}>
+                <BasicInfoSection
+                  formData={formData}
+                  errors={errors}
+                  showPassword={showPassword}
+                  showConfirmPassword={showConfirmPassword}
+                  onInputChange={handleInputChange}
+                  onSelectChange={handleSelectChange}
+                  onTogglePassword={() => setShowPassword(!showPassword)}
+                  onToggleConfirmPassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                  showFaceVerification={showFaceVerification}
+                  setShowFaceVerification={setShowFaceVerification}
+                  faceVerified={faceVerified}
+                  isVerifying={isVerifying}
+                  onFaceVerified={handleFaceVerified}
+                  faceError={errors.faceVerification}
+                />
+              </section>
 
-          {/* Work & Education */}
-          <div className="space-y-4 animate-scale-in">
-            <h4 className="text-lg font-semibold text-black">{t('registration.workEducation')}</h4>
-            <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-black">{t('profile.occupation')}</Label>
-                <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
-                  <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.occupation ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white text-black">
-                    {occupationOptions.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.occupation && <p className="text-red-500 text-xs mt-1">{errors.occupation}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-black">{t('profile.industry')}</Label>
-                <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
-                  <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.industry ? 'border-red-500' : ''}`}>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white text-black">
-                    {industryOptions.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.industry && <p className="text-red-500 text-xs mt-1">{errors.industry}</p>}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-black">{t('registration.educationLevel')}</Label>
-              <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
-                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.educationLevel ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent className="bg-white text-black">
-                  <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
-                  <SelectItem value="Some College">{t('registration.someCollege')}</SelectItem>
-                  <SelectItem value="Associate Degree">{t('registration.associateDegree')}</SelectItem>
-                  <SelectItem value="Bachelor's Degree">{t('registration.bachelorsDegree')}</SelectItem>
-                  <SelectItem value="Master's Degree">{t('registration.mastersDegree')}</SelectItem>
-                  <SelectItem value="Doctorate">{t('registration.doctorate')}</SelectItem>
-                  <SelectItem value="Other">{t('registration.other')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.educationLevel && <p className="text-red-500 text-xs mt-1">{errors.educationLevel}</p>}
-            </div>
-          </div>
-          
-          {/* Location Section */}
-          <div className="animate-scale-in">
-            <LocationInput
-              country={formData.country}
-              city={formData.city}
-              zipCode={formData.zipCode}
-              onLocationChange={handleLocationChange}
-              errors={{
-                country: errors.country,
-                city: errors.city,
-                zipCode: errors.zipCode
-              }}
-              required={false}
-              autoDetect={true}
-            />
-          </div>
+              {/* Work & Education */}
+              <section className={formSection}>
+                <h2 className={formSectionTitle}>{t('registration.workEducation')}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className={formLabel}>{t('profile.occupation')}</Label>
+                    <Select value={formData.occupation} onValueChange={(value) => handleSelectChange('occupation', value)}>
+                      <SelectTrigger className={formSelectTrigger(!!errors.occupation)}>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className={formSelectContent}>
+                        {occupationOptions.map(option => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.occupation && <p className={formError}>{errors.occupation}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className={formLabel}>{t('profile.industry')}</Label>
+                    <Select value={formData.industry} onValueChange={(value) => handleSelectChange('industry', value)}>
+                      <SelectTrigger className={formSelectTrigger(!!errors.industry)}>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className={formSelectContent}>
+                        {industryOptions.map(option => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.industry && <p className={formError}>{errors.industry}</p>}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className={formLabel}>{t('registration.educationLevel')}</Label>
+                  <Select value={formData.educationLevel} onValueChange={(value) => handleSelectChange('educationLevel', value)}>
+                    <SelectTrigger className={formSelectTrigger(!!errors.educationLevel)}>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent className={formSelectContent}>
+                      <SelectItem value="High School">{t('registration.highSchool')}</SelectItem>
+                      <SelectItem value="Some College">{t('registration.someCollege')}</SelectItem>
+                      <SelectItem value="Associate Degree">{t('registration.associateDegree')}</SelectItem>
+                      <SelectItem value="Bachelor's Degree">{t('registration.bachelorsDegree')}</SelectItem>
+                      <SelectItem value="Master's Degree">{t('registration.mastersDegree')}</SelectItem>
+                      <SelectItem value="Doctorate">{t('registration.doctorate')}</SelectItem>
+                      <SelectItem value="Other">{t('registration.other')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.educationLevel && <p className={formError}>{errors.educationLevel}</p>}
+                </div>
+              </section>
 
-          </div>
+              {/* Location Section */}
+              <section className={formSection}>
+                <h2 className={formSectionTitle}>{t('registration.location')}</h2>
+                <LocationInput
+                  country={formData.country}
+                  city={formData.city}
+                  zipCode={formData.zipCode}
+                  onLocationChange={handleLocationChange}
+                  errors={{
+                    country: errors.country,
+                    city: errors.city,
+                    zipCode: errors.zipCode
+                  }}
+                  required={false}
+                  autoDetect={true}
+                  tone="dark"
+                />
+              </section>
+            </div>
           )}
 
           {currentStep === 2 && (
-            <div className="space-y-6 animate-fade-in">
-
-          {/* Gender and Preference */}
-          <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4 animate-scale-in">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-black">{t('registration.iAm')} *</Label>
-              <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
-                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.gender ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder={t('registration.selectGender')} />
-                </SelectTrigger>
-                <SelectContent className="bg-white text-black">
-                  <SelectItem value="male">{t('registration.male')}</SelectItem>
-                  <SelectItem value="female">{t('registration.female')}</SelectItem>
-                  <SelectItem value="other">{t('registration.other')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-black">{t('registration.lookingFor')} *</Label>
-              <Select value={formData.preference} onValueChange={(value) => handleSelectChange('preference', value)}>
-                <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.preference ? 'border-red-500' : ''}`}>
-                  <SelectValue placeholder={t('registration.selectPreference')} />
-                </SelectTrigger>
-                <SelectContent className="bg-white text-black">
-                  <SelectItem value="male">{t('registration.male')}</SelectItem>
-                  <SelectItem value="female">{t('registration.female')}</SelectItem>
-                  <SelectItem value="everyone">{t('registration.everyone')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.preference && <p className="text-red-500 text-xs mt-1">{errors.preference}</p>}
-            </div>
-          </div>
-
-          {/* Relationship Intent */}
-          <div className="space-y-2 animate-scale-in">
-            <Label className="text-sm font-medium text-black">{t('registration.relationshipIntent')}</Label>
-            <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
-              <SelectTrigger className={`pl-2.5 pr-2.5 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.relationshipIntent ? 'border-red-500' : ''}`}>
-                <SelectValue placeholder={t('registration.whatLookingFor')} />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-black">
-                <SelectItem value="casual">{t('registration.casual')}</SelectItem>
-                <SelectItem value="serious">{t('registration.serious')}</SelectItem>
-                <SelectItem value="open_to_anything">{t('registration.openToAnything')}</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.relationshipIntent && <p className="text-red-500 text-xs mt-1">{errors.relationshipIntent}</p>}
-          </div>
-
-            {/* Adinkra Symbols Selector */}
-            <div className="space-y-4 mt-6 animate-scale-in">
-              <AdinkraSymbolSelector
-                selectedSymbols={formData.adinkraSymbols}
-                onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
-                userCountry={formData.country}
-              />
-              {errors.adinkraSymbols && <p className="text-red-500 text-xs mt-1">{errors.adinkraSymbols}</p>}
-            </div>
-
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="photos" className="text-sm font-semibold text-black">Profile Photos *</Label>
-                  <p className="text-[11px] text-black whitespace-nowrap">2+ photos required</p>
+            <div className="space-y-6 dl-fade-in">
+              {/* Gender and Preference */}
+              <section className={formSection}>
+                <h2 className={formSectionTitle}>About you</h2>
+                <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className={formLabel}>{t('registration.iAm')} <span className={formRequired}>*</span></Label>
+                    <Select value={formData.gender} onValueChange={(value) => handleSelectChange('gender', value)}>
+                      <SelectTrigger className={formSelectTrigger(!!errors.gender)}>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className={formSelectContent}>
+                        <SelectItem value="male">{t('registration.male')}</SelectItem>
+                        <SelectItem value="female">{t('registration.female')}</SelectItem>
+                        <SelectItem value="other">{t('registration.other')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.gender && <p className={formError}>{errors.gender}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className={formLabel}>{t('registration.lookingFor')} <span className={formRequired}>*</span></Label>
+                    <Select value={formData.preference} onValueChange={(value) => handleSelectChange('preference', value)}>
+                      <SelectTrigger className={formSelectTrigger(!!errors.preference)}>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className={formSelectContent}>
+                        <SelectItem value="male">{t('registration.male')}</SelectItem>
+                        <SelectItem value="female">{t('registration.female')}</SelectItem>
+                        <SelectItem value="everyone">{t('registration.everyone')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.preference && <p className={formError}>{errors.preference}</p>}
+                  </div>
                 </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-pink-400 transition-colors">
-                  <Input
-                    id="photos"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <Label htmlFor="photos" className="cursor-pointer block">
-                    <Upload className="mx-auto h-5 w-5 text-gray-400 mb-1" />
-                    <p className="text-xs text-black">Upload photos</p>
-                    <p className="text-[11px] text-black">JPG/PNG up to 10MB</p>
-                  </Label>
+
+                {/* Relationship Intent */}
+                <div className="space-y-1.5">
+                  <Label className={formLabel}>{t('registration.relationshipIntent')}</Label>
+                  <Select value={formData.relationshipIntent} onValueChange={(value) => handleSelectChange('relationshipIntent', value)}>
+                    <SelectTrigger className={formSelectTrigger(!!errors.relationshipIntent)}>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent className={formSelectContent}>
+                      <SelectItem value="casual">{t('registration.casual')}</SelectItem>
+                      <SelectItem value="serious">{t('registration.serious')}</SelectItem>
+                      <SelectItem value="open_to_anything">{t('registration.openToAnything')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.relationshipIntent && <p className={formError}>{errors.relationshipIntent}</p>}
                 </div>
+              </section>
+
+              {/* Adinkra Symbols Selector */}
+              <section className={formSection}>
+                <AdinkraSymbolSelector
+                  selectedSymbols={formData.adinkraSymbols}
+                  onChange={(symbols) => setFormData({ ...formData, adinkraSymbols: symbols })}
+                  userCountry={formData.country}
+                />
+                {errors.adinkraSymbols && <p className={formError}>{errors.adinkraSymbols}</p>}
+              </section>
+
+              <section className={formSection}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className={formSectionTitle}>Profile Photos <span className={formRequired}>*</span></h2>
+                  <p className={`text-xs font-medium whitespace-nowrap ${selectedPhotoCount >= 2 ? 'text-emerald-400' : 'text-white/55'}`}>
+                    {selectedPhotoCount} / 2 minimum
+                  </p>
+                </div>
+                <Input
+                  id="photos"
+                  type="file"
+                  accept={getPhotoAcceptAttribute(Capacitor.isNativePlatform())}
+                  multiple
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                <Label
+                  htmlFor="photos"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/25 bg-white/[0.03] px-4 py-5 text-center transition-colors hover:border-pink-500/70 active:border-pink-500"
+                >
+                  <span className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-pink-500/15">
+                    <Upload className="h-5 w-5 text-pink-400" />
+                  </span>
+                  <span className="text-sm font-medium text-white">Upload photos</span>
+                  <span className="text-xs text-white/50">JPG, PNG, HEIC or camera RAW</span>
+                </Label>
                 {images.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {images.map((image, index) => (
-                      <div key={image.preview} className="relative group">
-                        <img 
-                          src={image.preview} 
+                      <div key={image.preview} className="relative">
+                        <img
+                          src={image.preview}
                           alt={`Upload ${index + 1}`}
-                          className="w-full h-28 object-cover rounded-lg shadow-sm"
+                          className="w-full aspect-[4/5] object-cover rounded-xl border border-white/10"
                         />
                         {renderImageStatus(image)}
 
-                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Always visible: these were hover-only before, which
+                            left them unreachable on touch screens. */}
+                        <div className="absolute top-2 right-2 flex gap-1.5">
                           <Button
                             type="button"
                             size="sm"
                             onClick={() => setCroppingImage({ preview: image.preview })}
-                            className="p-0 h-8 w-8 bg-pink-600 hover:bg-pink-700 rounded-full shadow-md"
+                            className="p-0 h-8 w-8 rounded-full bg-black/70 text-white hover:bg-black/80 shadow-md"
                             title="Crop photo"
+                            aria-label="Crop photo"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             type="button"
-                            variant="destructive"
                             size="sm"
-                            className="p-1 h-8 w-8"
+                            className="p-0 h-8 w-8 rounded-full bg-black/70 text-white hover:bg-red-600 shadow-md"
                             onClick={() => removeImage(image.preview)}
+                            title="Remove photo"
+                            aria-label="Remove photo"
                           >
-                            ×
+                            <X className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -1247,34 +1352,32 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
                     />
                   </React.Suspense>
                 )}
+              </section>
 
-                {promoCodeEnabled && (
-                  <div className="animate-scale-in">
-                    <PromoCodeInput
-                      value={formData.promoCode}
-                      onChange={(value, promoCodeId) => {
-                        setFormData(prev => ({
-                          ...prev,
-                          promoCode: value,
-                          promoCodeId: promoCodeId
-                        }));
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Note: Face verification is now shown in step 1 under name fields */}
-              </div>
-          </div>
+              {promoCodeEnabled && (
+                <section className={formSection}>
+                  <PromoCodeInput
+                    value={formData.promoCode}
+                    onChange={(value, promoCodeId) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        promoCode: value,
+                        promoCodeId: promoCodeId
+                      }));
+                    }}
+                  />
+                </section>
+              )}
+            </div>
           )}
 
-          <div className="flex flex-row justify-end gap-3">
+          <div className="flex flex-row gap-3 pt-2">
             {currentStep > 1 && (
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => setCurrentStep(currentStep - 1)}
-                className="h-9 px-4 flex-1 sm:flex-none sm:w-auto bg-white border-2 border-[#7a0a40] text-[#7a0a40] hover:bg-pink-50 transition-all duration-200 animate-fade-in"
+                className={`${formSecondaryButton} flex-1`}
               >
                 {t('registration.back')}
               </Button>
@@ -1286,10 +1389,10 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
                 creatingAccount ||
                 (currentStep === 2 && (
                   images.some(img => img.status === 'moderating') ||
-                  images.filter(img => (img.status === 'approved' || img.status === 'pending') && (img.imageId || img.file)).length < 2
+                  selectedPhotoCount < 2
                 ))
               }
-              className="h-9 px-4 flex-1 sm:flex-none sm:w-auto bg-gradient-to-r from-[#3d0320] via-[#7a0a40] to-[#d6136e] hover:opacity-90 text-white font-semibold rounded-lg transition-all duration-200 animate-fade-in disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`${formPrimaryButton} flex-[2]`}
             >
               {creatingAccount
                 ? t('registration.creatingAccount')
@@ -1303,20 +1406,22 @@ const RegistrationForm = ({ onSubmit, onBackToLogin, onRegistrationInProgressCha
               }
             </Button>
           </div>
-          <div className="text-center animate-fade-in">
+          {currentStep === 2 && selectedPhotoCount < 2 && !images.some(img => img.status === 'moderating') && (
+            <p className="-mt-3 text-center text-xs text-white/50">Add at least 2 photos to create your account.</p>
+          )}
+          <div className="pt-1 text-center">
             <button
               type="button"
               onClick={onBackToLogin}
-              className="text-black hover:text-gray-700 font-bold transition-colors story-link"
+              className="text-sm text-white/70 transition-colors hover:text-white"
             >
               {t('registration.alreadyHaveAccount')}
             </button>
           </div>
         </form>
-      </CardContent>
-    </Card>
       </div>
     </div>
+    </>
   );
 };
 

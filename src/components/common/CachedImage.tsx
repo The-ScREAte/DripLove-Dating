@@ -5,6 +5,11 @@ type CachedImageProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> &
   src: string;
   /** Called only once neither the network nor the persistent cache has the image. */
   onLoadError?: () => void;
+  /** Tried next if `src` fails (e.g. src is a photo's thumbnail, this is the
+   *  full photo), before falling back to the offline cache. */
+  fallbackSrc?: string;
+  /** Called when `src` failed and `fallbackSrc` is being used instead. */
+  onFallback?: () => void;
 };
 
 // Drop-in <img> replacement that keeps the normal fast network path (no added
@@ -13,7 +18,7 @@ type CachedImageProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> &
 // still renders with no internet the next time this mounts. Every
 // successfully loaded image is opportunistically stored for next time.
 const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
-  ({ src, onError, onLoad, onLoadError, ...rest }, ref) => {
+  ({ src, onError, onLoad, onLoadError, fallbackSrc, onFallback, ...rest }, ref) => {
     // Resets effectiveSrc/triedCache the moment `src` changes, computed
     // during render (React's sanctioned "adjust state while rendering"
     // pattern) rather than in a useEffect - setState inside an effect body
@@ -44,20 +49,26 @@ const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
     const handleLoad = useCallback(
       (e: React.SyntheticEvent<HTMLImageElement>) => {
         onLoad?.(e);
-        if (!triedCache) warmImageCache(src);
+        // Cache whatever actually loaded (the fallback, if src failed).
+        if (!triedCache) warmImageCache(effectiveSrc);
       },
-      [onLoad, src, triedCache]
+      [onLoad, effectiveSrc, triedCache]
     );
 
     const handleError = useCallback(
       async (e: React.SyntheticEvent<HTMLImageElement>) => {
         onError?.(e);
+        if (fallbackSrc && fallbackSrc !== src && effectiveSrc === src && !triedCache) {
+          onFallback?.();
+          setEffectiveSrc(fallbackSrc);
+          return;
+        }
         if (triedCache) {
           onLoadError?.();
           return;
         }
         setTriedCache(true);
-        const cachedUrl = await getCachedObjectUrl(src);
+        const cachedUrl = await getCachedObjectUrl(src) ?? (fallbackSrc ? await getCachedObjectUrl(fallbackSrc) : null);
         if (cachedUrl) {
           objectUrlRef.current = cachedUrl;
           setEffectiveSrc(cachedUrl);
@@ -65,7 +76,7 @@ const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
           onLoadError?.();
         }
       },
-      [onError, onLoadError, src, triedCache]
+      [onError, onLoadError, src, triedCache, fallbackSrc, onFallback, effectiveSrc]
     );
 
     return <img ref={ref} src={effectiveSrc} onLoad={handleLoad} onError={handleError} {...rest} />;

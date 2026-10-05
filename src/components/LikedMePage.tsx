@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,6 +39,7 @@ import MusicLinkBadge from './discover/MusicLinkBadge';
 import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
+import ThumbnailImage from '@/components/common/ThumbnailImage';
 import {
   FAMILY_PLANS_OPTIONS,
   COMMUNICATION_STYLE_OPTIONS,
@@ -47,6 +48,10 @@ import {
   SOCIAL_MEDIA_OPTIONS,
   traitLabel,
 } from '@/constants/profileTraits';
+
+// Swipe card position/tilt for a given horizontal drag offset (px).
+const swipeCardTransform = (d: number) =>
+  `translate3d(${d}px, 0, 0) rotate(${Math.max(-15, Math.min(15, d * 0.05))}deg)`;
 
 const formatHeightLabel = (cm: number) => {
   const totalInches = Math.round(cm / 2.54);
@@ -224,20 +229,23 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   }, []);
   // Swipe-to-pass/like-back on the photo card, same gesture as Discover's swipe
   // card, replacing the old dedicated X/heart button row.
-  const [swipeDragX, setSwipeDragX] = useState(0);
+  // Only the hint's direction lives in state (it changes at most a couple of
+  // times per drag). The live drag offset is written straight to the DOM - a
+  // per-frame state update re-rendered the entire memoized profile card below
+  // on every frame, which is what made this drag stutter on Android.
+  const [swipeHintDir, setSwipeHintDir] = useState<'left' | 'right' | null>(null);
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
   const [swipeExitDirection, setSwipeExitDirection] = useState<'left' | 'right' | null>(null);
-  const swipeStartRef = useRef<{ x: number; y: number; dragging: boolean } | null>(null);
-  // rAF-throttled drag, same fix as Discover's swipe card: pointermove can fire far
-  // more often than the display refreshes (especially on Android), and calling
-  // setSwipeDragX on every single event re-renders this whole page that often -
-  // capping the state update to once per animation frame, and writing the
-  // transform straight to the card's own DOM node ahead of that (so it never
-  // waits on this page's render to actually land), is what keeps the drag feeling
-  // glued to the finger instead of stuttering on weaker hardware.
+  const swipeStartRef = useRef<{ x: number; y: number; dragging: boolean; lastX: number; lastT: number; vx: number } | null>(null);
+  const swipeHintElRef = useRef<HTMLDivElement>(null);
+  // rAF-throttled drag, same approach as Discover's swipe card: pointermove can
+  // fire far more often than the display refreshes (especially on Android), so the
+  // transform is written straight to the card's own DOM node once per frame and
+  // never waits on this page's render to land.
   const swipeCardElRef = useRef<HTMLDivElement>(null);
   const latestSwipeDeltaRef = useRef(0);
   const swipeRafScheduledRef = useRef(false);
+  const swipeRafIdRef = useRef<number | null>(null);
   const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
 
   // Navigating away from this tab always drops the premium-upgrade screen, so
@@ -834,10 +842,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   useEffect(() => {
     setShowMoreInfo(false);
     setCurrentSlide(0);
-    setSwipeDragX(0);
+    setSwipeHintDir(null);
     setIsSwipeDragging(false);
     setSwipeExitDirection(null);
     swipeStartRef.current = null;
+    latestSwipeDeltaRef.current = 0;
   }, [selectedProfile]);
 
   // Slide list built by the exact same helper Discover's swipe card uses, so the
@@ -1254,9 +1263,30 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // navigation instead, so browsing photos still works exactly as before.
   const SWIPE_THRESHOLD_RATIO = 0.3;
 
+  // Cancels any queued drag frame so it can't land after the card has been
+  // released and stomp the spring-back / fly-off transform.
+  const cancelSwipeFrame = useCallback(() => {
+    if (swipeRafIdRef.current !== null) {
+      cancelAnimationFrame(swipeRafIdRef.current);
+      swipeRafIdRef.current = null;
+    }
+    swipeRafScheduledRef.current = false;
+  }, []);
+
+  const springSwipeCardBack = useCallback(() => {
+    const el = swipeCardElRef.current;
+    if (el) {
+      el.style.transition = 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)';
+      el.style.transform = swipeCardTransform(0);
+    }
+    if (swipeHintElRef.current) swipeHintElRef.current.style.opacity = '0';
+    latestSwipeDeltaRef.current = 0;
+    setSwipeHintDir(null);
+  }, []);
+
   const handleSwipePointerDown = useCallback((e: React.PointerEvent) => {
     if (swipeExitDirection) return;
-    swipeStartRef.current = { x: e.clientX, y: e.clientY, dragging: false };
+    swipeStartRef.current = { x: e.clientX, y: e.clientY, dragging: false, lastX: e.clientX, lastT: e.timeStamp, vx: 0 };
   }, [swipeExitDirection]);
 
   const handleSwipePointerMove = useCallback((e: React.PointerEvent) => {
@@ -1268,18 +1298,36 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       // Ignore small jitter and mostly-vertical movement (that's a scroll, not a swipe).
       if (Math.abs(deltaX) < 8 || Math.abs(deltaY) > Math.abs(deltaX)) return;
       start.dragging = true;
-      setIsSwipeDragging(true);
+      // Kill any in-flight spring-back transition before the first drag frame,
+      // so the card tracks the finger 1:1 instead of easing behind it.
+      if (swipeCardElRef.current) swipeCardElRef.current.style.transition = 'none';
+      // Low priority: this re-renders the large memoized profile card; the
+      // drag itself is driven directly on the DOM and never waits on it.
+      startTransition(() => setIsSwipeDragging(true));
+    }
+    // Smoothed horizontal velocity (px/ms) so a quick flick counts as a swipe
+    // even when it doesn't travel past the distance threshold.
+    const dt = e.timeStamp - start.lastT;
+    if (dt > 0) {
+      start.vx = 0.8 * ((e.clientX - start.lastX) / dt) + 0.2 * start.vx;
+      start.lastX = e.clientX;
+      start.lastT = e.timeStamp;
     }
     latestSwipeDeltaRef.current = deltaX;
     if (!swipeRafScheduledRef.current) {
       swipeRafScheduledRef.current = true;
-      requestAnimationFrame(() => {
+      swipeRafIdRef.current = requestAnimationFrame(() => {
+        swipeRafIdRef.current = null;
+        swipeRafScheduledRef.current = false;
         const d = latestSwipeDeltaRef.current;
         if (swipeCardElRef.current) {
-          swipeCardElRef.current.style.transform = `translateX(${d}px) rotate(${Math.max(-15, Math.min(15, d * 0.05))}deg)`;
+          swipeCardElRef.current.style.transform = swipeCardTransform(d);
         }
-        setSwipeDragX(d);
-        swipeRafScheduledRef.current = false;
+        if (swipeHintElRef.current) {
+          swipeHintElRef.current.style.opacity = String(Math.min(1, Math.abs(d) / (window.innerWidth * SWIPE_THRESHOLD_RATIO)));
+        }
+        const dir = d > 0 ? 'right' : d < 0 ? 'left' : null;
+        startTransition(() => setSwipeHintDir(prev => (prev === dir ? prev : dir)));
       });
     }
   }, [swipeExitDirection]);
@@ -1295,27 +1343,47 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       return;
     }
 
+    // Read the release position from the event itself, not from state - state
+    // can trail the finger by a frame, which made borderline swipes misfire.
+    const deltaX = e.clientX - start.x;
+    cancelSwipeFrame();
     setIsSwipeDragging(false);
-    // Flush any pending rAF from handleSwipePointerMove - otherwise it can fire
-    // after this point with a stale delta and briefly redraw the card at the
-    // wrong position right after it's been reset/committed to an exit.
-    latestSwipeDeltaRef.current = 0;
-    swipeRafScheduledRef.current = false;
+
     const threshold = window.innerWidth * SWIPE_THRESHOLD_RATIO;
-    if (Math.abs(swipeDragX) > threshold && selectedProfile) {
-      const direction = swipeDragX > 0 ? 'right' : 'left';
+    const isFlick = Math.abs(start.vx) > 0.6 && Math.abs(deltaX) > 40 && Math.sign(start.vx) === Math.sign(deltaX);
+    if ((Math.abs(deltaX) > threshold || isFlick) && selectedProfile) {
+      const direction = deltaX > 0 ? 'right' : 'left';
+      const el = swipeCardElRef.current;
+      if (el) {
+        const exitX = (direction === 'right' ? 1 : -1) * window.innerWidth * 1.3;
+        el.style.transition = 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out';
+        el.style.transform = swipeCardTransform(exitX);
+      }
       setSwipeExitDirection(direction);
+      const profileId = selectedProfile.id;
       setTimeout(() => {
         if (direction === 'right') {
-          handleLikeBack(selectedProfile.id);
+          handleLikeBack(profileId);
         } else {
-          handlePass(selectedProfile.id);
+          handlePass(profileId);
         }
-      }, 250);
+      }, 260);
     } else {
-      setSwipeDragX(0);
+      springSwipeCardBack();
     }
-  }, [swipeDragX, selectedProfile, handleLikeBack, handlePass, handleNavigationClick]);
+  }, [selectedProfile, handleLikeBack, handlePass, handleNavigationClick, cancelSwipeFrame, springSwipeCardBack]);
+
+  // The OS/browser took the touch over (vertical scroll began, system gesture,
+  // incoming call...). Never treat that as a tap - it used to fall through to
+  // handleSwipePointerUp and flip the photo when the user only meant to scroll.
+  const handleSwipePointerCancel = useCallback(() => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start?.dragging) return;
+    cancelSwipeFrame();
+    setIsSwipeDragging(false);
+    springSwipeCardBack();
+  }, [cancelSwipeFrame, springSwipeCardBack]);
 
   // Closing early while a block is still in its undo window (see
   // handleBlockUser) finalizes it right away instead of leaving a timer
@@ -1565,14 +1633,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               willChange: 'transform',
               cursor: 'pointer',
               touchAction: 'pan-y',
-              transform: `translateX(${swipeDragX}px) rotate(${Math.max(-15, Math.min(15, swipeDragX * 0.05))}deg)`,
+              // Constant at rest and during a drag: the live offset is written
+              // imperatively (see handleSwipePointerMove), so React must not
+              // re-write this mid-drag or it would yank the card back.
+              transform: swipeExitDirection
+                ? swipeCardTransform((swipeExitDirection === 'right' ? 1 : -1) * window.innerWidth * 1.3)
+                : swipeCardTransform(0),
               opacity: swipeExitDirection ? 0 : 1,
-              transition: isSwipeDragging ? 'none' : 'transform 300ms ease-out, opacity 250ms ease-out',
+              transition: isSwipeDragging ? 'none' : 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
             }}
             onPointerDown={handleSwipePointerDown}
             onPointerMove={handleSwipePointerMove}
             onPointerUp={handleSwipePointerUp}
-            onPointerCancel={handleSwipePointerUp}
+            onPointerCancel={handleSwipePointerCancel}
           >
             <SlideRenderer
               slide={currentSlideData}
@@ -1585,14 +1658,15 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             {/* Swipe direction hint, same red/green X and heart the removed
                 button row used, now surfacing as a fading overlay tied to drag
                 distance instead of a pair of dedicated buttons. */}
-            {swipeDragX !== 0 && (
+            {swipeHintDir && (
               <div
+                ref={swipeHintElRef}
                 className={`absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center w-16 h-16 rounded-full border-4 ${
-                  swipeDragX > 0 ? 'right-6 border-green-400 bg-green-500/20' : 'left-6 border-red-400 bg-red-500/20'
+                  swipeHintDir === 'right' ? 'right-6 border-green-400 bg-green-500/20' : 'left-6 border-red-400 bg-red-500/20'
                 }`}
-                style={{ opacity: Math.min(1, Math.abs(swipeDragX) / (window.innerWidth * SWIPE_THRESHOLD_RATIO)) }}
+                style={{ opacity: Math.min(1, Math.abs(latestSwipeDeltaRef.current) / (window.innerWidth * SWIPE_THRESHOLD_RATIO)) }}
               >
-                {swipeDragX > 0 ? (
+                {swipeHintDir === 'right' ? (
                   <Heart className="w-8 h-8 text-green-400" />
                 ) : (
                   <X className="w-8 h-8 text-red-400" />
@@ -2194,14 +2268,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
                     <div className="grid grid-cols-2 gap-1.5">
                       <button
-                        className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 transition-all duration-200"
+                        className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-full shadow-sm disabled:opacity-50 transition-all duration-200"
                         onClick={handleReportImage}
                         disabled={reporting || !selectedReportReason || isBlocking}
                       >
                         {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
                       </button>
                       <button
-                        className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-lg disabled:opacity-50 transition-colors duration-200"
+                        className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-full disabled:opacity-50 transition-colors duration-200"
                         onClick={handleBlockUser}
                         disabled={isBlocking || reporting || (!selectedReportReason && !blockReason.trim())}
                       >
@@ -2222,7 +2296,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlights, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeDragX, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, captionedPhotos, secondPhotoAnchor, renderPhotoCaptionCard, showAbout, showVerifiedBadge]);
+  }, [selectedProfile, slides, previewHighlights, signHighlights, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeHintDir, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, handleSwipePointerCancel, captionedPhotos, secondPhotoAnchor, renderPhotoCaptionCard, showAbout, showVerifiedBadge]);
 
   // ⭐ All early returns MUST be after all hooks
   if (showMatchAnimation && matchedProfile) {
@@ -2355,7 +2429,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     {(() => {
                       const profileImages = userImages[liker.id] || [];
                       return profileImages.length > 0 ? (
-                        <img
+                        <ThumbnailImage
                           loading={isFirstThree ? "eager" : "lazy"}
                           decoding="async"
                           src={getSafeImageSrc(profileImages[0], true)}

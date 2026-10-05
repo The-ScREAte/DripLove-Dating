@@ -134,7 +134,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onReport }) 
                     key={reason}
                     onClick={() => setSelectedReason(reason)}
                     disabled={reporting}
-                    className={`w-full min-h-10 px-3 py-2 text-left rounded-lg border-2 transition-all duration-200 flex items-center justify-between ${
+                    className={`w-full min-h-10 px-3 py-2 text-left rounded-full border-2 transition-all duration-200 flex items-center justify-between ${
                       selectedReason === reason
                         ? 'border-red-500 bg-red-950/60 text-red-300'
                         : 'border-neutral-700 bg-neutral-900 text-gray-300 hover:border-neutral-500 hover:bg-neutral-800'
@@ -153,7 +153,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, onReport }) 
               {/* Action buttons with stable height */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  className="w-full h-10 bg-red-500 hover:bg-red-600 text-white font-semibold text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  className="w-full h-10 bg-red-500 hover:bg-red-600 text-white font-semibold text-sm rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   onClick={handleReportSubmit}
                   disabled={reporting || !selectedReason}
                 >

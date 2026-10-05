@@ -1,13 +1,13 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { User, Mail, Lock, Calendar, MapPin, Globe, Eye, EyeOff, Shield, CheckCircle, Camera, Loader2 } from 'lucide-react';
-import { countries } from '@/constants/formData';
+import { User, Mail, Lock, Eye, EyeOff, Shield, CheckCircle, Camera, Loader2 } from 'lucide-react';
 import { handleInputFocus, handleInputBlur, getInputStyles } from '@/utils/inputUtils';
 import { useTranslation } from 'react-i18next';
 import FaceVerification from '@/components/FaceVerification';
+import { formLabel, formRequired, formError, formInput, formFieldIcon } from '@/components/forms/formTheme';
+import { getLatestAllowedDateOfBirth } from '@/utils/formValidation';
 
 interface BasicInfoSectionProps {
   formData: any;
@@ -47,189 +47,197 @@ const BasicInfoSection = ({
   
   return (
     <div className="space-y-4">
-      {/* <p className="text-xs text-center text-gray-400 font-normal">{t('registration.step1Description')}</p> */}
-      
-      <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="firstName" className="text-sm font-medium text-black">{t('registration.firstName')} *</Label>
+      <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="firstName" className={formLabel}>{t('registration.firstName')} <span className={formRequired}>*</span></Label>
           <div className="relative">
-            <User className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
+            <User className={formFieldIcon} />
             <Input
               id="firstName"
               name="firstName"
               type="text"
+              autoComplete="given-name"
+              autoCapitalize="words"
               value={formData.firstName}
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.firstName ? 'border-red-500' : ''}`}
+              className={`mobile-input-field ${formInput(!!errors.firstName)} pl-10`}
               style={getInputStyles()}
-              placeholder={t('registration.firstName')}
+              placeholder="First"
             />
-            {errors.firstName && <p className="text-red-700 text-xs font-semibold mt-1">{errors.firstName}</p>}
           </div>
+          {errors.firstName && <p className={formError}>{errors.firstName}</p>}
         </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="lastName" className="text-sm font-medium text-black">{t('registration.lastName')} *</Label>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="lastName" className={formLabel}>{t('registration.lastName')} <span className={formRequired}>*</span></Label>
           <div className="relative">
-            <User className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
+            <User className={formFieldIcon} />
             <Input
               id="lastName"
               name="lastName"
               type="text"
+              autoComplete="family-name"
+              autoCapitalize="words"
               value={formData.lastName}
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.lastName ? 'border-red-500' : ''}`}
+              className={`mobile-input-field ${formInput(!!errors.lastName)} pl-10`}
               style={getInputStyles()}
-              placeholder={t('registration.lastName')}
+              placeholder="Last"
             />
-            {errors.lastName && <p className="text-red-700 text-xs font-semibold mt-1">{errors.lastName}</p>}
           </div>
+          {errors.lastName && <p className={formError}>{errors.lastName}</p>}
         </div>
       </div>
 
       {/* Face Verification Section - Right after name fields */}
       {setShowFaceVerification && onFaceVerified && (
-        <div className="space-y-3 mt-2">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-purple-600" />
-            <Label className="text-sm font-medium text-black">Face Verification *</Label>
-          </div>
+        <div className="space-y-1.5">
+          <Label className={`${formLabel} flex items-center gap-1.5`}>
+            <Shield className="w-4 h-4 text-pink-400" />
+            Face Verification <span className={formRequired}>*</span>
+          </Label>
 
           {showFaceVerification ? (
-            <div className="space-y-3 bg-black border border-white/10 rounded-lg p-3">
+            <div className="space-y-3 rounded-xl border border-white/10 p-3">
               <FaceVerification
                 onVerified={onFaceVerified}
                 disabled={isVerifying}
               />
             </div>
           ) : faceVerified ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <p className="font-medium text-green-800 text-sm">Verified</p>
-              </div>
+            <div className="flex items-center gap-2.5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-3">
+              <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+              <p className="text-sm font-medium text-emerald-300">Face verified</p>
             </div>
           ) : (
-            <div className={`bg-purple-50 border rounded-lg px-3 py-2.5 ${faceError ? 'border-red-300' : 'border-purple-200'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs sm:text-sm text-purple-800 leading-tight">Verify your face to continue</p>
-                <Button
-                  type="button"
-                  onClick={() => setShowFaceVerification(true)}
-                  className="h-5 px-1.5 shrink-0 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-[9px]"
-                  size="sm"
-                  disabled={isVerifying}
-                  style={{ minHeight: 0 }}
-                >
-                  {isVerifying ? (
-                    <Loader2 className="w-1.5 h-1.5 animate-spin" />
-                  ) : (
-                    <>
-                      <Camera className="w-1.5 h-1.5 mr-1" />
-                      Verify now
-                    </>
-                  )}
-                </Button>
-              </div>
-              {faceError && <p className="text-red-500 text-xs mt-2">{faceError}</p>}
+            <div className={`flex items-center justify-between gap-3 rounded-xl border bg-white/[0.06] px-3.5 py-2.5 ${faceError ? 'border-red-400/80' : 'border-white/15'}`}>
+              <p className="text-sm text-white/75 leading-snug">Verify your face to continue</p>
+              <Button
+                type="button"
+                onClick={() => setShowFaceVerification(true)}
+                className="h-9 shrink-0 rounded-full bg-gradient-to-r from-[#9d0d52] to-[#e0187a] px-4 text-[13px] font-semibold text-white hover:opacity-95"
+                disabled={isVerifying}
+              >
+                {isVerifying ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Camera className="w-4 h-4" />
+                    Verify now
+                  </>
+                )}
+              </Button>
             </div>
           )}
+          {faceError && !faceVerified && !showFaceVerification && <p className={formError}>{faceError}</p>}
         </div>
       )}
 
-      <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-        <div className="space-y-2 min-[390px]:order-2">
-        <Label htmlFor="email" className="text-sm font-medium text-black">{t('auth.email')} *</Label>
-        <div className="relative">
-          <Mail className="absolute left-2.5 top-3 h-4 w-4 text-gray-400 z-10" />
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={onInputChange}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-            className={`mobile-input-field pl-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.email ? 'border-red-500' : ''}`}
-            style={getInputStyles()}
-            placeholder={t('auth.email')}
-          />
-          {errors.email && <p className="text-red-700 text-xs font-semibold mt-1">{errors.email}</p>}
-        </div>
-      </div>
-        <div className="space-y-2 min-[390px]:order-1">
-          <Label htmlFor="dateOfBirth" className="text-sm font-medium text-black">{t('registration.dateOfBirth')} *</Label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5 order-2">
+          <Label htmlFor="email" className={formLabel}>{t('auth.email')} <span className={formRequired}>*</span></Label>
           <div className="relative">
+            <Mail className={formFieldIcon} />
             <Input
-              id="dateOfBirth"
-              name="dateOfBirth"
-              type="date"
-              value={formData.dateOfBirth}
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={formData.email}
               onChange={onInputChange}
-              className={`compact-date-input text-sm pl-2.5 pr-7 bg-white text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.dateOfBirth ? 'border-red-500' : ''}`}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              className={`mobile-input-field ${formInput(!!errors.email)} pl-10`}
+              style={getInputStyles()}
+              placeholder="Email"
             />
-            {errors.dateOfBirth && <p className="text-red-700 text-xs font-semibold mt-1">{errors.dateOfBirth}</p>}
           </div>
+          {errors.email && <p className={formError}>{errors.email}</p>}
+        </div>
+        <div className="space-y-1.5 order-1">
+          <Label htmlFor="dateOfBirth" className={formLabel}>{t('registration.dateOfBirth')} <span className={formRequired}>*</span></Label>
+          <Input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            autoComplete="bday"
+            max={getLatestAllowedDateOfBirth()}
+            value={formData.dateOfBirth}
+            onChange={onInputChange}
+            className={`[color-scheme:dark] ${formInput(!!errors.dateOfBirth)}`}
+            // Dim the "mm/dd/yyyy" mask until a date is picked, so an empty
+            // field doesn't read as already filled in.
+            style={formData.dateOfBirth ? undefined : { color: 'rgba(255,255,255,0.4)' }}
+          />
+          {errors.dateOfBirth && <p className={formError}>{errors.dateOfBirth}</p>}
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 min-[390px]:grid-cols-2 gap-3 sm:gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="password" className="text-sm font-medium text-black">{t('auth.password')} *</Label>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="password" className={formLabel}>{t('auth.password')} <span className={formRequired}>*</span></Label>
           <div className="relative">
-            <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+            <Lock className={formFieldIcon} />
             <Input
               id="password"
               name="password"
               type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
               value={formData.password}
               onChange={onInputChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              className={`mobile-input-field pl-8 pr-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.password ? 'border-red-500' : ''}`}
+              className={`mobile-input-field ${formInput(!!errors.password)} pl-10 pr-11`}
               style={getInputStyles()}
-              placeholder={t('auth.password')}
+              placeholder="Password"
             />
             <button
               type="button"
               onClick={onTogglePassword}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-white/50 hover:text-white/80"
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
-            {errors.password && <p className="text-red-700 text-xs font-semibold mt-1">{errors.password}</p>}
           </div>
+          {errors.password && <p className={formError}>{errors.password}</p>}
         </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="confirmPassword" className="text-sm font-medium text-black">{t('auth.confirmPassword')} *</Label>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword" className={formLabel}>{t('auth.confirmPassword')} <span className={formRequired}>*</span></Label>
           <div className="relative">
-            <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+            <Lock className={formFieldIcon} />
             <Input
               id="confirmPassword"
               name="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
+              autoComplete="new-password"
               value={formData.confirmPassword}
               onChange={onInputChange}
-              className={`pl-8 pr-8 bg-white text-black placeholder:text-black border-black focus:border-pink-400 focus:ring-pink-400 ${errors.confirmPassword ? 'border-red-500' : ''}`}
-              placeholder={t('auth.password')}
+              className={`mobile-input-field ${formInput(!!errors.confirmPassword)} pl-10 pr-11`}
+              style={getInputStyles()}
+              placeholder="Confirm"
             />
             <button
               type="button"
               onClick={onToggleConfirmPassword}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-white/50 hover:text-white/80"
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
-            {errors.confirmPassword && <p className="text-red-700 text-xs font-semibold mt-1">{errors.confirmPassword}</p>}
           </div>
+          {errors.confirmPassword && <p className={formError}>{errors.confirmPassword}</p>}
         </div>
       </div>
-      
     </div>
   );
 };

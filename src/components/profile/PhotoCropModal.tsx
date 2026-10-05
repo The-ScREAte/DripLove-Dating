@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getCroppedImageBlob } from '@/utils/cropImage';
+import { uploadPhotoThumbnail, withThumbnailPaths } from '@/utils/photoThumbnails';
 
 // Same aspect ratio the app actually displays profile photos in - a tall,
 // portrait frame close to the swipe card's own proportions (which itself
@@ -49,6 +50,7 @@ export const uploadCroppedPhoto = async (
 
   const storedPath = uploadData?.path;
   if (!storedPath) throw new Error('Upload succeeded but no path returned from storage');
+  void uploadPhotoThumbnail(storedPath, safeFile);
 
   const { data: urlData } = await supabase.storage.from('user-photos').getPublicUrl(storedPath);
   if (!urlData?.publicUrl) throw new Error('Failed to generate public image URL');
@@ -70,7 +72,7 @@ export const uploadCroppedPhoto = async (
   const bucketIndex = urlParts.findIndex((part) => part === 'user-photos');
   if (bucketIndex !== -1 && bucketIndex < urlParts.length - 1) {
     const oldPath = urlParts.slice(bucketIndex + 1).join('/');
-    void supabase.storage.from('user-photos').remove([oldPath]).catch(() => {});
+    void supabase.storage.from('user-photos').remove(withThumbnailPaths([oldPath])).catch(() => {});
   }
 
   return newUrl;

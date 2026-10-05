@@ -86,9 +86,9 @@ const StreakFlash: React.FC<StreakFlashProps> = ({ currentStreak, onClose }) => 
           type="button"
           onClick={handleClose}
           aria-label={t('common.close')}
-          className="absolute top-4 right-4 z-10 p-1 rounded-full text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+          className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors"
         >
-          <X className="w-3.5 h-3.5" />
+          <X className="w-4 h-4" />
         </button>
 
         <CardContent className="relative p-6 text-center">

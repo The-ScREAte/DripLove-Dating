@@ -56,7 +56,7 @@ const faqItems: FAQItem[] = [
   {
     id: 'cancel-subscription',
     question: 'How do I cancel my subscription?',
-    answer: 'Go to Profile → Account Actions → Cancel Subscription. Your premium features will remain active until the end of your billing period.',
+    answer: 'Go to Profile → Account Actions → Manage account → Cancel Subscription. Your premium features will remain active until the end of your billing period.',
     icon: <CreditCard className="w-4 h-4" />,
     category: 'subscription',
   },
@@ -108,7 +108,7 @@ const faqItems: FAQItem[] = [
   {
     id: 'delete-account',
     question: 'How do I delete my account?',
-    answer: 'Go to Profile → Account Actions → Delete Account. You will need to verify your identity. This action is permanent and removes all your data.',
+    answer: 'Go to Profile → Account Actions → Manage account → Delete Account. You will need to verify your identity. This action is permanent and removes all your data.',
     icon: <Settings className="w-4 h-4" />,
     category: 'account',
   },

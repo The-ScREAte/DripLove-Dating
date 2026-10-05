@@ -95,7 +95,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Cancel subscription
     if (msg.includes('cancel') || msg.includes('unsubscribe') || msg.includes('stop subscription') || msg.includes('end subscription')) {
-      return "❌ CANCEL SUBSCRIPTION\n\nWe're sad to see you go, but here's how:\n\n📱 STEPS:\n1. Go to Profile\n2. Open Account Actions\n3. Tap 'Cancel Subscription'\n4. Confirm cancellation\n\n📝 IMPORTANT:\n• Premium features remain active until your billing period ends\n• You won't be charged again\n• You can resubscribe anytime\n\n💭 Changed your mind? We'd love to know how we can improve! Email us at driploveinfo@gmail.com";
+      return "❌ CANCEL SUBSCRIPTION\n\nWe're sad to see you go, but here's how:\n\n📱 STEPS:\n1. Go to Profile\n2. Open Account Actions\n3. Tap 'Manage account'\n4. Tap 'Cancel Subscription'\n5. Confirm cancellation\n\n📝 IMPORTANT:\n• Premium features remain active until your billing period ends\n• You won't be charged again\n• You can resubscribe anytime\n\n💭 Changed your mind? We'd love to know how we can improve! Email us at driploveinfo@gmail.com";
     }
 
     // Explore more countries
@@ -135,7 +135,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Delete account
     if (msg.includes('delete account') || msg.includes('remove account') || msg.includes('close account') || msg.includes('deactivate')) {
-      return "⚠️ DELETE ACCOUNT\n\n📱 TO DELETE:\n1. Go to Profile\n2. Open Account Actions\n3. Tap 'Delete Account'\n4. Verify your identity\n5. Confirm deletion\n\n🚨 WARNING:\n• This action is PERMANENT\n• All your data will be removed\n• Your matches and chats will be deleted\n• This cannot be undone\n\n💭 Taking a break instead? Consider just logging out - your profile stays safe!";
+      return "⚠️ DELETE ACCOUNT\n\n📱 TO DELETE:\n1. Go to Profile\n2. Open Account Actions\n3. Tap 'Manage account'\n4. Tap 'Delete Account'\n5. Confirm deletion\n\n🚨 WARNING:\n• This action is PERMANENT\n• All your data will be removed\n• Your matches and chats will be deleted\n• This cannot be undone\n\n💭 Taking a break instead? Consider just logging out - your profile stays safe!";
     }
 
     // Features

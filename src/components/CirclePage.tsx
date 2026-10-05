@@ -39,6 +39,10 @@ import { getDetailImageUrl } from '@/utils/imageOptimizer';
 // any of those three opens the premium upsell, never a profile). Swiping
 // the one available free card - or, for premium, working through all 4 -
 // exhausts the whole row and starts its cooldown.
+// Entry point to Circle Up Live (video matching) at the top of this page.
+// Switched off until the feature is ready to launch.
+const SHOW_CIRCLE_UP_LIVE = false;
+
 const ROW_BATCH_SIZE = 4;
 const PREMIUM_ROW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const FREE_ROW_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -130,6 +134,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
+import ThumbnailImage from '@/components/common/ThumbnailImage';
 
 // One icon per interest tag (see src/constants/formData.ts) - shown as the
 // shared-thing badge on a card instead of spelling the interest out as text.
@@ -428,7 +433,7 @@ const RefillCard = ({
   const content = (
     <>
       <div className="absolute inset-0 bg-gradient-to-br from-pink-950 via-purple-950/90 to-black" />
-      <div className="absolute inset-0 bg-white/5" style={{ backdropFilter: 'blur(6px)' }} />
+      <div className="absolute inset-0 bg-white/5" />
       <div className="relative h-full flex flex-col items-center justify-center gap-2 px-3 text-center">
         {countdown ? (
           <CircularCountdown remainingMs={countdown.remainingMs} totalMs={countdown.totalMs} />
@@ -489,7 +494,7 @@ const CompatibilityBadge = ({ percent, showHint }: { percent: number; showHint?:
   }, [showHint]);
 
   return (
-    <span className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-semibold py-0.5 pl-2 pr-2 rounded-full flex items-center">
+    <span className="absolute top-2 left-2 bg-black/70 text-white text-xs font-semibold py-0.5 pl-2 pr-2 rounded-full flex items-center">
       <span className="whitespace-nowrap">{percent}%</span>
       <span
         className="whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin-left] duration-500 ease-out"
@@ -546,11 +551,11 @@ const PeopleRow = ({
           >
             <div className="relative w-40 h-48 bg-white/5">
               {p.firstImage && (
-                <img src={p.firstImage} alt={p.first_name} className={`w-full h-full object-cover ${locked ? 'blur-md' : ''}`} loading="lazy" />
+                <ThumbnailImage src={p.firstImage} alt={p.first_name} className={`w-full h-full object-cover ${locked ? 'blur-md' : ''}`} loading="lazy" decoding="async" draggable={false} />
               )}
               {locked && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                  <div className="bg-black/80 border border-pink-500/40 backdrop-blur-sm rounded-full p-2.5">
+                  <div className="bg-black/80 border border-pink-500/40 rounded-full p-2.5">
                     <Lock className="w-5 h-5 text-pink-300" />
                   </div>
                 </div>
@@ -561,7 +566,7 @@ const PeopleRow = ({
                   {interestIcons.slice(0, 3).map(({ icon: Icon, label }, i) => (
                     <span
                       key={`${label}-${i}`}
-                      className="w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center"
+                      className="w-7 h-7 rounded-full bg-black/70 flex items-center justify-center"
                       title={label}
                       aria-label={label}
                     >
@@ -954,9 +959,14 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         if (filter?.isVerified) q = q.eq('is_verified', true);
         if (filter?.familyPlans) q = q.in('family_plans', filter.familyPlans);
         if (filter?.interest) q = q.contains('interests', [filter.interest]);
-        if (filter?.hasMusic) q = q.contains('favorites', [{ category: 'Music' }]);
+        // favorites is a jsonb column: the value must go over as JSON text.
+        // Passed as a JS array it was serialised as `{[object Object]}`, which
+        // Postgres rejected (400) - so the Music Lovers count never loaded.
+        if (filter?.hasMusic) q = q.contains('favorites', JSON.stringify([{ category: 'Music' }]));
         if (filter?.hasSocialMedia) q = q.not('social_media', 'is', null).neq('social_media', '');
-        if (filter?.hasPets) q = q.not('pets', 'is', null).neq('pets', []);
+        // pets is a text[] column: an empty JS array was sent as '' ("malformed
+        // array literal", 400). '{}' is Postgres' empty array.
+        if (filter?.hasPets) q = q.not('pets', 'is', null).filter('pets', 'neq', '{}');
         const { data, error } = await q;
         if (error || !data) return 0;
         return data.filter((profile) => {
@@ -1829,20 +1839,23 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           )}
         </div>
         <p className="text-white/40 text-xs px-6">Made easy to spot and find who's right for you.</p>
-        <button
-          type="button"
-          onClick={() => navigate('/circle-up')}
-          className="mx-6 mt-3 w-[calc(100%-3rem)] flex items-center gap-3 rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-500/15 via-purple-500/10 to-transparent px-4 py-3 text-left transition-colors hover:border-pink-500/50"
-        >
-          <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600">
-            <Video className="h-5 w-5 text-white" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-white">Circle Up Live</span>
-            <span className="block truncate text-xs text-white/50">Go live and meet someone new, right now</span>
-          </span>
-          <ChevronRight className="h-4 w-4 flex-shrink-0 text-white/40" />
-        </button>
+        {/* Hidden for now - flip SHOW_CIRCLE_UP_LIVE to bring the entry back. */}
+        {SHOW_CIRCLE_UP_LIVE && (
+          <button
+            type="button"
+            onClick={() => navigate('/circle-up')}
+            className="mx-6 mt-3 w-[calc(100%-3rem)] flex items-center gap-3 rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-500/15 via-purple-500/10 to-transparent px-4 py-3 text-left transition-colors hover:border-pink-500/50"
+          >
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 to-purple-600">
+              <Video className="h-5 w-5 text-white" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-white">Circle Up Live</span>
+              <span className="block truncate text-xs text-white/50">Go live and meet someone new, right now</span>
+            </span>
+            <ChevronRight className="h-4 w-4 flex-shrink-0 text-white/40" />
+          </button>
+        )}
       </div>
       <div>
         {loading ? (

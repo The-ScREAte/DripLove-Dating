@@ -1020,7 +1020,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                         {/* Action buttons with stable height */}
                         <div className="grid grid-cols-2 gap-1.5">
                           <button
-                            className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                            className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-full shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                             onClick={handleReportImage}
                             disabled={reporting || !selectedReason || isBlocking}
                           >
@@ -1028,7 +1028,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
                           </button>
 
                           <button
-                            className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                            className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                             onClick={handleBlockUser}
                             disabled={isBlocking || reporting || (!selectedReason && !blockReason.trim())}
                           >

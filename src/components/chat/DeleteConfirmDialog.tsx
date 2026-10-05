@@ -38,7 +38,7 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+            className="flex-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-sm font-medium transition-colors"
           >
             {t('deleteMessage.delete')}
           </button>

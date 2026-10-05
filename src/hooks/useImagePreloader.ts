@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { getDetailImageUrl, optimizeImageUrl as buildTransformUrl } from '@/utils/imageOptimizer';
 
 interface ImagePreloaderOptions {
@@ -31,7 +31,11 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
     // upload time, so this hook's job is to serve them directly.
   } = options;
 
-  const [preloadedImages, setPreloadedImages] = useState<Map<string, PreloadedImageData>>(new Map());
+  // Bookkeeping only - a ref, not state. It used to be state too (that copy
+  // was never read by anything), so every photo starting and finishing a
+  // preload re-rendered the whole Discover page twice; with a deck's worth
+  // of photos preloading while swiping, that was a steady source of jank,
+  // worst on Android.
   const preloadedImagesRef = useRef<Map<string, PreloadedImageData>>(new Map());
   const loadingQueue = useRef<QueueItem[]>([]);
   const isProcessing = useRef(false);
@@ -39,19 +43,14 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const cancelledUrls = useRef<Set<string>>(new Set());
 
   const setImageData = useCallback((url: string, data: PreloadedImageData) => {
-    setPreloadedImages(prev => {
-      const next = new Map(prev);
-      next.set(url, data);
-      preloadedImagesRef.current = next;
-      return next;
-    });
+    preloadedImagesRef.current.set(url, data);
   }, []);
 
   const optimizeImageUrl = useCallback((url: string): string => {
     return getDetailImageUrl(url);
   }, []);
 
-  const preloadImage = useCallback((url: string): Promise<void> => {
+  const preloadImage = useCallback((url: string, decode = false): Promise<void> => {
     const existing = preloadedImagesRef.current.get(url);
     if (existing?.loaded) return Promise.resolve();
 
@@ -73,14 +72,24 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
       const img = new Image();
 
       img.onload = () => {
-        setImageData(url, {
-          url,
-          loaded: true,
-          loading: false,
-          error: false,
-          optimizedUrl
-        });
-        resolve();
+        const done = () => {
+          setImageData(url, {
+            url,
+            loaded: true,
+            loading: false,
+            error: false,
+            optimizedUrl
+          });
+          resolve();
+        };
+        // For the next card or two, also decode now, so the photo paints the
+        // moment its card appears instead of decoding on the first frame.
+        // (Only for 'high' priority - decoded bitmaps are memory-heavy.)
+        if (decode && typeof img.decode === 'function') {
+          img.decode().catch(() => {}).finally(done);
+        } else {
+          done();
+        }
       };
 
       img.onerror = () => {
@@ -147,7 +156,7 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
             continue;
           }
           
-          await preloadImage(nextItem.url).catch(() => {
+          await preloadImage(nextItem.url, nextItem.priority === 'high').catch(() => {
             // ignore individual image failures
           });
         }
@@ -197,7 +206,6 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   }, []);
 
   const clearCache = useCallback(() => {
-    setPreloadedImages(new Map());
     preloadedImagesRef.current = new Map();
     inFlightLoads.current.clear();
     loadingQueue.current = [];

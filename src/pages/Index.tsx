@@ -9,6 +9,8 @@ import { transformFormDataForSubmission } from '@/utils/formValidation';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 import { preloadExchangeRates } from '@/services/exchangeRateService';
 import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
+import { FORM_PAGE_BG } from '@/components/forms/formTheme';
+import OnboardingTransition from '@/components/forms/OnboardingTransition';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
@@ -243,6 +245,25 @@ const Index = ({
     checkUserTypeAndRedirect(user.id);
   }, [checkUserTypeAndRedirect, isAuthenticated, setViewIfChanged, user]);
 
+  // While someone is signing up / completing their profile / reading the
+  // terms, fetch the code for the screens that come next, so each hand-off
+  // (form -> terms -> Discover) renders immediately instead of waiting on a
+  // chunk download behind a blank frame.
+  useEffect(() => {
+    if (currentView !== 'register' && currentView !== 'profile-completion' && currentView !== 'terms-acceptance') return;
+    const warm = () => {
+      void import('@/components/TermsAcceptance');
+      void import('@/components/MainApp');
+    };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(warm, { timeout: 2000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(warm, 600);
+    return () => window.clearTimeout(id);
+  }, [currentView]);
+
   const handleGetStarted = () => {
     setCurrentView('login');
   };
@@ -347,8 +368,13 @@ const Index = ({
     setCurrentView('welcome');
   };
 
+  // Set only when arriving from sign-up/terms, so that hand-off shows the
+  // branded "getting Discover ready" screen while the app mounts; a normal
+  // cold start keeps its existing (empty) fallback.
+  const [isOnboardingHandoff, setIsOnboardingHandoff] = useState(false);
+
   const handleTermsAccept = () => {
-    // Update view
+    setIsOnboardingHandoff(true);
     setCurrentView('app');
   };
 
@@ -417,11 +443,9 @@ const Index = ({
         )}
 
         {currentView === 'register' && (
-          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
-            {/* Video Background - always rendered, loads async */}
-            <Suspense fallback={null}>
-              <VideoBackground />
-            </Suspense>
+          // One solid background for the whole sign-up flow (no video/gradient
+          // behind the form) - the form sets the colour itself, see formTheme.
+          <div className="h-fill flex items-start justify-center overflow-y-auto relative" style={{ minHeight: '100vh', background: FORM_PAGE_BG }}>
             <Suspense fallback={<PageLoader />}>
               <RegistrationForm
                 onSubmit={handleRegister}
@@ -433,18 +457,15 @@ const Index = ({
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start justify-center px-4 pt-8 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
-            <Suspense fallback={null}>
-              <VideoBackground />
-            </Suspense>
+          <div className="h-fill flex items-start justify-center overflow-y-auto relative" style={{ minHeight: '100vh', background: FORM_PAGE_BG }}>
             <Suspense fallback={<PageLoader />}>
-              <ProfileCompletionPage />
+              <ProfileCompletionPage onComplete={handleTermsAccept} />
             </Suspense>
           </div>
         )}
 
         {currentView === 'terms-acceptance' && user && (
-          <Suspense fallback={<PageLoader />}>
+          <Suspense fallback={<OnboardingTransition />}>
             <TermsAcceptance
               user={user}
               onAccept={handleTermsAccept}
@@ -454,7 +475,7 @@ const Index = ({
 
         {currentView === 'app' && user && (
           <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
+            <Suspense fallback={isOnboardingHandoff ? <OnboardingTransition title="Getting Discover ready" subtitle="Finding people near you…" /> : <PageLoader />}>
               <MainApp user={user} onLogout={handleLogout} />
             </Suspense>
           </ErrorBoundary>

@@ -1677,26 +1677,15 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             id="section-accountActions"
             className="mt-3"
           >
-            {/* Only show the rest of the account actions here, not logout/terms/privacy */}
+            {/* Log out is the last item in here; terms/privacy links stay hidden */}
             <AccountActions 
               currentUser={currentUser} 
-              hideLogoutTermsPrivacy={true} // Pass a prop to hide these actions
+              hideLogoutTermsPrivacy={true} // Hides the terms/privacy links only
               onLogout={onLogout}
               preferredLanguage={editedProfile.preferred_language}
               onLanguageChange={handleLanguageChange}
             />
           </CollapsibleSection>
-        </div>
-        {/* Move Logout to the bottom of the page */}
-        <div className="mt-2 flex flex-col items-center gap-4 w-full">
-          <div className="flex justify-center w-full">
-            <Button
-              onClick={onLogout}
-              className="w-full max-w-xs bg-neutral-900 hover:bg-neutral-800 text-white font-medium"
-            >
-              Log Out
-            </Button>
-          </div>
         </div>
       </div>
     </div>

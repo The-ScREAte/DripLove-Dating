@@ -476,3 +476,7 @@ export const AFRICAN_SYMBOL_GROUPS: SymbolGroup[] = [
 
 // For backward compatibility - Ghana Adinkra symbols
 export const SELECTABLE_ADINKRA_SYMBOLS = AFRICAN_SYMBOL_GROUPS.find(g => g.id === 'ghana-adinkra')?.symbols || [];
+
+/** Most cultural signs a profile can pick (sign-up, complete profile and the
+ *  profile editor all enforce this). */
+export const MAX_CULTURAL_SIGNS = 3;

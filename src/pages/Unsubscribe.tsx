@@ -238,7 +238,7 @@ const Unsubscribe: React.FC = () => {
             <Button
               onClick={handleUnsubscribe}
               disabled={loading || confirmation.trim().toLowerCase() !== REQUIRED_PHRASE.toLowerCase()}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg mt-2"
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full mt-2"
             >
               {loading ? 'Processing...' : 'Unsubscribe'}
             </Button>

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { preloadImageToBlob } from '@/utils/imageCache';
 import { getPlatformSync } from '@/utils/platformUtils';
 import { cacheAvatar, getCachedAvatar } from '@/cache/chatCache';
+import { thumbnailUrlFor, isThumbnailKnownMissing, markThumbnailMissing } from '@/utils/photoThumbnails';
 
 interface ChatUserAvatarProps {
   userId: string;
@@ -68,8 +69,17 @@ const ChatUserAvatar = ({ userId, firstName = '', lastName = '', onClick, size =
         if (images && images.length > 0) {
           const imageUrl = images[0].image_url;
 
-          // ⭐ Convert to blob URL → FASTEST on Android
-          const blobUrl = await preloadImageToBlob(imageUrl);
+          // ⭐ Convert to blob URL → FASTEST on Android. An avatar is tiny, so
+          // fetch the photo's small thumbnail; photos uploaded before
+          // thumbnails existed fall back to the full image.
+          const thumbUrl = thumbnailUrlFor(imageUrl);
+          let blobUrl = '';
+          if (thumbUrl && !isThumbnailKnownMissing(thumbUrl)) {
+            const fromThumb = await preloadImageToBlob(thumbUrl);
+            if (fromThumb.startsWith('blob:')) blobUrl = fromThumb;
+            else markThumbnailMissing(thumbUrl);
+          }
+          if (!blobUrl) blobUrl = await preloadImageToBlob(imageUrl);
 
           if (blobUrl) {
             cacheAvatar(userId, blobUrl); // Store in global cache

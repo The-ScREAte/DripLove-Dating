@@ -58,7 +58,7 @@ const App = ({
           <p className="text-gray-600 mb-4">Please refresh the app to continue.</p>
           <button 
             onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700"
+            className="px-4 py-2 bg-pink-600 text-white rounded-full hover:bg-pink-700"
           >
             Refresh App
           </button>

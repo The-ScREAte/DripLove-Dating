@@ -1415,7 +1415,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           <p className="text-gray-600 mb-6">{t('errors.unableToLoadUser')}</p>
           <button
             onClick={onLogout}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium"
+            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-full font-medium"
           >
             {t('auth.backToLogin')}
           </button>

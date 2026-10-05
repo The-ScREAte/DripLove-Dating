@@ -39,7 +39,7 @@ const ScreenCaptureBlockedOverlay = ({ isAuthenticated = false }: { isAuthentica
     let cancelled = false;
 
     (async () => {
-      const PrivacyScreen = await getPrivacyScreenPlugin();
+      const PrivacyScreen = (await getPrivacyScreenPlugin())?.plugin;
       if (cancelled || !PrivacyScreen) return;
 
       screenshotHandle = await PrivacyScreen.addListener('screenshotTaken', () => {

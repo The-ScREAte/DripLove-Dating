@@ -36,7 +36,7 @@ interface GeolocationResult {
 }
 
 // Map country codes to full names
-const countryCodeMap: Record<string, string> = {
+export const countryCodeMap: Record<string, string> = {
   'NG': 'Nigeria',
   'GH': 'Ghana',
   'SN': 'Senegal',
@@ -110,7 +110,7 @@ const countryCodeMap: Record<string, string> = {
 /**
  * Reverse geocode coordinates to get country and city
  */
-async function reverseGeocode(latitude: number, longitude: number): Promise<{ countryCode: string; city?: string } | null> {
+export async function reverseGeocode(latitude: number, longitude: number): Promise<{ countryCode: string; city?: string } | null> {
   try {
     // Using OpenStreetMap Nominatim (free, no API key needed)
     // NOTE: Browsers/WKWebView forbid setting some headers (like User-Agent),
