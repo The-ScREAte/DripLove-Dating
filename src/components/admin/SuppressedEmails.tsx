@@ -33,6 +33,9 @@ export default function SuppressedEmails() {
       const { data, error } = await supabase
         .from('email_suppression_list')
         .select('email, reason, last_error, created_at')
+        // Released entries (wrongly blocked by our own sending limit) are
+        // kept for the record but no longer block anyone.
+        .is('released_at', null)
         .order('created_at', { ascending: false })
         .limit(1000);
 

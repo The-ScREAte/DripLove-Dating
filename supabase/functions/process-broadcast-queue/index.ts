@@ -1,364 +1,308 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Process up to 500 recipients per run (claimed atomically); send with limited concurrency.
-const BATCH_SIZE = 500;
-const SEND_CONCURRENCY = 50;
-const MAX_RETRIES = 3; // Maximum retry attempts per recipient
-const STALE_PROCESSING_MINUTES = 10; // Self-heal processing recipients stuck longer than this
-const MAX_CHAIN_DEPTH = 1000; // Safety to prevent infinite self-invocation
+// Delivery pacing. Campaigns used to stop at ~120 recipients: 50 parallel
+// calls to send-push-notification were refused by the platform ("Failed to
+// send a request to the Edge Function"), the self-continue call failed the
+// same way, and nothing ever picked the campaign up again. Now each run sends
+// a modest number in parallel for up to RUN_BUDGET_MS, and a once-a-minute
+// cron job (see 20261005100000_broadcast_delivery_fix.sql) starts the next run
+// for as long as a campaign has work left.
+const CLAIM_SIZE = 40;
+const SEND_CONCURRENCY = 8;
+const RUN_BUDGET_MS = 50_000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MINUTES = 2;
+const BROADCAST_CAP_RETRY_HOURS = 6;
+const STALE_PROCESSING_MINUTES = 10;
+const LOCK_NAME = 'process-broadcast-queue';
+const LOCK_SECONDS = 90;
+
+// Reasons that mean "this person can't get a push at all" - final, not a
+// failure. They still see the message in their in-app inbox if the campaign
+// was saved to profiles.
+const SKIP_REASONS = new Set(['no_device', 'notifications_off', 'account_not_active', 'no_profile']);
+
+// Supabase Edge Runtime: keeps a task running after the response is sent.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
+
+type Recipient = { id: string; user_id: string; retry_count?: number };
+type Campaign = { id: string; title: string; message: string; notification_type: string | null; status: string };
+type Outcome = 'sent' | 'skipped' | 'deferred' | 'retry' | 'failed';
+
+const hoursUntilLocalMorning = (localHour: number | null | undefined): number => {
+  const h = typeof localHour === 'number' ? localHour : 0;
+  if (h >= 22) return 24 - h + 8;
+  if (h < 8) return 8 - h;
+  return 1;
+};
+
+const minutesFromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+
+async function updateRecipient(supabase: SupabaseClient, id: string, fields: Record<string, unknown>) {
+  const { error } = await supabase
+    .from('broadcast_recipients')
+    .update({ processing_started_at: null, ...fields })
+    .eq('id', id);
+  if (error) console.error(`Failed to update recipient ${id}:`, error);
+}
+
+async function deliverToRecipient(
+  supabase: SupabaseClient,
+  campaign: Campaign,
+  recipient: Recipient,
+): Promise<Outcome> {
+  const retryCount = recipient.retry_count ?? 0;
+
+  const retryOrFail = async (message: string): Promise<Outcome> => {
+    const next = retryCount + 1;
+    if (next >= MAX_RETRIES) {
+      await updateRecipient(supabase, recipient.id, { status: 'failed', error_message: message, retry_count: next });
+      return 'failed';
+    }
+    await updateRecipient(supabase, recipient.id, {
+      status: 'pending',
+      error_message: message,
+      retry_count: next,
+      next_attempt_at: minutesFromNow(RETRY_DELAY_MINUTES * next),
+    });
+    return 'retry';
+  };
+
+  const handleNotAllowed = async (reason: string, localHour: number | null | undefined): Promise<Outcome> => {
+    if (SKIP_REASONS.has(reason)) {
+      await updateRecipient(supabase, recipient.id, { status: 'skipped', error_message: reason });
+      return 'skipped';
+    }
+    if (reason === 'quiet_hours') {
+      // Night-time where they are: wait until about 8am their time (spread
+      // over half an hour so everyone isn't sent in the same second).
+      const minutes = hoursUntilLocalMorning(localHour) * 60 + Math.floor(Math.random() * 30);
+      await updateRecipient(supabase, recipient.id, {
+        status: 'pending',
+        error_message: 'Waiting for daytime in their time zone',
+        next_attempt_at: minutesFromNow(minutes),
+      });
+      return 'deferred';
+    }
+    if (reason === 'broadcast_cap' || reason === 'duplicate') {
+      await updateRecipient(supabase, recipient.id, {
+        status: 'pending',
+        error_message: 'Already had 2 broadcasts in the last 24h - waiting',
+        next_attempt_at: minutesFromNow(BROADCAST_CAP_RETRY_HOURS * 60),
+      });
+      return 'deferred';
+    }
+    return retryOrFail(`Not delivered: ${reason}`);
+  };
+
+  try {
+    // Check first, so people outside daytime (or without a device) don't
+    // cost a send call at all.
+    const { data: rows, error: eligibilityError } = await supabase.rpc('push_eligibility', {
+      p_user_id: recipient.user_id,
+      p_category: 'broadcast',
+      p_kind: 'broadcast',
+      p_dedupe_key: null,
+    });
+    if (eligibilityError) return retryOrFail(`Eligibility check failed: ${eligibilityError.message}`);
+    const eligibility = Array.isArray(rows) ? rows[0] : rows;
+    if (!eligibility?.allowed) {
+      return handleNotAllowed(eligibility?.reason ?? 'unknown', eligibility?.local_hour);
+    }
+
+    const { data, error } = await supabase.functions.invoke('send-push-notification', {
+      body: {
+        title: campaign.title,
+        body: campaign.message,
+        userId: recipient.user_id,
+        type: campaign.notification_type || 'system',
+        category: 'broadcast',
+        kind: 'broadcast',
+        data: { action: 'open_discover', campaignId: campaign.id },
+      },
+    });
+    if (error) return retryOrFail(error instanceof Error ? error.message : String(error));
+
+    if (data?.pushSuccess) {
+      await updateRecipient(supabase, recipient.id, {
+        status: 'sent',
+        error_message: null,
+        sent_at: new Date().toISOString(),
+        next_attempt_at: null,
+      });
+      return 'sent';
+    }
+    if (data?.suppressed) {
+      // Rules changed between the check and the send (e.g. another broadcast landed).
+      return handleNotAllowed(String(data.reason ?? 'unknown'), eligibility?.local_hour);
+    }
+    if (data?.reason === 'no_device') {
+      // Every device token turned out to be dead (app deleted) and was removed.
+      await updateRecipient(supabase, recipient.id, { status: 'skipped', error_message: 'no_device' });
+      return 'skipped';
+    }
+    return retryOrFail('Push notification failed');
+  } catch (error) {
+    return retryOrFail(error instanceof Error ? error.message : 'Unknown error');
+  }
+}
+
+async function syncCampaign(supabase: SupabaseClient, campaignId: string) {
+  const count = async (statuses: string[]) => {
+    const { count } = await supabase
+      .from('broadcast_recipients')
+      .select('id', { count: 'exact', head: true })
+      .eq('campaign_id', campaignId)
+      .in('status', statuses);
+    return count ?? 0;
+  };
+  const countWaiting = async () => {
+    const { count } = await supabase
+      .from('broadcast_recipients')
+      .select('id', { count: 'exact', head: true })
+      .eq('campaign_id', campaignId)
+      .eq('status', 'pending')
+      .gt('next_attempt_at', new Date().toISOString());
+    return count ?? 0;
+  };
+  const [sent, failed, skipped, remaining, waiting] = await Promise.all([
+    count(['sent']),
+    count(['failed']),
+    count(['skipped']),
+    count(['pending', 'processing']),
+    countWaiting(),
+  ]);
+  await supabase
+    .from('broadcast_campaigns')
+    .update({
+      successful_sends: sent,
+      failed_sends: failed,
+      skipped_sends: skipped,
+      waiting_sends: waiting,
+      ...(remaining === 0 ? { status: 'completed' } : {}),
+    })
+    .eq('id', campaignId);
+  return { sent, failed, skipped, waiting, remaining };
+}
+
+async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | null) {
+  const startedAt = Date.now();
+  const results: Array<Record<string, unknown>> = [];
+
+  try {
+    const { error: releaseError } = await supabase.rpc('release_stale_broadcast_recipients', {
+      p_stale_after: `${STALE_PROCESSING_MINUTES} minutes`,
+    });
+    if (releaseError) console.warn('Failed to release stale recipients:', releaseError);
+
+    let campaignsQuery = supabase
+      .from('broadcast_campaigns')
+      .select('id, title, message, notification_type, status')
+      .in('status', ['queued', 'processing'])
+      .order('created_at', { ascending: true });
+    campaignsQuery = requestedCampaignId
+      ? campaignsQuery.eq('id', requestedCampaignId)
+      : campaignsQuery.limit(5);
+
+    const { data: campaigns, error: campaignError } = await campaignsQuery;
+    if (campaignError) throw campaignError;
+
+    for (const campaign of (campaigns ?? []) as Campaign[]) {
+      if (campaign.status === 'queued') {
+        await supabase.from('broadcast_campaigns').update({ status: 'processing' }).eq('id', campaign.id);
+      }
+
+      const tally: Record<Outcome, number> = { sent: 0, skipped: 0, deferred: 0, retry: 0, failed: 0 };
+      while (Date.now() - startedAt < RUN_BUDGET_MS) {
+        const { data: claimed, error: claimError } = await supabase.rpc('claim_broadcast_recipients', {
+          p_campaign_id: campaign.id,
+          p_batch_size: CLAIM_SIZE,
+          p_max_retries: MAX_RETRIES,
+        });
+        if (claimError) {
+          console.error('Error claiming recipients:', claimError);
+          break;
+        }
+        const recipients = (claimed ?? []) as Recipient[];
+        if (recipients.length === 0) break;
+
+        for (let i = 0; i < recipients.length; i += SEND_CONCURRENCY) {
+          const outcomes = await Promise.all(
+            recipients.slice(i, i + SEND_CONCURRENCY).map((r) => deliverToRecipient(supabase, campaign, r)),
+          );
+          outcomes.forEach((o) => { tally[o] += 1; });
+        }
+      }
+
+      const totals = await syncCampaign(supabase, campaign.id);
+      console.log(`Campaign ${campaign.id}: this run ${JSON.stringify(tally)}; totals ${JSON.stringify(totals)}`);
+      results.push({ campaignId: campaign.id, title: campaign.title, thisRun: tally, totals });
+
+      if (Date.now() - startedAt >= RUN_BUDGET_MS) break;
+    }
+  } catch (error) {
+    console.error('Queue processor error:', error);
+    results.push({ error: error instanceof Error ? error.message : 'Unknown error' });
+  } finally {
+    await supabase.rpc('release_worker_lock', { p_name: LOCK_NAME });
+  }
+  return results;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  let requestedCampaignId: string | null = null;
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Optional body to target a specific campaign and/or allow self-chaining.
-    let requestedCampaignId: string | null = null;
-    let chainDepth = 0;
-    try {
-      const body = await req.json();
-      if (body && typeof body === 'object') {
-        const anyBody = body as Record<string, unknown>;
-        if (typeof anyBody.campaignId === 'string' && anyBody.campaignId.trim()) {
-          requestedCampaignId = anyBody.campaignId.trim(); 
-        }
-        if (typeof anyBody.depth === 'number' && Number.isFinite(anyBody.depth)) {
-          chainDepth = Math.max(0, Math.floor(anyBody.depth));
-        }
-      }
-    } catch {
-      // Ignore missing/invalid body
+    const body = await req.json();
+    if (body && typeof body.campaignId === 'string' && body.campaignId.trim()) {
+      requestedCampaignId = body.campaignId.trim();
     }
-
-    console.log('Starting broadcast queue processing...');
-
-    // Self-heal: release recipients stuck in processing (e.g. worker crash)
-    try {
-      const { data: releasedCount, error: releaseError } = await supabase.rpc(
-        'release_stale_broadcast_recipients',
-        { p_stale_after: `${STALE_PROCESSING_MINUTES} minutes` }
-      );
-
-      if (releaseError) {
-        console.warn('Failed to release stale processing recipients:', releaseError);
-      } else if (releasedCount && releasedCount > 0) {
-        console.log(`Released ${releasedCount} stale processing recipients back to pending`);
-      }
-    } catch (error) {
-      console.warn('Stale release step threw (continuing):', error);
-    }
-
-    // Find campaigns that need processing (queued or processing)
-    let campaignsQuery = supabase
-      .from('broadcast_campaigns')
-      .select('id, title, message, notification_type')
-      .in('status', ['queued', 'processing'])
-      .order('created_at', { ascending: true });
-
-    if (requestedCampaignId) {
-      campaignsQuery = campaignsQuery.eq('id', requestedCampaignId);
-    } else {
-      campaignsQuery = campaignsQuery.limit(5); // Process up to 5 campaigns per run
-    }
-
-    const { data: campaigns, error: campaignError } = await campaignsQuery;
-
-    if (campaignError) {
-      console.error('Error fetching campaigns:', campaignError);
-      throw campaignError;
-    }
-
-    if (!campaigns || campaigns.length === 0) {
-      console.log('No campaigns to process');
-      return new Response(
-        JSON.stringify({ message: 'No campaigns in queue', processed: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Found ${campaigns.length} campaigns to process`);
-
-    const results = [];
-
-    for (const campaign of campaigns) {
-      try {
-        // Mark campaign as processing if it's queued
-        const { data: currentCampaign } = await supabase
-          .from('broadcast_campaigns')
-          .select('status')
-          .eq('id', campaign.id)
-          .single();
-
-        if (currentCampaign?.status === 'queued') {
-          await supabase
-            .from('broadcast_campaigns')
-            .update({ status: 'processing' })
-            .eq('id', campaign.id);
-        }
-
-        // Atomically claim recipients so concurrent workers can't double-send
-        const { data: recipients, error: claimError } = await supabase.rpc(
-          'claim_broadcast_recipients',
-          {
-            p_campaign_id: campaign.id,
-            p_batch_size: BATCH_SIZE,
-            p_max_retries: MAX_RETRIES,
-          }
-        );
-
-        if (claimError) {
-          console.error('Error claiming recipients:', claimError);
-          continue;
-        }
-
-        if (!recipients || recipients.length === 0) {
-          // No claimable work this run. Sync stats and complete if finished.
-          const { count: remainingCount, error: remainingError } = await supabase
-            .from('broadcast_recipients')
-            .select('*', { count: 'exact', head: true })
-            .eq('campaign_id', campaign.id)
-            .in('status', ['pending', 'processing']);
-
-          if (remainingError) {
-            console.error('Error checking remaining recipients:', remainingError);
-            continue;
-          }
-
-          const { count: sentCount, error: sentCountError } = await supabase
-            .from('broadcast_recipients')
-            .select('*', { count: 'exact', head: true })
-            .eq('campaign_id', campaign.id)
-            .eq('status', 'sent');
-
-          const { count: failedCount, error: failedCountError } = await supabase
-            .from('broadcast_recipients')
-            .select('*', { count: 'exact', head: true })
-            .eq('campaign_id', campaign.id)
-            .eq('status', 'failed');
-
-          if (sentCountError) console.warn('Failed counting sent:', sentCountError);
-          if (failedCountError) console.warn('Failed counting failed:', failedCountError);
-
-          await supabase
-            .from('broadcast_campaigns')
-            .update({
-              successful_sends: sentCount || 0,
-              failed_sends: failedCount || 0,
-              status: !remainingCount || remainingCount === 0 ? 'completed' : currentCampaign?.status ?? 'processing',
-            })
-            .eq('id', campaign.id);
-
-          if (!remainingCount || remainingCount === 0) {
-            console.log(`Campaign ${campaign.id} completed`);
-          }
-
-          continue;
-        }
-
-        console.log(`Processing ${recipients.length} recipients for campaign ${campaign.id}`);
-
-        let successCount = 0;
-        for (let i = 0; i < recipients.length; i += SEND_CONCURRENCY) {
-          const batch = recipients.slice(i, i + SEND_CONCURRENCY);
-
-          const sendResults = await Promise.allSettled(
-            batch.map(async (recipient: { id: string; user_id: string; retry_count?: number }) => {
-              try {
-                // Call send-push-notification function
-                const { data, error } = await supabase.functions.invoke('send-push-notification', {
-                  body: {
-                    title: campaign.title,
-                    body: campaign.message,
-                    userId: recipient.user_id,
-                    type: campaign.notification_type,
-                    data: { action: 'open_discover' },
-                  },
-                });
-
-                if (error) throw error;
-
-                const success = data?.success || false;
-                const attemptedAt = new Date().toISOString();
-
-                // Update recipient status and release processing lock
-                if (success) {
-                  await supabase
-                    .from('broadcast_recipients')
-                    .update({
-                      status: 'sent',
-                      error_message: null,
-                      sent_at: attemptedAt,
-                      processing_started_at: null,
-                    })
-                    .eq('id', recipient.id);
-
-                  return { success: true, recipientId: recipient.id };
-                }
-
-                const newRetryCount = (recipient.retry_count ?? 0) + 1;
-                const shouldMarkFailed = newRetryCount >= MAX_RETRIES;
-
-                await supabase
-                  .from('broadcast_recipients')
-                  .update({
-                    status: shouldMarkFailed ? 'failed' : 'pending',
-                    error_message: 'Push notification failed',
-                    sent_at: null,
-                    retry_count: newRetryCount,
-                    processing_started_at: null,
-                  })
-                  .eq('id', recipient.id);
-
-                return { success: false, recipientId: recipient.id };
-              } catch (error) {
-                console.error(`Failed to send to recipient ${recipient.id}:`, error);
-
-                // Increment retry count
-                const newRetryCount = (recipient.retry_count ?? 0) + 1;
-                const shouldMarkFailed = newRetryCount >= MAX_RETRIES;
-
-                await supabase
-                  .from('broadcast_recipients')
-                  .update({
-                    status: shouldMarkFailed ? 'failed' : 'pending',
-                    error_message: error instanceof Error ? error.message : 'Unknown error',
-                    retry_count: newRetryCount,
-                    processing_started_at: null,
-                  })
-                  .eq('id', recipient.id);
-
-                return { success: false, recipientId: recipient.id };
-              }
-            })
-          );
-
-          successCount += sendResults.filter(
-            (r) => r.status === 'fulfilled' && r.value.success
-          ).length;
-        }
-
-        // Sync campaign stats after each batch so UI progress updates immediately.
-        const { count: sentCount, error: sentCountError } = await supabase
-          .from('broadcast_recipients')
-          .select('*', { count: 'exact', head: true })
-          .eq('campaign_id', campaign.id)
-          .eq('status', 'sent');
-
-        const { count: failedCount, error: failedCountError } = await supabase
-          .from('broadcast_recipients')
-          .select('*', { count: 'exact', head: true })
-          .eq('campaign_id', campaign.id)
-          .eq('status', 'failed');
-
-        if (sentCountError) console.warn('Failed counting sent:', sentCountError);
-        if (failedCountError) console.warn('Failed counting failed:', failedCountError);
-
-        await supabase
-          .from('broadcast_campaigns')
-          .update({
-            successful_sends: sentCount || 0,
-            failed_sends: failedCount || 0,
-          })
-          .eq('id', campaign.id);
-
-        // Complete campaign in the same run if there is no remaining work.
-        const { count: remainingCount, error: remainingError } = await supabase
-          .from('broadcast_recipients')
-          .select('*', { count: 'exact', head: true })
-          .eq('campaign_id', campaign.id)
-          .in('status', ['pending', 'processing']);
-
-        if (remainingError) {
-          console.warn('Error checking remaining recipients after batch:', remainingError);
-        } else if (!remainingCount || remainingCount === 0) {
-          await supabase
-            .from('broadcast_campaigns')
-            .update({ status: 'completed' })
-            .eq('id', campaign.id);
-          console.log(`Campaign ${campaign.id} completed`);
-        }
-
-        results.push({
-          campaignId: campaign.id,
-          title: campaign.title,
-          processed: recipients.length,
-          successful: successCount,
-          failed: recipients.length - successCount,
-        });
-
-        console.log(
-          `Campaign ${campaign.id}: processed ${recipients.length}, ` +
-          `${successCount} successful, ${recipients.length - successCount} failed/retry`
-        );
-
-      } catch (error) {
-        console.error(`Error processing campaign ${campaign.id}:`, error);
-        results.push({
-          campaignId: campaign.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    }
-
-    // If there is still work, self-invoke so processing continues even if the admin page is closed.
-    if (chainDepth < MAX_CHAIN_DEPTH) {
-      try {
-        const { count: remainingCampaigns } = await supabase
-          .from('broadcast_campaigns')
-          .select('*', { count: 'exact', head: true })
-          .in('status', ['queued', 'processing']);
-
-        if (remainingCampaigns && remainingCampaigns > 0) {
-          console.log(`Remaining campaigns detected (${remainingCampaigns}). Chaining next run (depth ${chainDepth + 1}).`);
-          supabase.functions
-            .invoke('process-broadcast-queue', {
-              body: {
-                campaignId: requestedCampaignId ?? undefined,
-                depth: chainDepth + 1,
-              },
-            })
-            .catch((err) => console.warn('Failed to chain worker invocation:', err));
-        }
-      } catch (error) {
-        console.warn('Chaining check failed (continuing):', error);
-      }
-    } else {
-      console.warn(`Max chain depth reached (${MAX_CHAIN_DEPTH}). Another trigger may be needed for remaining work.`);
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: 'Queue processing complete',
-        campaignsProcessed: campaigns.length,
-        results,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
-  } catch (error) {
-    console.error('Queue processor error:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+  } catch {
+    // no/invalid body - process everything
   }
+
+  // One worker at a time: the cron job, the admin screen and a scheduled
+  // broadcast can all start a run; overlapping runs used to compound the
+  // overload that stalled campaigns.
+  const { data: gotLock, error: lockError } = await supabase.rpc('try_acquire_worker_lock', {
+    p_name: LOCK_NAME,
+    p_seconds: LOCK_SECONDS,
+  });
+  if (lockError) console.error('Worker lock error (continuing without it):', lockError);
+  if (!lockError && !gotLock) {
+    return new Response(JSON.stringify({ message: 'Another run is in progress' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Answer right away and keep working in the background. Callers (the
+  // once-a-minute job, the admin screen) used to hold the connection open,
+  // and the scheduler gives up after a few seconds - which cut runs off
+  // mid-batch and left recipients stuck "processing".
+  const work = runQueue(supabase, requestedCampaignId);
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+    EdgeRuntime.waitUntil(work);
+    return new Response(JSON.stringify({ message: 'Queue run started' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 202,
+    });
+  }
+  const results = await work;
+  return new Response(JSON.stringify({ message: 'Queue processing complete', results }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 });

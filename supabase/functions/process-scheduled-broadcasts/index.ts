@@ -197,7 +197,9 @@ serve(async (req) => {
               failed = recipientEmails.length;
             } else {
               const emailResults = (emailData as any)?.results;
-              successful = emailResults?.sent || 0;
+              // Emails are queued and sent in steady batches, so "queued"
+              // counts as accepted for delivery here.
+              successful = (emailResults?.sent || 0) + (emailResults?.queued || 0);
               failed = emailResults?.failed || 0;
             }
 

@@ -752,7 +752,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         
         // Request permission
         const permissionResult = await PushNotifications.requestPermissions();
-        
+
+        // Report the answer straight away (useActivityTracker also reports it
+        // on every open) so a "no" stops pushes being attempted at once.
+        const permission = permissionResult.receive === 'granted' || permissionResult.receive === 'denied'
+          ? permissionResult.receive
+          : 'prompt';
+        supabase
+          .rpc('record_app_open', { p_notification_permission: permission })
+          .then(() => undefined, () => undefined);
+
         if (permissionResult.receive === 'granted') {
           try {
             await PushNotifications.register();

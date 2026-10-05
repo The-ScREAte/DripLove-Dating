@@ -53,9 +53,15 @@ interface Campaign {
   total_recipients: number;
   successful_sends: number;
   failed_sends: number;
+  // No device / notifications off - can't be pushed (still in their in-app
+  // inbox when saved to profiles).
+  skipped_sends?: number;
+  // Night-time in their time zone, or already had 2 broadcasts in 24h - sent
+  // automatically later.
+  waiting_sends?: number;
   created_at: string;
   admin_id: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
   save_to_profile: boolean;
 }
 
@@ -81,6 +87,8 @@ interface HistoryItem {
   totalRecipients: number;
   successful: number;
   failed: number;
+  skipped?: number;
+  waiting?: number;
   targetCountries: string[] | null;
   status: string;
   createdAt: string;
@@ -127,7 +135,7 @@ const CountriesBadge = ({ countries }: { countries: string[] | null }) => {
 interface Recipient {
   id: string;
   user_id: string;
-  status: 'pending' | 'sent' | 'failed';
+  status: 'pending' | 'sent' | 'failed' | 'skipped' | 'cancelled' | 'processing';
   error_message: string | null;
   sent_at: string | null;
   user?: {
@@ -372,6 +380,8 @@ export default function BroadcastNotifications() {
         totalRecipients: c.total_recipients,
         successful: c.successful_sends,
         failed: c.failed_sends,
+        skipped: c.skipped_sends ?? 0,
+        waiting: c.waiting_sends ?? 0,
         targetCountries: c.target_countries,
         status: c.status,
         createdAt: c.created_at,
@@ -397,7 +407,7 @@ export default function BroadcastNotifications() {
       );
 
       const signature = next
-        .map((c) => `${c.id}:${c.status}:${c.successful}:${c.failed}:${c.totalRecipients}`)
+        .map((c) => `${c.id}:${c.status}:${c.successful}:${c.failed}:${c.skipped ?? 0}:${c.waiting ?? 0}:${c.totalRecipients}`)
         .join('|');
 
       if (signature !== lastHistorySignatureRef.current) {
@@ -441,7 +451,7 @@ export default function BroadcastNotifications() {
       const recipients: Recipient[] = (data || []).map((item: any) => ({
         id: item.id,
         user_id: item.user_id,
-        status: item.status as 'pending' | 'sent' | 'failed',
+        status: item.status as Recipient['status'],
         error_message: item.error_message,
         sent_at: item.sent_at,
         user: item.user,
@@ -1141,8 +1151,9 @@ export default function BroadcastNotifications() {
                     {historyItems.map((item) => {
                       const isActive = item.status === 'queued' || item.status === 'processing';
                       const isPartial = item.status === 'partial';
+                      // Skipped people are finished too (they just can't get a push).
                       const progress = item.totalRecipients > 0
-                        ? ((item.successful + item.failed) / item.totalRecipients) * 100
+                        ? ((item.successful + item.failed + (item.skipped ?? 0)) / item.totalRecipients) * 100
                         : 0;
 
                       return (
@@ -1213,9 +1224,30 @@ export default function BroadcastNotifications() {
                             <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
                               ✓ {item.successful}
                             </span>
+                            {(item.waiting ?? 0) > 0 && (
+                              <span
+                                className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded"
+                                title="Night-time where they are, or they already had 2 broadcasts today - sent automatically later"
+                              >
+                                ⏳ {item.waiting} waiting
+                              </span>
+                            )}
+                            {(item.skipped ?? 0) > 0 && (
+                              <span
+                                className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded"
+                                title="No device or notifications turned off - can't receive a push"
+                              >
+                                ⊘ {item.skipped} no notifications
+                              </span>
+                            )}
                             {item.failed > 0 && (
                               <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
                                 ✗ {item.failed}
+                              </span>
+                            )}
+                            {item.status === 'cancelled' && (
+                              <span className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                                Cancelled
                               </span>
                             )}
                             <CountriesBadge countries={item.targetCountries} />
@@ -1337,7 +1369,13 @@ export default function BroadcastNotifications() {
                           </p>
                           <p className="text-[10px] text-gray-500">{recipient.user?.email}</p>
                           {recipient.error_message && (
-                            <p className="text-[10px] text-red-600 mt-1">{recipient.error_message}</p>
+                            <p className={`text-[10px] mt-1 ${recipient.status === 'failed' ? 'text-red-600' : 'text-gray-500'}`}>
+                              {recipient.error_message === 'no_device'
+                                ? 'No device with notifications'
+                                : recipient.error_message === 'notifications_off'
+                                  ? 'Notifications turned off'
+                                  : recipient.error_message}
+                            </p>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -1353,8 +1391,16 @@ export default function BroadcastNotifications() {
                               Failed
                             </Badge>
                           )}
-                          {recipient.status === 'pending' && (
-                            <Badge variant="outline" className="text-[10px] h-4">Pending</Badge>
+                          {(recipient.status === 'pending' || recipient.status === 'processing') && (
+                            <Badge variant="outline" className="text-[10px] h-4">
+                              {recipient.error_message?.startsWith('Waiting') || recipient.error_message?.startsWith('Already had') ? 'Waiting' : 'Pending'}
+                            </Badge>
+                          )}
+                          {recipient.status === 'skipped' && (
+                            <Badge className="bg-gray-100 text-gray-600 text-[10px] h-4">No notifications</Badge>
+                          )}
+                          {recipient.status === 'cancelled' && (
+                            <Badge className="bg-gray-100 text-gray-600 text-[10px] h-4">Cancelled</Badge>
                           )}
                         </div>
                       </div>

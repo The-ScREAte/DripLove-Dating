@@ -17,6 +17,49 @@ interface NotificationPayload {
   userId: string
   type?: 'message' | 'match' | 'like' | 'system' | 'admin' | 'image_rejected'
   data?: Record<string, any>
+  // Optional - inferred from `type` when absent (older callers / app versions):
+  //   transactional  welcome, photo moderation, account notices
+  //   event          message, match, like (a real person did something)
+  //   engagement     recommendations, comeback, games, streaks, broadcasts
+  category?: Category
+  kind?: string
+  // Same key within 30 minutes = sent once (e.g. a match announced by both
+  // the server and an older app version).
+  dedupeKey?: string
+}
+
+type Category = 'transactional' | 'event' | 'engagement' | 'broadcast'
+
+// Why a like/match push was held back - these wait in the missed-
+// notifications queue instead of being dropped.
+const HOLD_REASONS = new Set(['no_device', 'notifications_off', 'quiet_hours', 'like_grouped', 'like_cap'])
+
+function inferCategory(type: string): Category {
+  if (type === 'message' || type === 'match' || type === 'like') return 'event'
+  if (type === 'image_rejected') return 'transactional'
+  return 'engagement' // system, admin
+}
+
+// Only these FCM errors mean "this device no longer exists" (app deleted,
+// token rotated). Everything else - including a 400 caused by a bad message
+// payload - must NOT delete the token, or one broken template would wipe
+// every user's device.
+function isDeadTokenError(status: number, errorText: string): boolean {
+  if (status === 404) return true
+  try {
+    const parsed = JSON.parse(errorText)
+    const err = parsed?.error ?? {}
+    const codes: string[] = (err.details ?? []).map((d: { errorCode?: string }) => d?.errorCode).filter(Boolean)
+    if (codes.includes('UNREGISTERED')) return true
+    if (err.status === 'NOT_FOUND') return true
+    const message = String(err.message ?? '')
+    if (codes.includes('INVALID_ARGUMENT') || err.status === 'INVALID_ARGUMENT') {
+      return /registration token/i.test(message)
+    }
+  } catch {
+    // not JSON - fall through
+  }
+  return false
 }
 
 // Get OAuth2 access token for FCM v1 API
@@ -156,9 +199,117 @@ serve(async (req) => {
     )
 
     const payload: NotificationPayload = await req.json()
-    const { title, body, userId, type = 'system', data = {} } = payload
+    const { userId, type = 'system', data = {} } = payload
+    let { title, body } = payload
+    const category: Category = payload.category ?? inferCategory(type)
+    const kind = (payload.kind || type || 'system').toLowerCase()
+    const rawSender = (data as Record<string, unknown>)?.senderId
+    // Default dedupe for matches so an older app version and the server
+    // announcing the same match only produce one push.
+    const dedupeKey = payload.dedupeKey
+      ?? (kind === 'match' && typeof rawSender === 'string' && rawSender ? `match:${rawSender}` : undefined)
 
-    console.log(`📤 Processing notification for user ${userId}:`, { title, body, type })
+    // Sent by process-missed-notifications for items already in the inbox and
+    // already queued once - never store or queue them again.
+    const isCatchup = String((data as Record<string, unknown>)?.catchup ?? '') === 'true'
+
+    console.log(`📤 Processing notification for user ${userId}:`, { title, body, type, category, kind })
+
+    if (!userId || !title) {
+      return new Response(JSON.stringify({ error: 'userId and title are required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400,
+      })
+    }
+
+    // ---- Eligibility: should this person get this push right now? ----------
+    const { data: eligibilityRows, error: eligibilityError } = await supabase.rpc('push_eligibility', {
+      p_user_id: userId,
+      p_category: category,
+      p_kind: kind,
+      p_dedupe_key: dedupeKey ?? null,
+    })
+    if (eligibilityError) console.error('❌ Eligibility check failed:', eligibilityError)
+    const eligibility = Array.isArray(eligibilityRows) ? eligibilityRows[0] : eligibilityRows
+    // If the rule check itself errors, fail open for real-person events and
+    // transactional messages, closed for engagement.
+    const allowed: boolean = eligibility ? !!eligibility.allowed : category !== 'engagement'
+    const reason: string = eligibility?.reason ?? (eligibilityError ? 'eligibility_error' : 'unknown')
+    const tier: string | null = eligibility?.tier ?? null
+
+    const notificationId = crypto.randomUUID()
+    const logDecision = async (fields: Record<string, unknown>) => {
+      const { error } = await supabase.from('push_delivery_log').insert({
+        user_id: userId,
+        notification_id: notificationId,
+        category,
+        kind,
+        tier,
+        dedupe_key: dedupeKey ?? null,
+        ...fields,
+      })
+      if (error) console.error('❌ Error writing push_delivery_log:', error)
+    }
+    const storeInApp = async (dataForRow: Record<string, string>) => {
+      const { error } = await supabase.from('notifications').insert({
+        id: notificationId,
+        user_id: userId,
+        title,
+        message: body,
+        type,
+        category,
+        kind,
+        is_read: false,
+        data: dataForRow,
+        created_at: new Date().toISOString(),
+      })
+      if (error) console.error('❌ Error inserting notification:', error)
+      return !error
+    }
+
+    // Likes and matches that can't be pushed right now wait in the missed-
+    // notifications queue; process-missed-notifications sends them later by
+    // push (daytime / after grouping) or email (notifications blocked, app
+    // deleted). See 20261005120000_missed_like_match_notifications.sql.
+    const holdForLater = async (holdReason: string, stringData: Record<string, string>) => {
+      if (isCatchup || (kind !== 'like' && kind !== 'match')) return
+      const { error } = await supabase.from('notification_email_queue').insert({
+        user_id: userId, kind, title, body, data: stringData, reason: holdReason,
+      })
+      if (error) console.error('❌ Error queueing missed notification:', error)
+    }
+
+    if (!allowed) {
+      console.log(`⏸️ Not pushing (${reason}, tier ${tier}) - ${category}/${kind}`)
+      await logDecision({ decision: 'suppressed', reason })
+      const stringData = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [k, String(v)]))
+      // A real person's action is still recorded in-app; marketing isn't.
+      // (Catch-up pushes repeat items already in the inbox.)
+      let stored = false
+      if (category !== 'engagement' && reason !== 'duplicate' && !isCatchup) {
+        stored = await storeInApp(stringData)
+      }
+      if (HOLD_REASONS.has(reason)) await holdForLater(reason, stringData)
+      return new Response(JSON.stringify({ success: stored, pushSuccess: false, suppressed: true, reason, tier }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
+    // Likes are grouped: say how many arrived since the last like push.
+    if (kind === 'like') {
+      const { data: lastLikePush } = await supabase
+        .from('push_delivery_log')
+        .select('created_at')
+        .eq('user_id', userId).eq('kind', 'like').eq('decision', 'sent')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      const since = lastLikePush?.created_at ?? new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+      const { count } = await supabase
+        .from('likes').select('id', { count: 'exact', head: true })
+        .eq('liked_id', userId).gt('created_at', since)
+      if ((count ?? 0) > 1) {
+        title = `${count} people liked you 👀`
+        body = "See who's interested in you"
+      }
+    }
 
     // Resolve the other person's photo here, once, server-side - rather than
     // requiring every call site (match, message, like) to look this up and
@@ -168,7 +319,9 @@ serve(async (req) => {
     // already gets a person's photo from `user_images`.
     let resolvedImageUrl: string | undefined
     const senderId = (data as Record<string, unknown>).senderId
-    if (typeof senderId === 'string' && senderId) {
+    // Never for likes: who liked you is a Premium feature, so a like push must
+    // not show the liker's photo (older app versions still send senderId).
+    if (kind !== 'like' && typeof senderId === 'string' && senderId) {
       const { data: senderImage } = await supabase
         .from('user_images')
         .select('image_url')
@@ -180,7 +333,11 @@ serve(async (req) => {
         .maybeSingle()
       resolvedImageUrl = senderImage?.image_url
     }
-    const rawNotificationData = resolvedImageUrl ? { ...data, imageUrl: resolvedImageUrl } : data
+    const rawNotificationData = {
+      ...(resolvedImageUrl ? { ...data, imageUrl: resolvedImageUrl } : data),
+      // Lets the app record the tap (mark_notification_opened).
+      notificationId,
+    }
     // FCM's "data" payload only accepts string values - a boolean like
     // showStreakBanner: true gets the whole send rejected with a 400,
     // which is why streak-reminder pushes silently failed while every
@@ -218,10 +375,15 @@ serve(async (req) => {
     // 187 notifications ever could get badge 187 off a single new push.
     // profiles.badge_count is a plain counter instead: +1 per push sent,
     // reset to 0 client-side whenever the app comes to the foreground.
-    const { data: newBadgeCount, error: badgeError } = await supabase
-      .rpc('increment_badge_count', { p_user_id: userId })
-    if (badgeError) console.error('❌ Error incrementing badge count:', badgeError)
-    const badgeCount = newBadgeCount ?? 1
+    let badgeCount = 1
+    if (tokens && tokens.length > 0) {
+      const { data: newBadgeCount, error: badgeError } = await supabase
+        .rpc('increment_badge_count', { p_user_id: userId })
+      if (badgeError) console.error('❌ Error incrementing badge count:', badgeError)
+      badgeCount = newBadgeCount ?? 1
+    }
+    let tokensOk = 0
+    let tokensRemoved = 0
 
     // Send push notifications if tokens exist
     if (tokens && tokens.length > 0) {
@@ -344,18 +506,20 @@ serve(async (req) => {
               const errorText = await response.text()
               console.error(`❌ FCM Error for token ${tokenData.token.substring(0, 20)}...:`, response.status, errorText)
               
-              // Remove invalid tokens
-              if (response.status === 404 || response.status === 400 || errorText.includes('not found') || errorText.includes('invalid')) {
-                console.log(`🗑️ Removing invalid token from database`)
+              // Remove the token only if FCM says the device is gone.
+              if (isDeadTokenError(response.status, errorText)) {
+                console.log(`🗑️ Removing unregistered token from database`)
                 await supabase
                   .from('push_tokens')
                   .delete()
                   .eq('token', tokenData.token)
+                tokensRemoved++
               }
               return false
             }
 
             console.log(`✅ FCM sent successfully to ${tokenData.platform} device`)
+            tokensOk++
             return true
           } catch (error) {
             console.error(`❌ Error sending FCM to token ${tokenData.token.substring(0, 20)}...:`, error)
@@ -374,23 +538,22 @@ serve(async (req) => {
 
     // Store notification in database for real-time delivery
     console.log('💾 Storing notification in database...')
-    const { error: insertError } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: userId,
-        title,
-        message: body, // Column is 'message', not 'body'
-        type,
-        is_read: false, // Column is 'is_read', not 'read'
-        data: notificationData,
-        created_at: new Date().toISOString(),
-      })
+    realTimeStored = isCatchup ? false : await storeInApp(notificationData)
 
-    if (!insertError) {
-      realTimeStored = true
-      console.log('✅ Notification stored in database successfully')
-    } else {
-      console.error('❌ Error inserting notification:', insertError)
+    const failReason = tokens && tokens.length > 0 ? 'fcm_error' : 'no_device'
+    await logDecision({
+      decision: pushSuccess ? 'sent' : 'failed',
+      reason: pushSuccess ? reason : failReason,
+      tokens_attempted: tokens?.length ?? 0,
+      tokens_ok: tokensOk,
+      tokens_removed: tokensRemoved,
+    })
+    // The push didn't reach any device (e.g. app deleted since): let the
+    // missed-notifications job try again, by email if the device is gone.
+    if (!pushSuccess) {
+      await holdForLater(`push_${failReason}`, Object.fromEntries(
+        Object.entries(data ?? {}).map(([k, v]) => [k, String(v)])
+      ))
     }
 
     const finalSuccess = pushSuccess || realTimeStored
@@ -401,6 +564,8 @@ serve(async (req) => {
         success: finalSuccess,
         pushSuccess,
         realTimeStored,
+        reason,
+        tier,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

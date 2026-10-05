@@ -331,10 +331,12 @@ export default function EmailBroadcast({ cloneSeed }: EmailBroadcastProps = {}) 
       const queuedCount = results?.queued || 0;
 
       if (queuedCount > 0) {
+        // Emails now go out in small steady batches (better inbox placement
+        // than one big burst); progress shows in the History tab.
         toast({
-          title: 'Sent — some queued for later',
-          description: `Sent: ${sentCount}, Failed: ${failedCount}, Queued: ${queuedCount} (daily sending limit reached — these will go out automatically once quota resets).`,
-          duration: 7000,
+          title: 'Email broadcast started',
+          description: `${queuedCount} email(s) are going out in steady batches over the next hours (about 900 a day across our sending accounts).${failedCount > 0 ? ` ${failedCount} skipped (invalid, bounced before or unsubscribed).` : ''} Progress shows in History.`,
+          duration: 8000,
         });
       } else if (failedCount > 0) {
         toast({

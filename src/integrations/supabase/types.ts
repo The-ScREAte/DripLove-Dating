@@ -863,34 +863,64 @@ export type Database = {
       }
       email_send_queue: {
         Row: {
+          account_email: string | null
           attempt_count: number
-          broadcast_id: string
+          broadcast_id: string | null
           created_at: string | null
           error: string | null
+          failure_type: string | null
+          html: string | null
           id: string
+          kind: string
+          next_attempt_at: string | null
+          preheader: string | null
+          priority: number
           recipient: string
           sent_at: string | null
           status: string
+          subject: string | null
+          text_body: string | null
+          user_id: string | null
         }
         Insert: {
+          account_email?: string | null
           attempt_count?: number
-          broadcast_id: string
+          broadcast_id?: string | null
           created_at?: string | null
           error?: string | null
+          failure_type?: string | null
+          html?: string | null
           id?: string
+          kind?: string
+          next_attempt_at?: string | null
+          preheader?: string | null
+          priority?: number
           recipient: string
           sent_at?: string | null
           status?: string
+          subject?: string | null
+          text_body?: string | null
+          user_id?: string | null
         }
         Update: {
+          account_email?: string | null
           attempt_count?: number
-          broadcast_id?: string
+          broadcast_id?: string | null
           created_at?: string | null
           error?: string | null
+          failure_type?: string | null
+          html?: string | null
           id?: string
+          kind?: string
+          next_attempt_at?: string | null
+          preheader?: string | null
+          priority?: number
           recipient?: string
           sent_at?: string | null
           status?: string
+          subject?: string | null
+          text_body?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -909,6 +939,8 @@ export type Database = {
           email: string
           last_error: string | null
           reason: string
+          released_at: string | null
+          released_reason: string | null
         }
         Insert: {
           broadcast_id?: string | null
@@ -916,6 +948,8 @@ export type Database = {
           email: string
           last_error?: string | null
           reason: string
+          released_at?: string | null
+          released_reason?: string | null
         }
         Update: {
           broadcast_id?: string | null
@@ -923,6 +957,8 @@ export type Database = {
           email?: string
           last_error?: string | null
           reason?: string
+          released_at?: string | null
+          released_reason?: string | null
         }
         Relationships: []
       }
@@ -3161,6 +3197,10 @@ export type Database = {
         Returns: boolean
       }
       mark_my_profile_broadcasts_read: { Args: never; Returns: number }
+      mark_notification_opened: {
+        Args: { p_notification_id: string }
+        Returns: undefined
+      }
       pass_and_usage_batched: {
         Args: {
           passed_id_param: string
@@ -3190,6 +3230,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      record_app_open: {
+        Args: { p_notification_permission?: string; p_timezone?: string }
+        Returns: undefined
       }
       record_daily_active_count: { Args: never; Returns: undefined }
       record_daily_login: {

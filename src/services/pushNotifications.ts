@@ -152,6 +152,14 @@ export const ensureNotificationTapListener = (): void => {
   notificationTapListenerRegistered = true;
   PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
     const data = normalizeNotificationData(notification.notification.data);
+    // send-push-notification puts the inbox row's id in every push; record
+    // the open (and clear its unread dot) so we can see which pushes work.
+    // .then() is what actually fires the request - a bare rpc() call is lazy.
+    if (typeof data.notificationId === 'string') {
+      supabase
+        .rpc('mark_notification_opened', { p_notification_id: data.notificationId })
+        .then(() => undefined, () => undefined);
+    }
     navigateFromNotification(data?.type as string | undefined, data);
   });
 };

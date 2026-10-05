@@ -1,5 +1,30 @@
 import { useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '@/integrations/supabase/client';
+
+// Whether the phone currently lets us show notifications. Only the phone's
+// own setting matters for pushes - a browser tab's setting says nothing about
+// it, so web reports nothing and the stored value is left alone.
+const readNotificationPermission = async (): Promise<string | null> => {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const { receive } = await PushNotifications.checkPermissions();
+    if (receive === 'granted') return 'granted';
+    if (receive === 'denied') return 'denied';
+    return 'prompt';
+  } catch {
+    return null;
+  }
+};
+
+const readTimeZone = (): string | null => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Hook to track user activity and update last_login_at
@@ -24,14 +49,24 @@ export const useActivityTracker = (userId: string | undefined) => {
       lastUpdateRef.current = now;
       
       try {
-        // Update last_login_at AND unarchive user if they were archived
-        await supabase
-          .from('profiles')
-          .update({ 
-            last_login_at: new Date().toISOString(),
-            is_archived: false // Unarchive on activity
-          })
-          .eq('id', userId);
+        await Promise.all([
+          // Update last_login_at AND unarchive user if they were archived
+          supabase
+            .from('profiles')
+            .update({
+              last_login_at: new Date().toISOString(),
+              is_archived: false // Unarchive on activity
+            })
+            .eq('id', userId),
+          // Feeds the push rules: who counts as active, night-time in their
+          // own time zone, and no pushes to phones with notifications off.
+          readNotificationPermission().then((permission) =>
+            supabase.rpc('record_app_open', {
+              p_timezone: readTimeZone(),
+              p_notification_permission: permission,
+            })
+          ),
+        ]);
       } catch (error) {
         // Silently fail - activity tracking is not critical
         void 0;
