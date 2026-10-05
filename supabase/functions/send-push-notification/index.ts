@@ -236,6 +236,18 @@ serve(async (req) => {
       })
     }
 
+    // Likes are announced by the server (database trigger, always with a
+    // dedupeKey) or retried by process-missed-notifications (catchup). A like
+    // push from the app itself is redundant - and older app versions also send
+    // the LIKER a "New interest in your profile" push about their own likes.
+    // Ignore those until everyone has updated.
+    if (kind === 'like' && !payload.dedupeKey && !isCatchup) {
+      console.log('↩️ Ignoring app-sent like push (likes are announced by the server)')
+      return new Response(JSON.stringify({ success: true, pushSuccess: false, ignored: 'app_like' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
+      })
+    }
+
     // ---- Eligibility: should this person get this push right now? ----------
     const { data: eligibilityRows, error: eligibilityError } = await supabase.rpc('push_eligibility', {
       p_user_id: userId,
