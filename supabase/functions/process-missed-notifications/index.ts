@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { DAILY_LIMIT_PER_ACCOUNT, kickEmailQueue, loadAccounts, loadPausedAccounts } from '../_shared/email-utils.ts';
+import { kickEmailQueue, loadAccounts, loadPausedAccounts } from '../_shared/email-utils.ts';
 import { composeLikeMatchEmail } from '../_shared/notification-email.ts';
 
 // Likes and matches the phone couldn't show - no app, notifications off, or
@@ -70,6 +70,9 @@ async function setItems(supabase: SupabaseClient, ids: number[], fields: Record<
   if (error) console.error('Failed to update missed-notification items:', error);
 }
 
+// The primary account has no daily cap; this keeps one run's hand-out sane.
+const MAX_EMAILS_PER_RUN = 1000;
+
 /** How many more emails the sending accounts can take today, after what's already queued. */
 async function emailBudget(supabase: SupabaseClient): Promise<number> {
   const paused = await loadPausedAccounts(supabase);
@@ -87,7 +90,8 @@ async function emailBudget(supabase: SupabaseClient): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('status', 'pending')
     .eq('kind', 'notification');
-  return Math.max(0, accounts.length * DAILY_LIMIT_PER_ACCOUNT - used - (pending || 0));
+  const room = accounts.reduce((sum, a) => sum + a.dailyLimit, 0) - used - (pending || 0);
+  return Math.max(0, Math.min(MAX_EMAILS_PER_RUN, room));
 }
 
 // Retry for pushes that failed (the person's phone can get pushes again).

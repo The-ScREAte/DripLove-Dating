@@ -8,19 +8,26 @@ import {
   markSenderHealthy,
   kickEmailQueue,
   fromAddress,
-  smtpConfig,
+  smtpTransportOptions,
   getErrorMessage,
   loadAccounts,
 } from '../_shared/email-utils.ts';
 
-// "Is this sending account working again?" Runs every 30 minutes (only when a
-// paused account is due - see 20261005110000_email_sender_health.sql).
+// "Is it working again?" - for our sending accounts AND for recipients on
+// hold. Runs every 5 minutes, only when something is due (see
+// 20261006100000_email_send_now_hold_and_release.sql).
 //
-// For each paused account whose rest period is over: log in to the mail
-// server, and when it was paused for its sending limit (or being blocked),
-// also send one tiny email to the account itself - the only real proof the
-// limit has lifted. If it works, the account is un-paused and the queue starts
-// straight away; if not, it rests longer (6h -> 12h -> 24h for limits).
+// Sending accounts: for each paused account whose rest period is over, log in
+// to the mail server, and when it was paused for its sending limit (or being
+// blocked), also send one tiny email to the account itself - the only real
+// proof the limit has lifted. If it works, the account is un-paused and the
+// queue starts straight away; if not, it rests longer (6h -> 12h -> 24h).
+//
+// Recipients on hold: when an address is due for its check, look up whether
+// its domain takes email at all. If it does, the address is released and its
+// waiting emails go back in the queue - the newest straight away as the real
+// test, the rest 20 minutes later unless that one bounces. If not, it's
+// checked again later (longer gaps each time).
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +37,29 @@ const corsHeaders = {
 const LOCK_NAME = 'email-sender-health-check';
 
 type HealthRow = { account_email: string; pause_reason: string | null; next_check_at: string | null };
+type HeldRow = { email: string; reason: string };
+
+const RECHECKS_PER_RUN = 100;
+
+/** Does this domain accept email at all (MX record, or an address record)? */
+async function domainTakesEmail(domain: string): Promise<boolean | null> {
+  const lookup = async (type: string) => {
+    const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=${type}`);
+    if (!res.ok) throw new Error(`DNS lookup failed (${res.status})`);
+    return await res.json() as { Status: number; Answer?: Array<{ type: number; data: string }> };
+  };
+  try {
+    const mx = await lookup('MX');
+    const mxRecords = (mx.Answer || []).filter((a) => a.type === 15);
+    if (mxRecords.length > 0) return !mxRecords.every((a) => /^0\s+\.?$/.test(a.data.trim())); // "0 ." = no mail
+    if (mx.Status === 3) return false; // domain doesn't exist
+    const a = await lookup('A');
+    return (a.Answer || []).some((r) => r.type === 1);
+  } catch (error) {
+    console.warn(`DNS check for ${domain} failed:`, error);
+    return null; // couldn't tell - try again next time
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -46,9 +76,7 @@ serve(async (req) => {
   if (!gotLock) return json({ message: 'Another check is in progress' });
 
   try {
-    const smtp = smtpConfig();
     const accounts = new Map(loadAccounts().map((a) => [a.email, a]));
-    if (!smtp || accounts.size === 0) return json({ message: 'SMTP not configured' });
 
     const { data: due, error } = await supabase
       .from('email_sender_health')
@@ -65,12 +93,7 @@ serve(async (req) => {
         continue;
       }
 
-      const transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.secure,
-        auth: { user: account.email, pass: account.pass },
-      });
+      const transporter = nodemailer.createTransport(smtpTransportOptions(account));
 
       try {
         await transporter.verify();
@@ -98,9 +121,44 @@ serve(async (req) => {
       }
     }
 
-    if (results.some((r) => r.healthy)) await kickEmailQueue(supabaseUrl, serviceKey);
-    console.log('email-sender-health-check:', JSON.stringify(results));
-    return json({ checked: results.length, results });
+    // Recipients on hold whose check is due.
+    const { data: dueRecipients, error: heldError } = await supabase
+      .from('email_suppression_list')
+      .select('email, reason')
+      .is('released_at', null)
+      .neq('reason', 'unsubscribed')
+      .lte('next_check_at', new Date().toISOString())
+      .order('next_check_at', { ascending: true })
+      .limit(RECHECKS_PER_RUN);
+    if (heldError) throw heldError;
+
+    const domainCache = new Map<string, boolean | null>();
+    const recipients: Array<{ email: string; released: boolean; detail: string }> = [];
+    for (const row of (dueRecipients || []) as HeldRow[]) {
+      const domain = row.email.split('@')[1] || '';
+      if (!domainCache.has(domain)) domainCache.set(domain, await domainTakesEmail(domain));
+      const takesEmail = domainCache.get(domain);
+      if (takesEmail === null) continue;
+      if (takesEmail) {
+        const { data: requeued, error } = await supabase.rpc('release_email_suppression', {
+          p_email: row.email, p_reason: 'auto_recheck',
+        });
+        if (error) console.error(`Could not release ${row.email}:`, error);
+        else recipients.push({ email: row.email, released: true, detail: `released, ${requeued ?? 0} email(s) back in the queue` });
+      } else {
+        const { error } = await supabase.rpc('email_recheck_failed', {
+          p_email: row.email, p_error: `${domain} does not accept email`,
+        });
+        if (error) console.error(`Could not reschedule ${row.email}:`, error);
+        else recipients.push({ email: row.email, released: false, detail: 'domain does not accept email - checking again later' });
+      }
+    }
+
+    if (results.some((r) => r.healthy) || recipients.some((r) => r.released)) {
+      await kickEmailQueue(supabaseUrl, serviceKey);
+    }
+    console.log('email-sender-health-check:', JSON.stringify({ senders: results, recipients }));
+    return json({ checked: results.length, results, recipients });
   } catch (error) {
     console.error('Sender health check error:', error);
     return json({ error: getErrorMessage(error) }, 500);

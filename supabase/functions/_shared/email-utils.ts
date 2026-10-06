@@ -3,19 +3,22 @@
 // isQuotaError gap (see below) went unnoticed in one copy while being fixed
 // in neither - a single source of truth now.
 
-// Stay a safety margin under Gmail's real 500/day cap so we stop rotating
-// *before* Gmail starts hard-rejecting mid-batch.
+// Gmail backups: stay a safety margin under Gmail's real 500/day cap so we
+// stop using one *before* Gmail starts hard-rejecting mid-batch. The primary
+// account (Private Email) has no daily cap unless SMTP_PRIMARY_DAILY_LIMIT is set.
 export const DAILY_LIMIT_PER_ACCOUNT = 450;
 // A recipient that keeps transient-failing (never a hard bounce, never a
 // clean success) stops being retried after this many attempts, so a
 // pathological case can't loop forever re-consuming quota every run.
 export const MAX_SEND_ATTEMPTS = 5;
-// Pacing: hundreds of emails in one burst from a Gmail account is a classic
-// spam signal. The queue runs every 5 minutes and each run sends at most
-// this many per account, a few at a time with a pause in between.
+// Pacing for the Gmail backups only: hundreds of emails in one burst from a
+// Gmail account is a classic spam signal, so each queue run sends at most
+// this many per backup, a few at a time with a pause in between. The primary
+// account sends everything straight away.
 export const MAX_PER_ACCOUNT_PER_RUN = 25;
 export const SEND_CONCURRENCY = 3;
 export const SEND_PAUSE_MS = 1000;
+export const PRIMARY_CONCURRENCY = 5;
 
 export const APP_URL = 'https://www.driplove.love';
 
@@ -23,6 +26,11 @@ export interface SmtpAccount {
   email: string;
   pass: string;
   fromName: string | null;
+  host: string;
+  port: number;
+  secure: boolean;
+  dailyLimit: number;
+  primary: boolean;
 }
 
 export const isValidEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -182,6 +190,36 @@ export async function markSenderHealthy(supabase: Db, accountEmail: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Recipients that can't be reached (table email_suppression_list)
+//
+// An address that fails is put on hold, never dropped: its emails wait
+// (status 'held'), email-sender-health-check checks it again later
+// (next_check_at, longer gaps each time it fails again) and, once it looks
+// reachable, release_email_suppression puts its emails back in the queue.
+// Unsubscribes are the exception - those are never undone automatically.
+// ---------------------------------------------------------------------------
+
+/** Suppression-list reason for a recipient-side failure. */
+export const suppressionReason = (type: EmailFailureType): string => {
+  switch (type) {
+    case 'recipient_invalid': return 'hard_bounce';
+    case 'recipient_temporary': return 'mailbox_unavailable';
+    case 'message_rejected': return 'rejected';
+    default: return 'undeliverable';
+  }
+};
+
+/** Put an address on hold (and every email still waiting for it). */
+export async function holdRecipient(supabase: Db, email: string, type: EmailFailureType, message: string) {
+  const { error } = await supabase.rpc('hold_email_recipient', {
+    p_email: email.trim().toLowerCase(),
+    p_reason: suppressionReason(type),
+    p_error: message.slice(0, 500),
+  });
+  if (error) console.error(`Could not hold ${email}:`, error);
+}
+
+// ---------------------------------------------------------------------------
 // One-click unsubscribe
 //
 // Links carry the address plus an HMAC of it, so nobody can unsubscribe
@@ -257,7 +295,7 @@ export const escapeHtml = (value: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-/** Starts process-email-queue now instead of waiting for its next 5-minute run. */
+/** Starts process-email-queue now instead of waiting for its next scheduled run. */
 export async function kickEmailQueue(supabaseUrl: string, serviceKey: string): Promise<void> {
   try {
     await fetch(`${supabaseUrl}/functions/v1/process-email-queue`, {
@@ -266,23 +304,16 @@ export async function kickEmailQueue(supabaseUrl: string, serviceKey: string): P
       body: '{}',
     });
   } catch (error) {
-    console.warn('Could not start process-email-queue (the 5-minute schedule will pick it up):', error);
+    console.warn('Could not start process-email-queue (the every-minute schedule will pick it up):', error);
   }
 }
 
-export interface SmtpConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-}
-
-export function smtpConfig(): SmtpConfig | null {
-  const host = Deno.env.get('SMTP_HOST');
-  if (!host) return null;
-  const port = Number(Deno.env.get('SMTP_PORT') || 587);
-  const secure = (Deno.env.get('SMTP_SECURE') || String(port === 465)).toLowerCase() === 'true';
-  return { host, port, secure };
-}
+export const smtpTransportOptions = (account: SmtpAccount) => ({
+  host: account.host,
+  port: account.port,
+  secure: account.secure,
+  auth: { user: account.email, pass: account.pass },
+});
 
 export const fromAddress = (account: SmtpAccount) => ({
   name: account.fromName || 'DripLove',
@@ -385,23 +416,58 @@ export const getErrorMessage = (error: unknown): string => {
   return 'Unknown SMTP error';
 };
 
-// Reads SMTP_USER/SMTP_PASS/EMAIL_FROM_NAME as account 1, then SMTP_USER_2/SMTP_PASS_2/...,
-// SMTP_USER_3/... for as many additional sending accounts as are configured.
+// smtpServer('SMTP_PRIMARY', '') reads SMTP_PRIMARY_HOST/_PORT/_SECURE;
+// smtpServer('SMTP', '_2') reads SMTP_HOST_2/SMTP_PORT_2/SMTP_SECURE_2.
+const smtpServer = (prefix: string, suffix: string) => {
+  const host = Deno.env.get(`${prefix}_HOST${suffix}`);
+  if (!host) return null;
+  const port = Number(Deno.env.get(`${prefix}_PORT${suffix}`) || 587);
+  const secure = (Deno.env.get(`${prefix}_SECURE${suffix}`) || String(port === 465)).toLowerCase() === 'true';
+  return { host, port, secure };
+};
+
+// Sending accounts in the order they're used. First the primary account
+// (info@driplove.love on Private Email: SMTP_PRIMARY_USER/_PASS/_HOST/_PORT/
+// _SECURE/_DAILY_LIMIT), then the Gmail backups SMTP_USER/SMTP_PASS,
+// SMTP_USER_2/SMTP_PASS_2, ... on SMTP_HOST (each may set its own
+// SMTP_HOST_2 etc.). Backups only send what the primary can't: everything
+// while it's paused, nothing otherwise.
 export function loadAccounts(): SmtpAccount[] {
   const accounts: SmtpAccount[] = [];
-  let index = 1;
 
+  const primaryUser = Deno.env.get('SMTP_PRIMARY_USER');
+  const primaryPass = Deno.env.get('SMTP_PRIMARY_PASS');
+  const primaryServer = smtpServer('SMTP_PRIMARY', '');
+  if (primaryUser && primaryPass && primaryServer) {
+    accounts.push({
+      email: primaryUser,
+      pass: primaryPass,
+      fromName: Deno.env.get('EMAIL_FROM_NAME_PRIMARY') || Deno.env.get('EMAIL_FROM_NAME') || null,
+      ...primaryServer,
+      dailyLimit: Number(Deno.env.get('SMTP_PRIMARY_DAILY_LIMIT')) || Infinity,
+      primary: true,
+    });
+  }
+
+  const sharedServer = smtpServer('SMTP', '');
+  let index = 1;
   while (true) {
     const suffix = index === 1 ? '' : `_${index}`;
     const email = Deno.env.get(`SMTP_USER${suffix}`);
     const pass = Deno.env.get(`SMTP_PASS${suffix}`);
     if (!email || !pass) break;
 
-    accounts.push({
-      email,
-      pass,
-      fromName: Deno.env.get(`EMAIL_FROM_NAME${suffix}`) || Deno.env.get('EMAIL_FROM_NAME') || null,
-    });
+    const server = (suffix && smtpServer('SMTP', suffix)) || sharedServer;
+    if (server && email !== primaryUser) {
+      accounts.push({
+        email,
+        pass,
+        fromName: Deno.env.get(`EMAIL_FROM_NAME${suffix}`) || Deno.env.get('EMAIL_FROM_NAME') || null,
+        ...server,
+        dailyLimit: DAILY_LIMIT_PER_ACCOUNT,
+        primary: false,
+      });
+    }
     index += 1;
   }
 

@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import nodemailer from 'npm:nodemailer@6.9.14';
+import { sendWithFailover } from '../_shared/smtp-send.ts';
 import { buildDripLoveHtml } from '../_shared/email-utils.ts';
 
 const corsHeaders = {
@@ -66,17 +66,6 @@ serve(async (req: Request) => {
 
     const setupLink = `${appUrl}/influencer/set-password?id=${promoCodeId}&token=${encodeURIComponent(promoCode.password_hash)}`;
 
-    const host = Deno.env.get('SMTP_HOST');
-    const port = Number(Deno.env.get('SMTP_PORT') || 587);
-    const secure = (Deno.env.get('SMTP_SECURE') || String(port === 465)).toLowerCase() === 'true';
-    const smtpUser = Deno.env.get('SMTP_USER');
-    const smtpPass = Deno.env.get('SMTP_PASS');
-    const fromName = Deno.env.get('EMAIL_FROM_NAME') || 'DripLove';
-
-    if (!host || !smtpUser || !smtpPass) {
-      throw new Error('SMTP is not configured (missing SMTP_HOST/SMTP_USER/SMTP_PASS secrets in Supabase)');
-    }
-
     const subject = 'Set up your DripLove Promoter account';
     const bodyContent = `
       <h2 style="margin:0 0 12px 0;font-size:19px;color:#111827;">Welcome to the DripLove Promoter Program, ${escapeHtml(promoCode.owner_name)}!</h2>
@@ -91,13 +80,7 @@ serve(async (req: Request) => {
     `;
     const html = buildDripLoveHtml(subject, bodyContent);
 
-    const transporter = nodemailer.createTransport({ host, port, secure, auth: { user: smtpUser, pass: smtpPass } });
-    await transporter.sendMail({
-      from: `${fromName} <${smtpUser}>`,
-      to: promoCode.email,
-      subject,
-      html,
-    });
+    await sendWithFailover({ to: promoCode.email, subject, html });
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

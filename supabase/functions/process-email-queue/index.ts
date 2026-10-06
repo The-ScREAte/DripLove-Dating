@@ -2,40 +2,46 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import nodemailer from 'npm:nodemailer@6.9.14';
 import {
-  DAILY_LIMIT_PER_ACCOUNT,
-  MAX_SEND_ATTEMPTS,
   MAX_PER_ACCOUNT_PER_RUN,
+  PRIMARY_CONCURRENCY,
   SEND_CONCURRENCY,
   SEND_PAUSE_MS,
   SmtpAccount,
+  EmailFailureType,
   classifyEmailError,
   isSenderProblem,
   loadPausedAccounts,
   pauseSender,
   markSenderHealthy,
+  holdRecipient,
   loadUnsubscribeSecret,
   buildUnsubscribeUrl,
   unsubscribeHeaders,
   fromAddress,
-  smtpConfig,
+  smtpTransportOptions,
   htmlToText,
   normalizeBodyHtml,
   buildDripLoveHtml,
   getErrorMessage,
+  kickEmailQueue,
   loadAccounts,
 } from '../_shared/email-utils.ts';
 
-// Sends everything in email_send_queue - admin email broadcasts and the
-// likes/matches emails - in small steady batches (every 5 minutes, see
-// 20261005110000_email_sender_health.sql), likes/matches first.
+// Sends everything in email_send_queue - admin email broadcasts, scheduled
+// broadcasts and the likes/matches emails - the moment it's due. A new row
+// starts a run straight away (trigger on email_send_queue); a schedule every
+// minute is the safety net and sends scheduled emails at their time.
 //
-// When a send fails, who is at fault decides what happens:
-//   our account (sending limit, login, blocked, connection)
-//       -> the email stays queued, the account is paused and pinged later by
-//          email-sender-health-check; nothing is held against the recipient
-//   the address doesn't exist -> failed, and never emailed again
-//   anything else (mailbox full, "try later", refused) -> retried later with
-//       growing gaps, then given up after MAX_SEND_ATTEMPTS
+// Every email goes out through the primary account (info@driplove.love). The
+// Gmail backups only send while the primary is paused - and if a send fails
+// because of OUR account, the same email is tried on the next account at once.
+//
+// When a send fails because of the recipient:
+//   address doesn't exist         -> the address is put on hold right away
+//   anything else (mailbox full,  -> retried after 2, 10 and 30 minutes, then
+//   "try later", refused)            put on hold
+// Held emails wait; email-sender-health-check checks the address again later
+// and puts them back in the queue once it's reachable.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +50,10 @@ const corsHeaders = {
 
 const LOCK_NAME = 'process-email-queue';
 const LOCK_SECONDS = 240;
-const RETRY_MINUTES = [15, 60, 180, 720];
+// Stop picking up new batches after this long; a fresh run carries on.
+const RUN_BUDGET_MS = 100_000;
+const BATCH_SIZE = 60;
+const QUICK_RETRY_MINUTES = [2, 10, 30];
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
 
@@ -60,7 +69,12 @@ type QueueRow = {
   text_body: string | null;
 };
 
-type Broadcast = { id: string; subject: string; message: string; successful_sends: number | null; failed_sends: number | null };
+type Broadcast = { id: string; subject: string; message: string };
+
+type Outcome =
+  | { ok: true; account: SmtpAccount }
+  | { ok: false; senderOnly: true; message: string }
+  | { ok: false; senderOnly: false; type: EmailFailureType; message: string };
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -69,214 +83,211 @@ async function updateRow(supabase: SupabaseClient, id: string, fields: Record<st
   if (error) console.error(`Failed to update queue row ${id}:`, error);
 }
 
-/**
- * Scheduled emails carry a send-by time (expires_at): when the daily sending
- * limit means one can't go out near its local time, it's dropped instead of
- * arriving hours late or piling up day after day.
- */
-async function expireLateScheduledEmails(supabase: SupabaseClient) {
-  const { data: expired, error } = await supabase
-    .from('email_send_queue')
-    .update({
-      status: 'failed',
-      failure_type: 'expired',
-      error: 'Not sent: the daily sending limit was reached before its scheduled time passed',
-    })
-    .eq('status', 'pending')
-    .lt('expires_at', new Date().toISOString())
-    .select('broadcast_id');
-  if (error) {
-    console.error('Could not expire late scheduled emails:', error);
-    return 0;
-  }
-  const perBroadcast = new Map<string, number>();
-  (expired || []).forEach((r: { broadcast_id: string | null }) => {
-    if (r.broadcast_id) perBroadcast.set(r.broadcast_id, (perBroadcast.get(r.broadcast_id) || 0) + 1);
-  });
-  for (const [broadcastId, n] of perBroadcast) {
-    const { data: history } = await supabase
-      .from('email_broadcast_history')
-      .select('failed_sends')
-      .eq('id', broadcastId)
-      .maybeSingle();
-    if (history) {
-      await supabase
-        .from('email_broadcast_history')
-        .update({ failed_sends: (history.failed_sends || 0) + n })
-        .eq('id', broadcastId);
-    }
-  }
-  return expired?.length || 0;
-}
-
 async function runQueue(supabase: SupabaseClient, supabaseUrl: string) {
-  const summary = { sent: 0, failed: 0, retrying: 0, suppressed: 0, expired: 0, pausedNow: [] as string[], message: '' };
-  summary.expired = await expireLateScheduledEmails(supabase);
+  const started = Date.now();
+  const summary = {
+    sent: 0, held: 0, retrying: 0, unsubscribed: 0,
+    sentBy: {} as Record<string, number>, pausedNow: [] as string[], more: false, message: '',
+  };
 
-  const smtp = smtpConfig();
   const configured = loadAccounts();
-  if (!smtp || configured.length === 0) {
+  if (configured.length === 0) {
     summary.message = 'SMTP not configured';
     return summary;
   }
 
   const paused = await loadPausedAccounts(supabase);
-  const accounts = configured.filter((a) => !paused.has(a.email));
-  if (accounts.length === 0) {
-    summary.message = 'Every sending account is paused - waiting for the health check';
-    return summary;
-  }
-
-  // How many each account may send this run (daily limit and pacing).
   const today = new Date().toISOString().slice(0, 10);
   const { data: usageRows } = await supabase
     .from('email_account_usage')
     .select('account_email, sent_count')
-    .in('account_email', accounts.map((a) => a.email))
+    .in('account_email', configured.map((a) => a.email))
     .eq('send_date', today);
-  const used = new Map<string, number>();
-  (usageRows || []).forEach((r: { account_email: string; sent_count: number }) => used.set(r.account_email, r.sent_count));
+  const usedToday = new Map<string, number>();
+  (usageRows || []).forEach((r: { account_email: string; sent_count: number }) => usedToday.set(r.account_email, r.sent_count));
 
-  const slots = accounts
-    .map((account) => ({
-      account,
-      take: Math.min(MAX_PER_ACCOUNT_PER_RUN, Math.max(0, DAILY_LIMIT_PER_ACCOUNT - (used.get(account.email) || 0))),
-    }))
-    .filter((s) => s.take > 0);
-  const capacity = slots.reduce((sum, s) => sum + s.take, 0);
-  if (capacity === 0) {
-    summary.message = 'Daily limit reached on every account - continuing tomorrow';
-    return summary;
-  }
-
-  const nowIso = new Date().toISOString();
-  const { data: due, error: dueError } = await supabase
-    .from('email_send_queue')
-    .select('id, broadcast_id, recipient, attempt_count, kind, subject, preheader, html, text_body')
-    .eq('status', 'pending')
-    .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: true })
-    .limit(capacity * 2);
-  if (dueError) throw dueError;
-  const rows = (due || []) as QueueRow[];
-  if (rows.length === 0) {
-    summary.message = 'Nothing due';
-    return summary;
-  }
-
-  // Never email blocked addresses (bounced or unsubscribed).
-  const recipients = Array.from(new Set(rows.map((r) => r.recipient.trim().toLowerCase())));
-  const { data: blockedRows } = await supabase
-    .from('email_suppression_list')
-    .select('email')
-    .in('email', recipients)
-    .is('released_at', null);
-  const blocked = new Set((blockedRows || []).map((r: { email: string }) => r.email));
-  const sendable: QueueRow[] = [];
-  for (const row of rows) {
-    if (blocked.has(row.recipient.trim().toLowerCase())) {
-      await updateRow(supabase, row.id, {
-        status: 'failed',
-        failure_type: 'suppressed',
-        error: 'Not sent: address bounced before or unsubscribed',
+  // Per-run bookkeeping.
+  const attemptsThisRun = new Map<string, number>();
+  const successesThisRun = new Map<string, number>();
+  const transporters = new Map<string, ReturnType<typeof nodemailer.createTransport>>();
+  const transporterFor = (account: SmtpAccount) => {
+    let t = transporters.get(account.email);
+    if (!t) {
+      t = nodemailer.createTransport({
+        ...smtpTransportOptions(account),
+        pool: true,
+        maxConnections: account.primary ? PRIMARY_CONCURRENCY : SEND_CONCURRENCY,
       });
-      summary.suppressed += 1;
-    } else if (sendable.length < capacity) {
-      sendable.push(row);
+      transporters.set(account.email, t);
     }
-  }
-  if (sendable.length === 0) {
-    summary.message = 'Only blocked addresses were due';
-    return summary;
-  }
+    return t;
+  };
 
-  const broadcastIds = Array.from(new Set(sendable.map((r) => r.broadcast_id).filter(Boolean))) as string[];
-  const broadcastMap = new Map<string, Broadcast>();
-  if (broadcastIds.length > 0) {
-    const { data: broadcasts, error } = await supabase
-      .from('email_broadcast_history')
-      .select('id, subject, message, successful_sends, failed_sends')
-      .in('id', broadcastIds);
-    if (error) throw error;
-    (broadcasts || []).forEach((b: Broadcast) => broadcastMap.set(b.id, b));
-  }
-  const sentByBroadcast = new Map<string, number>();
-  const failedByBroadcast = new Map<string, number>();
-  const bump = (map: Map<string, number>, id: string | null) => {
-    if (id) map.set(id, (map.get(id) || 0) + 1);
+  // Accounts that can take another email right now, primary first.
+  const usable = () => configured.filter((a) => {
+    if (paused.has(a.email)) return false;
+    const attempts = attemptsThisRun.get(a.email) || 0;
+    if ((usedToday.get(a.email) || 0) + attempts >= a.dailyLimit) return false;
+    return a.primary || attempts < MAX_PER_ACCOUNT_PER_RUN;
+  });
+
+  const pauseInRun = async (account: SmtpAccount, type: EmailFailureType, message: string) => {
+    if (paused.has(account.email)) return;
+    paused.add(account.email);
+    summary.pausedNow.push(account.email);
+    await pauseSender(supabase, account.email, type, message);
   };
 
   const unsubscribeSecret = await loadUnsubscribeSecret(supabase);
-  const newlySuppressed: Array<{ email: string; error: string; broadcastId: string | null }> = [];
+  const broadcastCache = new Map<string, Broadcast | null>();
+  const sentByBroadcast = new Map<string, number>();
+  const touchedBroadcasts = new Set<string>();
 
-  // Hand rows to accounts in queue order.
-  let cursor = 0;
-  const assignments: Array<{ account: SmtpAccount; rows: QueueRow[] }> = [];
-  for (const slot of slots) {
-    if (cursor >= sendable.length) break;
-    const chunk = sendable.slice(cursor, cursor + slot.take);
-    cursor += chunk.length;
-    assignments.push({ account: slot.account, rows: chunk });
-  }
+  const compose = async (row: QueueRow) => {
+    const recipient = row.recipient.trim().toLowerCase();
+    let subject = row.subject;
+    let bodyHtml = row.html;
+    let bodyText = row.text_body;
+    if (row.kind === 'broadcast' || !bodyHtml) {
+      const broadcast = row.broadcast_id ? broadcastCache.get(row.broadcast_id) : undefined;
+      if (!broadcast) throw new Error('Broadcast no longer exists');
+      subject = broadcast.subject;
+      bodyHtml = broadcast.message;
+      bodyText = null;
+    }
+    const unsubscribeUrl = unsubscribeSecret
+      ? await buildUnsubscribeUrl(supabaseUrl, unsubscribeSecret, recipient)
+      : undefined;
+    const text = (bodyText || htmlToText(normalizeBodyHtml(bodyHtml || '')))
+      + (unsubscribeUrl ? `\n\n--\nDripLove\nUnsubscribe: ${unsubscribeUrl}` : '');
+    return {
+      to: recipient,
+      subject: subject || 'DripLove',
+      html: buildDripLoveHtml(subject || 'DripLove', bodyHtml || '', {
+        preheader: row.preheader || undefined,
+        unsubscribeUrl,
+      }),
+      text,
+      headers: unsubscribeUrl ? unsubscribeHeaders(unsubscribeUrl) : undefined,
+    };
+  };
 
-  for (const { account, rows: accountRows } of assignments) {
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port,
-      secure: smtp.secure,
-      auth: { user: account.email, pass: account.pass },
-    });
+  // Try the email on each usable account in turn until one takes it or the
+  // recipient is clearly the problem.
+  const deliver = async (row: QueueRow): Promise<Outcome> => {
+    const mail = await compose(row);
+    let lastMessage = 'No sending account available';
+    for (const account of usable()) {
+      attemptsThisRun.set(account.email, (attemptsThisRun.get(account.email) || 0) + 1);
+      try {
+        await transporterFor(account).sendMail({ from: fromAddress(account), ...mail });
+        successesThisRun.set(account.email, (successesThisRun.get(account.email) || 0) + 1);
+        return { ok: true, account };
+      } catch (error) {
+        const message = getErrorMessage(error);
+        const type = classifyEmailError(message);
+        if (!isSenderProblem(type)) return { ok: false, senderOnly: false, type, message };
+        lastMessage = message;
+        await pauseInRun(account, type, message);
+      }
+    }
+    return { ok: false, senderOnly: true, message: lastMessage };
+  };
 
-    let attempts = 0;
-    let successes = 0;
-    let accountPaused = false;
+  let stop = '';
+  while (!stop) {
+    if (Date.now() - started > RUN_BUDGET_MS) {
+      stop = 'time';
+      break;
+    }
+    const accountsNow = usable();
+    if (accountsNow.length === 0) {
+      stop = paused.size >= configured.length ? 'all_paused' : 'limits';
+      break;
+    }
 
-    for (let i = 0; i < accountRows.length && !accountPaused; i += SEND_CONCURRENCY) {
-      const chunk = accountRows.slice(i, i + SEND_CONCURRENCY);
-      const results = await Promise.allSettled(chunk.map(async (row) => {
-        const recipient = row.recipient.trim().toLowerCase();
-        let subject = row.subject;
-        let bodyHtml = row.html;
-        let bodyText = row.text_body;
-        if (row.kind === 'broadcast' || !bodyHtml) {
-          const broadcast = row.broadcast_id ? broadcastMap.get(row.broadcast_id) : undefined;
-          if (!broadcast) throw new Error('Broadcast no longer exists');
-          subject = broadcast.subject;
-          bodyHtml = broadcast.message;
-          bodyText = null;
-        }
-        const unsubscribeUrl = unsubscribeSecret
-          ? await buildUnsubscribeUrl(supabaseUrl, unsubscribeSecret, recipient)
-          : undefined;
-        const text = (bodyText || htmlToText(normalizeBodyHtml(bodyHtml || '')))
-          + (unsubscribeUrl ? `\n\n--\nDripLove\nUnsubscribe: ${unsubscribeUrl}` : '');
-        return transporter.sendMail({
-          from: fromAddress(account),
-          to: recipient,
-          subject: subject || 'DripLove',
-          html: buildDripLoveHtml(subject || 'DripLove', bodyHtml || '', {
-            preheader: row.preheader || undefined,
-            unsubscribeUrl,
-          }),
-          text,
-          headers: unsubscribeUrl ? unsubscribeHeaders(unsubscribeUrl) : undefined,
+    const { data: due, error: dueError } = await supabase
+      .from('email_send_queue')
+      .select('id, broadcast_id, recipient, attempt_count, kind, subject, preheader, html, text_body')
+      .eq('status', 'pending')
+      .or(`next_attempt_at.is.null,next_attempt_at.lte.${new Date().toISOString()}`)
+      .order('priority', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(BATCH_SIZE);
+    if (dueError) throw dueError;
+    const rows = (due || []) as QueueRow[];
+    if (rows.length === 0) {
+      stop = 'done';
+      break;
+    }
+
+    // Addresses that unsubscribed never get email; addresses on hold wait.
+    const recipients = Array.from(new Set(rows.map((r) => r.recipient.trim().toLowerCase())));
+    const { data: blockedRows } = await supabase
+      .from('email_suppression_list')
+      .select('email, reason')
+      .in('email', recipients)
+      .is('released_at', null);
+    const blocked = new Map((blockedRows || []).map((r: { email: string; reason: string }) => [r.email, r.reason]));
+    const sendable: QueueRow[] = [];
+    for (const row of rows) {
+      const reason = blocked.get(row.recipient.trim().toLowerCase());
+      if (reason === 'unsubscribed') {
+        summary.unsubscribed += 1;
+        await updateRow(supabase, row.id, {
+          status: 'failed', failure_type: 'suppressed', error: 'Not sent: unsubscribed',
         });
-      }));
+      } else if (reason) {
+        summary.held += 1;
+        await updateRow(supabase, row.id, {
+          status: 'held', failure_type: 'suppressed', error: `On hold: the address failed before (${reason})`,
+        });
+      } else {
+        sendable.push(row);
+      }
+    }
 
-      for (let idx = 0; idx < results.length; idx++) {
-        const result = results[idx];
+    const missing = Array.from(new Set(sendable.map((r) => r.broadcast_id).filter((id) => id && !broadcastCache.has(id)))) as string[];
+    if (missing.length > 0) {
+      const { data: broadcasts, error } = await supabase
+        .from('email_broadcast_history')
+        .select('id, subject, message')
+        .in('id', missing);
+      if (error) throw error;
+      missing.forEach((id) => broadcastCache.set(id, null));
+      (broadcasts || []).forEach((b: Broadcast) => broadcastCache.set(b.id, b));
+    }
+    // A broadcast deleted after it was queued has nothing left to send.
+    for (let i = sendable.length - 1; i >= 0; i--) {
+      const row = sendable[i];
+      if ((row.kind === 'broadcast' || !row.html) && !(row.broadcast_id && broadcastCache.get(row.broadcast_id))) {
+        sendable.splice(i, 1);
+        await updateRow(supabase, row.id, { status: 'failed', failure_type: 'cancelled', error: 'Broadcast no longer exists' });
+      }
+    }
+
+    const newlyHeld = new Set<string>();
+    for (let i = 0; i < sendable.length; ) {
+      const primaryUp = usable().some((a) => a.primary);
+      const width = primaryUp ? PRIMARY_CONCURRENCY : SEND_CONCURRENCY;
+      const chunk = sendable.slice(i, i + width);
+      i += chunk.length;
+      const outcomes = await Promise.all(chunk.map((row) => deliver(row)));
+
+      for (let idx = 0; idx < chunk.length; idx++) {
         const row = chunk[idx];
-        attempts += 1;
+        const outcome = outcomes[idx];
+        const recipient = row.recipient.trim().toLowerCase();
+        if (row.broadcast_id) touchedBroadcasts.add(row.broadcast_id);
 
-        if (result.status === 'fulfilled') {
-          successes += 1;
+        if (outcome.ok) {
           summary.sent += 1;
-          bump(sentByBroadcast, row.broadcast_id);
+          summary.sentBy[outcome.account.email] = (summary.sentBy[outcome.account.email] || 0) + 1;
+          if (row.broadcast_id) sentByBroadcast.set(row.broadcast_id, (sentByBroadcast.get(row.broadcast_id) || 0) + 1);
           await updateRow(supabase, row.id, {
             status: 'sent',
             sent_at: new Date().toISOString(),
-            account_email: account.email,
+            account_email: outcome.account.email,
             error: null,
             failure_type: null,
             next_attempt_at: null,
@@ -284,92 +295,78 @@ async function runQueue(supabase: SupabaseClient, supabaseUrl: string) {
           continue;
         }
 
-        const message = getErrorMessage(result.reason);
-        const type = classifyEmailError(message);
-
-        if (isSenderProblem(type)) {
-          // Our account's problem - keep the email exactly as it was (no
-          // attempt used up) and stop using this account until it's checked.
+        if (outcome.senderOnly) {
+          // Every account failed on its own side - nothing to hold against
+          // the recipient. It goes as soon as an account is back.
           summary.retrying += 1;
-          await updateRow(supabase, row.id, { status: 'pending', error: message, failure_type: type });
-          if (!accountPaused) {
-            accountPaused = true;
-            summary.pausedNow.push(account.email);
-            await pauseSender(supabase, account.email, type, message);
-          }
+          await updateRow(supabase, row.id, { status: 'pending', error: outcome.message, failure_type: 'sender_unavailable' });
           continue;
         }
 
         const attempt = (row.attempt_count || 0) + 1;
-        if (type === 'recipient_invalid') {
-          summary.failed += 1;
-          bump(failedByBroadcast, row.broadcast_id);
-          newlySuppressed.push({ email: row.recipient.trim().toLowerCase(), error: message, broadcastId: row.broadcast_id });
-          await updateRow(supabase, row.id, { status: 'failed', error: message, failure_type: type, attempt_count: attempt });
-        } else if (attempt < MAX_SEND_ATTEMPTS) {
+        const quickRetry = outcome.type !== 'recipient_invalid' && attempt <= QUICK_RETRY_MINUTES.length
+          && !newlyHeld.has(recipient);
+        if (quickRetry) {
           summary.retrying += 1;
-          const waitMinutes = RETRY_MINUTES[Math.min(attempt - 1, RETRY_MINUTES.length - 1)];
           await updateRow(supabase, row.id, {
             status: 'pending',
-            error: message,
-            failure_type: type,
+            error: outcome.message,
+            failure_type: outcome.type,
             attempt_count: attempt,
-            next_attempt_at: new Date(Date.now() + waitMinutes * 60_000).toISOString(),
+            next_attempt_at: new Date(Date.now() + QUICK_RETRY_MINUTES[attempt - 1] * 60_000).toISOString(),
           });
-        } else {
-          summary.failed += 1;
-          bump(failedByBroadcast, row.broadcast_id);
-          await updateRow(supabase, row.id, { status: 'failed', error: message, failure_type: type, attempt_count: attempt });
+          continue;
+        }
+
+        summary.held += 1;
+        await updateRow(supabase, row.id, {
+          status: 'held', error: outcome.message, failure_type: outcome.type, attempt_count: attempt, next_attempt_at: null,
+        });
+        if (!newlyHeld.has(recipient)) {
+          newlyHeld.add(recipient);
+          await holdRecipient(supabase, recipient, outcome.type, outcome.message);
         }
       }
 
-      if (!accountPaused && i + SEND_CONCURRENCY < accountRows.length) await sleep(SEND_PAUSE_MS);
+      if (usable().length === 0) break;
+      if (!primaryUp && i < sendable.length) await sleep(SEND_PAUSE_MS);
     }
-
-    if (attempts > 0) {
-      const { error } = await supabase.rpc('increment_email_account_usage', {
-        p_account_email: account.email,
-        p_amount: attempts,
-      });
-      if (error) console.error('Failed to record account usage:', error);
-    }
-    if (successes > 0 && !accountPaused) await markSenderHealthy(supabase, account.email);
   }
 
-  if (newlySuppressed.length > 0) {
-    const { error } = await supabase.from('email_suppression_list').upsert(
-      newlySuppressed.map(({ email, error: lastError, broadcastId }) => ({
-        email,
-        reason: 'hard_bounce',
-        last_error: lastError,
-        broadcast_id: broadcastId,
-        released_at: null,
-        released_reason: null,
-      })),
-      { onConflict: 'email' },
-    );
-    if (error) console.error('Failed to record bounced addresses:', error);
+  transporters.forEach((t) => t.close());
+
+  for (const [accountEmail, attempts] of attemptsThisRun) {
+    const { error } = await supabase.rpc('increment_email_account_usage', {
+      p_account_email: accountEmail,
+      p_amount: attempts,
+    });
+    if (error) console.error('Failed to record account usage:', error);
+    if ((successesThisRun.get(accountEmail) || 0) > 0 && !paused.has(accountEmail)) {
+      await markSenderHealthy(supabase, accountEmail);
+    }
   }
 
-  for (const broadcastId of broadcastIds) {
-    const broadcast = broadcastMap.get(broadcastId);
-    if (!broadcast) continue;
-    const { count: stillPending } = await supabase
-      .from('email_send_queue')
-      .select('id', { count: 'exact', head: true })
-      .eq('broadcast_id', broadcastId)
-      .eq('status', 'pending');
+  for (const broadcastId of touchedBroadcasts) {
+    const [{ data: history }, { count: stillWaiting }] = await Promise.all([
+      supabase.from('email_broadcast_history').select('successful_sends').eq('id', broadcastId).maybeSingle(),
+      supabase
+        .from('email_send_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('broadcast_id', broadcastId)
+        .in('status', ['pending', 'held']),
+    ]);
+    if (!history) continue;
     await supabase
       .from('email_broadcast_history')
       .update({
-        successful_sends: (broadcast.successful_sends || 0) + (sentByBroadcast.get(broadcastId) || 0),
-        failed_sends: (broadcast.failed_sends || 0) + (failedByBroadcast.get(broadcastId) || 0),
-        status: stillPending ? 'partial' : 'completed',
+        successful_sends: (history.successful_sends || 0) + (sentByBroadcast.get(broadcastId) || 0),
+        status: stillWaiting ? 'partial' : 'completed',
       })
       .eq('id', broadcastId);
   }
 
-  summary.message = 'Queue run complete';
+  summary.more = stop === 'time';
+  summary.message = `Queue run complete (${stop})`;
   console.log('process-email-queue:', JSON.stringify(summary));
   return summary;
 }
@@ -380,10 +377,12 @@ serve(async (req) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const supabase = createClient(supabaseUrl, serviceKey);
 
-  // One run at a time - the schedule, a new broadcast and the likes/matches
-  // job can all start one, and overlapping runs would send duplicates.
+  // One run at a time - new emails, the schedule and the admin screen can all
+  // start one, and overlapping runs would send duplicates. A run already going
+  // picks up new emails on its next batch.
   const { data: gotLock, error: lockError } = await supabase.rpc('try_acquire_worker_lock', {
     p_name: LOCK_NAME,
     p_seconds: LOCK_SECONDS,
@@ -403,12 +402,17 @@ serve(async (req) => {
   const work = runQueue(supabase, supabaseUrl)
     .catch((error) => {
       console.error('Email queue processor error:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
+      return { error: error instanceof Error ? error.message : 'Unknown error', more: false };
     })
-    .finally(() => supabase.rpc('release_worker_lock', { p_name: LOCK_NAME }));
+    .then(async (result) => {
+      await supabase.rpc('release_worker_lock', { p_name: LOCK_NAME });
+      // Out of time with emails still due: carry straight on in a fresh run.
+      if ((result as { more?: boolean }).more) await kickEmailQueue(supabaseUrl, serviceKey);
+      return result;
+    });
 
   // Answer straight away and keep sending in the background, so callers (the
-  // schedule, the admin screen) aren't cut off mid-batch by their timeouts.
+  // trigger, the schedule, the admin screen) aren't cut off by their timeouts.
   if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
     EdgeRuntime.waitUntil(work);
     return new Response(JSON.stringify({ message: 'Queue run started' }), {

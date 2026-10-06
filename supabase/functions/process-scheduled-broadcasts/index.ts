@@ -25,9 +25,6 @@ const corsHeaders = {
 
 const LOCK_NAME = 'process-scheduled-broadcasts'
 const INSERT_CHUNK = 500
-// A scheduled email that can't go out within this long of its time (daily
-// sending limit reached) is dropped rather than arriving hours late.
-const EMAIL_SEND_WINDOW_HOURS = 4
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined
 
@@ -102,7 +99,6 @@ async function lineUp(supabase: SupabaseClient, schedule: Schedule, day: string,
           priority: 3,
           attempt_count: 0,
           next_attempt_at: p.send_at,
-          expires_at: new Date(new Date(p.send_at).getTime() + EMAIL_SEND_WINDOW_HOURS * 3600_000).toISOString(),
         })))
       : await supabase.from('broadcast_recipients').insert(chunk.map((p) => ({
           campaign_id: occurrence.id,

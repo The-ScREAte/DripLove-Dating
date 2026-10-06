@@ -6,7 +6,8 @@ Apply these templates in Supabase Dashboard:
 Authentication -> Emails -> Templates
 
 Important:
-- Keep the same sender identity as SMTP: DripLove <driploveofficial@gmail.com>
+- Keep the same sender identity as SMTP: DripLove <info@driplove.love>
+  (Authentication -> Emails -> SMTP Settings: host mail.privateemail.com, port 465, user info@driplove.love)
 - Use the same social links in all templates
 - Save each template after paste
 

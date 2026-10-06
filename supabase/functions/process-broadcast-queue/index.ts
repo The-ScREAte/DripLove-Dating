@@ -35,11 +35,6 @@ const SKIP_REASONS = new Set(['no_device', 'notifications_off', 'account_not_act
 // ...and these people get the message by email instead (as do people whose
 // push kept failing). Closed/missing accounts get nothing.
 const EMAIL_INSTEAD_REASONS = new Set(['no_device', 'notifications_off']);
-// An email copy that can't go out in time (daily sending limit) is dropped
-// rather than arriving days late: scheduled ones within 4h of their local
-// time, others within 3 days.
-const EMAIL_COPY_HOURS_SCHEDULED = 4;
-const EMAIL_COPY_HOURS = 72;
 
 // Supabase Edge Runtime: keeps a task running after the response is sent.
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
@@ -201,8 +196,6 @@ async function queueEmailCopies(
   const id = await historyId();
   if (!id) return 0;
   const content = composeBroadcastEmail(campaign.title, campaign.message);
-  const hours = campaign.scheduled_broadcast_id ? EMAIL_COPY_HOURS_SCHEDULED : EMAIL_COPY_HOURS;
-  const expiresAt = new Date(Date.now() + hours * 3600_000).toISOString();
   const { error } = await supabase.from('email_send_queue').insert(people.map((p) => ({
     broadcast_id: id,
     recipient: p.email,
@@ -211,7 +204,6 @@ async function queueEmailCopies(
     priority: 4,
     preheader: content.preheader,
     attempt_count: 0,
-    expires_at: expiresAt,
   })));
   if (error) {
     console.error(`Could not queue email copies for campaign ${campaign.id}:`, error);

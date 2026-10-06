@@ -12,14 +12,31 @@ interface SuppressedEmail {
   reason: string;
   last_error: string | null;
   created_at: string;
+  failure_count: number;
+  next_check_at: string | null;
 }
 
-// Read-only view onto email_suppression_list (populated automatically by
-// send-broadcast-email-smtp / process-email-queue whenever an address hard-
-// bounces - see 20260825111113_email_suppression_list.sql) plus a manual
-// "Retry" action for the rare case an address was fixed or wrongly
-// suppressed. Every future broadcast already skips these addresses on its
-// own; this is purely visibility + a manual override, not what enforces it.
+const REASON_LABELS: Record<string, string> = {
+  hard_bounce: 'Address not found',
+  mailbox_unavailable: 'Mailbox unavailable',
+  rejected: 'Refused by their mail server',
+  undeliverable: 'Could not be delivered',
+  unsubscribed: 'Unsubscribed',
+};
+
+const nextCheckLabel = (entry: SuppressedEmail): string => {
+  if (entry.reason === 'unsubscribed') return 'never emailed again';
+  if (!entry.next_check_at) return 'check pending';
+  const when = new Date(entry.next_check_at);
+  return when.getTime() <= Date.now() ? 'checking now' : `next check ${when.toLocaleString()}`;
+};
+
+// View onto email_suppression_list. Addresses land here automatically when an
+// email to them fails or bounces back (process-email-queue,
+// process-email-bounces); their emails wait on hold, the address is checked
+// again on its own (email-sender-health-check) and released once it works -
+// see 20261006100000_email_send_now_hold_and_release.sql. "Retry" releases
+// one straight away. Unsubscribes stay until someone releases them here.
 export default function SuppressedEmails() {
   const [entries, setEntries] = useState<SuppressedEmail[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,9 +49,8 @@ export default function SuppressedEmails() {
     try {
       const { data, error } = await supabase
         .from('email_suppression_list')
-        .select('email, reason, last_error, created_at')
-        // Released entries (wrongly blocked by our own sending limit) are
-        // kept for the record but no longer block anyone.
+        .select('email, reason, last_error, created_at, failure_count, next_check_at')
+        // Released entries are kept for the record but no longer block anyone.
         .is('released_at', null)
         .order('created_at', { ascending: false })
         .limit(1000);
@@ -59,7 +75,7 @@ export default function SuppressedEmails() {
       const { error } = await supabase.rpc('remove_email_suppression', { target_email: email });
       if (error) throw error;
       setEntries((prev) => prev.filter((e) => e.email !== email));
-      toast({ title: 'Removed', description: `${email} will be included in future broadcasts again.` });
+      toast({ title: 'Released', description: `${email} is back in the queue - its waiting emails are going out now.` });
     } catch (error) {
       console.error('Error removing suppression:', error);
       toast({ title: 'Error', description: 'Failed to remove from suppression list', variant: 'destructive' });
@@ -80,7 +96,7 @@ export default function SuppressedEmails() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-xs flex items-center gap-1.5">
             <ShieldOff className="w-3.5 h-3.5" />
-            {entries.length} excluded
+            {entries.length} on hold
           </CardTitle>
           <Button
             variant="outline"
@@ -94,9 +110,9 @@ export default function SuppressedEmails() {
           </Button>
         </div>
         <p className="text-[10px] text-gray-500 mt-1">
-          Addresses that permanently failed (invalid or non-existent mailbox) on a past broadcast. These are
-          skipped automatically on every future send - this list is just visibility, plus a manual retry if one
-          was fixed or wrongly excluded.
+          Addresses whose emails failed or bounced back. Their emails wait here and each address is checked
+          again automatically - once it works, it's released and everything waiting goes out. Retry releases
+          one now. Unsubscribed addresses are never emailed unless released here.
         </p>
       </CardHeader>
       <CardContent className="pt-0">
@@ -117,7 +133,7 @@ export default function SuppressedEmails() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-10">
             <ShieldOff className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-            <p className="text-gray-500 text-xs">{entries.length === 0 ? 'No excluded addresses' : 'No matches'}</p>
+            <p className="text-gray-500 text-xs">{entries.length === 0 ? 'No addresses on hold' : 'No matches'}</p>
           </div>
         ) : (
           <ScrollArea className="h-[420px]">
@@ -130,7 +146,11 @@ export default function SuppressedEmails() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-[11px] truncate">{entry.email}</div>
                     <div className="text-[9px] text-gray-500 truncate">
-                      {entry.last_error || entry.reason} · {new Date(entry.created_at).toLocaleDateString()}
+                      {REASON_LABELS[entry.reason] || entry.reason}
+                      {entry.failure_count > 1 ? ` · failed ${entry.failure_count}x` : ''} · {nextCheckLabel(entry)}
+                    </div>
+                    <div className="text-[9px] text-gray-400 truncate" title={entry.last_error || ''}>
+                      {entry.last_error || '-'} · since {new Date(entry.created_at).toLocaleDateString()}
                     </div>
                   </div>
                   <Button
@@ -139,7 +159,7 @@ export default function SuppressedEmails() {
                     onClick={() => handleRetry(entry.email)}
                     disabled={removingEmail === entry.email}
                     className="h-6 text-[10px] px-2 text-purple-600 hover:bg-purple-50 shrink-0"
-                    title="Remove from suppression list so future broadcasts try it again"
+                    title="Release now - its waiting emails go back in the queue"
                   >
                     {removingEmail === entry.email ? (
                       <Loader2 className="w-3 h-3 animate-spin" />

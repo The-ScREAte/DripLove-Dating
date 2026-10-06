@@ -937,28 +937,40 @@ export type Database = {
           broadcast_id: string | null
           created_at: string
           email: string
+          failure_count: number
+          last_checked_at: string | null
           last_error: string | null
+          next_check_at: string | null
           reason: string
           released_at: string | null
           released_reason: string | null
+          updated_at: string
         }
         Insert: {
           broadcast_id?: string | null
           created_at?: string
           email: string
+          failure_count?: number
+          last_checked_at?: string | null
           last_error?: string | null
+          next_check_at?: string | null
           reason: string
           released_at?: string | null
           released_reason?: string | null
+          updated_at?: string
         }
         Update: {
           broadcast_id?: string | null
           created_at?: string
           email?: string
+          failure_count?: number
+          last_checked_at?: string | null
           last_error?: string | null
+          next_check_at?: string | null
           reason?: string
           released_at?: string | null
           released_reason?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

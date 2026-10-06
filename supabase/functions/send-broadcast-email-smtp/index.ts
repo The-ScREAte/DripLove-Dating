@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { isValidEmail, getErrorMessage, kickEmailQueue, loadAccounts, smtpConfig } from '../_shared/email-utils.ts';
+import { isValidEmail, getErrorMessage, kickEmailQueue, loadAccounts } from '../_shared/email-utils.ts';
 
 // Admin email broadcasts. This used to send up to ~900 emails in one burst
 // from the Gmail accounts - exactly the pattern spam filters punish - and
@@ -75,11 +75,8 @@ serve(async (req: Request) => {
     if (!subject || !htmlContent) {
       throw new Error('Subject and htmlContent are required');
     }
-    if (!smtpConfig()) {
-      throw new Error('SMTP is not configured (missing SMTP_HOST secret in Supabase)');
-    }
     if (loadAccounts().length === 0) {
-      throw new Error('SMTP is not configured (missing SMTP_USER/SMTP_PASS secrets in Supabase)');
+      throw new Error('SMTP is not configured (missing SMTP_PRIMARY_* or SMTP_HOST/SMTP_USER/SMTP_PASS secrets in Supabase)');
     }
 
     // Dedupe + validate recipients up front.
@@ -98,7 +95,8 @@ serve(async (req: Request) => {
       formatChecked.push(email);
     }
 
-    // Skip addresses that bounced before or unsubscribed.
+    // Skip addresses that unsubscribed. Addresses on hold (they failed before)
+    // are still queued - their copy waits and goes out once they're released.
     const accepted: string[] = [];
     for (let i = 0; i < formatChecked.length; i += CHECK_CHUNK) {
       const slice = formatChecked.slice(i, i + CHECK_CHUNK);
@@ -106,11 +104,12 @@ serve(async (req: Request) => {
         .from('email_suppression_list')
         .select('email')
         .in('email', slice)
+        .eq('reason', 'unsubscribed')
         .is('released_at', null);
       const blocked = new Set((blockedRows || []).map((r: { email: string }) => r.email));
       for (const email of slice) {
         if (blocked.has(email)) {
-          skipped.push({ email, error: 'Skipped: address bounced before or unsubscribed' });
+          skipped.push({ email, error: 'Skipped: unsubscribed' });
         } else {
           accepted.push(email);
         }

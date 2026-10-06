@@ -3,63 +3,82 @@ const nodemailer = require('nodemailer');
 const DEFAULT_BATCH_SIZE = 20;
 const DEFAULT_BATCH_DELAY_MS = 1000;
 
-let transporter;
+let accounts;
 
 function parseBoolean(value, fallback = false) {
   if (typeof value !== 'string') return fallback;
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
-function getSmtpConfig() {
-  const host = process.env.SMTP_HOST || process.env.EMAIL_SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user =
-    process.env.SMTP_USER ||
-    process.env.EMAIL_USER ||
-    process.env.NOTIFY_EMAIL_USER ||
-    process.env.ADMIN_NOTIFY_EMAIL_USER;
-  const pass =
-    process.env.SMTP_PASS ||
-    process.env.EMAIL_PASSWORD ||
-    process.env.NOTIFY_EMAIL_PASSWORD ||
-    process.env.ADMIN_NOTIFY_EMAIL_PASSWORD;
+// smtpServer('SMTP_PRIMARY', '') reads SMTP_PRIMARY_HOST/_PORT/_SECURE;
+// smtpServer('SMTP', '_2') reads SMTP_HOST_2/SMTP_PORT_2/SMTP_SECURE_2.
+function smtpServer(prefix, suffix) {
+  const host = process.env[`${prefix}_HOST${suffix}`] || (prefix === 'SMTP' && !suffix ? process.env.EMAIL_SMTP_HOST : undefined);
+  if (!host) return null;
+  const port = Number(process.env[`${prefix}_PORT${suffix}`] || 587);
+  return { host, port, secure: parseBoolean(process.env[`${prefix}_SECURE${suffix}`], port === 465) };
+}
 
-  if (!host || !user || !pass) {
-    throw new Error('SMTP config missing. Required: SMTP_HOST, SMTP_USER, SMTP_PASS');
-  }
-
-  return {
-    host,
-    port,
-    secure: parseBoolean(process.env.SMTP_SECURE, port === 465),
+function createTransport(server, user, pass) {
+  return nodemailer.createTransport({
+    ...server,
     auth: { user, pass },
     pool: true,
     maxConnections: Number(process.env.SMTP_MAX_CONNECTIONS || 5),
     maxMessages: Number(process.env.SMTP_MAX_MESSAGES || 100),
     connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 15000),
     socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 30000),
-  };
+  });
 }
 
-function getTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport(getSmtpConfig());
+// Sending accounts in the order they're tried: the primary (info@driplove.love
+// on Private Email, SMTP_PRIMARY_*) first, then the Gmail backups
+// SMTP_USER/SMTP_PASS, SMTP_USER_2/SMTP_PASS_2, ... on SMTP_HOST.
+function getAccounts() {
+  if (accounts) return accounts;
+  accounts = [];
+
+  const primaryUser = process.env.SMTP_PRIMARY_USER;
+  const primaryPass = process.env.SMTP_PRIMARY_PASS;
+  const primaryServer = smtpServer('SMTP_PRIMARY', '');
+  if (primaryUser && primaryPass && primaryServer) {
+    accounts.push({
+      user: primaryUser,
+      fromName: process.env.EMAIL_FROM_NAME_PRIMARY || process.env.EMAIL_FROM_NAME,
+      transporter: createTransport(primaryServer, primaryUser, primaryPass),
+    });
   }
-  return transporter;
+
+  const sharedServer = smtpServer('SMTP', '');
+  for (let index = 1; ; index += 1) {
+    const suffix = index === 1 ? '' : `_${index}`;
+    const user = index === 1
+      ? process.env.SMTP_USER || process.env.EMAIL_USER || process.env.NOTIFY_EMAIL_USER || process.env.ADMIN_NOTIFY_EMAIL_USER
+      : process.env[`SMTP_USER${suffix}`];
+    const pass = index === 1
+      ? process.env.SMTP_PASS || process.env.EMAIL_PASSWORD || process.env.NOTIFY_EMAIL_PASSWORD || process.env.ADMIN_NOTIFY_EMAIL_PASSWORD
+      : process.env[`SMTP_PASS${suffix}`];
+    if (!user || !pass) break;
+
+    const server = (suffix && smtpServer('SMTP', suffix)) || sharedServer;
+    if (server && user !== primaryUser) {
+      accounts.push({
+        user,
+        fromName: process.env[`EMAIL_FROM_NAME${suffix}`] || process.env.EMAIL_FROM_NAME,
+        transporter: createTransport(server, user, pass),
+      });
+    }
+  }
+
+  if (accounts.length === 0) {
+    throw new Error('SMTP config missing. Required: SMTP_PRIMARY_HOST/USER/PASS or SMTP_HOST, SMTP_USER, SMTP_PASS');
+  }
+  return accounts;
 }
 
-function getFromAddress() {
-  const from =
-    process.env.EMAIL_FROM ||
-    process.env.SMTP_FROM ||
-    process.env.SMTP_USER ||
-    process.env.EMAIL_USER ||
-    process.env.NOTIFY_EMAIL_USER ||
-    process.env.ADMIN_NOTIFY_EMAIL_USER;
-  if (!from) {
-    throw new Error('Sender email missing. Set EMAIL_FROM or SMTP_FROM or SMTP_USER');
-  }
-  return from;
+function isRecipientInvalid(message) {
+  return /\b5\.1\.(1|3|10)\b|\b5\.2\.1\b|does not exist|no such user|user unknown|unknown user|mailbox unavailable|invalid recipient|recipient address rejected/i
+    .test(message || '');
 }
 
 function getSuppressionSet() {
@@ -181,27 +200,34 @@ function sanitizeRecipients(recipients) {
   return { accepted, rejected };
 }
 
+// Tries the primary account first, then each backup. A bad recipient address
+// stops early - another account wouldn't change that.
 async function sendEmailSafely({ to, subject, html, text }) {
-  const tx = getTransporter();
-  const from = getFromAddress();
-
-  const mailOptions = {
-    from: process.env.EMAIL_FROM_NAME ? `${process.env.EMAIL_FROM_NAME} <${from}>` : from,
-    to,
-    subject,
-    html,
-    text: text || htmlToText(html),
-    headers: {
-      'List-Unsubscribe': '<https://driplove.love/unsubscribe>',
-      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-      'X-Priority': '3',
-    },
-    envelope: process.env.SMTP_ENVELOPE_FROM
-      ? { from: process.env.SMTP_ENVELOPE_FROM, to: [to] }
-      : undefined,
-  };
-
-  return tx.sendMail(mailOptions);
+  const errors = [];
+  for (const account of getAccounts()) {
+    try {
+      return await account.transporter.sendMail({
+        from: account.fromName ? `${account.fromName} <${account.user}>` : account.user,
+        to,
+        subject,
+        html,
+        text: text || htmlToText(html),
+        headers: {
+          'List-Unsubscribe': '<https://driplove.love/unsubscribe>',
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          'X-Priority': '3',
+        },
+        envelope: process.env.SMTP_ENVELOPE_FROM && process.env.SMTP_ENVELOPE_FROM === account.user
+          ? { from: process.env.SMTP_ENVELOPE_FROM, to: [to] }
+          : undefined,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown SMTP error';
+      errors.push(`${account.user}: ${message}`);
+      if (isRecipientInvalid(message)) break;
+    }
+  }
+  throw new Error(`Every sending account failed - ${errors.join(' | ')}`);
 }
 
 async function sendBulkEmails({ recipients, subject, htmlContent, textContent }) {
@@ -267,5 +293,5 @@ async function sendBulkEmails({ recipients, subject, htmlContent, textContent })
 
 module.exports = {
   sendBulkEmails,
-  getTransporter,
+  getAccounts,
 };
