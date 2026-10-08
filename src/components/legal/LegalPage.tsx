@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { COMPANY } from './legalInfo';
 
 // Shared layout for About, Terms of Service and Privacy Policy: one dark
 // surface like the rest of the app, a sticky back bar, a single scroll area,
@@ -17,6 +19,15 @@ interface LegalPageProps {
 
 export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPageProps) => {
   const { t } = useTranslation();
+
+  // Give each page its own browser tab / search result title.
+  useEffect(() => {
+    const previous = document.title;
+    document.title = `${title} | DripLove`;
+    return () => {
+      document.title = previous;
+    };
+  }, [title]);
 
   return (
     <div
@@ -52,7 +63,9 @@ export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPage
         <div className="mt-10 space-y-10">{children}</div>
 
         <footer className="mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-neutral-500">
-          © {new Date().getFullYear()} The ScREAte Ltd. DripLove is operated by The ScREAte Ltd.
+          © {new Date().getFullYear()} {COMPANY.name}. All rights reserved.
+          <br />
+          {COMPANY.address}
         </footer>
       </main>
     </div>
@@ -91,11 +104,20 @@ export const LegalSubheading = ({ children }: { children: React.ReactNode }) => 
 
 export const ContactCard = ({ team }: { team: string }) => (
   <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-    <p className="font-medium text-white">The ScREAte Ltd, {team}</p>
-    <a href="mailto:info@driplove.love" className="mt-1 inline-block text-pink-400 hover:underline">
-      info@driplove.love
+    <p className="font-medium text-white">
+      {COMPANY.name}, {team}
+    </p>
+    <p className="mt-1 text-sm text-neutral-400">{COMPANY.address}</p>
+    <a href={`mailto:${COMPANY.email}`} className="mt-1 inline-block text-pink-400 hover:underline">
+      {COMPANY.email}
     </a>
   </div>
 );
 
-export const LEGAL_LAST_UPDATED = 'Last updated: October 8, 2026';
+// Small inline link to another policy page.
+export const PolicyLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
+  <Link to={to} className="text-pink-400 hover:underline">
+    {children}
+  </Link>
+);
+

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -259,8 +260,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [startY, setStartY] = useState(0);
   const [showRatingFunnel, setShowRatingFunnel] = useState(false);
   // Liking someone back here can turn into a mutual match without ever
   // visiting Discover - same "It's a match!" banner as Discover uses.
@@ -670,7 +669,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
           await new Promise<void>((resolve) => window.setTimeout(resolve, remainingHold));
         }
         setIsRefreshing(false);
-        setPullDistance(0);
       } else {
         setLoading(false);
       }
@@ -1550,52 +1548,13 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     loadFullImages(liker.id);
   };
 
-  // Pull to refresh handlers.
-  // handleTouchStart used to check e.currentTarget.scrollTop, but
-  // currentTarget here is the outer non-scrolling wrapper (it's a flex
-  // column, header + flex-1 list - it never scrolls itself, so its
-  // scrollTop is always 0). That armed pull-to-refresh on literally every
-  // touch anywhere on the page, not just when the actual list
-  // (scrollContainerRef) was scrolled to its top - hence "very sensitive".
-  const PULL_TRIGGER_THRESHOLD = 70; // was 50 - needs a more deliberate pull
-  const PULL_MAX_VISUAL = 90;
-  const PULL_DAMPING = 0.55; // rubber-band feel: finger travel > visual pull
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (!selectedProfile && (scrollContainerRef.current?.scrollTop ?? 0) === 0) {
-      setStartY(e.touches[0].clientY);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!selectedProfile && startY > 0 && !isRefreshing) {
-      // If the list has scrolled away from the top mid-gesture (or was
-      // never really at the top), abandon the pull instead of tracking it.
-      if ((scrollContainerRef.current?.scrollTop ?? 0) > 0) {
-        setStartY(0);
-        setPullDistance(0);
-        return;
-      }
-      const currentY = e.touches[0].clientY;
-      const rawDistance = currentY - startY;
-      if (rawDistance <= 0) {
-        setPullDistance(0);
-        return;
-      }
-      const distance = Math.max(0, Math.min(PULL_MAX_VISUAL, rawDistance * PULL_DAMPING));
-      setPullDistance(distance);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (!selectedProfile && pullDistance > PULL_TRIGGER_THRESHOLD && !isRefreshing) {
-      setPullDistance(PULL_TRIGGER_THRESHOLD);
-      void fetchLikers(true);
-    } else {
-      setPullDistance(0);
-    }
-    setStartY(0);
-  };
+  // Pull to refresh (only from the top of the list, and not while a profile is open).
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: () => fetchLikers(true),
+    isRefreshing,
+    getScrollTop: () => scrollContainerRef.current?.scrollTop ?? 0,
+    enabled: !selectedProfile,
+  });
   // ⭐ FIX #7: Memoize entire selected profile card (1,200+ lines) to prevent re-render storms on Android
   const selectedProfileCard = useMemo(() => {
     if (!selectedProfile) return null;
@@ -2352,16 +2311,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none'
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      {...pullToRefresh.handlers}
     >
-      <div
-        className={`flex shrink-0 items-center justify-center overflow-hidden bg-black transition-[height,opacity] duration-300 ease-out ${pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'}`}
-        style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
-      >
-        <HoppingLogo size={24} opacity={pullDistance > 0 || isRefreshing ? 1 : 0.65} className="shrink-0" />
-      </div>
+      {pullToRefresh.indicator}
 
   <div
     className="flex-shrink-0 shadow-sm border-b border-pink-500/30 px-4 py-4"
@@ -2405,7 +2357,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 pb-24 bg-black" ref={scrollContainerRef}>
+      <div className="flex-1 overflow-y-auto overscroll-y-contain p-4 pb-24 bg-black" ref={scrollContainerRef}>
         {likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">

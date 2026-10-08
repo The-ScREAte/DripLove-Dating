@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   ContactCard,
-  LEGAL_LAST_UPDATED,
   LegalList,
   LegalPage,
   LegalSection,
 } from '@/components/legal/LegalPage';
+import { LEGAL_LAST_UPDATED } from '@/components/legal/legalInfo';
 
 interface ChildSafetyStandardsProps {
   onBack: () => void;
@@ -20,7 +20,7 @@ const ChildSafetyStandards = ({ onBack }: ChildSafetyStandardsProps) => (
     intro={
       <p>
         DripLove is for adults only. We have zero tolerance for child sexual abuse and exploitation (CSAE) of any
-        kind. These standards explain how The ScREAte Ltd prevents, detects and responds to it on DripLove.
+        kind. These standards explain how The ScREAte prevents, detects and responds to it on DripLove.
       </p>
     }
   >

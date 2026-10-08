@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { MessageCircle } from 'lucide-react';
 import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
@@ -373,8 +374,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
 
   const backgroundFetchingRef = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullDistance, setPullDistance] = useState(0);
-  const [startY, setStartY] = useState(0);
+  const conversationListRef = useRef<HTMLDivElement>(null);
   const matchesNeedsRefreshRef = useRef(false);
   
   // Swipe gesture state for back navigation
@@ -1284,7 +1284,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           await new Promise<void>((resolve) => window.setTimeout(resolve, remainingHold));
         }
         setIsRefreshing(false);
-        setPullDistance(0);
       }
     }
   };
@@ -2095,50 +2094,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   };
 
   // Pull to refresh handlers for the matches list.
-  // Higher trigger threshold + rubber-band damping (finger travel > visual
-  // pull) so a small/incidental drag near the top doesn't fire a refresh -
-  // matches the same fix applied to LikedMePage's pull-to-refresh.
-  const PULL_TRIGGER_THRESHOLD = 70; // was 50
-  const PULL_MAX_VISUAL = 90;
-  const PULL_DAMPING = 0.55;
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    // Only start pull when at top of scroll and not currently in a conversation
-    const container = e.currentTarget as HTMLElement;
-    if (container.scrollTop === 0) {
-      setStartY(e.touches[0].clientY);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (startY > 0 && !isRefreshing) {
-      const container = e.currentTarget as HTMLElement;
-      if (container.scrollTop > 0) {
-        setStartY(0);
-        setPullDistance(0);
-        return;
-      }
-      const currentY = e.touches[0].clientY;
-      const rawDistance = currentY - startY;
-      if (rawDistance <= 0) {
-        setPullDistance(0);
-        return;
-      }
-      const distance = Math.max(0, Math.min(PULL_MAX_VISUAL, rawDistance * PULL_DAMPING));
-      setPullDistance(distance);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (pullDistance > PULL_TRIGGER_THRESHOLD && !isRefreshing) {
-      // Trigger a user-visible refresh
-      setPullDistance(PULL_TRIGGER_THRESHOLD);
-      void fetchMatches(true);
-    } else {
-      setPullDistance(0);
-    }
-    setStartY(0);
-  };
+  // Pull to refresh the conversation list (only from the top of the list).
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: () => fetchMatches(true),
+    isRefreshing,
+    getScrollTop: () => conversationListRef.current?.scrollTop ?? 0,
+  });
 
   const handleUserProfileClick = (userId?: string) => {
     if (userId) {
@@ -2384,21 +2345,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
 
   {/* Scrollable Chat List (only this area scrolls) */}
   <div
+    ref={conversationListRef}
     className="flex-1 min-h-0 overflow-y-auto pb-44 sm:pb-35 scrollbar-hide"
-    style={{ 
+    style={{
       WebkitOverflowScrolling: 'touch',
+      // The pull indicator handles the top edge; the list's own bounce there
+      // would move the content twice as far as the finger.
+      overscrollBehaviorY: 'contain',
       paddingTop: '0px'
     }}
-    onTouchStart={handleTouchStart}
-    onTouchMove={handleTouchMove}
-    onTouchEnd={handleTouchEnd}
+    {...pullToRefresh.handlers}
   >
-    <div
-      className={`flex shrink-0 items-center justify-center overflow-hidden bg-black transition-[height,opacity] duration-300 ease-out ${pullDistance > 0 || isRefreshing ? 'opacity-100' : 'opacity-0'}`}
-      style={{ height: `${isRefreshing ? PULL_TRIGGER_THRESHOLD : pullDistance}px` }}
-    >
-      <HoppingLogo size={24} opacity={pullDistance > 0 || isRefreshing ? 1 : 0.65} className="shrink-0" />
-    </div>
+    {pullToRefresh.indicator}
           {activeConversations.length === 0 && dormantConversations.length === 0 && newMatchList.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
               <div className="mb-6">

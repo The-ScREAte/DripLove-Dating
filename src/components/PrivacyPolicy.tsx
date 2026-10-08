@@ -2,12 +2,12 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ContactCard,
-  LEGAL_LAST_UPDATED,
   LegalList,
   LegalPage,
   LegalSection,
   LegalSubheading,
 } from '@/components/legal/LegalPage';
+import { COMPANY, LEGAL_LAST_UPDATED } from '@/components/legal/legalInfo';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
@@ -26,9 +26,10 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
           <p>
             Your privacy matters to us. This Privacy Policy explains what information DripLove collects, how we use
             and share it, and the choices you have. It applies to the DripLove app and website, which are operated by
-            The ScREAte Ltd ("DripLove", "we", "us").
+            {COMPANY.name} ("DripLove", "we", "us"), based in Rexburg, Idaho, United States. {COMPANY.name} is the
+            controller of your personal information.
           </p>
-          <p>We never sell your personal information.</p>
+          <p>We never sell your personal information or share it for targeted advertising.</p>
         </>
       }
     >
@@ -149,27 +150,71 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
 
       <LegalSection number={10} title="International transfers">
         <p>
-          DripLove is used around the world, and our service providers may process your information in countries
-          other than your own, including the United States. When that happens, we rely on appropriate safeguards to
-          protect your information.
+          DripLove is operated from the United States and used around the world. If you use DripLove from outside
+          the US, your information is transferred to and processed in the United States and in other countries
+          where our service providers operate. Where the law requires it, for example for the European Economic
+          Area, the United Kingdom and Switzerland, we rely on safeguards such as the European Commission's Standard
+          Contractual Clauses.
         </p>
       </LegalSection>
 
-      <LegalSection number={11} title="Children">
+      <LegalSection number={11} title="Regional privacy notices">
+        <LegalSubheading>European Economic Area, United Kingdom and Switzerland</LegalSubheading>
+        <p>We process your personal information on these legal bases:</p>
+        <LegalList
+          items={[
+            'Contract: to provide DripLove, including your profile, matching, messaging and Premium.',
+            'Legitimate interests: to keep DripLove safe, prevent fraud and abuse, and improve the Service.',
+            'Consent: for profile verification (face data), device location and marketing messages. You can withdraw consent at any time.',
+            'Legal obligation: where we must keep or disclose information by law.',
+          ]}
+        />
+        <p>
+          You have the rights described in section 9, and the right to lodge a complaint with your local data
+          protection authority.
+        </p>
+
+        <LegalSubheading>United States: state privacy rights</LegalSubheading>
+        <p>
+          If you live in California, Colorado, Connecticut, Oregon, Texas, Utah, Virginia or another state with a
+          consumer privacy law, you may have the right to know what personal information we collect and how we use
+          it, to access, correct, delete or receive a copy of it, and to opt out of its sale, sharing for targeted
+          advertising or profiling. We do not sell your personal information or share it for targeted advertising.
+        </p>
+        <p>
+          Some information we process is considered sensitive: your face template if you verify your profile, your
+          device location if you share it, and the gender and preferences you choose to show. We use it only to
+          provide and secure DripLove, never to profile you for advertising. To make a request, email us; you can
+          also use an authorised agent. We will not treat you differently for exercising your rights. If we deny a
+          request, you can appeal by replying to our decision, and if you are not satisfied you can contact your
+          state attorney general.
+        </p>
+
+        <LegalSubheading>Consumer health data (Washington, Nevada and similar laws)</LegalSubheading>
+        <p>
+          Under laws like Washington's My Health My Data Act, some information can count as consumer health data.
+          On DripLove that is mainly the face template created when you verify your profile (biometric data), plus
+          any health-related details you choose to add to your profile. We collect it only with your consent, use it
+          only to verify your profile and keep DripLove safe, share it only with Amazon Web Services as our service
+          provider, and never sell it. You can access or delete it, or withdraw consent by deleting your account.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={12} title="Children">
         <p>
           DripLove is only for adults aged 18 and over. We do not knowingly collect information from anyone under
           18. If we learn that someone under 18 has an account, we will delete it.
         </p>
       </LegalSection>
 
-      <LegalSection number={12} title="Changes to this policy">
+      <LegalSection number={13} title="Changes to this policy">
         <p>
           We may update this Privacy Policy from time to time. If we make significant changes, we will let you know
           in the app or by email, and ask for your consent where the law requires it.
         </p>
       </LegalSection>
 
-      <LegalSection number={13} title="Contact us">
+      <LegalSection number={14} title="Contact us">
         <p>Questions about your privacy or this policy? Contact our privacy team.</p>
         <ContactCard team="Privacy Team" />
       </LegalSection>

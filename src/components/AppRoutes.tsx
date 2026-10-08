@@ -24,6 +24,8 @@ const RedirectHandler = lazy(() => import('./RedirectHandler'));
 const TermsOfService = lazy(() => import('./TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 const ChildSafetyStandards = lazy(() => import('./ChildSafetyStandards'));
+const CommunityGuidelines = lazy(() => import('./CommunityGuidelines'));
+const SafetyTips = lazy(() => import('./SafetyTips'));
 const InfluencerPortal = lazy(() => import('../pages/InfluencerPortal'));
 const InfluencerSetPassword = lazy(() => import('../pages/InfluencerSetPassword'));
 const Games = lazy(() => import('../pages/Games'));
@@ -83,6 +85,8 @@ const AppRoutes = ({
       <Route path="/terms-of-service" element={<TermsOfService onBack={() => navigate(-1)} />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy onBack={() => navigate(-1)} />} />
       <Route path="/child-safety" element={<ChildSafetyStandards onBack={() => navigate(-1)} />} />
+      <Route path="/community-guidelines" element={<CommunityGuidelines onBack={() => navigate(-1)} />} />
+      <Route path="/safety-tips" element={<SafetyTips onBack={() => navigate(-1)} />} />
       <Route path="/influencer" element={<InfluencerPortal />} />
       <Route path="/influencer/set-password" element={<InfluencerSetPassword />} />
       <Route path="/games" element={<Games />} />
