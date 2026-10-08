@@ -48,6 +48,7 @@ type Campaign = {
   status: string;
   admin_id: string | null;
   scheduled_broadcast_id: string | null;
+  email_fallback: boolean | null;
 };
 type Outcome = 'sent' | 'skipped' | 'retry' | 'failed';
 type Delivery = { outcome: Outcome; emailInstead: boolean };
@@ -275,7 +276,7 @@ async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | 
 
     let campaignsQuery = supabase
       .from('broadcast_campaigns')
-      .select('id, title, message, notification_type, status, admin_id, scheduled_broadcast_id')
+      .select('id, title, message, notification_type, status, admin_id, scheduled_broadcast_id, email_fallback')
       .in('status', ['queued', 'processing'])
       .order('created_at', { ascending: true });
     campaignsQuery = requestedCampaignId
@@ -311,7 +312,8 @@ async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | 
           const deliveries = await Promise.all(batch.map((r) => deliverToRecipient(supabase, campaign, r)));
           deliveries.forEach((d, idx) => {
             tally[d.outcome] += 1;
-            if (d.emailInstead) emailInstead.push(batch[idx].user_id);
+            // Campaigns can turn email copies off (push only).
+            if (d.emailInstead && campaign.email_fallback !== false) emailInstead.push(batch[idx].user_id);
           });
         }
         tally.emailed += await queueEmailCopies(supabase, campaign, emailInstead, historyId);

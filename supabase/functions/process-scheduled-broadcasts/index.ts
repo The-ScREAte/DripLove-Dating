@@ -38,6 +38,8 @@ type Schedule = {
   admin_id: string | null
   target_countries: string[] | null
   total_sends: number | null
+  save_to_inbox: boolean | null
+  email_fallback: boolean | null
 }
 
 type Due = { user_id: string; email: string | null; local_date: string; send_time: string; send_at: string }
@@ -79,7 +81,11 @@ async function occurrenceRow(
     ? { ...common, subject: schedule.title, message: schedule.message, recipient_count: 0, successful_sends: 0,
         failed_sends: 0, status: 'partial', recipient_filter: 'scheduled' }
     : { ...common, title: schedule.title, message: schedule.message, notification_type: 'system', total_recipients: 0,
-        successful_sends: 0, failed_sends: 0, status: 'queued', save_to_profile: true }
+        successful_sends: 0, failed_sends: 0, status: 'queued',
+        // Push only by default: no inbox copy unless the schedule asks for one,
+        // and no email copies unless email fallback is on.
+        save_to_profile: schedule.save_to_inbox === true,
+        email_fallback: schedule.email_fallback !== false }
 
   const { data, error } = await supabase.from(table).insert(row).select('id').single()
   if (error) {
@@ -135,7 +141,7 @@ async function run(supabase: SupabaseClient) {
 
   const { data: schedules, error } = await supabase
     .from('scheduled_broadcasts')
-    .select('id, title, message, channel, admin_id, target_countries, total_sends')
+    .select('id, title, message, channel, admin_id, target_countries, total_sends, save_to_inbox, email_fallback')
     .eq('is_active', true)
     .neq('repeat_type', 'interval')
   if (error) throw error

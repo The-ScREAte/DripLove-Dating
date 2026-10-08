@@ -45,6 +45,9 @@ interface ScheduledBroadcast {
   send_window_minutes?: number;
   activity?: 'any' | 'active' | 'inactive';
   smart_quiet?: boolean;
+  save_to_inbox?: boolean;
+  email_fallback?: boolean;
+  include_new_members?: boolean;
   audience?: 'all' | 'free' | 'premium';
   recipient_emails?: string[] | null;
   specific_day?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -199,6 +202,9 @@ export default function ScheduledBroadcasts() {
   const [sendWindow, setSendWindow] = useState('0');
   const [activity, setActivity] = useState<Activity>('any');
   const [smartQuiet, setSmartQuiet] = useState(true);
+  const [saveToInbox, setSaveToInbox] = useState(false);
+  const [emailFallback, setEmailFallback] = useState(false);
+  const [includeNewMembers, setIncludeNewMembers] = useState(true);
   // undefined = counting, null = couldn't count
   const [preview, setPreview] = useState<AudiencePreview | null | undefined>(undefined);
   const [sendingNowId, setSendingNowId] = useState<string | null>(null);
@@ -290,6 +296,9 @@ export default function ScheduledBroadcasts() {
     setSendWindow('0');
     setActivity('any');
     setSmartQuiet(true);
+    setSaveToInbox(false);
+    setEmailFallback(false);
+    setIncludeNewMembers(true);
     setShowDialog(true);
   };
 
@@ -315,6 +324,9 @@ export default function ScheduledBroadcasts() {
     setSendWindow(String(broadcast.send_window_minutes || 0));
     setActivity(broadcast.activity || 'any');
     setSmartQuiet(!!broadcast.smart_quiet);
+    setSaveToInbox(!!broadcast.save_to_inbox);
+    setEmailFallback(broadcast.email_fallback !== false);
+    setIncludeNewMembers(broadcast.include_new_members !== false);
     setShowDialog(true);
   };
 
@@ -424,6 +436,9 @@ export default function ScheduledBroadcasts() {
       send_window_minutes: isInterval ? 0 : Number(sendWindow),
       activity,
       smart_quiet: smartQuiet,
+      save_to_inbox: channel === 'push' && saveToInbox,
+      email_fallback: channel === 'push' ? emailFallback : true,
+      include_new_members: includeNewMembers,
       audience,
       recipient_emails: emails.length > 0 ? emails : null,
       next_send_at: nextSendAt.toISOString(),
@@ -460,13 +475,9 @@ export default function ScheduledBroadcasts() {
       loadScheduledBroadcasts();
     } catch (error) {
       console.error('Error saving scheduled broadcast:', error);
-      const detail = String((error as { message?: string } | null)?.message || '');
       toast({
         title: 'Error',
-        // Temporary guard (20261008000100_one_send_time_until_scheduler_deployed.sql).
-        description: detail.includes('one_send_time_tmp')
-          ? 'Several send times a day turn on once the scheduler update is deployed - use one time for now.'
-          : 'Failed to save scheduled broadcast',
+        description: 'Failed to save scheduled broadcast',
         variant: 'destructive',
       });
     }
@@ -654,6 +665,20 @@ export default function ScheduledBroadcasts() {
                       {broadcast.smart_quiet && (
                         <Badge variant="outline" className="text-xs bg-violet-50" title="Follows the shared notification budget (about 2 a day, quiet Tue/Thu, none right after app use or a like, match or message)">
                           Smart quiet
+                        </Badge>
+                      )}
+                      {broadcast.channel !== 'email' && (
+                        <Badge variant="outline" className="text-xs bg-gray-50" title="Where the message goes">
+                          {[
+                            'Push',
+                            broadcast.save_to_inbox && 'inbox',
+                            broadcast.email_fallback !== false && 'email if no push',
+                          ].filter(Boolean).join(' + ')}
+                        </Badge>
+                      )}
+                      {broadcast.include_new_members === false && (
+                        <Badge variant="outline" className="text-xs bg-orange-50" title="People who joined after this schedule was created don't get it">
+                          Existing members only
                         </Badge>
                       )}
                       {broadcast.recipient_emails && broadcast.recipient_emails.length > 0 && (
@@ -1041,6 +1066,47 @@ export default function ScheduledBroadcasts() {
                 </p>
               </div>
               <Switch id="smart-quiet" checked={smartQuiet} onCheckedChange={setSmartQuiet} />
+            </div>
+
+            {channel === 'push' && (
+              <>
+                <div className="flex items-center justify-between p-3 border rounded-md">
+                  <div className="pr-4">
+                    <Label htmlFor="save-to-inbox" className="text-sm font-medium">
+                      Save to members' in-app inbox
+                    </Label>
+                    <p className="text-xs text-gray-500">
+                      Off: delivered once, as a push only. On: also kept in each member's in-app messages.
+                    </p>
+                  </div>
+                  <Switch id="save-to-inbox" checked={saveToInbox} onCheckedChange={setSaveToInbox} />
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-md">
+                  <div className="pr-4">
+                    <Label htmlFor="email-fallback" className="text-sm font-medium">
+                      Email people a push can't reach
+                    </Label>
+                    <p className="text-xs text-gray-500">
+                      Off: only people with the app and notifications on get it. On: everyone else gets it by email.
+                    </p>
+                  </div>
+                  <Switch id="email-fallback" checked={emailFallback} onCheckedChange={setEmailFallback} />
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center justify-between p-3 border rounded-md">
+              <div className="pr-4">
+                <Label htmlFor="include-new-members" className="text-sm font-medium">
+                  Include new members automatically
+                </Label>
+                <p className="text-xs text-gray-500">
+                  On: the audience is worked out fresh for every send, so people who sign up later get it too.
+                  Off: only people who were members when this schedule was created.
+                </p>
+              </div>
+              <Switch id="include-new-members" checked={includeNewMembers} onCheckedChange={setIncludeNewMembers} />
             </div>
 
             <div className="space-y-2">
