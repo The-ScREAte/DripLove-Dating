@@ -652,7 +652,7 @@ export default function ScheduledBroadcasts() {
                         </Badge>
                       )}
                       {broadcast.smart_quiet && (
-                        <Badge variant="outline" className="text-xs bg-violet-50" title="Skips anyone who opened the app, matched or got a message in the last 4 hours">
+                        <Badge variant="outline" className="text-xs bg-violet-50" title="Follows the shared notification budget (about 2 a day, quiet Tue/Thu, none right after app use or a like, match or message)">
                           Smart quiet
                         </Badge>
                       )}
@@ -1035,8 +1035,9 @@ export default function ScheduledBroadcasts() {
                   Smart quiet
                 </Label>
                 <p className="text-xs text-gray-500">
-                  Skip anyone who opened the app, matched or got a message in the last 4 hours - checked at the
-                  moment of sending.
+                  Follows the shared notification budget, checked at the moment of sending: about 2 a day, 4 hours
+                  apart (1 if they've used the app today, 1 a week if they've been away a week), none on Tuesdays and
+                  Thursdays, and none within 4 hours of opening the app or getting a like, match or message.
                 </p>
               </div>
               <Switch id="smart-quiet" checked={smartQuiet} onCheckedChange={setSmartQuiet} />
