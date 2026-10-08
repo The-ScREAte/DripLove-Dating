@@ -127,9 +127,9 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   };
 
   const guidelines = [
-    { icon: Heart, title: 'Be respectful', text: 'Treat everyone with kindness.' },
-    { icon: Shield, title: 'Stay safe', text: 'Meet in public and protect your privacy.' },
-    { icon: Users, title: 'Be authentic', text: 'Use real photos and honest info.' },
+    { icon: Shield, title: 'Your safety is in your hands', text: 'Meet in public, protect your information and report anything unsafe.' },
+    { icon: Heart, title: 'Keep others safe', text: 'Respect boundaries and consent, and treat everyone with kindness.' },
+    { icon: Users, title: 'Be authentic', text: 'Use real photos and honest information.' },
   ];
 
   return (
@@ -207,7 +207,9 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-white/40 data-[state=checked]:border-pink-500 data-[state=checked]:bg-pink-500 data-[state=checked]:text-white"
           />
           <span className="text-sm leading-snug text-white/85">
-            I agree to the Terms of Service and Privacy Policy, and I confirm I'm 18 or older.
+            I am 18 or older and I agree to the Terms of Service (including the arbitration agreement and class
+            action waiver), the Privacy Policy and the Community Guidelines. I understand that I am responsible for
+            my own safety and for my conduct towards other members.
           </span>
         </label>
 

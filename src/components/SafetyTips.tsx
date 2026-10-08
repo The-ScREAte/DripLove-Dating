@@ -18,11 +18,17 @@ const SafetyTips = ({ onBack }: SafetyTipsProps) => (
     updated={LEGAL_LAST_UPDATED}
     onBack={onBack}
     intro={
-      <p>
-        Meeting new people should be exciting, not risky. Most people on DripLove are here for the same reason you
-        are, but it is always smart to take a few simple precautions. DripLove does not run criminal background
-        checks, so trust your instincts and use these tips.
-      </p>
+      <>
+        <p>
+          Your safety is in your hands. DripLove gives you tools to help, including profile verification, reporting
+          and blocking, but you are responsible for your own safety and for treating every member safely and with
+          respect.
+        </p>
+        <p className="font-semibold text-neutral-100">
+          DripLove does not conduct criminal background checks. Trust your instincts, take your time and use these
+          precautions.
+        </p>
+      </>
     }
   >
     <LegalSection number={1} title="Getting to know someone online">
@@ -60,7 +66,18 @@ const SafetyTips = ({ onBack }: SafetyTipsProps) => (
       />
     </LegalSection>
 
-    <LegalSection number={4} title="Reporting and getting help">
+    <LegalSection number={4} title="Help keep others safe">
+      <LegalList
+        items={[
+          'Respect boundaries and consent at every step, and accept a no without argument.',
+          'Never share anyone\'s photos, messages or personal details without their permission.',
+          'If you notice someone acting suspiciously, asking members for money or targeting anyone vulnerable, report them.',
+          'If a member tells you they feel unsafe, take it seriously and encourage them to contact local authorities.',
+        ]}
+      />
+    </LegalSection>
+
+    <LegalSection number={5} title="Reporting and getting help">
       <p>
         Report anyone who makes you uncomfortable, asks for money or breaks our{' '}
         <PolicyLink to="/community-guidelines">Community Guidelines</PolicyLink>. Use the report button on their

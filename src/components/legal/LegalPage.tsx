@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -14,11 +14,34 @@ interface LegalPageProps {
   updated?: string;
   intro?: React.ReactNode;
   onBack: () => void;
+  /** Show a clickable table of contents (Parts if the page has them, otherwise sections). */
+  contents?: boolean;
   children: React.ReactNode;
 }
 
-export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPageProps) => {
+type ContentsItem = { id: string; label: string };
+
+// Headings sit below the sticky back bar when jumped to.
+const ANCHOR_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 72px)';
+
+export const LegalPage = ({ title, updated, intro, onBack, contents = false, children }: LegalPageProps) => {
   const { t } = useTranslation();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [toc, setToc] = useState<ContentsItem[]>([]);
+
+  // Build the contents list from the rendered headings, so it can never drift
+  // from the document itself.
+  useEffect(() => {
+    if (!contents) return;
+    const timer = window.setTimeout(() => {
+      const body = bodyRef.current;
+      if (!body) return;
+      const parts = body.querySelectorAll<HTMLElement>('[data-toc-part]');
+      const nodes = parts.length > 0 ? parts : body.querySelectorAll<HTMLElement>('[data-toc-section]');
+      setToc(Array.from(nodes).map((node) => ({ id: node.id, label: node.dataset.tocPart || node.dataset.tocSection || '' })));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [contents]);
 
   // Give each page its own browser tab / search result title.
   useEffect(() => {
@@ -60,7 +83,28 @@ export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPage
         {updated && <p className="mt-2 text-sm text-neutral-500">{updated}</p>}
         {intro && <div className="mt-6 space-y-3 text-[15px] leading-relaxed">{intro}</div>}
 
-        <div className="mt-10 space-y-10">{children}</div>
+        {toc.length > 0 && (
+          <nav aria-label="Contents" className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">Contents</p>
+            <ol className="mt-3 space-y-1.5">
+              {toc.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className="text-left text-[14px] text-neutral-300 transition-colors hover:text-pink-400"
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        )}
+
+        <div ref={bodyRef} className="mt-10 space-y-10">
+          {children}
+        </div>
 
         <footer className="mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-neutral-500">
           © {new Date().getFullYear()} {COMPANY.name}. All rights reserved.
@@ -79,13 +123,41 @@ export const LegalSection = ({
   title: string;
   children: React.ReactNode;
 }) => (
-  <section>
+  <section
+    id={number !== undefined ? `section-${number}` : undefined}
+    data-toc-section={number !== undefined ? `${number}. ${title}` : title}
+    style={{ scrollMarginTop: ANCHOR_OFFSET }}
+  >
     <h2 className="flex gap-3 text-lg font-semibold text-white">
       {number !== undefined && <span className="tabular-nums text-pink-500">{number}.</span>}
       {title}
     </h2>
     <div className="mt-3 space-y-3 text-[15px] leading-relaxed">{children}</div>
   </section>
+);
+
+// A group of sections ("Part II – Your Safety and Responsibility").
+export const LegalPart = ({
+  numeral,
+  title,
+  children,
+}: {
+  numeral: string;
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <div className="space-y-10">
+    <div
+      id={`part-${numeral.toLowerCase()}`}
+      data-toc-part={`Part ${numeral} · ${title}`}
+      className="border-t border-white/10 pt-8"
+      style={{ scrollMarginTop: ANCHOR_OFFSET }}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-pink-500">Part {numeral}</p>
+      <h2 className="mt-1 text-xl font-bold tracking-tight text-white">{title}</h2>
+    </div>
+    {children}
+  </div>
 );
 
 export const LegalList = ({ items }: { items: React.ReactNode[] }) => (

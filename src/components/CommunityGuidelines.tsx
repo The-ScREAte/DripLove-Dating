@@ -20,10 +20,11 @@ const CommunityGuidelines = ({ onBack }: CommunityGuidelinesProps) => (
     intro={
       <>
         <p>
-          DripLove is a place to meet people with kindness, honesty and respect. These guidelines describe what we
-          expect from everyone in our community. They are part of our{' '}
-          <PolicyLink to="/terms-of-service">Terms of Service</PolicyLink>, and breaking them can lead to content
-          being removed or an account being banned.
+          DripLove is a community built on respect, honesty and safety. Every member is responsible for their own
+          safety and shares responsibility for the safety of others. These guidelines set the standard of conduct we
+          expect from everyone. They form part of our{' '}
+          <PolicyLink to="/terms-of-service">Terms of Service</PolicyLink>, and any breach may result in content
+          being removed or an account being suspended or permanently banned.
         </p>
       </>
     }
@@ -90,7 +91,18 @@ const CommunityGuidelines = ({ onBack }: CommunityGuidelinesProps) => (
       </p>
     </LegalSection>
 
-    <LegalSection number={7} title="Reporting and enforcement">
+    <LegalSection number={7} title="Look out for one another">
+      <LegalList
+        items={[
+          'Respect boundaries. Take no for an answer, and never pressure anyone to meet, share photos or move the conversation elsewhere.',
+          'Make safe plans together: public places, your own transport, and a trusted person who knows where you are.',
+          'If someone seems at risk, or something feels wrong, report it, even if you are not certain.',
+          'Never put another member in danger, online or in person.',
+        ]}
+      />
+    </LegalSection>
+
+    <LegalSection number={8} title="Reporting and enforcement">
       <p>
         If someone breaks these guidelines, please report them from their profile or your conversation; reports are
         confidential. Our team reviews reports and may warn members, remove content, or suspend or permanently ban
@@ -100,7 +112,7 @@ const CommunityGuidelines = ({ onBack }: CommunityGuidelinesProps) => (
       <ContactCard team="Trust & Safety" />
     </LegalSection>
 
-    <LegalSection number={8} title="Stay safe">
+    <LegalSection number={9} title="Stay safe">
       <p>
         Our <PolicyLink to="/safety-tips">Safety Tips</PolicyLink> explain how to get to know people safely online
         and when you meet in person.

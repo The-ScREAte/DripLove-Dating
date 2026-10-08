@@ -22,6 +22,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
       title={t('privacyPolicy.title')}
       updated={LEGAL_LAST_UPDATED}
       onBack={onBack}
+      contents
       intro={
         <>
           <p>
@@ -45,10 +46,11 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             'Account information: name, email address, date of birth, gender and, where you use Apple or Google sign-in, the identifiers provided by those services.',
             'Profile information: photographs, biography, interests, lifestyle, occupation and education, relationship intentions and partner preferences.',
             'Location information: country and city and, where you grant permission, the location of your device.',
-            'Activity information: likes, matches, messages and other interactions with members.',
+            'Activity information: likes, matches, messages (including photographs shared in conversations) and other interactions with members.',
             'Verification information: the selfie you submit if you elect to verify your profile, as described in Section 3.',
             'Transaction information: confirmation of purchases processed by Apple, Google or Paystack. We do not receive or store full payment card numbers.',
-            'Communications: information you provide when contacting support, submitting a report or creating an advertisement.',
+            'Advertising and promoter information: the content, targeting and budget of advertising campaigns you create and, if you participate in our promoter program, your referral activity and payout details.',
+            'Communications: information you provide when contacting support or submitting a report.',
           ]}
         />
       </LegalSection>
@@ -59,6 +61,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             'Device information, including device type, operating system, application version and push notification token.',
             'Usage information, including the dates and times you access the Service and the features you use.',
             'Log information, including Internet Protocol (IP) address and request timestamps.',
+            'Referral information, including the referral link or code through which you reached the Service.',
             'Information stored through local storage and similar technologies on our website to maintain your session and preferences.',
           ]}
         />
@@ -83,7 +86,16 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={4} title="Purposes of Processing">
+      <LegalSection number={4} title="Video Calls">
+        <p>
+          Video and audio in video calls, including Circle Up, are transmitted in real time through LiveKit, our
+          real-time communications provider. DripLove does not record or store the content of video calls. We
+          process limited call information, such as the participants and the time of the call, to operate the
+          feature and to investigate reports.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={5} title="Purposes of Processing">
         <p>We process personal information for the following purposes:</p>
         <LegalList
           items={[
@@ -92,7 +104,9 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
             'to enable communications between members;',
             'to send notifications and emails regarding your account, member activity and offers relating to the Service, in accordance with your settings;',
             'to verify profiles, moderate content, and detect and prevent fraud, abuse and violations of our Terms of Service;',
-            'to process subscriptions and payments;',
+            'to process subscriptions, advertising purchases and payments;',
+            'to display advertising within the Service, including advertisements selected by country, age range and gender; we do not provide advertisers with your personal information;',
+            'to administer the promoter program, including attributing referrals and paying commissions;',
             'to provide customer support;',
             'to analyse and improve the Service; and',
             'to comply with legal obligations and to establish, exercise or defend legal claims.',
@@ -100,7 +114,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         />
       </LegalSection>
 
-      <LegalSection number={5} title="Information Visible to Other Members">
+      <LegalSection number={6} title="Information Visible to Other Members">
         <p>
           Your profile, including your name, age, photographs, biography, interests and city or country, is visible
           to other members. Messages are visible to their recipients. Your email address, date of birth, transaction
@@ -108,12 +122,12 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={6} title="Disclosure of Personal Information">
+      <LegalSection number={7} title="Disclosure of Personal Information">
         <p>We disclose personal information only in the following circumstances:</p>
         <LegalList
           items={[
-            'Service providers: to vendors that process personal information on our behalf under contractual obligations restricting its use, namely Supabase (hosting, database and storage), Amazon Web Services (profile verification), Google Firebase and Apple (push notifications), our email service providers, and Apple, Google and Paystack (authentication and payment processing).',
-            'Other members: as described in Section 5.',
+            'Service providers: to vendors that process personal information on our behalf under contractual obligations restricting its use, namely Supabase (hosting, database and storage), Amazon Web Services (profile verification), LiveKit (real-time video calls), Google Firebase and Apple (push notifications), our email service providers, and Apple, Google, Paystack and Stripe (authentication and payment processing).',
+            'Other members: as described in Section 6.',
             'Legal requirements: where required by law, regulation, legal process or governmental request, or where necessary to protect the rights, property or safety of DripLove, our members or the public.',
             'Business transfers: in connection with a merger, acquisition, financing or sale of all or part of our business or assets.',
             'Consent: with your consent or at your direction.',
@@ -121,7 +135,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         />
       </LegalSection>
 
-      <LegalSection number={7} title="Data Security">
+      <LegalSection number={8} title="Data Security">
         <p>
           We maintain administrative, technical and organisational measures designed to protect personal
           information, including encryption in transit using Transport Layer Security (TLS), encryption at rest
@@ -131,7 +145,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={8} title="Data Retention">
+      <LegalSection number={9} title="Data Retention">
         <p>
           We retain personal information for as long as your account remains active. Upon deletion of your account,
           we delete your personal information from our active systems within thirty (30) days and permanently
@@ -141,7 +155,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={9} title="Your Rights and Choices">
+      <LegalSection number={10} title="Your Rights and Choices">
         <p>Subject to applicable law, you may have the right to:</p>
         <LegalList
           items={[
@@ -156,12 +170,12 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         <p>
           You may disable push notifications and location access in your device settings and opt out of marketing
           emails using the unsubscribe link provided. To exercise any other right, contact us using the details in
-          Section 14. We may need to verify your identity before responding. You may also lodge a complaint with the
+          Section 15. We may need to verify your identity before responding. You may also lodge a complaint with the
           data protection authority in your jurisdiction.
         </p>
       </LegalSection>
 
-      <LegalSection number={10} title="International Data Transfers">
+      <LegalSection number={11} title="International Data Transfers">
         <p>
           Your personal information may be transferred to and processed in jurisdictions other than the one in which
           you reside, which may have data protection laws different from those of your jurisdiction. Where required
@@ -170,8 +184,8 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={11} title="Jurisdiction-Specific Disclosures">
-        <LegalSubheading>11.1 European Economic Area, United Kingdom and Switzerland</LegalSubheading>
+      <LegalSection number={12} title="Jurisdiction-Specific Disclosures">
+        <LegalSubheading>12.1 European Economic Area, United Kingdom and Switzerland</LegalSubheading>
         <p>We rely on the following legal bases for processing personal information:</p>
         <LegalList
           items={[
@@ -182,10 +196,10 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
           ]}
         />
         <p>
-          You have the rights set out in Section 9 and the right to lodge a complaint with a supervisory authority.
+          You have the rights set out in Section 10 and the right to lodge a complaint with a supervisory authority.
         </p>
 
-        <LegalSubheading>11.2 State Consumer Privacy Laws</LegalSubheading>
+        <LegalSubheading>12.2 State Consumer Privacy Laws</LegalSubheading>
         <p>
           Residents of jurisdictions with comprehensive consumer privacy laws, including California, Colorado,
           Connecticut, Oregon, Texas and Virginia, may have the right to know the categories and specific
@@ -199,12 +213,12 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
           templates generated through optional profile verification), precise geolocation (where you grant
           permission), and information concerning gender and partner preferences that you elect to provide. We
           process sensitive personal information only as necessary to provide and secure the Service. Requests may
-          be submitted to the contact in Section 14 or through an authorised agent. We will not discriminate against
+          be submitted to the contact in Section 15 or through an authorised agent. We will not discriminate against
           you for exercising your rights. If we decline a request, you may appeal by responding to our decision; if
           your appeal is denied, you may contact the attorney general of your jurisdiction.
         </p>
 
-        <LegalSubheading>11.3 Consumer Health Data</LegalSubheading>
+        <LegalSubheading>12.3 Consumer Health Data</LegalSubheading>
         <p>
           Certain laws, including the Washington My Health My Data Act and Nevada Senate Bill 370, treat some
           information as consumer health data. Consumer health data processed by DripLove consists of the facial
@@ -216,7 +230,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={12} title="Children">
+      <LegalSection number={13} title="Children">
         <p>
           The Service is intended solely for persons aged eighteen (18) and over. We do not knowingly collect
           personal information from anyone under eighteen (18). If we become aware that such information has been
@@ -225,7 +239,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={13} title="Changes to This Privacy Policy">
+      <LegalSection number={14} title="Changes to This Privacy Policy">
         <p>
           We may amend this Privacy Policy from time to time. We will provide notice of material changes in the
           Service or by email before they take effect and will obtain your consent where required by applicable law.
@@ -233,7 +247,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={14} title="Contact">
+      <LegalSection number={15} title="Contact">
         <p>
           Requests and enquiries regarding this Privacy Policy or our processing of personal information may be
           directed to:
