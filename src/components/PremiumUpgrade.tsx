@@ -724,6 +724,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                           <div className="text-[10px] md:text-xs text-white/70 mt-0.5">
                             then {pageTrialOfferInfo.priceAfterTrial || (pricingConfig.loading ? '...' : displayPrice)}/month
                           </div>
+                          {/* Google Play trials end the moment they're cancelled (see
+                              supabase/functions/_shared/google-trial.ts). */}
+                          {Capacitor.getPlatform() === 'android' && (
+                            <div className="text-[10px] md:text-xs text-white/50 mt-0.5">
+                              Cancelling during the free trial ends Premium immediately.
+                            </div>
+                          )}
                         </>
                       ) : (
                         <div className="text-sm sm:text-base md:text-xl font-bold text-white">

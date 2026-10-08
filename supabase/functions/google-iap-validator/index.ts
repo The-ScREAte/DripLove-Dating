@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { isCancelledFreeTrial } from '../_shared/google-trial.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -382,6 +383,20 @@ serve(async (req: Request) => {
         active: false,
         expiresDate: expiresAt,
         expires_at: expiresAt,
+        transaction_id: transactionId || purchaseToken,
+        purchaseToken,
+      })
+    }
+
+    // Cancelled during the free trial: Premium already ended (see
+    // _shared/google-trial.ts). Don't grant it again from a restore or re-check
+    // while Google still lists the trial until its end date.
+    if (isCancelledFreeTrial({ paymentState, autoRenewing: autoRenew })) {
+      console.log('ℹ️ [GOOGLE-IAP-VALIDATOR] Free trial was cancelled - not granting Premium')
+      return json(200, {
+        valid: true,
+        active: false,
+        trial_cancelled: true,
         transaction_id: transactionId || purchaseToken,
         purchaseToken,
       })

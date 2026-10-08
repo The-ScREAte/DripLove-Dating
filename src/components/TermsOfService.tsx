@@ -236,7 +236,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
               'AUTOMATIC RENEWAL: YOUR SUBSCRIPTION RENEWS AUTOMATICALLY AT THE END OF EACH SUBSCRIPTION PERIOD AT THE THEN-CURRENT PRICE UNLESS YOU CANCEL AT LEAST TWENTY-FOUR (24) HOURS BEFORE THE RENEWAL DATE.',
               'You may cancel through your App Store or Google Play account settings, or within the Service for Paystack subscriptions. Cancellation takes effect at the end of the current paid period.',
               'Deleting your account does not cancel a subscription purchased through the App Store or Google Play.',
-              'Any free trial converts to a paid subscription at its end unless cancelled before the trial expires.',
+              'Any free trial converts to a paid subscription at its end unless cancelled before the trial expires. For subscriptions purchased through Google Play, cancelling during a free trial ends Premium immediately.',
               "Except as required by applicable law or the applicable app store's refund policy, all payments are non-refundable.",
               'We will notify you in advance of any price change, which will apply from your next renewal.',
             ]}

@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { cancelledTrialFields, isCancelledFreeTrial, revokeGoogleSubscription } from '../_shared/google-trial.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -120,7 +121,7 @@ async function getAndroidPublisherAccessToken(): Promise<string | null> {
 async function verifyGoogleSubscription(
   accessToken: string,
   purchaseToken: string
-): Promise<{ expiryTimeMillis: number; autoRenewing: boolean } | null> {
+): Promise<{ expiryTimeMillis: number; autoRenewing: boolean; paymentState?: number; subscriptionId?: string } | null> {
   const subscriptionIds = ['premium_monthly', 'monthly']
   const shortToken = purchaseToken.slice(0, 12)
 
@@ -134,6 +135,8 @@ async function verifyGoogleSubscription(
         return {
           expiryTimeMillis: Number(data.expiryTimeMillis),
           autoRenewing: data.autoRenewing === true,
+          paymentState: typeof data.paymentState === 'number' ? data.paymentState : undefined,
+          subscriptionId: subId,
         }
       }
       // Was previously swallowed silently, so every failure just became a
@@ -301,6 +304,25 @@ serve(async (req) => {
             if (!googleData) {
               console.log(`[SUBSCRIPTION-CHECKER] Could not verify Google subscription for user ${sub.user_id}`)
               googleSyncStats.errors++
+              continue
+            }
+
+            // Cancelled during the free trial: Premium ends now (see
+            // _shared/google-trial.ts). Also never re-activate it below, even
+            // while Google still lists the trial as running.
+            if (isCancelledFreeTrial(googleData)) {
+              if (sub.plan_name === 'premium') {
+                const revoked = googleData.subscriptionId
+                  ? await revokeGoogleSubscription(googleAccessToken, GOOGLE_PACKAGE_NAME, googleData.subscriptionId, purchaseToken)
+                  : false
+                const { error } = await supabase.from('user_subscriptions').update(cancelledTrialFields()).eq('id', sub.id)
+                if (!error) {
+                  googleSyncStats.updated++
+                  console.log(`[SUBSCRIPTION-CHECKER] ⏹️ Free trial cancelled - Premium ended for user ${sub.user_id} (revoked at Google: ${revoked})`)
+                } else {
+                  googleSyncStats.errors++
+                }
+              }
               continue
             }
             

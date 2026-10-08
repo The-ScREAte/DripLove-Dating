@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Sparkles, Globe, MessageCircle, Heart, MapPin, Compass, X, Loader2 } from 'lucide-react';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 
@@ -110,6 +111,9 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
 
         <p className="mt-2.5 text-center text-[11px] text-white/45">
           {offerInfo.trialPeriodLabel ? `No charge for ${offerInfo.trialPeriodLabel}.` : 'No charge during your trial.'} Cancel anytime.
+          {/* Google Play trials end the moment they're cancelled (see
+              supabase/functions/_shared/google-trial.ts). */}
+          {Capacitor.getPlatform() === 'android' && ' Cancelling during the free trial ends Premium immediately.'}
         </p>
       </div>
     </div>

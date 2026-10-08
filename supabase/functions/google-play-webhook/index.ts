@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { cancelledTrialFields, isCancelledFreeTrial, revokeGoogleSubscription } from '../_shared/google-trial.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -134,6 +135,8 @@ interface GoogleSubscriptionData {
   autoRenewing: boolean
   paymentState?: number
   cancelReason?: number
+  /** The subscription product the v3 lookup matched (needed to revoke). */
+  subscriptionId?: string
 }
 
 async function verifyWithGoogleAPI(
@@ -163,6 +166,7 @@ async function verifyWithGoogleAPI(
           autoRenewing: data.autoRenewing === true,
           paymentState: data.paymentState,
           cancelReason: data.cancelReason,
+          subscriptionId: subId,
         }
       }
     } catch (err) {
@@ -489,7 +493,22 @@ serve(async (req) => {
         if (!subscription) {
           return json(200, { message: 'Subscription not found for cancellation' })
         }
-        
+
+        // Cancelled during the free trial: Premium ends now, not at the end of
+        // the trial (see _shared/google-trial.ts).
+        if (accessToken && isCancelledFreeTrial(googleData)) {
+          const revoked = googleData?.subscriptionId
+            ? await revokeGoogleSubscription(accessToken, GOOGLE_PACKAGE_NAME, googleData.subscriptionId, purchaseToken)
+            : false
+          const { error: trialError } = await updateSubscriptionByToken(supabase, purchaseToken, cancelledTrialFields())
+          if (trialError) {
+            console.error('[GOOGLE-WEBHOOK] Error ending cancelled free trial:', trialError)
+            return json(500, { error: 'Failed to end free trial' })
+          }
+          console.log(`[GOOGLE-WEBHOOK] ⏹️ Free trial cancelled - Premium ended now for user ${subscription.user_id} (revoked at Google: ${revoked})`)
+          break
+        }
+
         // Get actual expiry from Google - user keeps access until then
         let cancelExpiry = subscription.expires_at
         if (googleData && googleData.expiryTimeMillis > Date.now()) {
