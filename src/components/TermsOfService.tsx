@@ -26,7 +26,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
         <>
           <p>
             Welcome to DripLove. These Terms of Service ("Terms") are a legal agreement between you and {COMPANY.name}{' '}
-            ("DripLove", "we", "us"), based in Rexburg, Idaho, United States. They govern your use of the DripLove app
+            ("DripLove", "we", "us"), based in Utah, United States. They govern your use of the DripLove app
             and website (the "Service").
           </p>
           <p>
@@ -251,9 +251,9 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
 
       <LegalSection number={15} title="Governing law">
         <p>
-          These Terms are governed by the laws of the State of Idaho and applicable US federal law, without regard
+          These Terms are governed by the laws of the State of Utah and applicable US federal law, without regard
           to conflict-of-law rules. Any claim that is not subject to arbitration will be brought exclusively in the
-          state or federal courts located in Idaho, and you and we consent to their jurisdiction. If you live
+          state or federal courts located in Utah, and you and we consent to their jurisdiction. If you live
           outside the United States, you keep the protection of any mandatory consumer laws of your country.
         </p>
       </LegalSection>

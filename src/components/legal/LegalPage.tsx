@@ -65,7 +65,7 @@ export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPage
         <footer className="mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-neutral-500">
           © {new Date().getFullYear()} {COMPANY.name}. All rights reserved.
           <br />
-          {COMPANY.address}
+          {COMPANY.location}
         </footer>
       </main>
     </div>
@@ -107,7 +107,7 @@ export const ContactCard = ({ team }: { team: string }) => (
     <p className="font-medium text-white">
       {COMPANY.name}, {team}
     </p>
-    <p className="mt-1 text-sm text-neutral-400">{COMPANY.address}</p>
+    <p className="mt-1 text-sm text-neutral-400">{COMPANY.location}</p>
     <a href={`mailto:${COMPANY.email}`} className="mt-1 inline-block text-pink-400 hover:underline">
       {COMPANY.email}
     </a>

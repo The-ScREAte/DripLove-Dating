@@ -26,7 +26,7 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
           <p>
             Your privacy matters to us. This Privacy Policy explains what information DripLove collects, how we use
             and share it, and the choices you have. It applies to the DripLove app and website, which are operated by
-            {COMPANY.name} ("DripLove", "we", "us"), based in Rexburg, Idaho, United States. {COMPANY.name} is the
+            {COMPANY.name} ("DripLove", "we", "us"), based in Utah, United States. {COMPANY.name} is the
             controller of your personal information.
           </p>
           <p>We never sell your personal information or share it for targeted advertising.</p>

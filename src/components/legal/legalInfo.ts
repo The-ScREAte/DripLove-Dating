@@ -2,7 +2,7 @@
 // Community Guidelines, Safety Tips and Child Safety.
 export const COMPANY = {
   name: 'The ScREAte',
-  address: '354 S 1st W #15, Rexburg, ID 83440, United States',
+  location: 'Utah, United States',
   email: 'info@driplove.love',
 };
 
