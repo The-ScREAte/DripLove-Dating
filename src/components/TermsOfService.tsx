@@ -1,7 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText, Users, Crown, Shield, Gavel, Mail } from 'lucide-react';
+import {
+  ContactCard,
+  LEGAL_LAST_UPDATED,
+  LegalList,
+  LegalPage,
+  LegalSection,
+} from '@/components/legal/LegalPage';
 
 interface TermsOfServiceProps {
   onBack: () => void;
@@ -9,211 +14,198 @@ interface TermsOfServiceProps {
 
 const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
   const { t } = useTranslation();
-  
+
   return (
-  <div
-    className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 px-4 pb-4"
-    style={{
-      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
-    }}
-  >
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 sticky top-0 z-10">
-          <Button
-            onClick={onBack}
-            variant="ghost"
-            size="sm"
-            className="text-white hover:bg-white/20"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {t('common.back')}
-          </Button>
-          <h1 className="text-3xl font-bold">{t('termsOfService.title')}</h1>
-          <p className="text-purple-100 mt-2">{t('termsOfService.lastUpdated')}</p>
-        </div>
+    <LegalPage
+      title={t('termsOfService.title')}
+      updated={LEGAL_LAST_UPDATED}
+      onBack={onBack}
+      intro={
+        <>
+          <p>
+            Welcome to DripLove. These Terms of Service ("Terms") are an agreement between you and The ScREAte Ltd
+            ("DripLove", "we", "us") and govern your use of the DripLove app and website (the "Service").
+          </p>
+          <p>
+            By creating an account or using the Service, you agree to these Terms and to our Privacy Policy. If you
+            do not agree, please do not use DripLove.
+          </p>
+        </>
+      }
+    >
+      <LegalSection number={1} title="Eligibility">
+        <p>To use DripLove, you must:</p>
+        <LegalList
+          items={[
+            'Be at least 18 years old',
+            'Be legally able to enter into a binding agreement',
+            'Not be prohibited from using the Service under any applicable law',
+            'Not have been convicted of a violent or sexual offence',
+            'Not have had a DripLove account removed by us for breaking these Terms',
+          ]}
+        />
+        <p>You may have only one account.</p>
+      </LegalSection>
 
-        {/* Content */}
-        <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <FileText className="w-6 h-6 mr-2 text-blue-600" />
-              1. Acceptance of Terms
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              By accessing or using DripLove ("the Service"), you agree to comply with and be legally bound by these Terms of Service. If you do not accept these terms in full, do not use the Service.
-            </p>
-            <p className="text-gray-600 leading-relaxed">
-              DripLove is owned and operated by The ScREAte Ltd, a company committed to building innovative and inclusive digital experiences.
-            </p>
-          </section>
+      <LegalSection number={2} title="Your account">
+        <p>
+          Keep the information in your account accurate and up to date, and keep your sign-in details secure. You
+          are responsible for everything that happens under your account. If you think someone else has accessed
+          it, contact us right away.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Users className="w-6 h-6 mr-2 text-purple-600" />
-              2. Description of Service
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              DripLove is a global dating platform created to connect individuals from diverse backgrounds. Our features include:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 text-gray-600">
-              <li>Personalized profile creation and management</li>
-              <li>Match suggestions based on preferences and compatibility</li>
-              <li>Real-time messaging and communication tools</li>
-              <li>Optional premium subscription features</li>
-              <li>Safety guidelines and community moderation</li>
-            </ul>
-          </section>
+      <LegalSection number={3} title="Community standards">
+        <p>DripLove is built on respect. When using the Service, you agree not to:</p>
+        <LegalList
+          items={[
+            'Harass, threaten, bully, stalk or intimidate anyone',
+            'Post hateful, discriminatory, violent, sexually explicit or illegal content',
+            'Share any content involving minors in a sexual or inappropriate way',
+            'Create a fake profile, impersonate anyone, or use photos that are not of you',
+            'Ask other members for money, gifts or financial information, or run any kind of scam',
+            'Promote products or services, or send spam, outside our advertising tools',
+            "Share other people's private information without their permission",
+            'Use bots, scrapers or other automated means to access the Service',
+            "Interfere with the Service's security or safety features",
+          ]}
+        />
+        <p>
+          We may remove content and suspend or close accounts that break these standards, with or without notice.
+          Please report anything that concerns you using the in-app report tools.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">3. User Eligibility</h2>
-            <p className="text-gray-600 leading-relaxed mb-3">To use DripLove, you must:</p>
-            <ul className="list-disc pl-6 space-y-1 text-gray-600">
-              <li>Be at least 18 years of age</li>
-              <li>Provide accurate and truthful personal information</li>
-              <li>Not be prohibited from using the service by any applicable law</li>
-              <li>Not have been previously suspended or banned from DripLove</li>
-              <li>Use the platform solely for legitimate dating or relationship purposes</li>
-            </ul>
-          </section>
+      <LegalSection number={4} title="Your content">
+        <p>
+          You own the photos, text and other content you post. By posting it, you give us a worldwide,
+          non-exclusive, royalty-free licence to host, store, display and distribute that content as needed to run,
+          improve and promote the Service. This licence ends when you delete the content or your account, except
+          where other members have already received it (for example, in messages) or we must keep it by law.
+        </p>
+        <p>
+          You are responsible for what you post. Photos and profiles may be reviewed, automatically and by our
+          team, and we may remove anything that breaks these Terms.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-              4. User Conduct
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              All users are expected to behave respectfully and responsibly. The following actions are strictly prohibited:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
-              <li>Harassment, abuse, or threatening behavior</li>
-              <li>Uploading or sharing explicit, hateful, or illegal content</li>
-              <li>Creating fake identities or impersonating others</li>
-              <li>Soliciting money, gifts, or sensitive information</li>
-              <li>Promoting commercial services, spam, or scams</li>
-              <li>Violating any laws while using the service</li>
-              <li>Circumventing or disabling safety features</li>
-            </ul>
-            <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
-              <p className="text-red-800">
-                <strong>⚠️ Violation of these rules may result in immediate account suspension or termination.</strong>
-              </p>
-            </div>
-          </section>
+      <LegalSection number={5} title="Verification and safety">
+        <p>
+          You can verify your profile with a selfie. A verification badge means the selfie matched the person in
+          the profile photos at the time of verification; it does not guarantee who someone is. DripLove does not
+          conduct criminal background checks on members.
+        </p>
+        <p>
+          You are responsible for your interactions with other members. Get to know people in the app first, meet
+          in public places, tell a friend where you are going, and never send money to someone you have met online.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Crown className="w-6 h-6 mr-2 text-yellow-600" />
-              5. Premium Subscription
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              DripLove offers optional premium features, such as:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 text-gray-600 mb-4">
-              <li>Unlimited likes and super likes</li>
-              <li>Advanced match filtering</li>
-              <li>Ad-free browsing</li>
-              <li>Enhanced profile visibility</li>
-              <li>Priority customer support</li>
-            </ul>
-            <p className="text-gray-600 leading-relaxed mb-2">All subscriptions:</p>
-            <ul className="list-disc pl-6 space-y-1 text-gray-600">
-              <li>Auto-renew by default unless canceled before renewal</li>
-              <li>Are non-refundable unless otherwise required by law</li>
-            </ul>
-          </section>
+      <LegalSection number={6} title="Premium subscriptions and payments">
+        <p>DripLove Premium is an optional paid subscription. It currently includes:</p>
+        <LegalList
+          items={[
+            'Unlimited daily swipes',
+            'Unlimited reverse dislikes',
+            'See everyone who liked you',
+            'Fewer ads',
+            'Up to 4 additional countries to explore',
+            'Priority support',
+          ]}
+        />
+        <p>Features may change over time.</p>
+        <LegalList
+          items={[
+            'Payments are processed by the Apple App Store, Google Play or Paystack, depending on where you subscribe.',
+            'Subscriptions renew automatically at the end of each period unless you cancel at least 24 hours before renewal.',
+            'Cancel through your App Store or Google Play account settings, or in DripLove for Paystack subscriptions. Your benefits continue until the end of the paid period.',
+            'Deleting your account does not cancel an App Store or Google Play subscription. Please cancel it in your store settings.',
+            'If a free trial is offered, it becomes a paid subscription when the trial ends unless you cancel before then.',
+            "Payments are non-refundable except where required by law or by the app store's refund policy.",
+            'If prices change, we will tell you in advance, and the new price applies from your next renewal.',
+          ]}
+        />
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">6. Privacy and Data Protection</h2>
-            <p className="text-gray-600 leading-relaxed">
-              We respect your privacy. Our practices are explained in our Privacy Policy. By using DripLove, you consent to the collection and use of your information in accordance with that policy.
-            </p>
-          </section>
+      <LegalSection number={7} title="Notifications and emails">
+        <p>
+          We send push notifications and emails about activity on your account (such as likes, matches and
+          messages), account and safety updates, and occasional suggestions and offers. You can turn off push
+          notifications in your device settings and unsubscribe from marketing emails using the link in any
+          email. We will still send messages that are essential to your account and security.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">7. Content and Intellectual Property</h2>
-            <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>Users retain ownership of their uploaded content but grant DripLove a non-exclusive, worldwide license to use, display, and distribute it within the platform.</li>
-              <li>All platform branding, visuals, and code remain the exclusive property of The ScREAte Ltd and may not be used without written permission.</li>
-            </ul>
-          </section>
+      <LegalSection number={8} title="Advertising">
+        <p>
+          The Service may show ads, including ads created by other members using DripLove's advertising tools.
+          Ads must follow our advertising guidelines, and we may reject or remove any ad. We are not responsible
+          for the products or services advertisers offer.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Shield className="w-6 h-6 mr-2 text-green-600" />
-              8. Safety and Security
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              DripLove implements community and technical safeguards, but your personal safety is your responsibility.
-            </p>
-            
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-green-800 mb-3 flex items-center">
-                🔐 User Safety Guidelines:
-              </h3>
-              <ul className="list-disc pl-6 space-y-1 text-green-700">
-                <li>Always meet in public spaces for initial dates</li>
-                <li>Inform someone you trust of your meeting details</li>
-                <li>Never share banking or financial information</li>
-                <li>Use in-app chat before exchanging personal contact details</li>
-                <li>Report suspicious behavior using the in-app report tool</li>
-              </ul>
-            </div>
-          </section>
+      <LegalSection number={9} title="Intellectual property">
+        <p>
+          The DripLove name, logo, design, software and all other parts of the Service, apart from content posted
+          by members, belong to The ScREAte Ltd and are protected by law. You may not copy, modify or use them
+          without our written permission.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">9. Account Termination</h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              We reserve the right to suspend or permanently ban users who violate these Terms or compromise user safety.
-            </p>
-            <p className="text-gray-600 leading-relaxed">
-              You may delete your account at any time via your profile settings. Account deletion is permanent and will remove your data from our active servers.
-            </p>
-          </section>
+      <LegalSection number={10} title="Ending your account">
+        <p>
+          You can delete your account at any time in your profile settings. We may suspend or close your account
+          if you break these Terms, create risk for other members or for us, or where required by law. Sections
+          that by their nature should continue after your account ends, such as Disclaimers and Limitation of
+          Liability, will continue to apply.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Gavel className="w-6 h-6 mr-2 text-gray-600" />
-              10. Limitation of Liability
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              DripLove is provided "as is" and without warranties of any kind. We are not liable for:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 text-gray-600">
-              <li>User interactions or relationships</li>
-              <li>Technical disruptions, bugs, or downtime</li>
-              <li>Data loss or service interruptions</li>
-              <li>Unauthorized use of your account</li>
-            </ul>
-          </section>
+      <LegalSection number={11} title="Disclaimers">
+        <p>
+          The Service is provided "as is" and "as available". We do not guarantee that you will find a match, that
+          the Service will be uninterrupted or error-free, or that information provided by other members is
+          accurate. We are not responsible for the conduct of any member, online or offline.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">11. Changes to Terms</h2>
-            <p className="text-gray-600 leading-relaxed">
-              We may update these Terms periodically. You will be notified of significant changes, and continued use of the Service constitutes acceptance of the new Terms.
-            </p>
-          </section>
+      <LegalSection number={12} title="Limitation of liability">
+        <p>
+          To the fullest extent permitted by law, The ScREAte Ltd will not be liable for any indirect, incidental,
+          special, consequential or punitive damages, or for any loss of data, profits or goodwill, arising from
+          your use of the Service or your interactions with other members. Our total liability for any claim
+          relating to the Service will not exceed the amount you paid us in the 12 months before the claim.
+          Nothing in these Terms limits any rights you have that cannot be limited by law.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Mail className="w-6 h-6 mr-2 text-pink-600" />
-              12. Contact Information
-            </h2>
-            <p className="text-gray-600 mb-4">
-              If you have questions or need assistance, contact us at:
-            </p>
-            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 space-y-2">
-              <p className="text-pink-800 font-semibold">
-                📧 <a href="mailto:driploveinfo@gmail.com" className="hover:underline">driploveinfo@gmail.com</a>
-              </p>
-              <p className="text-pink-700">
-                📍 The ScREAte Ltd – Support Team
-              </p>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
+      <LegalSection number={13} title="Indemnity">
+        <p>
+          You agree to compensate The ScREAte Ltd for any claims, losses or costs (including reasonable legal fees)
+          arising from your breach of these Terms or your conduct towards other members.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={14} title="Governing law">
+        <p>
+          These Terms are governed by the laws of the country in which The ScREAte Ltd is registered. If you live
+          in a country whose consumer protection laws give you additional rights, those rights still apply.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={15} title="Changes to these Terms">
+        <p>
+          We may update these Terms from time to time. If we make significant changes, we will let you know in
+          the app or by email before they take effect. Continuing to use DripLove after that means you accept the
+          updated Terms.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={16} title="Contact us">
+        <p>Questions about these Terms? We're happy to help.</p>
+        <ContactCard team="Support" />
+      </LegalSection>
+    </LegalPage>
   );
 };
 

@@ -1,7 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Shield, Eye, Lock, Users, Globe, Database, FileText, Mail } from 'lucide-react';
+import {
+  ContactCard,
+  LEGAL_LAST_UPDATED,
+  LegalList,
+  LegalPage,
+  LegalSection,
+  LegalSubheading,
+} from '@/components/legal/LegalPage';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
@@ -9,193 +15,165 @@ interface PrivacyPolicyProps {
 
 const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
   const { t } = useTranslation();
-  
+
   return (
-    <div
-      className="min-h-fill bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 px-4 pb-4"
-      style={{
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)'
-      }}
+    <LegalPage
+      title={t('privacyPolicy.title')}
+      updated={LEGAL_LAST_UPDATED}
+      onBack={onBack}
+      intro={
+        <>
+          <p>
+            Your privacy matters to us. This Privacy Policy explains what information DripLove collects, how we use
+            and share it, and the choices you have. It applies to the DripLove app and website, which are operated by
+            The ScREAte Ltd ("DripLove", "we", "us").
+          </p>
+          <p>We never sell your personal information.</p>
+        </>
+      }
     >
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 sticky top-0 z-10">
-          <Button
-            onClick={onBack}
-            variant="ghost"
-            size="sm"
-            className="text-white hover:bg-white/20"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            {t('common.back')}
-          </Button>
-          <h1 className="text-3xl font-bold">{t('privacyPolicy.title')}</h1>
-          <p className="text-purple-100 mt-2">{t('privacyPolicy.lastUpdated')}</p>
-        </div>
+      <LegalSection number={1} title="Information you give us">
+        <LegalList
+          items={[
+            'Account details: your name, email address, date of birth and gender, and your sign-in details if you use Apple or Google sign-in.',
+            'Profile information: photos, bio, interests, lifestyle, work and education, relationship goals and the kind of people you would like to meet.',
+            'Location: your country and city, and your device location if you choose to share it.',
+            'Activity: your likes, matches, messages and other interactions with members.',
+            'Verification selfie: if you choose to verify your profile (see section 3).',
+            'Payments: when you subscribe, Apple, Google or Paystack processes the payment. We receive confirmation of the purchase, not your full card details.',
+            'Support, reports and ads: what you send us when you contact support, report a member or create an ad.',
+          ]}
+        />
+      </LegalSection>
 
-        {/* Content */}
-        <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto">
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Shield className="w-6 h-6 mr-2 text-purple-600" />
-              1. Our Commitment to Privacy
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              At DripLove, we respect and protect your privacy. This Privacy Policy explains how we collect, use, protect, and share your information when you use our platform. We are committed to maintaining the trust of our users by handling your data responsibly and in compliance with applicable privacy laws.
-            </p>
-            <p className="text-gray-600 leading-relaxed">
-              DripLove is owned and operated by The ScREAte Ltd, a company dedicated to protecting user privacy and maintaining the highest standards of data security.
-            </p>
-          </section>
+      <LegalSection number={2} title="Information collected automatically">
+        <LegalList
+          items={[
+            'Device information, such as device type, operating system and app version, and the push notification token for your device.',
+            'Usage information, such as when you last used the app and which features you use.',
+            'Log information, such as your IP address and the dates and times of your requests.',
+            'On our website, local storage and similar technologies that keep you signed in and remember your preferences.',
+          ]}
+        />
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Database className="w-6 h-6 mr-2 text-blue-600" />
-              2. Information We Collect
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Information You Provide:</h3>
-                <ul className="list-disc pl-6 space-y-1 text-gray-600">
-                  <li>Profile details (name, age, photos, bio, interests)</li>
-                  <li>Contact information (email address, phone number)</li>
-                  <li>Location data (city, country, zip code)</li>
-                  <li>Dating preferences and relationship goals</li>
-                  <li>Messages and interactions with other users</li>
-                  <li>Payment details for premium features</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Information We Collect Automatically:</h3>
-                <ul className="list-disc pl-6 space-y-1 text-gray-600">
-                  <li>Device information (type, OS, unique identifiers)</li>
-                  <li>Usage data (interactions, features used, time spent)</li>
-                  <li>Log data (IP address, access times, referral sources)</li>
-                  <li>Location information (with your permission)</li>
-                  <li>Cookies and similar tracking technologies</li>
-                </ul>
-              </div>
-            </div>
-          </section>
+      <LegalSection number={3} title="Profile verification and photo checks">
+        <p>
+          Profile verification is optional. When you verify, your selfie is analysed by Amazon Rekognition, a
+          service provided by Amazon Web Services, which creates a face template, a set of numbers describing your
+          facial features. We use it only to confirm that your profile photos show you and to stop the same person
+          from creating multiple or fake accounts.
+        </p>
+        <p>
+          The face template is stored by Amazon Web Services on our behalf and is deleted when you delete your
+          account. We do not use it for any other purpose or share it with anyone else.
+        </p>
+        <p>
+          Photos you upload may be checked automatically and reviewed by our team to keep inappropriate content and
+          fake profiles off DripLove.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Eye className="w-6 h-6 mr-2 text-green-600" />
-              3. How We Use Your Information
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              We use your information to provide and improve our services, including:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>Creating and maintaining your profile</li>
-              <li>Matching you with compatible users</li>
-              <li>Facilitating communication between users</li>
-              <li>Personalizing your experience</li>
-              <li>Ensuring platform safety and security</li>
-              <li>Processing payments and subscriptions</li>
-              <li>Providing customer support</li>
-              <li>Improving our algorithms and features</li>
-            </ul>
-          </section>
+      <LegalSection number={4} title="How we use your information">
+        <LegalList
+          items={[
+            'To create and run your account and profile',
+            'To suggest people you may like, based on your preferences, location and activity',
+            'To let you chat and connect with other members',
+            'To send notifications and emails about your activity, your account and occasional suggestions or offers, in line with your settings',
+            'To keep DripLove safe: verifying profiles, moderating content, and preventing fraud, spam and abuse',
+            'To process subscriptions and payments',
+            'To provide customer support',
+            'To understand how DripLove is used and improve it',
+            'To comply with the law and enforce our Terms of Service',
+          ]}
+        />
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Users className="w-6 h-6 mr-2 text-orange-600" />
-              4. Information Sharing
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              We may share your information in the following circumstances:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>With other users as part of the matching and communication features</li>
-              <li>With service providers who help us operate our platform</li>
-              <li>When required by law or to protect our rights</li>
-              <li>In connection with a business transaction (merger, acquisition)</li>
-              <li>With your explicit consent for specific purposes</li>
-            </ul>
-            <p className="text-gray-600 leading-relaxed mt-3">
-              We never sell your personal information to third parties for marketing purposes.
-            </p>
-          </section>
+      <LegalSection number={5} title="What other members can see">
+        <p>
+          Your profile, including your name, age, photos, bio, interests and city or country, is visible to other
+          members. Your messages are visible to the members you send them to. Your email address, date of birth,
+          payment information and verification selfie are never shown to other members.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Lock className="w-6 h-6 mr-2 text-red-600" />
-              5. Data Security
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              We implement comprehensive security measures to protect your information:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>End-to-end encryption for sensitive communications</li>
-              <li>Secure data transmission using SSL/TLS protocols</li>
-              <li>Regular security audits and vulnerability assessments</li>
-              <li>Access controls and authentication systems</li>
-              <li>Data backup and recovery procedures</li>
-              <li>Staff training on privacy and security best practices</li>
-            </ul>
-          </section>
+      <LegalSection number={6} title="How we share information">
+        <p>We share information only as described here:</p>
+        <LegalList
+          items={[
+            'With service providers who help us run DripLove, under contracts that limit how they can use it: Supabase (hosting, database and storage), Amazon Web Services (profile verification), Google Firebase and Apple (push notifications), our email providers, and Apple, Google and Paystack (sign-in and payments).',
+            'With other members, as described in section 5.',
+            'When required by law, or when needed to protect the safety, rights or property of our members, the public or DripLove.',
+            'With a buyer or successor if DripLove is involved in a merger, acquisition or sale of assets.',
+            'With your permission, for any other purpose.',
+          ]}
+        />
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Globe className="w-6 h-6 mr-2 text-indigo-600" />
-              6. Your Rights and Choices
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-3">
-              You have several rights regarding your personal information:
-            </p>
-            <ul className="list-disc pl-6 space-y-2 text-gray-600">
-              <li>Access and review your personal data</li>
-              <li>Correct or update inaccurate information</li>
-              <li>Delete your account and associated data</li>
-              <li>Control your privacy settings and preferences</li>
-              <li>Opt out of certain communications</li>
-              <li>Request data portability</li>
-              <li>Object to certain processing activities</li>
-            </ul>
-          </section>
+      <LegalSection number={7} title="How we protect your information">
+        <p>
+          Information is encrypted in transit using TLS and encrypted at rest by our hosting provider. Access to
+          personal information is restricted to the people and systems that need it to run the Service. No method
+          of storing or sending information is completely secure, but we work hard to protect yours.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <FileText className="w-6 h-6 mr-2 text-cyan-600" />
-              7. Data Retention
-            </h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              We retain your information only as long as necessary to provide our services and comply with legal obligations. When you delete your account, we will remove your personal information from our active systems within 30 days.
-            </p>
-            <p className="text-gray-600 leading-relaxed">
-              Some information may be retained for longer periods for legal, safety, or business purposes, but will be kept in a secure and restricted manner.
-            </p>
-          </section>
+      <LegalSection number={8} title="How long we keep information">
+        <p>
+          We keep your information while your account is active. When you delete your account, we remove your
+          personal information from our active systems within 30 days, and your face template as soon as you delete
+          your account. We may keep limited information for longer where we need to for legal, safety or fraud
+          prevention reasons, such as payment records or records of accounts removed for breaking our Terms.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">8. Changes to This Policy</h2>
-            <p className="text-gray-600 leading-relaxed">
-              We may update this Privacy Policy periodically to reflect changes in our practices or applicable laws. We will notify you of significant changes and obtain your consent where required by law.
-            </p>
-          </section>
+      <LegalSection number={9} title="Your rights and choices">
+        <p>Depending on where you live, you may have the right to:</p>
+        <LegalList
+          items={[
+            'Access the personal information we hold about you',
+            'Correct information that is inaccurate',
+            'Delete your account and personal information (you can do this in your profile settings)',
+            'Receive a copy of your information in a portable format',
+            'Object to or restrict certain uses of your information',
+            'Withdraw consent you have given us, such as for location or verification',
+          ]}
+        />
+        <p>
+          You can also turn off push notifications and location access in your device settings, and unsubscribe
+          from marketing emails using the link in any email. To exercise any of these rights, contact us at the
+          address below. You also have the right to complain to your local data protection authority.
+        </p>
+      </LegalSection>
 
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
-              <Mail className="w-6 h-6 mr-2 text-pink-600" />
-              9. Contact Information
-            </h2>
-            <p className="text-gray-600 mb-4">
-              If you have questions about this Privacy Policy or your data, contact us at:
-            </p>
-            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 space-y-2">
-              <p className="text-pink-800 font-semibold">
-                📧 <a href="mailto:driploveinfo@gmail.com" className="hover:underline">driploveinfo@gmail.com</a>
-              </p>
-              <p className="text-pink-700">
-                📍 The ScREAte Ltd – Privacy Team
-              </p>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
+      <LegalSection number={10} title="International transfers">
+        <p>
+          DripLove is used around the world, and our service providers may process your information in countries
+          other than your own, including the United States. When that happens, we rely on appropriate safeguards to
+          protect your information.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={11} title="Children">
+        <p>
+          DripLove is only for adults aged 18 and over. We do not knowingly collect information from anyone under
+          18. If we learn that someone under 18 has an account, we will delete it.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={12} title="Changes to this policy">
+        <p>
+          We may update this Privacy Policy from time to time. If we make significant changes, we will let you know
+          in the app or by email, and ask for your consent where the law requires it.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={13} title="Contact us">
+        <p>Questions about your privacy or this policy? Contact our privacy team.</p>
+        <ContactCard team="Privacy Team" />
+      </LegalSection>
+    </LegalPage>
   );
 };
 

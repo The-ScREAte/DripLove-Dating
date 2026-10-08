@@ -1,0 +1,95 @@
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { ArrowLeft } from 'lucide-react';
+
+// Shared layout for the Terms of Service and Privacy Policy: one dark surface
+// like the rest of the app, a sticky back bar, and a single scroll area.
+
+interface LegalPageProps {
+  title: string;
+  updated: string;
+  intro: React.ReactNode;
+  onBack: () => void;
+  children: React.ReactNode;
+}
+
+export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPageProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="min-h-fill h-full overflow-y-auto bg-black text-neutral-300"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)' }}
+    >
+      <header
+        className="sticky top-0 z-10 border-b border-white/10 bg-black/85 backdrop-blur-md"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
+        <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label={t('common.back')}
+            className="rounded-full p-2 text-white transition-colors hover:bg-white/10"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <span className="truncate text-[15px] font-semibold text-white">{title}</span>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-5 pt-8">
+        <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
+        <p className="mt-2 text-sm text-neutral-500">{updated}</p>
+        <div className="mt-6 space-y-3 text-[15px] leading-relaxed">{intro}</div>
+
+        <div className="mt-10 space-y-10">{children}</div>
+
+        <footer className="mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-neutral-500">
+          © {new Date().getFullYear()} The ScREAte Ltd. DripLove is operated by The ScREAte Ltd.
+        </footer>
+      </main>
+    </div>
+  );
+};
+
+export const LegalSection = ({
+  number,
+  title,
+  children,
+}: {
+  number: number;
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <section>
+    <h2 className="flex gap-3 text-lg font-semibold text-white">
+      <span className="tabular-nums text-pink-500">{number}.</span>
+      {title}
+    </h2>
+    <div className="mt-3 space-y-3 text-[15px] leading-relaxed">{children}</div>
+  </section>
+);
+
+export const LegalList = ({ items }: { items: React.ReactNode[] }) => (
+  <ul className="list-disc space-y-2 pl-5 marker:text-pink-500/70">
+    {items.map((item, i) => (
+      <li key={i}>{item}</li>
+    ))}
+  </ul>
+);
+
+export const LegalSubheading = ({ children }: { children: React.ReactNode }) => (
+  <h3 className="pt-1 text-[15px] font-semibold text-neutral-100">{children}</h3>
+);
+
+export const ContactCard = ({ team }: { team: string }) => (
+  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <p className="font-medium text-white">The ScREAte Ltd, {team}</p>
+    <a href="mailto:info@driplove.love" className="mt-1 inline-block text-pink-400 hover:underline">
+      info@driplove.love
+    </a>
+  </div>
+);
+
+export const LEGAL_LAST_UPDATED = 'Last updated: October 8, 2026';
