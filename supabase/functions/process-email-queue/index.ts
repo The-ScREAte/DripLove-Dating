@@ -212,7 +212,11 @@ async function runQueue(supabase: SupabaseClient, supabaseUrl: string) {
       .eq('status', 'pending')
       .or(`next_attempt_at.is.null,next_attempt_at.lte.${new Date().toISOString()}`)
       .order('priority', { ascending: true })
-      .order('created_at', { ascending: true })
+      // Earliest due first; ties (a whole broadcast is due at once) in random
+      // order, so when a sending limit is hit it isn't always the same people
+      // who wait. Ids are random UUIDs, new for every send.
+      .order('next_attempt_at', { ascending: true, nullsFirst: true })
+      .order('id', { ascending: true })
       .limit(BATCH_SIZE);
     if (dueError) throw dueError;
     const rows = (due || []) as QueueRow[];

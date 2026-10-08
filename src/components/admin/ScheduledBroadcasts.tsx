@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -35,7 +35,13 @@ interface ScheduledBroadcast {
   title: string;
   message: string;
   target_countries: string[];
-  repeat_type: 'daily' | 'every_2_days' | 'weekends' | 'weekdays' | 'specific_day';
+  repeat_type: 'daily' | 'every_2_days' | 'every_n_days' | 'weekends' | 'weekdays' | 'specific_day' | 'interval';
+  every_n_days?: number | null;
+  specific_days?: string[] | null;
+  send_times?: string[] | null; // HH:MM, each person's local time
+  interval_minutes?: number | null;
+  audience?: 'all' | 'free' | 'premium';
+  recipient_emails?: string[] | null;
   specific_day?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
   time_to_send: string; // HH:MM format
   is_active: boolean;
@@ -50,6 +56,66 @@ const htmlToPlainText = (html: string): string => {
   const div = document.createElement('div');
   div.innerHTML = html;
   return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+};
+
+const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const WEEK: Array<[string, string]> = [
+  ['monday', 'Mon'], ['tuesday', 'Tue'], ['wednesday', 'Wed'], ['thursday', 'Thu'],
+  ['friday', 'Fri'], ['saturday', 'Sat'], ['sunday', 'Sun'],
+];
+const MAX_SEND_TIMES = 6;
+const SUGGESTED_TIMES = ['09:00', '19:00', '13:00', '21:00', '07:00', '16:00'];
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const scheduleTimes = (b: ScheduledBroadcast): string[] =>
+  (b.send_times && b.send_times.length > 0 ? [...b.send_times] : [b.time_to_send]).sort();
+
+const scheduleDays = (b: ScheduledBroadcast): string[] =>
+  b.specific_days && b.specific_days.length > 0 ? b.specific_days : b.specific_day ? [b.specific_day] : [];
+
+const weekOrder = (days: string[]) => WEEK.map(([d]) => d).filter((d) => days.includes(d));
+
+const formatInterval = (minutes: number) =>
+  minutes >= 60 && minutes % 60 === 0
+    ? `${minutes / 60} ${minutes === 60 ? 'hour' : 'hours'}`
+    : `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+
+// Next local date and time a schedule runs - the same rule the server uses
+// (schedule_runs_on). Each person gets it at that time in their own time zone.
+// "Every N days" counts from the day the schedule was created (UTC).
+const nextLocalSend = (
+  repeatType: string,
+  days: string[],
+  everyNDays: number,
+  times: string[],
+  createdAt?: string,
+): Date | null => {
+  const now = new Date();
+  const anchor = createdAt ? new Date(createdAt) : now;
+  const anchorDay = Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate());
+  const runsOn = (d: Date) => {
+    const diff = Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - anchorDay) / 86_400_000);
+    switch (repeatType) {
+      case 'daily': return true;
+      case 'every_2_days': return diff >= 0 && diff % 2 === 0;
+      case 'every_n_days': return diff >= 0 && diff % Math.max(everyNDays, 1) === 0;
+      case 'weekdays': return d.getDay() >= 1 && d.getDay() <= 5;
+      case 'weekends': return d.getDay() === 0 || d.getDay() === 6;
+      case 'specific_day': return days.includes(DAY_NAMES[d.getDay()]);
+      default: return false;
+    }
+  };
+  const sorted = times.filter((t) => TIME_RE.test(t)).sort();
+  for (let i = 0; i < 62; i++) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    if (!runsOn(day)) continue;
+    for (const t of sorted) {
+      const [h, m] = t.split(':').map(Number);
+      const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, m);
+      if (at > now) return at;
+    }
+  }
+  return null;
 };
 
 const getCountryName = (code: string): string => {
@@ -82,9 +148,14 @@ export default function ScheduledBroadcasts() {
   const [message, setMessage] = useState('');
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [repeatType, setRepeatType] = useState<string>('daily');
-  const [specificDay, setSpecificDay] = useState<string>('monday');
-  const [timeToSend, setTimeToSend] = useState('09:00');
+  const [everyNDays, setEveryNDays] = useState('2');
+  const [specificDays, setSpecificDays] = useState<string[]>(['monday']);
+  const [sendTimes, setSendTimes] = useState<string[]>(['09:00']);
   const [isActive, setIsActive] = useState(true);
+  const [intervalValue, setIntervalValue] = useState('4');
+  const [intervalUnit, setIntervalUnit] = useState<'minutes' | 'hours'>('hours');
+  const [audience, setAudience] = useState<'all' | 'free' | 'premium'>('all');
+  const [recipientEmails, setRecipientEmails] = useState('');
 
   useEffect(() => {
     loadScheduledBroadcasts();
@@ -163,9 +234,14 @@ export default function ScheduledBroadcasts() {
     setMessage('');
     setSelectedCountries([]);
     setRepeatType('daily');
-    setSpecificDay('monday');
-    setTimeToSend('09:00');
+    setEveryNDays('2');
+    setSpecificDays(['monday']);
+    setSendTimes(['09:00']);
     setIsActive(true);
+    setIntervalValue('4');
+    setIntervalUnit('hours');
+    setAudience('all');
+    setRecipientEmails('');
     setShowDialog(true);
   };
 
@@ -175,50 +251,30 @@ export default function ScheduledBroadcasts() {
     setTitle(broadcast.title);
     setMessage(broadcast.message);
     setSelectedCountries(broadcast.target_countries || []);
-    setRepeatType(broadcast.repeat_type);
-    setSpecificDay(broadcast.specific_day || 'monday');
-    setTimeToSend(broadcast.time_to_send);
+    setRepeatType(broadcast.repeat_type === 'every_2_days' ? 'every_n_days' : broadcast.repeat_type);
+    setEveryNDays(String(broadcast.every_n_days || 2));
+    setSpecificDays(scheduleDays(broadcast).length > 0 ? scheduleDays(broadcast) : ['monday']);
+    setSendTimes(broadcast.repeat_type === 'interval' ? ['09:00'] : scheduleTimes(broadcast));
     setIsActive(broadcast.is_active);
+    const minutes = broadcast.interval_minutes || 240;
+    const inHours = minutes >= 60 && minutes % 60 === 0;
+    setIntervalUnit(inHours ? 'hours' : 'minutes');
+    setIntervalValue(String(inHours ? minutes / 60 : minutes));
+    setAudience(broadcast.audience || 'all');
+    setRecipientEmails((broadcast.recipient_emails || []).join('\n'));
     setShowDialog(true);
   };
 
-  // Next day the schedule runs, at its time - the same rule the server uses
-  // (schedule_runs_on). Each person gets it at this time in their own time
-  // zone, so this is shown as a date plus a local time, not one instant.
-  // every_2_days counts from the day the schedule was created (UTC).
-  const calculateNextSendTime = (
-    repeatType: string,
-    specificDay: string,
-    timeToSend: string,
-    createdAt?: string,
-  ): Date => {
-    const now = new Date();
-    const [hours, minutes] = timeToSend.split(':').map(Number);
-    const anchor = createdAt ? new Date(createdAt) : now;
-    const anchorDay = Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate());
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const updateSendTime = (index: number, value: string) =>
+    setSendTimes((prev) => prev.map((t, i) => (i === index ? value : t)));
 
-    const runsOn = (d: Date) => {
-      const weekday = d.getDay();
-      switch (repeatType) {
-        case 'daily': return true;
-        case 'every_2_days': {
-          const diff = Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - anchorDay) / 86_400_000);
-          return diff >= 0 && diff % 2 === 0;
-        }
-        case 'weekdays': return weekday >= 1 && weekday <= 5;
-        case 'weekends': return weekday === 0 || weekday === 6;
-        case 'specific_day': return dayNames[weekday] === specificDay;
-        default: return false;
-      }
-    };
+  const addSendTime = () =>
+    setSendTimes((prev) => [...prev, SUGGESTED_TIMES.find((t) => !prev.includes(t)) || '12:00']);
 
-    const next = new Date();
-    next.setHours(hours, minutes, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
-    for (let i = 0; i < 14 && !runsOn(next); i++) next.setDate(next.getDate() + 1);
-    return next;
-  };
+  const removeSendTime = (index: number) => setSendTimes((prev) => prev.filter((_, i) => i !== index));
+
+  const toggleDay = (day: string) =>
+    setSpecificDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
 
   const handleSave = async () => {
     const bodyIsEmpty = channel === 'email' ? !htmlToPlainText(message) : !message.trim();
@@ -234,7 +290,35 @@ export default function ScheduledBroadcasts() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const nextSendAt = calculateNextSendTime(repeatType, specificDay, timeToSend, editingBroadcast?.created_at);
+    const fail = (description: string) => toast({ title: 'Error', description, variant: 'destructive' });
+    const emails = Array.from(new Set(
+      recipientEmails.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean),
+    ));
+    const isInterval = repeatType === 'interval';
+    const intervalMinutes = Number(intervalValue) * (intervalUnit === 'hours' ? 60 : 1);
+    const times = Array.from(new Set(sendTimes.filter((t) => TIME_RE.test(t)))).sort();
+    const days = weekOrder(specificDays);
+    const nDays = Number(everyNDays);
+
+    if (isInterval) {
+      if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440) {
+        return fail('Choose an interval between 1 minute and 24 hours.');
+      }
+      // Server rule: minute intervals only go to a hand-picked list of accounts.
+      if (intervalMinutes < 60 && (emails.length < 1 || emails.length > 50)) {
+        return fail('Minute intervals need 1 to 50 account emails under "Only these accounts".');
+      }
+    } else {
+      if (times.length === 0) return fail('Add at least one send time.');
+      if (repeatType === 'every_n_days' && (!Number.isInteger(nDays) || nDays < 2 || nDays > 30)) {
+        return fail('Every how many days? Enter 2 to 30.');
+      }
+      if (repeatType === 'specific_day' && days.length === 0) return fail('Pick at least one day.');
+    }
+
+    const nextSendAt = isInterval
+      ? new Date(Date.now() + intervalMinutes * 60_000)
+      : nextLocalSend(repeatType, days, nDays, times, editingBroadcast?.created_at) || new Date();
 
     const broadcastData = {
       channel,
@@ -242,9 +326,15 @@ export default function ScheduledBroadcasts() {
       message: channel === 'email' ? message : message.trim(),
       target_countries: selectedCountries.length > 0 ? selectedCountries : null,
       repeat_type: repeatType,
-      specific_day: repeatType === 'specific_day' ? specificDay : null,
-      time_to_send: timeToSend,
+      every_n_days: repeatType === 'every_n_days' ? nDays : null,
+      specific_days: repeatType === 'specific_day' ? days : null,
+      specific_day: repeatType === 'specific_day' ? days[0] : null,
+      send_times: isInterval ? null : times,
+      time_to_send: isInterval ? editingBroadcast?.time_to_send || '00:00' : times[0],
       is_active: isActive,
+      interval_minutes: isInterval ? intervalMinutes : null,
+      audience,
+      recipient_emails: emails.length > 0 ? emails : null,
       next_send_at: nextSendAt.toISOString(),
       admin_id: user.id,
     };
@@ -279,9 +369,13 @@ export default function ScheduledBroadcasts() {
       loadScheduledBroadcasts();
     } catch (error) {
       console.error('Error saving scheduled broadcast:', error);
+      const detail = String((error as { message?: string } | null)?.message || '');
       toast({
         title: 'Error',
-        description: 'Failed to save scheduled broadcast',
+        // Temporary guard (20261008000100_one_send_time_until_scheduler_deployed.sql).
+        description: detail.includes('one_send_time_tmp')
+          ? 'Several send times a day turn on once the scheduler update is deployed - use one time for now.'
+          : 'Failed to save scheduled broadcast',
         variant: 'destructive',
       });
     }
@@ -342,15 +436,19 @@ export default function ScheduledBroadcasts() {
   const getRepeatLabel = (broadcast: ScheduledBroadcast) => {
     switch (broadcast.repeat_type) {
       case 'daily':
-        return 'Daily';
+        return 'Every day';
       case 'every_2_days':
         return 'Every 2 days';
+      case 'every_n_days':
+        return `Every ${broadcast.every_n_days} days`;
       case 'weekends':
         return 'Weekends';
       case 'weekdays':
         return 'Weekdays';
       case 'specific_day':
-        return `Every ${broadcast.specific_day?.charAt(0).toUpperCase()}${broadcast.specific_day?.slice(1)}`;
+        return `Every ${weekOrder(scheduleDays(broadcast)).map((d) => WEEK.find(([w]) => w === d)?.[1]).join(', ')}`;
+      case 'interval':
+        return `Every ${formatInterval(broadcast.interval_minutes || 0)}`;
       default:
         return broadcast.repeat_type;
     }
@@ -436,10 +534,31 @@ export default function ScheduledBroadcasts() {
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{getRepeatLabel(broadcast)}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{broadcast.time_to_send} their local time</span>
-                      </div>
+                      {broadcast.repeat_type !== 'interval' ? (
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{scheduleTimes(broadcast).join(' & ')} their local time</span>
+                        </div>
+                      ) : !(broadcast.recipient_emails && broadcast.recipient_emails.length > 0) && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Skips 10pm-8am their local time</span>
+                        </div>
+                      )}
+                      {broadcast.audience && broadcast.audience !== 'all' && (
+                        <Badge variant="outline" className="text-xs bg-amber-50">
+                          {broadcast.audience === 'free' ? 'Free users only' : 'Premium users only'}
+                        </Badge>
+                      )}
+                      {broadcast.recipient_emails && broadcast.recipient_emails.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-blue-50"
+                          title={broadcast.recipient_emails.join(', ')}
+                        >
+                          Only {broadcast.recipient_emails.length} accounts
+                        </Badge>
+                      )}
                       {broadcast.target_countries && broadcast.target_countries.length > 0 ? (
                         <Collapsible>
                           <CollapsibleTrigger className="flex items-center gap-1 text-xs">
@@ -467,18 +586,28 @@ export default function ScheduledBroadcasts() {
                     </div>
 
                     <div className="text-xs text-gray-500 mb-3 space-y-0.5">
-                      {broadcast.is_active && (
+                      {broadcast.is_active && broadcast.repeat_type === 'interval' && (
                         <p>
                           Next send:{' '}
-                          {calculateNextSendTime(
-                            broadcast.repeat_type,
-                            broadcast.specific_day || 'monday',
-                            broadcast.time_to_send,
-                            broadcast.created_at,
-                          ).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}{' '}
-                          at {broadcast.time_to_send} (each person's local time)
+                          {broadcast.next_send_at ? new Date(broadcast.next_send_at).toLocaleTimeString() : 'within a minute'}
                         </p>
                       )}
+                      {broadcast.is_active && broadcast.repeat_type !== 'interval' && (() => {
+                        const next = nextLocalSend(
+                          broadcast.repeat_type,
+                          scheduleDays(broadcast),
+                          broadcast.every_n_days || 2,
+                          scheduleTimes(broadcast),
+                          broadcast.created_at,
+                        );
+                        return next ? (
+                          <p>
+                            Next send:{' '}
+                            {next.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} at{' '}
+                            {next.toTimeString().slice(0, 5)} (each person's local time)
+                          </p>
+                        ) : null;
+                      })()}
                       <p>
                         Last sent: {broadcast.last_sent_at ? new Date(broadcast.last_sent_at).toLocaleString() : 'Never'}
                       </p>
@@ -591,53 +720,161 @@ export default function ScheduledBroadcasts() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Every Day</SelectItem>
-                  <SelectItem value="every_2_days">Every 2 Days</SelectItem>
+                  <SelectItem value="daily">Every day</SelectItem>
+                  <SelectItem value="every_n_days">Every few days</SelectItem>
                   <SelectItem value="weekdays">Weekdays (Mon-Fri)</SelectItem>
                   <SelectItem value="weekends">Weekends (Sat-Sun)</SelectItem>
-                  <SelectItem value="specific_day">Specific Day of Week</SelectItem>
+                  <SelectItem value="specific_day">Specific days of the week</SelectItem>
+                  <SelectItem value="interval">Every few minutes or hours</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {repeatType === 'every_n_days' && (
+              <div className="space-y-2">
+                <Label htmlFor="every-n-days">Every how many days? *</Label>
+                <Input
+                  id="every-n-days"
+                  type="number"
+                  min={2}
+                  max={30}
+                  value={everyNDays}
+                  onChange={(e) => setEveryNDays(e.target.value)}
+                  className="w-28"
+                />
+              </div>
+            )}
+
             {repeatType === 'specific_day' && (
               <div className="space-y-2">
-                <Label>Day of Week *</Label>
-                <Select value={specificDay} onValueChange={setSpecificDay}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monday">Monday</SelectItem>
-                    <SelectItem value="tuesday">Tuesday</SelectItem>
-                    <SelectItem value="wednesday">Wednesday</SelectItem>
-                    <SelectItem value="thursday">Thursday</SelectItem>
-                    <SelectItem value="friday">Friday</SelectItem>
-                    <SelectItem value="saturday">Saturday</SelectItem>
-                    <SelectItem value="sunday">Sunday</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Days of the week *</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEK.map(([day, label]) => {
+                    const selected = specificDays.includes(day);
+                    return (
+                      <Button
+                        key={day}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleDay(day)}
+                        className={`h-8 px-3 text-xs ${
+                          selected ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700 hover:text-white' : ''
+                        }`}
+                      >
+                        {label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {repeatType === 'interval' ? (
+              <div className="space-y-2">
+                <Label htmlFor="interval">Send every *</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="interval"
+                    type="number"
+                    min={1}
+                    max={intervalUnit === 'hours' ? 24 : 1440}
+                    value={intervalValue}
+                    onChange={(e) => setIntervalValue(e.target.value)}
+                    className="w-28"
+                  />
+                  <Select value={intervalUnit} onValueChange={(v) => setIntervalUnit(v as 'minutes' | 'hours')}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minutes">Minutes</SelectItem>
+                      <SelectItem value="hours">Hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {intervalUnit === 'minutes'
+                    ? 'Minute intervals are for testing: they only go to the accounts listed below (up to 50).'
+                    : "Repeats around the clock from when the schedule starts, skipping anyone whose local time is 10pm-8am. Listed accounts get every send."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Send times (each person's local time) *</Label>
+                <div className="space-y-2">
+                  {sendTimes.map((time, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        type="time"
+                        value={time}
+                        onChange={(e) => updateSendTime(index, e.target.value)}
+                        className="w-36"
+                      />
+                      {sendTimes.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeSendTime(index)}
+                          className="h-8 w-8"
+                          title="Remove this time"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {sendTimes.length < MAX_SEND_TIMES && (
+                  <Button type="button" variant="outline" size="sm" onClick={addSendTime} className="h-7 text-xs">
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add another time
+                  </Button>
+                )}
+                <p className="text-xs text-gray-500">
+                  Spread the day's messages out - for example 09:00 in the morning and 19:00 in the evening. Everyone
+                  gets them at these times in their own time zone.
+                </p>
+                {channel === 'email' && (
+                  <p className="text-xs text-amber-600">
+                    Our Gmail sending accounts can send about 450 emails a day each. Anyone we can't reach within
+                    4 hours of their time is skipped for that send rather than emailed late.
+                  </p>
+                )}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="time">Time to Send (each person's local time) *</Label>
-              <Input
-                id="time"
-                type="time"
-                value={timeToSend}
-                onChange={(e) => setTimeToSend(e.target.value)}
+              <Label>Audience</Label>
+              <Select value={audience} onValueChange={(v) => setAudience(v as 'all' | 'free' | 'premium')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All users</SelectItem>
+                  <SelectItem value="free">Free users only</SelectItem>
+                  <SelectItem value="premium">Premium users only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="recipients">
+                Only these accounts {repeatType === 'interval' && intervalUnit === 'minutes' ? '*' : '(optional)'}
+              </Label>
+              <Textarea
+                id="recipients"
+                value={recipientEmails}
+                onChange={(e) => setRecipientEmails(e.target.value)}
+                placeholder="One email per line. Leave empty to send to everyone who matches."
+                rows={4}
               />
               <p className="text-xs text-gray-500">
-                Everyone gets it at this time in their own time zone - {timeToSend || '09:00'} in Accra is{' '}
-                {timeToSend || '09:00'} Accra time, in Chicago it's {timeToSend || '09:00'} Chicago time.
+                {recipientEmails.trim()
+                  ? 'Only these accounts get it (still filtered by audience and countries).'
+                  : 'Empty: everyone who matches the audience and countries.'}
               </p>
-              {channel === 'email' && (
-                <p className="text-xs text-amber-600">
-                  Our Gmail sending accounts can send about 450 emails a day each. Anyone we can't reach within
-                  4 hours of their time is skipped for that day rather than emailed late.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">

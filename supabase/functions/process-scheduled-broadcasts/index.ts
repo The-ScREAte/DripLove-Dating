@@ -3,9 +3,11 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 
 // Scheduled broadcasts (Admin > Scheduled), email or push.
 //
-// The chosen time is each person's OWN local time: "Daily at 09:00" reaches
-// someone in Accra at 09:00 Accra time and someone in Chicago at 09:00
-// Chicago time, on the chosen days (judged by their local date too).
+// The chosen times are each person's OWN local time: "Daily at 09:00 and
+// 19:00" reaches someone in Accra at 09:00 and 19:00 Accra time and someone in
+// Chicago at 09:00 and 19:00 Chicago time, on the chosen days (judged by their
+// local date too). Every-few-minutes/hours schedules are sent by the database
+// (run_interval_broadcasts), not here.
 //
 // Runs every 15 minutes (see
 // 20261005130000_send_when_it_happens_and_local_time_schedules.sql). Each run
@@ -15,7 +17,7 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 //            process-email-queue with the usual layout, pacing and checks
 //   push  -> broadcast_recipients (next_attempt_at = their time), sent by
 //            process-broadcast-queue
-// Each schedule gets one History entry per day. Turning a schedule off
+// Each schedule gets one History entry per day per send time. Turning a schedule off
 // cancels whatever was lined up for later that day.
 
 const corsHeaders = {
@@ -38,13 +40,14 @@ type Schedule = {
   total_sends: number | null
 }
 
-type Due = { user_id: string; email: string | null; local_date: string; send_at: string }
+type Due = { user_id: string; email: string | null; local_date: string; send_time: string; send_at: string }
 
-/** The day's History entry for this schedule - created on first use. */
+/** The History entry for this schedule's day and send time - created on first use. */
 async function occurrenceRow(
   supabase: SupabaseClient,
   schedule: Schedule,
   day: string,
+  time: string,
 ): Promise<{ id: string; count: number; isNew: boolean }> {
   const isEmail = schedule.channel === 'email'
   const table = isEmail ? 'email_broadcast_history' : 'broadcast_campaigns'
@@ -56,6 +59,8 @@ async function occurrenceRow(
       .select(`id, ${countColumn}`)
       .eq('scheduled_broadcast_id', schedule.id)
       .eq('occurrence_date', day)
+      .eq('occurrence_time', time)
+      .is('occurrence_at', null)
       .maybeSingle()
     return data as Record<string, unknown> | null
   }
@@ -68,6 +73,7 @@ async function occurrenceRow(
     target_countries: schedule.target_countries && schedule.target_countries.length > 0 ? schedule.target_countries : null,
     scheduled_broadcast_id: schedule.id,
     occurrence_date: day,
+    occurrence_time: time,
   }
   const row = isEmail
     ? { ...common, subject: schedule.title, message: schedule.message, recipient_count: 0, successful_sends: 0,
@@ -77,7 +83,7 @@ async function occurrenceRow(
 
   const { data, error } = await supabase.from(table).insert(row).select('id').single()
   if (error) {
-    // Another run created it a moment ago (unique per schedule and day).
+    // Another run created it a moment ago (unique per schedule, day and time).
     const again = await find()
     if (again) return { id: again.id as string, count: (again[countColumn] as number) || 0, isNew: false }
     throw error
@@ -85,8 +91,8 @@ async function occurrenceRow(
   return { id: data.id as string, count: 0, isNew: true }
 }
 
-async function lineUp(supabase: SupabaseClient, schedule: Schedule, day: string, people: Due[]) {
-  const occurrence = await occurrenceRow(supabase, schedule, day)
+async function lineUp(supabase: SupabaseClient, schedule: Schedule, day: string, time: string, people: Due[]) {
+  const occurrence = await occurrenceRow(supabase, schedule, day, time)
   const isEmail = schedule.channel === 'email'
 
   for (let i = 0; i < people.length; i += INSERT_CHUNK) {
@@ -131,6 +137,7 @@ async function run(supabase: SupabaseClient) {
     .from('scheduled_broadcasts')
     .select('id, title, message, channel, admin_id, target_countries, total_sends')
     .eq('is_active', true)
+    .neq('repeat_type', 'interval')
   if (error) throw error
 
   const results: Array<Record<string, unknown>> = []
@@ -143,17 +150,22 @@ async function run(supabase: SupabaseClient) {
       const due = (data || []) as Due[]
       if (due.length === 0) continue
 
-      const byDay = new Map<string, Due[]>()
-      due.forEach((d) => byDay.set(d.local_date, [...(byDay.get(d.local_date) || []), d]))
+      // One History entry per local day and send time.
+      const bySlot = new Map<string, Due[]>()
+      due.forEach((d) => {
+        const key = `${d.local_date}|${d.send_time}`
+        bySlot.set(key, [...(bySlot.get(key) || []), d])
+      })
 
-      let newDays = 0
-      for (const [day, people] of byDay) {
-        if (await lineUp(supabase, schedule, day, people)) newDays += 1
+      let newSlots = 0
+      for (const [key, people] of bySlot) {
+        const [day, time] = key.split('|')
+        if (await lineUp(supabase, schedule, day, time, people)) newSlots += 1
       }
 
       await supabase.from('scheduled_broadcasts').update({
         last_sent_at: new Date().toISOString(),
-        total_sends: (schedule.total_sends || 0) + newDays,
+        total_sends: (schedule.total_sends || 0) + newSlots,
       }).eq('id', schedule.id)
 
       results.push({ id: schedule.id, title: schedule.title, channel: schedule.channel, linedUp: due.length })
