@@ -6,6 +6,7 @@ import {
   LegalPage,
   LegalSection,
   LegalSubheading,
+  PolicyLink,
 } from '@/components/legal/LegalPage';
 import { COMPANY, LEGAL_LAST_UPDATED } from '@/components/legal/legalInfo';
 
@@ -24,199 +25,220 @@ const PrivacyPolicy = ({ onBack }: PrivacyPolicyProps) => {
       intro={
         <>
           <p>
-            Your privacy matters to us. This Privacy Policy explains what information DripLove collects, how we use
-            and share it, and the choices you have. It applies to the DripLove app and website, which are operated by
-            {COMPANY.name} ("DripLove", "we", "us"), based in Utah, United States. {COMPANY.name} is the
-            controller of your personal information.
+            This Privacy Policy describes how {COMPANY.name} ("DripLove," "we," "us," or "our") collects, uses,
+            discloses and otherwise processes personal information in connection with the DripLove mobile application
+            and website (collectively, the "Service"), and the rights and choices available to you. {COMPANY.name} is
+            the controller of the personal information processed under this Privacy Policy.
           </p>
-          <p>We never sell your personal information or share it for targeted advertising.</p>
+          <p>
+            This Privacy Policy forms part of our{' '}
+            <PolicyLink to="/terms-of-service">Terms of Service</PolicyLink>. By using the Service, you acknowledge
+            that your personal information will be processed as described herein. We do not sell personal
+            information, and we do not share personal information for cross-context behavioral advertising.
+          </p>
         </>
       }
     >
-      <LegalSection number={1} title="Information you give us">
+      <LegalSection number={1} title="Personal Information We Collect From You">
         <LegalList
           items={[
-            'Account details: your name, email address, date of birth and gender, and your sign-in details if you use Apple or Google sign-in.',
-            'Profile information: photos, bio, interests, lifestyle, work and education, relationship goals and the kind of people you would like to meet.',
-            'Location: your country and city, and your device location if you choose to share it.',
-            'Activity: your likes, matches, messages and other interactions with members.',
-            'Verification selfie: if you choose to verify your profile (see section 3).',
-            'Payments: when you subscribe, Apple, Google or Paystack processes the payment. We receive confirmation of the purchase, not your full card details.',
-            'Support, reports and ads: what you send us when you contact support, report a member or create an ad.',
+            'Account information: name, email address, date of birth, gender and, where you use Apple or Google sign-in, the identifiers provided by those services.',
+            'Profile information: photographs, biography, interests, lifestyle, occupation and education, relationship intentions and partner preferences.',
+            'Location information: country and city and, where you grant permission, the location of your device.',
+            'Activity information: likes, matches, messages and other interactions with members.',
+            'Verification information: the selfie you submit if you elect to verify your profile, as described in Section 3.',
+            'Transaction information: confirmation of purchases processed by Apple, Google or Paystack. We do not receive or store full payment card numbers.',
+            'Communications: information you provide when contacting support, submitting a report or creating an advertisement.',
           ]}
         />
       </LegalSection>
 
-      <LegalSection number={2} title="Information collected automatically">
+      <LegalSection number={2} title="Personal Information Collected Automatically">
         <LegalList
           items={[
-            'Device information, such as device type, operating system and app version, and the push notification token for your device.',
-            'Usage information, such as when you last used the app and which features you use.',
-            'Log information, such as your IP address and the dates and times of your requests.',
-            'On our website, local storage and similar technologies that keep you signed in and remember your preferences.',
+            'Device information, including device type, operating system, application version and push notification token.',
+            'Usage information, including the dates and times you access the Service and the features you use.',
+            'Log information, including Internet Protocol (IP) address and request timestamps.',
+            'Information stored through local storage and similar technologies on our website to maintain your session and preferences.',
           ]}
         />
       </LegalSection>
 
-      <LegalSection number={3} title="Profile verification and photo checks">
+      <LegalSection number={3} title="Profile Verification and Biometric Information">
         <p>
-          Profile verification is optional. When you verify, your selfie is analysed by Amazon Rekognition, a
-          service provided by Amazon Web Services, which creates a face template, a set of numbers describing your
-          facial features. We use it only to confirm that your profile photos show you and to stop the same person
-          from creating multiple or fake accounts.
+          Profile verification is optional. If you elect to verify your profile, the selfie you submit is processed
+          by Amazon Rekognition, a service of Amazon Web Services, Inc., to generate a facial template, being a
+          numerical representation of facial features. The facial template is used solely to confirm that your
+          profile photographs depict you and to prevent duplicate and fraudulent accounts.
         </p>
         <p>
-          The face template is stored by Amazon Web Services on our behalf and is deleted when you delete your
-          account. We do not use it for any other purpose or share it with anyone else.
+          The facial template is stored by Amazon Web Services on our behalf, is not used for any other purpose, is
+          not sold or otherwise disclosed to any third party, and is permanently deleted upon deletion of your
+          account. By submitting a verification selfie, you consent to the collection and processing described in
+          this Section.
         </p>
         <p>
-          Photos you upload may be checked automatically and reviewed by our team to keep inappropriate content and
-          fake profiles off DripLove.
+          Photographs uploaded to the Service may be screened by automated systems and reviewed by our personnel to
+          detect prohibited content and fraudulent profiles.
         </p>
       </LegalSection>
 
-      <LegalSection number={4} title="How we use your information">
+      <LegalSection number={4} title="Purposes of Processing">
+        <p>We process personal information for the following purposes:</p>
         <LegalList
           items={[
-            'To create and run your account and profile',
-            'To suggest people you may like, based on your preferences, location and activity',
-            'To let you chat and connect with other members',
-            'To send notifications and emails about your activity, your account and occasional suggestions or offers, in line with your settings',
-            'To keep DripLove safe: verifying profiles, moderating content, and preventing fraud, spam and abuse',
-            'To process subscriptions and payments',
-            'To provide customer support',
-            'To understand how DripLove is used and improve it',
-            'To comply with the law and enforce our Terms of Service',
+            'to create and maintain your account and profile;',
+            'to recommend potential matches based on your preferences, location and activity;',
+            'to enable communications between members;',
+            'to send notifications and emails regarding your account, member activity and offers relating to the Service, in accordance with your settings;',
+            'to verify profiles, moderate content, and detect and prevent fraud, abuse and violations of our Terms of Service;',
+            'to process subscriptions and payments;',
+            'to provide customer support;',
+            'to analyse and improve the Service; and',
+            'to comply with legal obligations and to establish, exercise or defend legal claims.',
           ]}
         />
       </LegalSection>
 
-      <LegalSection number={5} title="What other members can see">
+      <LegalSection number={5} title="Information Visible to Other Members">
         <p>
-          Your profile, including your name, age, photos, bio, interests and city or country, is visible to other
-          members. Your messages are visible to the members you send them to. Your email address, date of birth,
-          payment information and verification selfie are never shown to other members.
+          Your profile, including your name, age, photographs, biography, interests and city or country, is visible
+          to other members. Messages are visible to their recipients. Your email address, date of birth, transaction
+          information and verification selfie are not displayed to other members.
         </p>
       </LegalSection>
 
-      <LegalSection number={6} title="How we share information">
-        <p>We share information only as described here:</p>
+      <LegalSection number={6} title="Disclosure of Personal Information">
+        <p>We disclose personal information only in the following circumstances:</p>
         <LegalList
           items={[
-            'With service providers who help us run DripLove, under contracts that limit how they can use it: Supabase (hosting, database and storage), Amazon Web Services (profile verification), Google Firebase and Apple (push notifications), our email providers, and Apple, Google and Paystack (sign-in and payments).',
-            'With other members, as described in section 5.',
-            'When required by law, or when needed to protect the safety, rights or property of our members, the public or DripLove.',
-            'With a buyer or successor if DripLove is involved in a merger, acquisition or sale of assets.',
-            'With your permission, for any other purpose.',
+            'Service providers: to vendors that process personal information on our behalf under contractual obligations restricting its use, namely Supabase (hosting, database and storage), Amazon Web Services (profile verification), Google Firebase and Apple (push notifications), our email service providers, and Apple, Google and Paystack (authentication and payment processing).',
+            'Other members: as described in Section 5.',
+            'Legal requirements: where required by law, regulation, legal process or governmental request, or where necessary to protect the rights, property or safety of DripLove, our members or the public.',
+            'Business transfers: in connection with a merger, acquisition, financing or sale of all or part of our business or assets.',
+            'Consent: with your consent or at your direction.',
           ]}
         />
       </LegalSection>
 
-      <LegalSection number={7} title="How we protect your information">
+      <LegalSection number={7} title="Data Security">
         <p>
-          Information is encrypted in transit using TLS and encrypted at rest by our hosting provider. Access to
-          personal information is restricted to the people and systems that need it to run the Service. No method
-          of storing or sending information is completely secure, but we work hard to protect yours.
+          We maintain administrative, technical and organisational measures designed to protect personal
+          information, including encryption in transit using Transport Layer Security (TLS), encryption at rest
+          provided by our hosting provider, and access controls limiting access to personnel and systems that
+          require it. No method of transmission or storage is completely secure, and we cannot guarantee absolute
+          security.
         </p>
       </LegalSection>
 
-      <LegalSection number={8} title="How long we keep information">
+      <LegalSection number={8} title="Data Retention">
         <p>
-          We keep your information while your account is active. When you delete your account, we remove your
-          personal information from our active systems within 30 days, and your face template as soon as you delete
-          your account. We may keep limited information for longer where we need to for legal, safety or fraud
-          prevention reasons, such as payment records or records of accounts removed for breaking our Terms.
+          We retain personal information for as long as your account remains active. Upon deletion of your account,
+          we delete your personal information from our active systems within thirty (30) days and permanently
+          delete your facial template immediately. We may retain limited information for longer periods where
+          necessary to comply with legal obligations, resolve disputes, prevent fraud and abuse, or enforce our
+          agreements, including transaction records and records of accounts removed for violations.
         </p>
       </LegalSection>
 
-      <LegalSection number={9} title="Your rights and choices">
-        <p>Depending on where you live, you may have the right to:</p>
+      <LegalSection number={9} title="Your Rights and Choices">
+        <p>Subject to applicable law, you may have the right to:</p>
         <LegalList
           items={[
-            'Access the personal information we hold about you',
-            'Correct information that is inaccurate',
-            'Delete your account and personal information (you can do this in your profile settings)',
-            'Receive a copy of your information in a portable format',
-            'Object to or restrict certain uses of your information',
-            'Withdraw consent you have given us, such as for location or verification',
+            'access the personal information we hold about you;',
+            'correct inaccurate personal information;',
+            'delete your account and personal information, which you may do at any time in your profile settings;',
+            'receive a copy of your personal information in a portable format;',
+            'object to or restrict certain processing; and',
+            'withdraw consent previously given, including for device location and profile verification.',
           ]}
         />
         <p>
-          You can also turn off push notifications and location access in your device settings, and unsubscribe
-          from marketing emails using the link in any email. To exercise any of these rights, contact us at the
-          address below. You also have the right to complain to your local data protection authority.
+          You may disable push notifications and location access in your device settings and opt out of marketing
+          emails using the unsubscribe link provided. To exercise any other right, contact us using the details in
+          Section 14. We may need to verify your identity before responding. You may also lodge a complaint with the
+          data protection authority in your jurisdiction.
         </p>
       </LegalSection>
 
-      <LegalSection number={10} title="International transfers">
+      <LegalSection number={10} title="International Data Transfers">
         <p>
-          DripLove is operated from the United States and used around the world. If you use DripLove from outside
-          the US, your information is transferred to and processed in the United States and in other countries
-          where our service providers operate. Where the law requires it, for example for the European Economic
-          Area, the United Kingdom and Switzerland, we rely on safeguards such as the European Commission's Standard
-          Contractual Clauses.
+          Your personal information may be transferred to and processed in jurisdictions other than the one in which
+          you reside, which may have data protection laws different from those of your jurisdiction. Where required
+          by applicable law, we implement appropriate safeguards for such transfers, including the Standard
+          Contractual Clauses approved by the European Commission.
         </p>
       </LegalSection>
 
-      <LegalSection number={11} title="Regional privacy notices">
-        <LegalSubheading>European Economic Area, United Kingdom and Switzerland</LegalSubheading>
-        <p>We process your personal information on these legal bases:</p>
+      <LegalSection number={11} title="Jurisdiction-Specific Disclosures">
+        <LegalSubheading>11.1 European Economic Area, United Kingdom and Switzerland</LegalSubheading>
+        <p>We rely on the following legal bases for processing personal information:</p>
         <LegalList
           items={[
-            'Contract: to provide DripLove, including your profile, matching, messaging and Premium.',
-            'Legitimate interests: to keep DripLove safe, prevent fraud and abuse, and improve the Service.',
-            'Consent: for profile verification (face data), device location and marketing messages. You can withdraw consent at any time.',
-            'Legal obligation: where we must keep or disclose information by law.',
+            'performance of a contract, to provide the Service, including profiles, matching, messaging and subscriptions;',
+            'legitimate interests, to secure the Service, prevent fraud and abuse, and improve the Service;',
+            'consent, for profile verification, device location and marketing communications, which you may withdraw at any time; and',
+            'compliance with legal obligations.',
           ]}
         />
         <p>
-          You have the rights described in section 9, and the right to lodge a complaint with your local data
-          protection authority.
+          You have the rights set out in Section 9 and the right to lodge a complaint with a supervisory authority.
         </p>
 
-        <LegalSubheading>United States: state privacy rights</LegalSubheading>
+        <LegalSubheading>11.2 State Consumer Privacy Laws</LegalSubheading>
         <p>
-          If you live in California, Colorado, Connecticut, Oregon, Texas, Utah, Virginia or another state with a
-          consumer privacy law, you may have the right to know what personal information we collect and how we use
-          it, to access, correct, delete or receive a copy of it, and to opt out of its sale, sharing for targeted
-          advertising or profiling. We do not sell your personal information or share it for targeted advertising.
+          Residents of jurisdictions with comprehensive consumer privacy laws, including California, Colorado,
+          Connecticut, Oregon, Texas and Virginia, may have the right to know the categories and specific
+          pieces of personal information we process; to access, correct, delete and obtain a copy of their personal
+          information; and to opt out of the sale of personal information, its sharing for cross-context behavioral
+          advertising, and profiling in furtherance of decisions producing legal or similarly significant effects.
+          We do not sell personal information or share it for cross-context behavioral advertising.
         </p>
         <p>
-          Some information we process is considered sensitive: your face template if you verify your profile, your
-          device location if you share it, and the gender and preferences you choose to show. We use it only to
-          provide and secure DripLove, never to profile you for advertising. To make a request, email us; you can
-          also use an authorised agent. We will not treat you differently for exercising your rights. If we deny a
-          request, you can appeal by replying to our decision, and if you are not satisfied you can contact your
-          state attorney general.
+          We process the following categories of sensitive personal information: biometric information (facial
+          templates generated through optional profile verification), precise geolocation (where you grant
+          permission), and information concerning gender and partner preferences that you elect to provide. We
+          process sensitive personal information only as necessary to provide and secure the Service. Requests may
+          be submitted to the contact in Section 14 or through an authorised agent. We will not discriminate against
+          you for exercising your rights. If we decline a request, you may appeal by responding to our decision; if
+          your appeal is denied, you may contact the attorney general of your jurisdiction.
         </p>
 
-        <LegalSubheading>Consumer health data (Washington, Nevada and similar laws)</LegalSubheading>
+        <LegalSubheading>11.3 Consumer Health Data</LegalSubheading>
         <p>
-          Under laws like Washington's My Health My Data Act, some information can count as consumer health data.
-          On DripLove that is mainly the face template created when you verify your profile (biometric data), plus
-          any health-related details you choose to add to your profile. We collect it only with your consent, use it
-          only to verify your profile and keep DripLove safe, share it only with Amazon Web Services as our service
-          provider, and never sell it. You can access or delete it, or withdraw consent by deleting your account.
+          Certain laws, including the Washington My Health My Data Act and Nevada Senate Bill 370, treat some
+          information as consumer health data. Consumer health data processed by DripLove consists of the facial
+          template generated through optional profile verification and any health-related information you elect to
+          include in your profile. We collect consumer health data only with your consent; use it only to verify
+          profiles and maintain the safety of the Service; disclose it only to Amazon Web Services as our processor;
+          and do not sell it. You may access or delete your consumer health data, or withdraw your consent, by
+          contacting us or deleting your account.
         </p>
       </LegalSection>
 
       <LegalSection number={12} title="Children">
         <p>
-          DripLove is only for adults aged 18 and over. We do not knowingly collect information from anyone under
-          18. If we learn that someone under 18 has an account, we will delete it.
+          The Service is intended solely for persons aged eighteen (18) and over. We do not knowingly collect
+          personal information from anyone under eighteen (18). If we become aware that such information has been
+          collected, we will delete the associated account. See also our{' '}
+          <PolicyLink to="/child-safety">Child Safety Standards</PolicyLink>.
         </p>
       </LegalSection>
 
-      <LegalSection number={13} title="Changes to this policy">
+      <LegalSection number={13} title="Changes to This Privacy Policy">
         <p>
-          We may update this Privacy Policy from time to time. If we make significant changes, we will let you know
-          in the app or by email, and ask for your consent where the law requires it.
+          We may amend this Privacy Policy from time to time. We will provide notice of material changes in the
+          Service or by email before they take effect and will obtain your consent where required by applicable law.
+          The "Last updated" date above indicates when this Privacy Policy was last revised.
         </p>
       </LegalSection>
 
-      <LegalSection number={14} title="Contact us">
-        <p>Questions about your privacy or this policy? Contact our privacy team.</p>
-        <ContactCard team="Privacy Team" />
+      <LegalSection number={14} title="Contact">
+        <p>
+          Requests and enquiries regarding this Privacy Policy or our processing of personal information may be
+          directed to:
+        </p>
+        <ContactCard team="Privacy Office" />
       </LegalSection>
     </LegalPage>
   );

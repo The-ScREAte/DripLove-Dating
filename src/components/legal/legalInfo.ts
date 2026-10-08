@@ -2,7 +2,6 @@
 // Community Guidelines, Safety Tips and Child Safety.
 export const COMPANY = {
   name: 'The ScREAte',
-  location: 'Utah, United States',
   email: 'info@driplove.love',
 };
 
