@@ -42,6 +42,9 @@ interface ScheduledBroadcast {
   interval_minutes?: number | null;
   starts_at?: string | null;
   ends_at?: string | null;
+  send_window_minutes?: number;
+  activity?: 'any' | 'active' | 'inactive';
+  smart_quiet?: boolean;
   audience?: 'all' | 'free' | 'premium';
   recipient_emails?: string[] | null;
   specific_day?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -89,6 +92,16 @@ const toLocalInput = (iso?: string | null) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 const fromLocalInput = (value: string) => (value ? new Date(value).toISOString() : null);
+
+type Activity = 'any' | 'active' | 'inactive';
+
+// "09:00" + 90 -> "09:00-10:30"
+const timeWindow = (time: string, minutes: number) => {
+  if (!minutes) return time;
+  const [h, m] = time.split(':').map(Number);
+  const end = (h * 60 + m + minutes) % (24 * 60);
+  return `${time}-${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
+};
 
 const scheduleTimes = (b: ScheduledBroadcast): string[] =>
   (b.send_times && b.send_times.length > 0 ? [...b.send_times] : [b.time_to_send]).sort();
@@ -183,6 +196,9 @@ export default function ScheduledBroadcasts() {
   const [recipientEmails, setRecipientEmails] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  const [sendWindow, setSendWindow] = useState('0');
+  const [activity, setActivity] = useState<Activity>('any');
+  const [smartQuiet, setSmartQuiet] = useState(true);
   // undefined = counting, null = couldn't count
   const [preview, setPreview] = useState<AudiencePreview | null | undefined>(undefined);
   const [sendingNowId, setSendingNowId] = useState<string | null>(null);
@@ -221,6 +237,7 @@ export default function ScheduledBroadcasts() {
         p_audience: audience,
         p_recipient_emails: parseEmails(recipientEmails),
         p_target_countries: selectedCountries,
+        p_activity: activity,
       });
       if (!cancelled) setPreview(error || !data?.[0] ? null : data[0]);
     }, 400);
@@ -228,7 +245,7 @@ export default function ScheduledBroadcasts() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [showDialog, channel, audience, recipientEmails, selectedCountries]);
+  }, [showDialog, channel, audience, recipientEmails, selectedCountries, activity]);
 
   const loadScheduledBroadcasts = async () => {
     setIsLoading(true);
@@ -270,6 +287,9 @@ export default function ScheduledBroadcasts() {
     setRecipientEmails('');
     setStartsAt('');
     setEndsAt('');
+    setSendWindow('0');
+    setActivity('any');
+    setSmartQuiet(true);
     setShowDialog(true);
   };
 
@@ -292,6 +312,9 @@ export default function ScheduledBroadcasts() {
     setRecipientEmails((broadcast.recipient_emails || []).join('\n'));
     setStartsAt(toLocalInput(broadcast.starts_at));
     setEndsAt(toLocalInput(broadcast.ends_at));
+    setSendWindow(String(broadcast.send_window_minutes || 0));
+    setActivity(broadcast.activity || 'any');
+    setSmartQuiet(!!broadcast.smart_quiet);
     setShowDialog(true);
   };
 
@@ -398,6 +421,9 @@ export default function ScheduledBroadcasts() {
       interval_minutes: isInterval ? intervalMinutes : null,
       starts_at: startsIso,
       ends_at: endsIso,
+      send_window_minutes: isInterval ? 0 : Number(sendWindow),
+      activity,
+      smart_quiet: smartQuiet,
       audience,
       recipient_emails: emails.length > 0 ? emails : null,
       next_send_at: nextSendAt.toISOString(),
@@ -602,7 +628,12 @@ export default function ScheduledBroadcasts() {
                       {broadcast.repeat_type !== 'interval' ? (
                         <div className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{scheduleTimes(broadcast).join(' & ')} their local time</span>
+                          <span>
+                            {scheduleTimes(broadcast)
+                              .map((t) => timeWindow(t, broadcast.send_window_minutes || 0))
+                              .join(' & ')}{' '}
+                            their local time
+                          </span>
                         </div>
                       ) : !(broadcast.recipient_emails && broadcast.recipient_emails.length > 0) && (
                         <div className="flex items-center gap-1">
@@ -613,6 +644,16 @@ export default function ScheduledBroadcasts() {
                       {broadcast.audience && broadcast.audience !== 'all' && (
                         <Badge variant="outline" className="text-xs bg-amber-50">
                           {broadcast.audience === 'free' ? 'Free users only' : 'Premium users only'}
+                        </Badge>
+                      )}
+                      {broadcast.activity && broadcast.activity !== 'any' && (
+                        <Badge variant="outline" className="text-xs bg-sky-50">
+                          {broadcast.activity === 'active' ? 'Recently active' : 'Inactive 3+ days'}
+                        </Badge>
+                      )}
+                      {broadcast.smart_quiet && (
+                        <Badge variant="outline" className="text-xs bg-violet-50" title="Skips anyone who opened the app, matched or got a message in the last 4 hours">
+                          Smart quiet
                         </Badge>
                       )}
                       {broadcast.recipient_emails && broadcast.recipient_emails.length > 0 && (
@@ -930,9 +971,26 @@ export default function ScheduledBroadcasts() {
                     Add another time
                   </Button>
                 )}
+                <div className="flex items-center gap-2 pt-1">
+                  <Label className="text-xs font-normal text-gray-600">Spread each send over</Label>
+                  <Select value={sendWindow} onValueChange={setSendWindow}>
+                    <SelectTrigger className="h-8 w-36 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Exact time</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="90">90 minutes</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-xs text-gray-500">
                   Spread the day's messages out - for example 09:00 in the morning and 19:00 in the evening. Everyone
-                  gets them at these times in their own time zone.
+                  gets them at these times in their own time zone; with a spread, each person gets their own moment
+                  inside the window so the whole audience isn't pinged at once.
                 </p>
                 {channel === 'email' && (
                   <p className="text-xs text-amber-600">
@@ -955,6 +1013,33 @@ export default function ScheduledBroadcasts() {
                   <SelectItem value="premium">Premium users only</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Activity</Label>
+              <Select value={activity} onValueChange={(v) => setActivity(v as Activity)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Everyone</SelectItem>
+                  <SelectItem value="active">Recently active (opened the app in the last 3 days)</SelectItem>
+                  <SelectItem value="inactive">Inactive for 3+ days (re-engagement)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between p-3 border rounded-md">
+              <div className="pr-4">
+                <Label htmlFor="smart-quiet" className="text-sm font-medium">
+                  Smart quiet
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Skip anyone who opened the app, matched or got a message in the last 4 hours - checked at the
+                  moment of sending.
+                </p>
+              </div>
+              <Switch id="smart-quiet" checked={smartQuiet} onCheckedChange={setSmartQuiet} />
             </div>
 
             <div className="space-y-2">
