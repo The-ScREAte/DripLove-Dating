@@ -64,7 +64,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
           <p>By accessing or using the Service, you represent and warrant that you:</p>
           <LegalList
             items={[
-              'are at least eighteen (18) years of age;',
+              'are at least eighteen (18) years of age or, if higher, the minimum age required to use the Service in the country in which you reside;',
               'have the legal capacity to enter into a binding contract with DripLove;',
               'are not prohibited from using the Service under any applicable law;',
               'have never been convicted of a felony or indictable offence involving violence or a sexual offence, and are not required to register as a sex offender with any government authority; and',

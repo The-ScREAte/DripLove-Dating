@@ -207,9 +207,9 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
             className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-white/40 data-[state=checked]:border-pink-500 data-[state=checked]:bg-pink-500 data-[state=checked]:text-white"
           />
           <span className="text-sm leading-snug text-white/85">
-            I am 18 or older and I agree to the Terms of Service (including the arbitration agreement and class
-            action waiver), the Privacy Policy and the Community Guidelines. I understand that I am responsible for
-            my own safety and for my conduct towards other members.
+            I meet the minimum age to use DripLove in my country, and I agree to the Terms of Service (including the
+            arbitration agreement and class action waiver), the Privacy Policy and the Community Guidelines. I
+            understand that I am responsible for my own safety and for my conduct towards other members.
           </span>
         </label>
 
