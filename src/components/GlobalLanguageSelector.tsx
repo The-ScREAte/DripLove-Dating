@@ -74,12 +74,12 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
               key={language.code}
               onClick={() => handleLanguageChange(language.code)}
               className={`cursor-pointer ${
-                currentLanguage === language.code ? 'bg-purple-100' : ''
+                currentLanguage === language.code ? 'bg-pink-500/20' : ''
               }`}
             >
               <span className="uppercase">{language.code}</span>
               {currentLanguage === language.code && (
-                <span className="ml-auto text-purple-600">✓</span>
+                <span className="ml-auto text-pink-400">✓</span>
               )}
             </DropdownMenuItem>
           ))}
@@ -102,12 +102,12 @@ const GlobalLanguageSelector: React.FC<GlobalLanguageSelectorProps> = ({
             key={language.code}
             onClick={() => handleLanguageChange(language.code)}
             className={`cursor-pointer text-xs ${
-              currentLanguage === language.code ? 'bg-primary/10' : ''
+              currentLanguage === language.code ? 'bg-pink-500/20' : ''
             }`}
           >
             <span className="uppercase text-[10px]">{language.code}</span>
             {currentLanguage === language.code && (
-              <span className="ml-auto text-primary">✓</span>
+              <span className="ml-auto text-pink-400">✓</span>
             )}
           </DropdownMenuItem>
         ))}

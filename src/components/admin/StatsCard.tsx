@@ -182,12 +182,17 @@ const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
                   <ChevronDown className="w-2 h-2 ml-0.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-48 overflow-y-auto z-50">
+              {/* Light menu to match the admin page (the shared menu is dark for the app) */}
+              <DropdownMenuContent className="max-h-48 overflow-y-auto z-50 bg-white text-gray-900 border-gray-200 shadow-lg">
                 {dateOptions.map((option, index) => (
                   <DropdownMenuItem
                     key={index}
                     onClick={() => handleSelectDate(option.date)}
-                    className={format(selectedDate, 'yyyy-MM-dd') === format(option.date, 'yyyy-MM-dd') ? 'bg-purple-100' : ''}
+                    className={`focus:bg-purple-50 focus:text-gray-900 ${
+                      format(selectedDate, 'yyyy-MM-dd') === format(option.date, 'yyyy-MM-dd')
+                        ? 'bg-purple-100 text-purple-900 font-medium'
+                        : ''
+                    }`}
                   >
                     {option.label}
                   </DropdownMenuItem>

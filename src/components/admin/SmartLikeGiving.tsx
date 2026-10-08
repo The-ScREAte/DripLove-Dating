@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { getCountriesList } from '@/constants/locationData';
-import { Heart, Users, Search, Check, X, Loader2, UserPlus, Filter, Undo2 } from 'lucide-react';
+import { Heart, Users, Search, Check, X, Loader2, UserPlus, Filter, Undo2, Clock } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -19,12 +19,49 @@ interface UserProfile {
   country?: string;
   country_code?: string | null;
   city?: string;
+  last_login_at?: string | null;
+  created_at?: string | null;
 }
 
 interface Props {
   users: UserProfile[];
   onLikesCreated: () => void;
 }
+
+type LastActiveRange = 'all' | 'today' | '3' | '7' | '14' | '30' | '90' | 'inactive30' | 'custom';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// Rendering thousands of rows makes search typing lag; Select All still covers every match.
+const MAX_VISIBLE_RECEIVERS = 500;
+
+const startOfLocalDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+// Calendar-day shift (stays on local midnight across daylight-saving changes).
+const addDays = (d: Date, days: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+
+// "yyyy-MM-dd" from a date input, read as a local day (new Date(str) would read it as UTC).
+const parseDateInput = (value: string): Date | null => {
+  const [y, m, d] = value.split('-').map(Number);
+  return y && m && d ? new Date(y, m - 1, d) : null;
+};
+
+const toDateInputValue = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Users with no recorded login are treated as last active when they signed up,
+// the same rule the dashboard's "Current Users" stat uses.
+const lastActiveTime = (u: UserProfile): number | null => {
+  const ts = u.last_login_at ?? u.created_at;
+  return ts ? new Date(ts).getTime() : null;
+};
+
+const describeLastActive = (u: UserProfile): string => {
+  const ts = lastActiveTime(u);
+  if (ts === null) return 'No activity recorded';
+  const days = Math.round((startOfLocalDay(new Date()).getTime() - startOfLocalDay(new Date(ts)).getTime()) / DAY_MS);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days}d ago`;
+  return u.last_login_at ? `Active ${when}` : `Joined ${when}`;
+};
 
 const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
   const [selectedGiver, setSelectedGiver] = useState<string | null>(null);
@@ -33,6 +70,9 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
   const [receiverSearch, setReceiverSearch] = useState('');
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [genderFilter, setGenderFilter] = useState<string>('all');
+  const [lastActiveRange, setLastActiveRange] = useState<LastActiveRange>('all');
+  const [activeFrom, setActiveFrom] = useState('');
+  const [activeTo, setActiveTo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
   const [existingLikes, setExistingLikes] = useState<Set<string>>(new Set());
@@ -78,7 +118,36 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     if (genderFilter !== 'all') {
       filtered = filtered.filter(u => u.gender === genderFilter);
     }
-    
+
+    if (lastActiveRange !== 'all') {
+      const today = startOfLocalDay(new Date());
+      let from: number | null = null;
+      let to: number | null = null;
+
+      if (lastActiveRange === 'today') {
+        from = today.getTime();
+      } else if (lastActiveRange === 'inactive30') {
+        to = addDays(today, -30).getTime();
+      } else if (lastActiveRange === 'custom') {
+        const fromDate = parseDateInput(activeFrom);
+        const toDate = parseDateInput(activeTo);
+        from = fromDate ? fromDate.getTime() : null;
+        // Through the end of the "to" day
+        to = toDate ? addDays(toDate, 1).getTime() : null;
+      } else {
+        // "Last N days" includes today
+        from = addDays(today, -(Number(lastActiveRange) - 1)).getTime();
+      }
+
+      if (from !== null || to !== null) {
+        filtered = filtered.filter(u => {
+          const ts = lastActiveTime(u);
+          if (ts === null) return lastActiveRange === 'inactive30';
+          return (from === null || ts >= from) && (to === null || ts < to);
+        });
+      }
+    }
+
     if (search) {
       filtered = filtered.filter(u => 
         u.first_name?.toLowerCase().includes(search) ||
@@ -90,7 +159,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     }
     
     return filtered;
-  }, [allReceivers, receiverSearch, countryFilter, genderFilter, existingLikes, countries]);
+  }, [allReceivers, receiverSearch, countryFilter, genderFilter, lastActiveRange, activeFrom, activeTo, existingLikes, countries]);
 
   // Load existing likes when giver is selected
   const loadExistingLikes = async (giverId: string) => {
@@ -117,20 +186,29 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     }
   };
 
-  // Load all potential receivers from database
+  // Load all potential receivers from database, in pages - a single query is
+  // capped at 1000 rows, which silently dropped everyone but the newest 1000.
   const loadReceivers = async (giverId: string) => {
     setLoadingReceivers(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, gender, country, country_code, city')
-        .eq('is_admin', false)
-        .neq('id', giverId)
-        .order('created_at', { ascending: false }); // Order by newest first to see more recent users
+      const PAGE_SIZE = 1000;
+      const receivers: UserProfile[] = [];
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, gender, country, country_code, city, last_login_at, created_at')
+          .eq('is_admin', false)
+          .neq('id', giverId)
+          .order('created_at', { ascending: false }) // Newest first to see more recent users
+          .order('id', { ascending: true }) // Stable paging when created_at ties
+          .range(offset, offset + PAGE_SIZE - 1);
 
-      if (error) throw error;
+        if (error) throw error;
+        receivers.push(...(data || []));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
 
-      setAllReceivers(data || []);
+      setAllReceivers(receivers);
     } catch (err) {
       console.error('Error loading receivers:', err);
       toast({
@@ -148,6 +226,9 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     setSelectedReceivers(new Set());
     setCountryFilter('all');
     setGenderFilter('all');
+    setLastActiveRange('all');
+    setActiveFrom('');
+    setActiveTo('');
     setReceiverSearch('');
     await Promise.all([
       loadExistingLikes(userId),
@@ -182,8 +263,9 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
     setIsLoading(true);
     let successCount = 0;
     let errorCount = 0;
-    let notificationsSent = 0;
 
+    // No push calls from here: the likes trigger announces every new like to
+    // its receiver, and send-push-notification ignores app-sent like pushes.
     try {
       // Create likes in batches to avoid overwhelming the DB
       const receiverIds = Array.from(selectedReceivers);
@@ -206,41 +288,21 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
           errorCount += batch.length;
         } else {
           successCount += batch.length;
-          
-          // Send notifications to each receiver in this batch
-          for (const receiverId of batch) {
-            try {
-              await supabase.functions.invoke('send-push-notification', {
-                body: {
-                  title: 'Someone likes you',
-                  body: 'You caught someone\'s eye. Tap to see who\'s interested.',
-                  userId: receiverId,
-                  type: 'like',
-                  save_to_db: true
-                }
-              });
-              notificationsSent++;
-            } catch (notifErr) {
-              console.error('Failed to send notification to:', receiverId, notifErr);
-              // Non-fatal: continue with other notifications
-            }
-          }
+          // Only batches that actually inserted count as liked
+          setExistingLikes(prev => {
+            const next = new Set(prev);
+            batch.forEach(id => next.add(id));
+            return next;
+          });
         }
       }
-
-      // Update existing likes set
-      setExistingLikes(prev => {
-        const next = new Set(prev);
-        selectedReceivers.forEach(id => next.add(id));
-        return next;
-      });
 
       // Clear selection
       setSelectedReceivers(new Set());
 
       toast({
         title: 'Likes Created',
-        description: `Created ${successCount} likes, sent ${notificationsSent} notifications${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+        description: `Created ${successCount} likes${errorCount > 0 ? `, ${errorCount} failed` : ''}. Each receiver is notified automatically.`
       });
 
       onLikesCreated();
@@ -416,6 +478,34 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                       ))}
                     </SelectContent>
                   </Select>
+
+                  <Select
+                    value={lastActiveRange}
+                    onValueChange={(v) => {
+                      setLastActiveRange(v as LastActiveRange);
+                      if (v === 'custom' && !activeFrom && !activeTo) {
+                        const today = new Date();
+                        setActiveFrom(toDateInputValue(addDays(today, -6)));
+                        setActiveTo(toDateInputValue(today));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[170px] text-xs">
+                      <Clock className="w-3 h-3 mr-1 text-gray-500 shrink-0" />
+                      <SelectValue placeholder="Last active" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Last active: any time</SelectItem>
+                      <SelectItem value="today">Active today</SelectItem>
+                      <SelectItem value="3">Last 3 days</SelectItem>
+                      <SelectItem value="7">Last 7 days</SelectItem>
+                      <SelectItem value="14">Last 14 days</SelectItem>
+                      <SelectItem value="30">Last 30 days</SelectItem>
+                      <SelectItem value="90">Last 90 days</SelectItem>
+                      <SelectItem value="inactive30">Inactive 30+ days</SelectItem>
+                      <SelectItem value="custom">Custom date range…</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <Button
@@ -436,6 +526,29 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                 </Button>
               </div>
 
+              {lastActiveRange === 'custom' && (
+                <div className="flex items-center gap-2 flex-wrap text-xs text-gray-600">
+                  <span>Last active from</span>
+                  <Input
+                    type="date"
+                    value={activeFrom}
+                    max={activeTo || toDateInputValue(new Date())}
+                    onChange={(e) => setActiveFrom(e.target.value)}
+                    className="h-8 w-[150px] text-xs"
+                  />
+                  <span>to</span>
+                  <Input
+                    type="date"
+                    value={activeTo}
+                    min={activeFrom || undefined}
+                    max={toDateInputValue(new Date())}
+                    onChange={(e) => setActiveTo(e.target.value)}
+                    className="h-8 w-[150px] text-xs"
+                  />
+                  <span className="text-gray-400">(either date can be left empty)</span>
+                </div>
+              )}
+
               <ScrollArea className="h-[400px] border rounded-lg">
                 <div className="p-1 space-y-1">
                   {filteredReceivers.length === 0 ? (
@@ -443,7 +556,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                       No users found matching your criteria
                     </div>
                   ) : (
-                    filteredReceivers.map(user => {
+                    filteredReceivers.slice(0, MAX_VISIBLE_RECEIVERS).map(user => {
                       const isSelected = selectedReceivers.has(user.id);
 
                       return (
@@ -465,6 +578,7 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
                               {user.first_name} {user.last_name}
                             </div>
                             <div className="text-gray-500 truncate">{user.email}</div>
+                            <div className="text-[10px] text-gray-400 truncate">{describeLastActive(user)}</div>
                           </div>
                           {user.gender && (
                             <Badge variant="secondary" className="text-[10px]">
@@ -487,7 +601,11 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
               </ScrollArea>
 
               <div className="text-xs text-gray-500 flex items-center justify-between">
-                <span>Showing {filteredReceivers.length} of {allReceivers.length} users</span>
+                <span>
+                  {filteredReceivers.length} of {allReceivers.length} users match
+                  {filteredReceivers.length > MAX_VISIBLE_RECEIVERS &&
+                    ` (listing first ${MAX_VISIBLE_RECEIVERS}; Select All picks all ${filteredReceivers.length})`}
+                </span>
                 <span className="text-pink-600">{existingLikes.size} already liked by this user</span>
               </div>
 
