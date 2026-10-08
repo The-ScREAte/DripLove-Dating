@@ -2,13 +2,15 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 
-// Shared layout for the Terms of Service and Privacy Policy: one dark surface
-// like the rest of the app, a sticky back bar, and a single scroll area.
+// Shared layout for About, Terms of Service and Privacy Policy: one dark
+// surface like the rest of the app, a sticky back bar, a single scroll area,
+// and every safe-area inset respected (notch, home indicator, and the sides in
+// landscape).
 
 interface LegalPageProps {
   title: string;
-  updated: string;
-  intro: React.ReactNode;
+  updated?: string;
+  intro?: React.ReactNode;
   onBack: () => void;
   children: React.ReactNode;
 }
@@ -19,7 +21,11 @@ export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPage
   return (
     <div
       className="min-h-fill h-full overflow-y-auto bg-black text-neutral-300"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)' }}
+      style={{
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)',
+        paddingLeft: 'env(safe-area-inset-left, 0px)',
+        paddingRight: 'env(safe-area-inset-right, 0px)',
+      }}
     >
       <header
         className="sticky top-0 z-10 border-b border-white/10 bg-black/85 backdrop-blur-md"
@@ -40,8 +46,8 @@ export const LegalPage = ({ title, updated, intro, onBack, children }: LegalPage
 
       <main className="mx-auto max-w-3xl px-5 pt-8">
         <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
-        <p className="mt-2 text-sm text-neutral-500">{updated}</p>
-        <div className="mt-6 space-y-3 text-[15px] leading-relaxed">{intro}</div>
+        {updated && <p className="mt-2 text-sm text-neutral-500">{updated}</p>}
+        {intro && <div className="mt-6 space-y-3 text-[15px] leading-relaxed">{intro}</div>}
 
         <div className="mt-10 space-y-10">{children}</div>
 
@@ -58,13 +64,13 @@ export const LegalSection = ({
   title,
   children,
 }: {
-  number: number;
+  number?: number;
   title: string;
   children: React.ReactNode;
 }) => (
   <section>
     <h2 className="flex gap-3 text-lg font-semibold text-white">
-      <span className="tabular-nums text-pink-500">{number}.</span>
+      {number !== undefined && <span className="tabular-nums text-pink-500">{number}.</span>}
       {title}
     </h2>
     <div className="mt-3 space-y-3 text-[15px] leading-relaxed">{children}</div>

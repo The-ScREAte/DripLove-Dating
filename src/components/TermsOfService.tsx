@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import {
   ContactCard,
   LEGAL_LAST_UPDATED,
@@ -70,6 +71,10 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
             "Interfere with the Service's security or safety features",
           ]}
         />
+        <p>
+          We have zero tolerance for child sexual abuse and exploitation. See our{' '}
+          <Link to="/child-safety" className="text-pink-400 hover:underline">Child Safety Standards</Link>.
+        </p>
         <p>
           We may remove content and suspend or close accounts that break these standards, with or without notice.
           Please report anything that concerns you using the in-app report tools.
@@ -152,7 +157,16 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={10} title="Ending your account">
+      <LegalSection number={10} title="Copyright complaints">
+        <p>
+          If you believe content on DripLove infringes your copyright, email info@driplove.love with a description
+          of your work, where the content appears on DripLove, your contact details, and a statement that you are
+          the owner or authorised to act for the owner. We will remove infringing content and may close the
+          accounts of repeat infringers.
+        </p>
+      </LegalSection>
+
+      <LegalSection number={11} title="Ending your account">
         <p>
           You can delete your account at any time in your profile settings. We may suspend or close your account
           if you break these Terms, create risk for other members or for us, or where required by law. Sections
@@ -161,7 +175,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={11} title="Disclaimers">
+      <LegalSection number={12} title="Disclaimers">
         <p>
           The Service is provided "as is" and "as available". We do not guarantee that you will find a match, that
           the Service will be uninterrupted or error-free, or that information provided by other members is
@@ -169,7 +183,7 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={12} title="Limitation of liability">
+      <LegalSection number={13} title="Limitation of liability">
         <p>
           To the fullest extent permitted by law, The ScREAte Ltd will not be liable for any indirect, incidental,
           special, consequential or punitive damages, or for any loss of data, profits or goodwill, arising from
@@ -179,29 +193,30 @@ const TermsOfService = ({ onBack }: TermsOfServiceProps) => {
         </p>
       </LegalSection>
 
-      <LegalSection number={13} title="Indemnity">
+      <LegalSection number={14} title="Indemnity">
         <p>
           You agree to compensate The ScREAte Ltd for any claims, losses or costs (including reasonable legal fees)
           arising from your breach of these Terms or your conduct towards other members.
         </p>
       </LegalSection>
 
-      <LegalSection number={14} title="Governing law">
+      <LegalSection number={15} title="Governing law">
         <p>
           These Terms are governed by the laws of the country in which The ScREAte Ltd is registered. If you live
           in a country whose consumer protection laws give you additional rights, those rights still apply.
         </p>
       </LegalSection>
 
-      <LegalSection number={15} title="Changes to these Terms">
+      <LegalSection number={16} title="Changes to these Terms">
         <p>
           We may update these Terms from time to time. If we make significant changes, we will let you know in
-          the app or by email before they take effect. Continuing to use DripLove after that means you accept the
-          updated Terms.
+          the app or by email at least 14 days before they take effect, unless a change is required by law or
+          urgently needed to keep members safe. If you do not agree, you can delete your account before the changes
+          take effect; continuing to use DripLove after that means you accept the updated Terms.
         </p>
       </LegalSection>
 
-      <LegalSection number={16} title="Contact us">
+      <LegalSection number={17} title="Contact us">
         <p>Questions about these Terms? We're happy to help.</p>
         <ContactCard team="Support" />
       </LegalSection>

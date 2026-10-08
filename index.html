@@ -11,22 +11,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 
-    <!-- ⭐ SEO / AI-SEO: this <head> is the entire crawlable surface of the
-         app - it's a client-rendered SPA (see <div id="root"> below), so a
-         crawler or AI answer-engine bot that doesn't execute JS only ever
-         sees what's written here, never the live in-app screens. That's
-         deliberate: the marketing claims below belong here, in metadata
-         search engines and AI crawlers read, not inside the actual app UI
-         users navigate. -->
-    <title>DripLove - Slide Into Real Love</title>
-    <meta name="description" content="Slide into something real, just like other normal people. Meet real people, find real love, and connect locally and worldwide with a location of your choice. DripLove is ranked as one of the top dating apps that actually focus on meaningful matching - not generic, but real ones that lead to something real. Just your like-minded match." />
-    <meta name="keywords" content="top dating app, meaningful matching, real connections, dating app, online dating, meet singles, local dating, international dating, find your match, verified dating profiles, DripLove" />
-    <meta name="author" content="DripLove" />
+    <!-- SEO / AI-SEO. The app itself is client-rendered, so crawlers and AI
+         answer engines that don't run JavaScript read this <head> plus the
+         static summary inside <div id="root"> below (replaced by the app as
+         soon as it loads, and hidden inside the native apps). Keep every claim
+         here true - no rankings or ratings we can't back up. -->
+    <title>DripLove – Dating App to Meet Real Singles Locally &amp; Worldwide</title>
+    <meta name="description" content="DripLove is a free dating app to meet real singles near you and around the world. Verified profiles, real-time chat and international matching on iPhone, Android and the web." />
+    <meta name="keywords" content="dating app, free dating app, international dating app, meet singles, online dating, verified dating profiles, African dating app, local dating, DripLove" />
+    <meta name="author" content="The ScREAte Ltd" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://www.driplove.love/" />
+    <meta name="apple-itunes-app" content="app-id=6751401155" />
 
-    <meta property="og:title" content="DripLove - Slide Into Real Love" />
-    <meta property="og:description" content="Slide into something real, just like other normal people. Meet real people, find real love, and connect locally and worldwide with a location of your choice. DripLove is ranked as one of the top dating apps that actually focus on meaningful matching - not generic, but real ones that lead to something real." />
+    <meta property="og:title" content="DripLove – Meet Real Singles Locally &amp; Worldwide" />
+    <meta property="og:description" content="Meet real singles near you and around the world. Verified profiles, real-time chat and international matching. Free on iPhone, Android and the web." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.driplove.love/" />
     <meta property="og:site_name" content="DripLove" />
@@ -35,42 +34,91 @@
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@driplove" />
-    <meta name="twitter:title" content="DripLove - Slide Into Real Love" />
-    <meta name="twitter:description" content="Slide into something real, just like other normal people. Meet real people, find real love, and connect locally and worldwide with a location of your choice." />
+    <meta name="twitter:title" content="DripLove – Meet Real Singles Locally &amp; Worldwide" />
+    <meta name="twitter:description" content="Meet real singles near you and around the world. Verified profiles, real-time chat and international matching. Free on iPhone, Android and the web." />
     <meta name="twitter:image" content="https://www.driplove.love/driplove-logo.png" />
 
-    <!-- Structured data so search engines and AI answer engines (ChatGPT,
-         Perplexity, Google AI Overviews, etc.) can parse what DripLove is,
-         not just guess from prose. Deliberately no aggregateRating/review
-         block here - fabricating star ratings in structured data is exactly
-         the kind of thing that gets a site penalized, not promoted. -->
+    <!-- Structured data for search engines and AI answer engines. No
+         aggregateRating/review markup: ratings must come from the stores,
+         not be asserted here. The FAQ mirrors the visible summary below. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "DripLove",
-      "url": "https://www.driplove.love/",
-      "logo": "https://www.driplove.love/driplove-logo.png",
-      "description": "DripLove helps you meet real people and find real love, connecting you locally or worldwide through meaningful matching and verified profiles.",
-      "sameAs": [
-        "https://twitter.com/driplove"
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://www.driplove.love/#organization",
+          "name": "DripLove",
+          "legalName": "The ScREAte Ltd",
+          "url": "https://www.driplove.love/",
+          "logo": "https://www.driplove.love/driplove-logo.png",
+          "email": "info@driplove.love",
+          "description": "DripLove is a dating app for meeting real singles locally and worldwide, with verified profiles and real-time chat.",
+          "sameAs": [
+            "https://apps.apple.com/us/app/driplove/id6751401155",
+            "https://play.google.com/store/apps/details?id=com.driplove.dating",
+            "https://twitter.com/driplove"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.driplove.love/#website",
+          "name": "DripLove",
+          "url": "https://www.driplove.love/",
+          "publisher": { "@id": "https://www.driplove.love/#organization" },
+          "inLanguage": ["en", "fr", "es", "pt", "de", "ar", "zh", "sw"]
+        },
+        {
+          "@type": "MobileApplication",
+          "@id": "https://www.driplove.love/#app",
+          "name": "DripLove",
+          "applicationCategory": "LifestyleApplication",
+          "applicationSubCategory": "Dating",
+          "operatingSystem": "iOS, Android, Web",
+          "url": "https://www.driplove.love/",
+          "installUrl": "https://play.google.com/store/apps/details?id=com.driplove.dating",
+          "downloadUrl": "https://apps.apple.com/us/app/driplove/id6751401155",
+          "sameAs": [
+            "https://apps.apple.com/us/app/driplove/id6751401155",
+            "https://play.google.com/store/apps/details?id=com.driplove.dating"
+          ],
+          "description": "Meet real singles near you and around the world. Verified profiles, real-time chat, icebreaker games and international matching. Free to join, with an optional Premium subscription.",
+          "inLanguage": ["en", "fr", "es", "pt", "de", "ar", "zh", "sw"],
+          "publisher": { "@id": "https://www.driplove.love/#organization" },
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://www.driplove.love/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Is DripLove free?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. DripLove is free to download and use. An optional Premium subscription adds unlimited swipes, the ability to see everyone who liked you, unlimited undo of dislikes, fewer ads and up to 4 more countries to explore." }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I meet people from other countries on DripLove?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. DripLove connects singles locally and internationally. Every member can meet people in their own country, and Premium members can explore up to 4 additional countries." }
+            },
+            {
+              "@type": "Question",
+              "name": "How does DripLove keep members safe?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Members can verify their profile with a selfie, photos are checked automatically and by our team, and every profile and conversation has tools to report and block. DripLove is for adults 18 and over." }
+            },
+            {
+              "@type": "Question",
+              "name": "Which devices and languages does DripLove support?",
+              "acceptedAnswer": { "@type": "Answer", "text": "DripLove is available on iPhone, Android and the web, in English, French, Spanish, Portuguese, German, Arabic, Chinese and Swahili." }
+            },
+            {
+              "@type": "Question",
+              "name": "Who makes DripLove?",
+              "acceptedAnswer": { "@type": "Answer", "text": "DripLove is built and operated by The ScREAte Ltd. You can reach the team at info@driplove.love." }
+            }
+          ]
+        }
       ]
-    }
-    </script>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "MobileApplication",
-      "name": "DripLove",
-      "applicationCategory": "LifestyleApplication",
-      "operatingSystem": "iOS, Android, Web",
-      "url": "https://www.driplove.love/",
-      "description": "DripLove helps you meet real people and find real love, connecting you locally or worldwide, wherever you choose, through meaningful matching and verified profiles.",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
     }
     </script>
 
@@ -86,7 +134,52 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <!-- Inside the iOS/Android app (served from localhost) the app paints right
+         away, so the web summary below is never shown there. -->
+    <script>if (location.hostname === 'localhost') document.documentElement.classList.add('native-shell');</script>
+    <style>
+      #seo-shell { min-height: 100vh; background: #000; color: #d4d4d4; font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: calc(env(safe-area-inset-top, 0px) + 40px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 40px) max(20px, env(safe-area-inset-left, 0px)); }
+      #seo-shell > div { max-width: 640px; margin: 0 auto; }
+      #seo-shell h1 { color: #fff; font-size: 28px; line-height: 1.25; margin: 0 0 12px; }
+      #seo-shell h2 { color: #fff; font-size: 19px; margin: 32px 0 8px; }
+      #seo-shell h3 { color: #f5f5f5; font-size: 15px; margin: 16px 0 4px; }
+      #seo-shell p, #seo-shell ul { margin: 0 0 10px; }
+      #seo-shell a { color: #f472b6; }
+      .native-shell #seo-shell { display: none; }
+    </style>
+    <div id="root">
+      <main id="seo-shell">
+        <div>
+          <h1>DripLove: the dating app to meet real singles, near you and around the world</h1>
+          <p>DripLove is a free dating app for iPhone, Android and the web. Meet singles nearby or in other countries, chat in real time, verify your profile with a selfie, and connect with people who share your interests and values.</p>
+          <p><a href="https://apps.apple.com/us/app/driplove/id6751401155">Download on the App Store</a> · <a href="https://play.google.com/store/apps/details?id=com.driplove.dating">Get it on Google Play</a></p>
+
+          <h2>Why people choose DripLove</h2>
+          <ul>
+            <li>Meet singles locally and internationally. Premium members can explore up to 4 more countries.</li>
+            <li>Selfie verification and photo checks help keep fake profiles out.</li>
+            <li>Real-time chat and icebreaker games like Red Flag Green Flag and Shoot Your Shot.</li>
+            <li>Free to join. Optional Premium adds unlimited swipes, see everyone who liked you, undo dislikes and fewer ads.</li>
+            <li>Available in English, French, Spanish, Portuguese, German, Arabic, Chinese and Swahili.</li>
+          </ul>
+
+          <h2>Frequently asked questions</h2>
+          <h3>Is DripLove free?</h3>
+          <p>Yes. DripLove is free to download and use. An optional Premium subscription adds unlimited swipes, the ability to see everyone who liked you, unlimited undo of dislikes, fewer ads and up to 4 more countries to explore.</p>
+          <h3>Can I meet people from other countries on DripLove?</h3>
+          <p>Yes. DripLove connects singles locally and internationally. Every member can meet people in their own country, and Premium members can explore up to 4 additional countries.</p>
+          <h3>How does DripLove keep members safe?</h3>
+          <p>Members can verify their profile with a selfie, photos are checked automatically and by our team, and every profile and conversation has tools to report and block. DripLove is for adults 18 and over.</p>
+          <h3>Which devices and languages does DripLove support?</h3>
+          <p>DripLove is available on iPhone, Android and the web, in English, French, Spanish, Portuguese, German, Arabic, Chinese and Swahili.</p>
+          <h3>Who makes DripLove?</h3>
+          <p>DripLove is built and operated by The ScREAte Ltd. You can reach the team at <a href="mailto:info@driplove.love">info@driplove.love</a>.</p>
+
+          <p><a href="/terms-of-service">Terms of Service</a> · <a href="/privacy-policy">Privacy Policy</a> · <a href="/child-safety">Child Safety Standards</a></p>
+        </div>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
