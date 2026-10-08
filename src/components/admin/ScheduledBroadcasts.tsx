@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail, X } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail, X, Send, Copy } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -40,6 +40,8 @@ interface ScheduledBroadcast {
   specific_days?: string[] | null;
   send_times?: string[] | null; // HH:MM, each person's local time
   interval_minutes?: number | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
   audience?: 'all' | 'free' | 'premium';
   recipient_emails?: string[] | null;
   specific_day?: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -67,6 +69,27 @@ const MAX_SEND_TIMES = 6;
 const SUGGESTED_TIMES = ['09:00', '19:00', '13:00', '21:00', '07:00', '16:00'];
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+type AudiencePreview = { matched: number; by_push: number; by_email: number; unreachable: number };
+
+// Admin RPCs that aren't in the generated Supabase types yet.
+const callRpc = <T,>(fn: string, args?: Record<string, unknown>) =>
+  (supabase.rpc.bind(supabase) as unknown as (
+    name: string,
+    params?: Record<string, unknown>,
+  ) => Promise<{ data: T | null; error: { message: string } | null }>)(fn, args);
+
+const parseEmails = (text: string) =>
+  Array.from(new Set(text.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean)));
+
+// <input type="datetime-local"> works in the admin's local time.
+const toLocalInput = (iso?: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const fromLocalInput = (value: string) => (value ? new Date(value).toISOString() : null);
+
 const scheduleTimes = (b: ScheduledBroadcast): string[] =>
   (b.send_times && b.send_times.length > 0 ? [...b.send_times] : [b.time_to_send]).sort();
 
@@ -89,8 +112,10 @@ const nextLocalSend = (
   everyNDays: number,
   times: string[],
   createdAt?: string,
+  startsAt?: string | null,
 ): Date | null => {
-  const now = new Date();
+  const start = startsAt ? new Date(startsAt) : null;
+  const now = start && start > new Date() ? start : new Date();
   const anchor = createdAt ? new Date(createdAt) : now;
   const anchorDay = Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate());
   const runsOn = (d: Date) => {
@@ -156,6 +181,11 @@ export default function ScheduledBroadcasts() {
   const [intervalUnit, setIntervalUnit] = useState<'minutes' | 'hours'>('hours');
   const [audience, setAudience] = useState<'all' | 'free' | 'premium'>('all');
   const [recipientEmails, setRecipientEmails] = useState('');
+  const [startsAt, setStartsAt] = useState('');
+  const [endsAt, setEndsAt] = useState('');
+  // undefined = counting, null = couldn't count
+  const [preview, setPreview] = useState<AudiencePreview | null | undefined>(undefined);
+  const [sendingNowId, setSendingNowId] = useState<string | null>(null);
 
   useEffect(() => {
     loadScheduledBroadcasts();
@@ -165,44 +195,40 @@ export default function ScheduledBroadcasts() {
   const loadCountries = async () => {
     setIsLoadingCountries(true);
     try {
-      // Page through everyone - a single select stops at 1,000 rows, which
-      // left countries (and counts) missing from this list.
-      const data: Array<{ country: string }> = [];
-      const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
-        const { data: page, error } = await supabase
-          .from('profiles')
-          .select('country')
-          .not('country', 'is', null)
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        data.push(...((page || []) as Array<{ country: string }>));
-        if (!page || page.length < PAGE) break;
-      }
-
-      const countryMap = new Map<string, number>();
-      data.forEach((profile) => {
-        const count = countryMap.get(profile.country) || 0;
-        countryMap.set(profile.country, count + 1);
-      });
-
-      const countryList: Country[] = Array.from(countryMap.entries())
-        .map(([code, userCount]) => ({
-          code,
-          name: getCountryName(code),
-          userCount,
-        }))
-        .sort((a, b) => b.userCount - a.userCount);
-
-      setCountries(countryList);
+      // Counted on the server - this used to download every profile.
+      const { data, error } = await callRpc<Array<{ country: string; users: number }>>('admin_country_counts');
+      if (error) throw error;
+      setCountries((data || []).map(({ country, users }) => ({
+        code: country,
+        name: getCountryName(country),
+        userCount: users,
+      })));
     } catch (error) {
       console.error('Error loading countries:', error);
     } finally {
       setIsLoadingCountries(false);
     }
   };
+
+  // Live "who gets this" count while the form is open.
+  useEffect(() => {
+    if (!showDialog) return;
+    let cancelled = false;
+    setPreview(undefined);
+    const timer = setTimeout(async () => {
+      const { data, error } = await callRpc<AudiencePreview[]>('preview_schedule_audience', {
+        p_channel: channel,
+        p_audience: audience,
+        p_recipient_emails: parseEmails(recipientEmails),
+        p_target_countries: selectedCountries,
+      });
+      if (!cancelled) setPreview(error || !data?.[0] ? null : data[0]);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [showDialog, channel, audience, recipientEmails, selectedCountries]);
 
   const loadScheduledBroadcasts = async () => {
     setIsLoading(true);
@@ -242,6 +268,8 @@ export default function ScheduledBroadcasts() {
     setIntervalUnit('hours');
     setAudience('all');
     setRecipientEmails('');
+    setStartsAt('');
+    setEndsAt('');
     setShowDialog(true);
   };
 
@@ -262,7 +290,40 @@ export default function ScheduledBroadcasts() {
     setIntervalValue(String(inHours ? minutes / 60 : minutes));
     setAudience(broadcast.audience || 'all');
     setRecipientEmails((broadcast.recipient_emails || []).join('\n'));
+    setStartsAt(toLocalInput(broadcast.starts_at));
+    setEndsAt(toLocalInput(broadcast.ends_at));
     setShowDialog(true);
+  };
+
+  // Same settings as a new, paused schedule.
+  const duplicateBroadcast = (broadcast: ScheduledBroadcast) => {
+    openEditDialog(broadcast);
+    setEditingBroadcast(null);
+    setTitle(`${broadcast.title} (copy)`);
+    setIsActive(false);
+    setStartsAt('');
+    setEndsAt('');
+  };
+
+  const sendNow = async (broadcast: ScheduledBroadcast) => {
+    if (!confirm(`Send "${broadcast.title}" now to everyone this schedule targets?`)) return;
+    setSendingNowId(broadcast.id);
+    try {
+      const { data, error } = await callRpc<number>('send_schedule_now', { p_schedule_id: broadcast.id });
+      if (error) throw error;
+      toast({
+        title: 'Sent',
+        description: data
+          ? `On its way to ${data} ${data === 1 ? 'person' : 'people'}.`
+          : 'Nobody matches this schedule right now.',
+      });
+      loadScheduledBroadcasts();
+    } catch (error) {
+      console.error('Error sending schedule now:', error);
+      toast({ title: 'Error', description: 'Failed to send now', variant: 'destructive' });
+    } finally {
+      setSendingNowId(null);
+    }
   };
 
   const updateSendTime = (index: number, value: string) =>
@@ -291,9 +352,11 @@ export default function ScheduledBroadcasts() {
     if (!user) return;
 
     const fail = (description: string) => toast({ title: 'Error', description, variant: 'destructive' });
-    const emails = Array.from(new Set(
-      recipientEmails.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean),
-    ));
+    const emails = parseEmails(recipientEmails);
+    const startsIso = fromLocalInput(startsAt);
+    const endsIso = fromLocalInput(endsAt);
+    if (endsIso && new Date(endsIso) <= new Date()) return fail('The end time has already passed.');
+    if (startsIso && endsIso && new Date(endsIso) <= new Date(startsIso)) return fail('The end must be after the start.');
     const isInterval = repeatType === 'interval';
     const intervalMinutes = Number(intervalValue) * (intervalUnit === 'hours' ? 60 : 1);
     const times = Array.from(new Set(sendTimes.filter((t) => TIME_RE.test(t)))).sort();
@@ -317,8 +380,8 @@ export default function ScheduledBroadcasts() {
     }
 
     const nextSendAt = isInterval
-      ? new Date(Date.now() + intervalMinutes * 60_000)
-      : nextLocalSend(repeatType, days, nDays, times, editingBroadcast?.created_at) || new Date();
+      ? new Date(Math.max(Date.now(), startsIso ? Date.parse(startsIso) : 0))
+      : nextLocalSend(repeatType, days, nDays, times, editingBroadcast?.created_at, startsIso) || new Date();
 
     const broadcastData = {
       channel,
@@ -333,6 +396,8 @@ export default function ScheduledBroadcasts() {
       time_to_send: isInterval ? editingBroadcast?.time_to_send || '00:00' : times[0],
       is_active: isActive,
       interval_minutes: isInterval ? intervalMinutes : null,
+      starts_at: startsIso,
+      ends_at: endsIso,
       audience,
       recipient_emails: emails.length > 0 ? emails : null,
       next_send_at: nextSendAt.toISOString(),
@@ -474,7 +539,7 @@ export default function ScheduledBroadcasts() {
             <div>
               <CardTitle>Scheduled Broadcasts</CardTitle>
               <CardDescription>
-                Create and manage recurring push notifications
+                Recurring push notifications and emails, sent at each person's local time
               </CardDescription>
             </div>
             <Button onClick={openCreateDialog} className="bg-purple-600 hover:bg-purple-700">
@@ -599,6 +664,7 @@ export default function ScheduledBroadcasts() {
                           broadcast.every_n_days || 2,
                           scheduleTimes(broadcast),
                           broadcast.created_at,
+                          broadcast.starts_at,
                         );
                         return next ? (
                           <p>
@@ -611,6 +677,15 @@ export default function ScheduledBroadcasts() {
                       <p>
                         Last sent: {broadcast.last_sent_at ? new Date(broadcast.last_sent_at).toLocaleString() : 'Never'}
                       </p>
+                      {broadcast.starts_at && new Date(broadcast.starts_at) > new Date() && (
+                        <p>Starts: {new Date(broadcast.starts_at).toLocaleString()}</p>
+                      )}
+                      {broadcast.ends_at && (
+                        <p>
+                          {new Date(broadcast.ends_at) > new Date() ? 'Ends' : 'Ended'}:{' '}
+                          {new Date(broadcast.ends_at).toLocaleString()}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1">
@@ -631,6 +706,29 @@ export default function ScheduledBroadcasts() {
                         title="Edit"
                       >
                         <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => sendNow(broadcast)}
+                        disabled={sendingNowId === broadcast.id}
+                        className="h-7 w-7"
+                        title="Send now"
+                      >
+                        {sendingNowId === broadcast.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => duplicateBroadcast(broadcast)}
+                        className="h-7 w-7"
+                        title="Duplicate"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
                       </Button>
                       <Button
                         variant="outline"
@@ -932,6 +1030,57 @@ export default function ScheduledBroadcasts() {
                   : "New users who sign up in these countries after this schedule is created are automatically included on every future send."}
               </p>
             </div>
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="starts-at">Start (optional)</Label>
+                  <Input
+                    id="starts-at"
+                    type="datetime-local"
+                    value={startsAt}
+                    onChange={(e) => setStartsAt(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ends-at">End (optional)</Label>
+                  <Input
+                    id="ends-at"
+                    type="datetime-local"
+                    value={endsAt}
+                    min={startsAt || undefined}
+                    onChange={(e) => setEndsAt(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                Nothing goes out before the start, and the schedule turns itself off at the end. These are in your
+                time zone.
+              </p>
+            </div>
+
+            {preview !== null && (
+              <div className="p-3 rounded-md border bg-gray-50 text-xs text-gray-700">
+                <p className="font-medium mb-0.5">Who gets this</p>
+                {preview === undefined ? (
+                  <p className="text-gray-500">Counting...</p>
+                ) : preview.matched === 0 ? (
+                  <p>Nobody matches these settings right now.</p>
+                ) : (
+                  <p>
+                    {preview.matched} {preview.matched === 1 ? 'person matches' : 'people match'} right now:{' '}
+                    {channel === 'email'
+                      ? `${preview.by_email} by email`
+                      : `${preview.by_push} by push, ${preview.by_email} by email instead`}
+                    {preview.unreachable > 0 &&
+                      `, ${preview.unreachable} can't be reached${
+                        channel === 'push' && recipientEmails.trim() ? ' (in-app inbox only)' : ''
+                      }`}
+                    .
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-3 border rounded-md">
               <div>
