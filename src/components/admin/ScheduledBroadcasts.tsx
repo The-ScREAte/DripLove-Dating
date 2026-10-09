@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail, X, Send, Copy } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Calendar, Clock, Play, Pause, ChevronDown, Bell, Mail, X, Send, Copy, FlaskConical } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -83,6 +83,25 @@ const WINDOWS: Array<[string, string, string]> = [
 ];
 const windowOrder = (windows: string[]) => WINDOWS.map(([w]) => w).filter((w) => windows.includes(w));
 const windowLabel = (w: string) => WINDOWS.find(([key]) => key === w)?.[1] ?? w;
+
+// Smallest pool per group that lets members go 14 days without a repeat at the
+// daily rotation's pace (about 10 a week active, 3 a week away, 2 Premium a week).
+const POOL_MINIMUMS = { everyone: 18, free: 2, premium: 2, away: 6 };
+const TEST_EMAILS_KEY = 'driplove.admin.testEmails';
+const readTestEmails = () => {
+  try {
+    return localStorage.getItem(TEST_EMAILS_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+const saveTestEmails = (value: string) => {
+  try {
+    localStorage.setItem(TEST_EMAILS_KEY, value);
+  } catch {
+    // private mode - nothing to remember
+  }
+};
 const SUGGESTED_TIMES = ['09:00', '19:00', '13:00', '21:00', '07:00', '16:00'];
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -377,6 +396,41 @@ export default function ScheduledBroadcasts() {
     }
   };
 
+  // Sends the message to a few named accounts right away - for checking a new
+  // message on a test phone without reaching everyone.
+  const sendTest = async (broadcast: ScheduledBroadcast) => {
+    const input = window.prompt(
+      `Send "${broadcast.title}" as a test push to these accounts (emails, comma separated):`,
+      readTestEmails(),
+    );
+    if (input === null) return;
+    const emails = parseEmails(input);
+    if (emails.length === 0 || emails.length > 20) {
+      toast({ title: 'Error', description: 'Enter 1 to 20 email addresses.', variant: 'destructive' });
+      return;
+    }
+    saveTestEmails(emails.join(', '));
+    setSendingNowId(broadcast.id);
+    try {
+      const { data, error } = await callRpc<number>('send_schedule_test', {
+        p_schedule_id: broadcast.id,
+        p_emails: emails,
+      });
+      if (error) throw error;
+      toast({
+        title: data ? 'Test sent' : 'No matching accounts',
+        description: data
+          ? `On its way to ${data} ${data === 1 ? 'account' : 'accounts'} within a minute.`
+          : 'None of those emails belongs to a DripLove account.',
+      });
+    } catch (error) {
+      console.error('Error sending test:', error);
+      toast({ title: 'Error', description: 'Failed to send the test', variant: 'destructive' });
+    } finally {
+      setSendingNowId(null);
+    }
+  };
+
   const updateSendTime = (index: number, value: string) =>
     setSendTimes((prev) => prev.map((t, i) => (i === index ? value : t)));
 
@@ -518,8 +572,12 @@ export default function ScheduledBroadcasts() {
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: `Broadcast ${!broadcast.is_active ? 'activated' : 'deactivated'}`,
+        title: broadcast.is_active ? 'Paused' : 'Active',
+        description: broadcast.is_active
+          ? 'Nothing more goes out for it; anything waiting to send was cancelled.'
+          : broadcast.repeat_type === 'rotation'
+            ? "Back in the rotation from members' next daily plan."
+            : 'It will send at its next scheduled time.',
       });
 
       loadScheduledBroadcasts();
@@ -533,8 +591,13 @@ export default function ScheduledBroadcasts() {
     }
   };
 
-  const deleteBroadcast = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this scheduled broadcast?')) return;
+  const deleteBroadcast = async (broadcast: ScheduledBroadcast) => {
+    const confirmText =
+      broadcast.repeat_type === 'rotation'
+        ? `Delete "${broadcast.title}"? Anything of it still waiting to send today is cancelled. You can add it again any time - people who had it in the last 14 days won't get it again until then.`
+        : `Delete "${broadcast.title}"? Anything of it still waiting to send is cancelled.`;
+    if (!confirm(confirmText)) return;
+    const id = broadcast.id;
 
     try {
       const { error } = await supabase
@@ -545,8 +608,8 @@ export default function ScheduledBroadcasts() {
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: 'Scheduled broadcast deleted',
+        title: 'Deleted',
+        description: `"${broadcast.title}" was removed.`,
       });
 
       loadScheduledBroadcasts();
@@ -624,6 +687,44 @@ export default function ScheduledBroadcasts() {
           ) : scheduledBroadcasts.length === 0 ? (
             <p className="text-center text-gray-500 py-8">No scheduled broadcasts yet</p>
           ) : (
+            <>
+            {(() => {
+              const pool = scheduledBroadcasts.filter(
+                (b) => b.is_active && b.repeat_type === 'rotation' && b.channel !== 'email',
+              );
+              if (pool.length === 0) return null;
+              const groups = {
+                everyone: pool.filter((b) => (b.audience || 'all') === 'all' && b.activity !== 'inactive').length,
+                free: pool.filter((b) => b.audience === 'free').length,
+                premium: pool.filter((b) => b.audience === 'premium').length,
+                away: pool.filter((b) => b.activity === 'inactive').length,
+              };
+              const short = (Object.keys(POOL_MINIMUMS) as Array<keyof typeof POOL_MINIMUMS>).filter(
+                (k) => groups[k] < POOL_MINIMUMS[k],
+              );
+              return (
+                <div className="mb-3 rounded-md border border-purple-100 bg-purple-50/50 p-3 text-xs text-gray-700">
+                  <p className="font-medium text-gray-800">
+                    Daily rotation: {pool.length} active {pool.length === 1 ? 'message' : 'messages'}
+                  </p>
+                  <p className="mt-0.5">
+                    Everyone {groups.everyone} · Free users {groups.free} · Premium {groups.premium} · Away 3+ days{' '}
+                    {groups.away}
+                  </p>
+                  <p className="mt-0.5 text-gray-500">
+                    Each member gets Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 at random times, never the same message
+                    twice in 14 days. New and re-activated messages join from members' next daily plan.
+                  </p>
+                  {short.length > 0 && (
+                    <p className="mt-1 text-amber-700">
+                      Add more {short.map((k) => (k === 'away' ? 'away 3+ days' : k)).join(', ')} messages - with fewer
+                      than {short.map((k) => POOL_MINIMUMS[k]).join(' / ')}, some members will run out of new ones and
+                      get fewer pushes.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <ScrollArea className="h-[500px] pr-4">
               <div className="space-y-3">
                 {scheduledBroadcasts.map((broadcast) => (
@@ -815,20 +916,34 @@ export default function ScheduledBroadcasts() {
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => sendNow(broadcast)}
-                        disabled={sendingNowId === broadcast.id}
-                        className="h-7 w-7"
-                        title="Send now"
-                      >
-                        {sendingNowId === broadcast.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
+                      {broadcast.channel !== 'email' && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => sendTest(broadcast)}
+                          disabled={sendingNowId === broadcast.id}
+                          className="h-7 w-7"
+                          title="Send a test to chosen accounts"
+                        >
+                          {sendingNowId === broadcast.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <FlaskConical className="w-3.5 h-3.5" />
+                          )}
+                        </Button>
+                      )}
+                      {broadcast.repeat_type !== 'rotation' && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => sendNow(broadcast)}
+                          disabled={sendingNowId === broadcast.id}
+                          className="h-7 w-7"
+                          title="Send now to everyone it targets"
+                        >
                           <Send className="w-3.5 h-3.5" />
-                        )}
-                      </Button>
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="icon"
@@ -841,7 +956,7 @@ export default function ScheduledBroadcasts() {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => deleteBroadcast(broadcast.id)}
+                        onClick={() => deleteBroadcast(broadcast)}
                         className="h-7 w-7 text-red-600 hover:text-red-700"
                         title="Delete"
                       >
@@ -852,6 +967,7 @@ export default function ScheduledBroadcasts() {
                 ))}
               </div>
             </ScrollArea>
+            </>
           )}
         </CardContent>
       </Card>
@@ -957,7 +1073,9 @@ export default function ScheduledBroadcasts() {
                 <p className="text-xs text-gray-600">
                   Each member gets a plan for their day: Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 pushes (away 3+ days:
                   Wed, Fri, Sun; away a week or more: Fridays), at random times at least 4.5 hours apart. This message
-                  is picked when it fits, and nobody gets the same message twice in 14 days.
+                  is picked when it fits, and nobody gets the same message twice in 14 days. Text edits reach
+                  today's waiting pushes right away; other changes apply from members' next daily plan. Use the test
+                  button on the list to try it on your own phone first.
                 </p>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Time of day (empty = any window)</Label>
