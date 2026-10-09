@@ -713,7 +713,8 @@ export default function ScheduledBroadcasts() {
                   </p>
                   <p className="mt-0.5 text-gray-500">
                     Each member gets Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 at random times, never the same message
-                    twice in 14 days. New and re-activated messages join from members' next daily plan.
+                    twice in 14 days. About 1 day in 3 (not Tue/Thu) one of them comes as a pair a few minutes apart.
+                    New and re-activated messages join from members' next daily plan.
                   </p>
                   {short.length > 0 && (
                     <p className="mt-1 text-amber-700">
@@ -1072,7 +1073,8 @@ export default function ScheduledBroadcasts() {
               <div className="space-y-3 rounded-md border border-purple-100 bg-purple-50/40 p-3">
                 <p className="text-xs text-gray-600">
                   Each member gets a plan for their day: Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 pushes (away 3+ days:
-                  Wed, Fri, Sun; away a week or more: Fridays), at random times at least 4.5 hours apart. This message
+                  Wed, Fri, Sun; away a week or more: Fridays), at random times at least 4.5 hours apart - and about 1
+                  day in 3, one of them is followed by a second message 3-8 minutes later. This message
                   is picked when it fits, and nobody gets the same message twice in 14 days. Text edits reach
                   today's waiting pushes right away; other changes apply from members' next daily plan. Use the test
                   button on the list to try it on your own phone first.
