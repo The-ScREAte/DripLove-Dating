@@ -85,8 +85,8 @@ const windowOrder = (windows: string[]) => WINDOWS.map(([w]) => w).filter((w) =>
 const windowLabel = (w: string) => WINDOWS.find(([key]) => key === w)?.[1] ?? w;
 
 // Smallest pool per group that lets members go 14 days without a repeat at the
-// daily rotation's pace (about 10 a week active, 3 a week away, 2 Premium a week).
-const POOL_MINIMUMS = { everyone: 18, free: 2, premium: 2, away: 6 };
+// daily rotation's pace (2 a day; away members also get general messages).
+const POOL_MINIMUMS = { everyone: 28, free: 2, premium: 2, away: 6 };
 const TEST_EMAILS_KEY = 'driplove.admin.testEmails';
 const readTestEmails = () => {
   try {
@@ -712,9 +712,10 @@ export default function ScheduledBroadcasts() {
                     {groups.away}
                   </p>
                   <p className="mt-0.5 text-gray-500">
-                    Each member gets Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 at random times, never the same message
-                    twice in 14 days. About 1 day in 3 (not Tue/Thu) one of them comes as a pair a few minutes apart.
-                    New and re-activated messages join from members' next daily plan.
+                    Every member with the app gets 2 pushes a day at random times, whether or not they use the app -
+                    if they're in the app right then, it waits a little (at most twice) and then goes out. About 1 day
+                    in 3 (not Tue/Thu) active members also get a quick follow-up a few minutes later. No repeats within
+                    14 days while there are new messages. New and re-activated messages join from the next daily plan.
                   </p>
                   {short.length > 0 && (
                     <p className="mt-1 text-amber-700">
@@ -807,7 +808,7 @@ export default function ScheduledBroadcasts() {
                         </Badge>
                       )}
                       {broadcast.smart_quiet && (
-                        <Badge variant="outline" className="text-xs bg-violet-50" title="Follows the shared notification budget (at most 3 a day, 2 on Mon/Tue/Thu; none within 4 hours of app use or a like, match or message; rotation pushes move later instead)">
+                        <Badge variant="outline" className="text-xs bg-violet-50" title="Daily pushes wait briefly if the member is in the app, then go out; extras follow the daily budget (3 a day Mon-Thu, 4 Fri-Sun)">
                           Smart quiet
                         </Badge>
                       )}
@@ -1072,9 +1073,8 @@ export default function ScheduledBroadcasts() {
             {repeatType === 'rotation' && (
               <div className="space-y-3 rounded-md border border-purple-100 bg-purple-50/40 p-3">
                 <p className="text-xs text-gray-600">
-                  Each member gets a plan for their day: Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 pushes (away 3+ days:
-                  Wed, Fri, Sun; away a week or more: Fridays), at random times at least 4.5 hours apart - and about 1
-                  day in 3, one of them is followed by a second message 3-8 minutes later. This message
+                  Every member with the app gets 2 pushes a day, at random times at least 4h40m apart, active or not -
+                  and about 1 day in 3, one of them is followed by a second message 3-8 minutes later. This message
                   is picked when it fits, and nobody gets the same message twice in 14 days. Text edits reach
                   today's waiting pushes right away; other changes apply from members' next daily plan. Use the test
                   button on the list to try it on your own phone first.
@@ -1277,10 +1277,10 @@ export default function ScheduledBroadcasts() {
                   Smart quiet
                 </Label>
                 <p className="text-xs text-gray-500">
-                  Follows the shared notification budget, checked at the moment of sending: at most 3 pushes a day (2
-                  on Mon, Tue and Thu), 2 hours apart and 4.5 hours between general messages, 1 a week if they've been
-                  away a week, and none within 4 hours of opening the app or getting a like, match or message. In the
-                  daily rotation a held push moves to later that day (before 9pm) instead of being skipped.
+                  Checked at the moment of sending. Daily rotation pushes wait about 30 minutes if the member is in
+                  the app or just got a like, match or message (at most twice), then go out anyway - never 10pm-8am.
+                  Extras (follow-ups, other schedules) wait 4 hours after app use, stay within 3 pushes a day Mon-Thu
+                  and 4 Fri-Sun, and are moved later at most once.
                 </p>
               </div>
               <Switch id="smart-quiet" checked={smartQuiet} onCheckedChange={setSmartQuiet} />
