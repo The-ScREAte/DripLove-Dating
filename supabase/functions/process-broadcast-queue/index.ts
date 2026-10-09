@@ -274,16 +274,16 @@ async function runQueue(supabase: SupabaseClient, requestedCampaignId: string | 
     });
     if (releaseError) console.warn('Failed to release stale recipients:', releaseError);
 
-    let campaignsQuery = supabase
-      .from('broadcast_campaigns')
-      .select('id, title, message, notification_type, status, admin_id, scheduled_broadcast_id, email_fallback')
-      .in('status', ['queued', 'processing'])
-      .order('created_at', { ascending: true });
-    campaignsQuery = requestedCampaignId
-      ? campaignsQuery.eq('id', requestedCampaignId)
-      : campaignsQuery.limit(5);
-
-    const { data: campaigns, error: campaignError } = await campaignsQuery;
+    // Campaigns with someone due right now. The daily push plan keeps many
+    // campaigns open all day with people due at different times, so taking
+    // the oldest few open ones would leave the rest waiting.
+    const { data: campaigns, error: campaignError } = requestedCampaignId
+      ? await supabase
+        .from('broadcast_campaigns')
+        .select('id, title, message, notification_type, status, admin_id, scheduled_broadcast_id, email_fallback')
+        .in('status', ['queued', 'processing'])
+        .eq('id', requestedCampaignId)
+      : await supabase.rpc('due_broadcast_campaigns', { p_limit: 10, p_max_retries: MAX_RETRIES });
     if (campaignError) throw campaignError;
 
     for (const campaign of (campaigns ?? []) as Campaign[]) {

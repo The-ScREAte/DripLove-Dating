@@ -35,7 +35,8 @@ interface ScheduledBroadcast {
   title: string;
   message: string;
   target_countries: string[];
-  repeat_type: 'daily' | 'every_2_days' | 'every_n_days' | 'weekends' | 'weekdays' | 'specific_day' | 'interval';
+  repeat_type: 'daily' | 'every_2_days' | 'every_n_days' | 'weekends' | 'weekdays' | 'specific_day' | 'interval' | 'rotation';
+  rotation_windows?: string[] | null; // daily rotation: allowed windows (empty = any)
   every_n_days?: number | null;
   specific_days?: string[] | null;
   send_times?: string[] | null; // HH:MM, each person's local time
@@ -72,6 +73,16 @@ const WEEK: Array<[string, string]> = [
   ['friday', 'Fri'], ['saturday', 'Sat'], ['sunday', 'Sun'],
 ];
 const MAX_SEND_TIMES = 6;
+// Daily rotation windows, each member's local time (plan_daily_pushes).
+const WINDOWS: Array<[string, string, string]> = [
+  ['morning', 'Morning', '8-10am'],
+  ['midday', 'Midday', '11am-1pm'],
+  ['afternoon', 'Afternoon', '2-4pm'],
+  ['early_evening', 'Early evening', '5-7pm'],
+  ['evening', 'Evening', '7-9pm'],
+];
+const windowOrder = (windows: string[]) => WINDOWS.map(([w]) => w).filter((w) => windows.includes(w));
+const windowLabel = (w: string) => WINDOWS.find(([key]) => key === w)?.[1] ?? w;
 const SUGGESTED_TIMES = ['09:00', '19:00', '13:00', '21:00', '07:00', '16:00'];
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -202,6 +213,7 @@ export default function ScheduledBroadcasts() {
   const [sendWindow, setSendWindow] = useState('0');
   const [activity, setActivity] = useState<Activity>('any');
   const [smartQuiet, setSmartQuiet] = useState(true);
+  const [rotationWindows, setRotationWindows] = useState<string[]>([]);
   const [saveToInbox, setSaveToInbox] = useState(false);
   const [emailFallback, setEmailFallback] = useState(false);
   const [includeNewMembers, setIncludeNewMembers] = useState(true);
@@ -282,9 +294,10 @@ export default function ScheduledBroadcasts() {
     setTitle('');
     setMessage('');
     setSelectedCountries([]);
-    setRepeatType('daily');
+    setRepeatType('rotation');
     setEveryNDays('2');
-    setSpecificDays(['monday']);
+    setSpecificDays([]);
+    setRotationWindows([]);
     setSendTimes(['09:00']);
     setIsActive(true);
     setIntervalValue('4');
@@ -310,7 +323,10 @@ export default function ScheduledBroadcasts() {
     setSelectedCountries(broadcast.target_countries || []);
     setRepeatType(broadcast.repeat_type === 'every_2_days' ? 'every_n_days' : broadcast.repeat_type);
     setEveryNDays(String(broadcast.every_n_days || 2));
-    setSpecificDays(scheduleDays(broadcast).length > 0 ? scheduleDays(broadcast) : ['monday']);
+    setSpecificDays(
+      broadcast.repeat_type === 'rotation' || scheduleDays(broadcast).length > 0 ? scheduleDays(broadcast) : ['monday'],
+    );
+    setRotationWindows(broadcast.rotation_windows || []);
     setSendTimes(broadcast.repeat_type === 'interval' ? ['09:00'] : scheduleTimes(broadcast));
     setIsActive(broadcast.is_active);
     const minutes = broadcast.interval_minutes || 240;
@@ -372,6 +388,9 @@ export default function ScheduledBroadcasts() {
   const toggleDay = (day: string) =>
     setSpecificDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
 
+  const toggleWindow = (window: string) =>
+    setRotationWindows((prev) => (prev.includes(window) ? prev.filter((w) => w !== window) : [...prev, window]));
+
   const handleSave = async () => {
     const bodyIsEmpty = channel === 'email' ? !htmlToPlainText(message) : !message.trim();
     if (!title.trim() || bodyIsEmpty) {
@@ -393,6 +412,7 @@ export default function ScheduledBroadcasts() {
     if (endsIso && new Date(endsIso) <= new Date()) return fail('The end time has already passed.');
     if (startsIso && endsIso && new Date(endsIso) <= new Date(startsIso)) return fail('The end must be after the start.');
     const isInterval = repeatType === 'interval';
+    const isRotation = repeatType === 'rotation';
     const intervalMinutes = Number(intervalValue) * (intervalUnit === 'hours' ? 60 : 1);
     const times = Array.from(new Set(sendTimes.filter((t) => TIME_RE.test(t)))).sort();
     const days = weekOrder(specificDays);
@@ -406,6 +426,8 @@ export default function ScheduledBroadcasts() {
       if (intervalMinutes < 60 && (emails.length < 1 || emails.length > 50)) {
         return fail('Minute intervals need 1 to 50 account emails under "Only these accounts".');
       }
+    } else if (isRotation) {
+      if (channel !== 'push') return fail('The daily rotation is for push notifications.');
     } else {
       if (times.length === 0) return fail('Add at least one send time.');
       if (repeatType === 'every_n_days' && (!Number.isInteger(nDays) || nDays < 2 || nDays > 30)) {
@@ -414,9 +436,11 @@ export default function ScheduledBroadcasts() {
       if (repeatType === 'specific_day' && days.length === 0) return fail('Pick at least one day.');
     }
 
-    const nextSendAt = isInterval
-      ? new Date(Math.max(Date.now(), startsIso ? Date.parse(startsIso) : 0))
-      : nextLocalSend(repeatType, days, nDays, times, editingBroadcast?.created_at, startsIso) || new Date();
+    const nextSendAt = isRotation
+      ? null
+      : isInterval
+        ? new Date(Math.max(Date.now(), startsIso ? Date.parse(startsIso) : 0))
+        : nextLocalSend(repeatType, days, nDays, times, editingBroadcast?.created_at, startsIso) || new Date();
 
     const broadcastData = {
       channel,
@@ -425,15 +449,16 @@ export default function ScheduledBroadcasts() {
       target_countries: selectedCountries.length > 0 ? selectedCountries : null,
       repeat_type: repeatType,
       every_n_days: repeatType === 'every_n_days' ? nDays : null,
-      specific_days: repeatType === 'specific_day' ? days : null,
+      specific_days: repeatType === 'specific_day' || (isRotation && days.length > 0) ? days : null,
       specific_day: repeatType === 'specific_day' ? days[0] : null,
-      send_times: isInterval ? null : times,
-      time_to_send: isInterval ? editingBroadcast?.time_to_send || '00:00' : times[0],
+      rotation_windows: isRotation && rotationWindows.length > 0 ? windowOrder(rotationWindows) : null,
+      send_times: isInterval || isRotation ? null : times,
+      time_to_send: isInterval || isRotation ? editingBroadcast?.time_to_send || '09:00' : times[0],
       is_active: isActive,
       interval_minutes: isInterval ? intervalMinutes : null,
       starts_at: startsIso,
       ends_at: endsIso,
-      send_window_minutes: isInterval ? 0 : Number(sendWindow),
+      send_window_minutes: isInterval || isRotation ? 0 : Number(sendWindow),
       activity,
       smart_quiet: smartQuiet,
       save_to_inbox: channel === 'push' && saveToInbox,
@@ -441,7 +466,7 @@ export default function ScheduledBroadcasts() {
       include_new_members: includeNewMembers,
       audience,
       recipient_emails: emails.length > 0 ? emails : null,
-      next_send_at: nextSendAt.toISOString(),
+      next_send_at: nextSendAt ? nextSendAt.toISOString() : null,
       admin_id: user.id,
     };
 
@@ -551,6 +576,12 @@ export default function ScheduledBroadcasts() {
         return `Every ${weekOrder(scheduleDays(broadcast)).map((d) => WEEK.find(([w]) => w === d)?.[1]).join(', ')}`;
       case 'interval':
         return `Every ${formatInterval(broadcast.interval_minutes || 0)}`;
+      case 'rotation': {
+        const days = weekOrder(scheduleDays(broadcast));
+        return days.length > 0
+          ? `Daily rotation, ${days.map((d) => WEEK.find(([w]) => w === d)?.[1]).join(', ')} only`
+          : 'Daily rotation';
+      }
       default:
         return broadcast.repeat_type;
     }
@@ -636,7 +667,18 @@ export default function ScheduledBroadcasts() {
                         <Calendar className="w-3.5 h-3.5" />
                         <span>{getRepeatLabel(broadcast)}</span>
                       </div>
-                      {broadcast.repeat_type !== 'interval' ? (
+                      {broadcast.repeat_type === 'rotation' ? (
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>
+                            Random time,{' '}
+                            {broadcast.rotation_windows && broadcast.rotation_windows.length > 0
+                              ? windowOrder(broadcast.rotation_windows).map(windowLabel).join(', ').toLowerCase()
+                              : 'any window 8am-9pm'}{' '}
+                            their local time
+                          </span>
+                        </div>
+                      ) : broadcast.repeat_type !== 'interval' ? (
                         <div className="flex items-center gap-1">
                           <Clock className="w-3.5 h-3.5" />
                           <span>
@@ -663,7 +705,7 @@ export default function ScheduledBroadcasts() {
                         </Badge>
                       )}
                       {broadcast.smart_quiet && (
-                        <Badge variant="outline" className="text-xs bg-violet-50" title="Follows the shared notification budget (about 2 a day, quiet Tue/Thu, none right after app use or a like, match or message)">
+                        <Badge variant="outline" className="text-xs bg-violet-50" title="Follows the shared notification budget (at most 3 a day, 2 on Mon/Tue/Thu; none within 4 hours of app use or a like, match or message; rotation pushes move later instead)">
                           Smart quiet
                         </Badge>
                       )}
@@ -723,7 +765,7 @@ export default function ScheduledBroadcasts() {
                           {broadcast.next_send_at ? new Date(broadcast.next_send_at).toLocaleTimeString() : 'within a minute'}
                         </p>
                       )}
-                      {broadcast.is_active && broadcast.repeat_type !== 'interval' && (() => {
+                      {broadcast.is_active && broadcast.repeat_type !== 'interval' && broadcast.repeat_type !== 'rotation' && (() => {
                         const next = nextLocalSend(
                           broadcast.repeat_type,
                           scheduleDays(broadcast),
@@ -884,6 +926,7 @@ export default function ScheduledBroadcasts() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="rotation">Daily rotation (random time, recommended)</SelectItem>
                   <SelectItem value="daily">Every day</SelectItem>
                   <SelectItem value="every_n_days">Every few days</SelectItem>
                   <SelectItem value="weekdays">Weekdays (Mon-Fri)</SelectItem>
@@ -906,6 +949,60 @@ export default function ScheduledBroadcasts() {
                   onChange={(e) => setEveryNDays(e.target.value)}
                   className="w-28"
                 />
+              </div>
+            )}
+
+            {repeatType === 'rotation' && (
+              <div className="space-y-3 rounded-md border border-purple-100 bg-purple-50/40 p-3">
+                <p className="text-xs text-gray-600">
+                  Each member gets a plan for their day: Mon 1, Tue 1, Wed 1-2, Thu 1, Fri-Sun 2 pushes (away 3+ days:
+                  Wed, Fri, Sun; away a week or more: Fridays), at random times at least 4.5 hours apart. This message
+                  is picked when it fits, and nobody gets the same message twice in 14 days.
+                </p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Time of day (empty = any window)</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WINDOWS.map(([key, label, hours]) => {
+                      const selected = rotationWindows.includes(key);
+                      return (
+                        <Button
+                          key={key}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleWindow(key)}
+                          className={`h-8 px-3 text-xs ${
+                            selected ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700 hover:text-white' : ''
+                          }`}
+                        >
+                          {label} <span className="ml-1 opacity-70">{hours}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Only on these days (empty = any day)</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEK.map(([day, label]) => {
+                      const selected = specificDays.includes(day);
+                      return (
+                        <Button
+                          key={day}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleDay(day)}
+                          className={`h-8 px-3 text-xs ${
+                            selected ? 'bg-purple-600 text-white border-purple-600 hover:bg-purple-700 hover:text-white' : ''
+                          }`}
+                        >
+                          {label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -934,7 +1031,7 @@ export default function ScheduledBroadcasts() {
               </div>
             )}
 
-            {repeatType === 'interval' ? (
+            {repeatType === 'rotation' ? null : repeatType === 'interval' ? (
               <div className="space-y-2">
                 <Label htmlFor="interval">Send every *</Label>
                 <div className="flex items-center gap-2">
@@ -1060,9 +1157,10 @@ export default function ScheduledBroadcasts() {
                   Smart quiet
                 </Label>
                 <p className="text-xs text-gray-500">
-                  Follows the shared notification budget, checked at the moment of sending: about 2 a day, 4 hours
-                  apart (1 if they've used the app today, 1 a week if they've been away a week), none on Tuesdays and
-                  Thursdays, and none within 4 hours of opening the app or getting a like, match or message.
+                  Follows the shared notification budget, checked at the moment of sending: at most 3 pushes a day (2
+                  on Mon, Tue and Thu), 2 hours apart and 4.5 hours between general messages, 1 a week if they've been
+                  away a week, and none within 4 hours of opening the app or getting a like, match or message. In the
+                  daily rotation a held push moves to later that day (before 9pm) instead of being skipped.
                 </p>
               </div>
               <Switch id="smart-quiet" checked={smartQuiet} onCheckedChange={setSmartQuiet} />
