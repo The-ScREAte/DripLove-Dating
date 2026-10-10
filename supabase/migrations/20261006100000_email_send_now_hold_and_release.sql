@@ -251,20 +251,12 @@ begin
 end;
 $$;
 
--- 3. Bounce mailbox reading: where each mailbox was read up to ----------------------
-
-create table if not exists public.email_bounce_scan_state (
-  account_email text primary key,
-  uid_validity text,
-  last_uid bigint not null default 0,
-  last_scan_at timestamptz,
-  last_error text
-);
-alter table public.email_bounce_scan_state enable row level security;
-drop policy if exists "Admins can view bounce scan state" on public.email_bounce_scan_state;
-create policy "Admins can view bounce scan state"
-  on public.email_bounce_scan_state for select
-  using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_admin = true));
+-- NOT APPLIED YET (declined 2026-10-10). Trimmed on 2026-10-10 to what is
+-- safe to apply on top of the current system. Left out of the original
+-- draft: the bounce-mailbox reader (its process-email-bounces function was
+-- never deployed), an older copy of prepare_scheduled_broadcast (superseded by
+-- 20261009150000_daily_push_rhythm.sql) and running process-scheduled-broadcasts
+-- every 5 minutes (it stays every 15).
 
 -- 4. New email -> start sending now -------------------------------------------------
 
@@ -287,77 +279,7 @@ create trigger email_send_queue_start_on_insert
   referencing new table as new_rows
   for each statement execute function public.email_send_queue_start_on_insert();
 
--- 5. Scheduled broadcasts: only unsubscribes leave people out (addresses on
---    hold get theirs held and delivered once released) ---------------------------
-
-create or replace function public.prepare_scheduled_broadcast(
-  p_schedule_id uuid,
-  p_ahead interval default '2 hours',
-  p_grace interval default '30 minutes'
-)
-returns table (user_id uuid, email text, local_date date, send_at timestamptz)
-language plpgsql security definer set search_path = '' as $$
-#variable_conflict use_column
-declare
-  s record;
-  v_time time;
-begin
-  select * into s from public.scheduled_broadcasts b where b.id = p_schedule_id and b.is_active;
-  if not found then return; end if;
-  begin
-    v_time := s.time_to_send::time;
-  exception when others then
-    return;
-  end;
-
-  return query
-  with candidates as (
-    select p.id as uid, lower(trim(p.email)) as addr,
-           public.user_timezone(p.timezone, p.country_code) as tz
-    from public.profiles p
-    where coalesce(p.account_status, 'active') = 'active'
-      and coalesce(p.is_admin, false) = false
-      and (s.target_countries is null or cardinality(s.target_countries) = 0 or p.country = any (s.target_countries))
-      and (
-        -- Reachable by email (email schedules; and push schedules for people
-        -- the push can't reach)...
-        (p.email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
-         and not exists (select 1 from public.email_suppression_list x
-                         where x.email = lower(trim(p.email)) and x.released_at is null
-                           and x.reason = 'unsubscribed'))
-        -- ...or, for push schedules, by push.
-        or (coalesce(s.channel, 'push') <> 'email'
-            and exists (select 1 from public.push_tokens t where t.user_id = p.id)
-            and coalesce(p.notification_permission, '') <> 'denied')
-      )
-  ),
-  slots as (
-    select c.uid, c.addr, d.day,
-           ((d.day + v_time) at time zone c.tz) as at
-    from candidates c
-    cross join lateral (
-      select ((now() at time zone c.tz)::date + k) as day from generate_series(-1, 1) k
-    ) d
-  ),
-  due as (
-    select sl.* from slots sl
-    where sl.at between now() - p_grace and now() + p_ahead
-      and public.schedule_runs_on(s.repeat_type, s.specific_day, (s.created_at at time zone 'UTC')::date, sl.day)
-  ),
-  ins as (
-    insert into public.scheduled_broadcast_deliveries (schedule_id, user_id, local_date, send_at)
-    select p_schedule_id, du.uid, du.day, du.at from due du
-    on conflict do nothing
-    returning scheduled_broadcast_deliveries.user_id as uid, scheduled_broadcast_deliveries.local_date as day,
-              scheduled_broadcast_deliveries.send_at as at
-  )
-  select i.uid, du.addr, i.day, i.at
-  from ins i join due du on du.uid = i.uid and du.day = i.day;
-end;
-$$;
-revoke all on function public.prepare_scheduled_broadcast(uuid, interval, interval) from public, anon, authenticated;
-
--- 6. Schedules ---------------------------------------------------------------------
+-- 5. Schedules ---------------------------------------------------------------------
 
 -- Queue: every minute (safety net; new emails start a run themselves), only
 -- when something is due - scheduled emails go out within the minute.
@@ -385,26 +307,6 @@ select cron.schedule(
   $cron$
 );
 
--- Scheduler: line scheduled broadcasts up every 5 minutes.
-select cron.unschedule('process-scheduled-broadcasts')
-where exists (select 1 from cron.job where jobname = 'process-scheduled-broadcasts');
-select cron.schedule(
-  'process-scheduled-broadcasts',
-  '*/5 * * * *',
-  $cron$
-  select net.http_post(
-    url := 'https://tgjsyyihabsovironesw.supabase.co/functions/v1/process-scheduled-broadcasts',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select value from public.internal_secrets where key = 'notification_cron_anon_key')
-    ),
-    body := '{}'::jsonb,
-    timeout_milliseconds := 60000
-  )
-  where exists (select 1 from public.scheduled_broadcasts);
-  $cron$
-);
-
 -- Health check: paused sending accounts and addresses on hold, every 5
 -- minutes, only when one is due.
 select cron.unschedule('email-sender-health-check')
@@ -428,30 +330,6 @@ select cron.schedule(
   ) or exists (
     select 1 from public.email_suppression_list
     where released_at is null and reason <> 'unsubscribed' and next_check_at <= now()
-  );
-  $cron$
-);
-
--- Bounces: read the sending mailboxes every 10 minutes while anything was
--- sent in the last 3 days.
-select cron.unschedule('process-email-bounces')
-where exists (select 1 from cron.job where jobname = 'process-email-bounces');
-select cron.schedule(
-  'process-email-bounces',
-  '*/10 * * * *',
-  $cron$
-  select net.http_post(
-    url := 'https://tgjsyyihabsovironesw.supabase.co/functions/v1/process-email-bounces',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (select value from public.internal_secrets where key = 'notification_cron_anon_key')
-    ),
-    body := '{}'::jsonb,
-    timeout_milliseconds := 60000
-  )
-  where exists (
-    select 1 from public.email_send_queue
-    where status = 'sent' and sent_at > now() - interval '3 days'
   );
   $cron$
 );
