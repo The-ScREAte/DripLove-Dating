@@ -16,6 +16,21 @@ interface PreloadedImageData {
 }
 
 type Priority = 'high' | 'medium' | 'low';
+const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+
+// The most urgent photo waiting, removed from the queue. Picked at every step
+// (not sorted once per batch): photos queued while workers are busy - the next
+// card's, right after a swipe - used to wait behind every low-priority
+// background photo queued before them, which is what made cards load while
+// swiping.
+export const takeNext = (queue: QueueItem[]): QueueItem | undefined => {
+  if (queue.length === 0) return undefined;
+  let best = 0;
+  for (let i = 1; i < queue.length && PRIORITY_RANK[queue[best].priority] > 0; i++) {
+    if (PRIORITY_RANK[queue[i].priority] < PRIORITY_RANK[queue[best].priority]) best = i;
+  }
+  return queue.splice(best, 1)[0];
+};
 
 interface QueueItem {
   url: string;
@@ -135,19 +150,13 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
 
     isProcessing.current = true;
 
-    // Sort queue by priority: high > medium > low
-    loadingQueue.current.sort((a, b) => {
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
-
     // Worker pool keeps concurrency saturated (no artificial delays).
     const workerCount = Math.max(1, maxConcurrent);
 
     await Promise.all(
       Array.from({ length: workerCount }).map(async () => {
         while (loadingQueue.current.length > 0) {
-          const nextItem = loadingQueue.current.shift();
+          const nextItem = takeNext(loadingQueue.current);
           if (!nextItem) return;
           
           // Skip cancelled URLs
@@ -169,21 +178,27 @@ export const useImagePreloader = (options: ImagePreloaderOptions = {}) => {
   const preloadImages = useCallback((urls: string[], priority: Priority = 'medium') => {
     // Add new URLs to queue (avoid duplicates)
     const newItems: QueueItem[] = [];
-    const queuedUrls = new Set(loadingQueue.current.map(item => item.url));
+    const queued = new Map(loadingQueue.current.map(item => [item.url, item]));
 
     for (const url of urls) {
       const status = preloadedImagesRef.current.get(url);
       if (status?.loaded) continue;
-      if (queuedUrls.has(url)) continue;
       if (inFlightLoads.current.has(url)) continue;
-      if (cancelledUrls.current.has(url)) continue;
-      newItems.push({ url, priority });
+      // Asked for again (e.g. its card is now next): it's no longer cancelled,
+      // and it moves up if it was waiting at a lower priority.
+      cancelledUrls.current.delete(url);
+      const waiting = queued.get(url);
+      if (waiting) {
+        if (PRIORITY_RANK[priority] < PRIORITY_RANK[waiting.priority]) waiting.priority = priority;
+        continue;
+      }
+      const item = { url, priority };
+      queued.set(url, item);
+      newItems.push(item);
     }
 
-    if (newItems.length === 0) return;
-
-    loadingQueue.current.push(...newItems);
-    processQueue();
+    if (newItems.length > 0) loadingQueue.current.push(...newItems);
+    if (loadingQueue.current.length > 0) processQueue();
   }, [processQueue]);
 
   const cancelImages = useCallback((urls: string[]) => {

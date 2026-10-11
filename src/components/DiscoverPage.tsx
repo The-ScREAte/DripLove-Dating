@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAndroidPlatform } from '@/utils/platformUtils';
-import { preloadImageToBlob, dropBlobUrl } from '@/utils/imageCache';
+import { dropBlobUrl } from '@/utils/imageCache';
 import { calculateAge } from '@/utils/discoverCache';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
@@ -2866,29 +2866,18 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           setUserImages((prev) => ({ ...prev, ...userImageUpdates }));
         }
 
-        // iOS/Web: blob preloading for instant render; Android WebView: skip blobs (too expensive)
-        if (!isAndroid) {
-          for (const user of usersWithImages) {
-            const imageUrls = userImageUpdates[user.id] || [];
-            const blobMap: { [url: string]: string } = {};
-            await Promise.all(
-              imageUrls.map(async (originalUrl) => {
-                try {
-                  const blobUrl = await preloadImageToBlob(originalUrl);
-                  blobMap[originalUrl] = blobUrl;
-                } catch {
-                  blobMap[originalUrl] = originalUrl;
-                }
-              })
-            );
-            setPreloadedBlobImages((prev) => ({ ...prev, [user.id]: blobMap }));
-            requestedImageProfileIds.current.delete(user.id);
-          }
-        } else {
-          // Android: no blob preloading; clear loading flags immediately after setting URLs.
-          for (const user of usersWithImages) {
-            requestedImageProfileIds.current.delete(user.id);
-          }
+        // Every platform warms photos through the shared preloader (the
+        // browser's own cache, the exact URL the card renders), first photo
+        // of each profile ahead of the rest. iOS/web used to also download
+        // EVERY photo of the next 10 profiles at once into blob copies - no
+        // limit on how many at a time, competing with the photo actually
+        // needed next, and each profile finishing re-rendered the whole page,
+        // often mid-swipe. That was the stutter and the "loads while swiping".
+        // The per-swipe effect below promotes the next cards to high priority.
+        preloadImages(usersWithImages.map((user) => userImageUpdates[user.id][0]).filter(Boolean), 'medium');
+        preloadImages(usersWithImages.flatMap((user) => userImageUpdates[user.id].slice(1)), 'low');
+        for (const user of usersWithImages) {
+          requestedImageProfileIds.current.delete(user.id);
         }
       } catch {
         // ignore preload errors; fallback to original URLs
@@ -2897,7 +2886,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         idsToLoad.forEach((id) => requestedImageProfileIds.current.delete(id));
       }
     })();
-  }, [mergeImageCaptions]);
+  }, [mergeImageCaptions, preloadImages]);
 
   // Force refresh function for preference changes
   const forceRefresh = useCallback(() => {
@@ -4419,72 +4408,32 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
   }, [potentialMatches, currentIndex, hasCompletedInitialFetch, preloadProfileImages]);
 
-  // Android: keep the next few cards' photos downloaded AND decoded, right
-  // after every swipe. Android skips the in-memory (blob) copies iOS/web use
-  // (too memory-heavy on cheaper phones), and the batch/idle preloads above
-  // don't run per swipe - so on a slow connection the next card's photo could
-  // pop in a moment after the card itself. This warms just the current card +
-  // next 3 cards' first photos (and the next card's next two photos) through
-  // the browser's own cache, which stays light on memory. Already-loaded
-  // photos are skipped, so re-running on every update is cheap.
+  // Every swipe (and coming back to this tab): the current card and the next
+  // three cards' first photos are downloaded AND decoded first, so each card's
+  // photo is on screen the moment the card is; then the rest of the current
+  // and next card's photos, so tapping through them doesn't wait. Everything
+  // goes through the browser's own cache - the exact URL the card renders -
+  // and anything already loaded is skipped, so running on every update is
+  // cheap. Photos further ahead stay at lower priority behind these.
   useEffect(() => {
-    if (!isActiveTab || !isAndroidPlatform()) return;
+    if (!isActiveTab) return;
     const firstPhotos: string[] = [];
-    const nextCardExtras: string[] = [];
+    const morePhotos: string[] = [];
     for (let i = currentIndex; i <= currentIndex + 3 && i < potentialMatches.length; i++) {
       const match = potentialMatches[i];
       if (!match || isAd(match)) continue;
       const photos = userImages[match.id];
       if (!photos || photos.length === 0) continue;
       firstPhotos.push(photos[0]);
-      if (i <= currentIndex + 1) nextCardExtras.push(...photos.slice(1, 3));
+      if (i <= currentIndex + 1) morePhotos.push(...photos.slice(1));
     }
     if (firstPhotos.length > 0) preloadImages(firstPhotos, 'high');
-    if (nextCardExtras.length > 0) preloadImages(nextCardExtras, 'medium');
+    if (morePhotos.length > 0) preloadImages(morePhotos, 'medium');
   }, [isActiveTab, currentIndex, potentialMatches, userImages, preloadImages]);
 
-  // Re-warm the CURRENT card's blob preview whenever the user returns to this
-  // tab. `preloadProfileImages` above only fires on `currentIndex`/`potentialMatches`
-  // changes (i.e. on swipe) and, even then, skips any profile whose image URLs
-  // are already known - it never re-checks whether the blob preview itself is
-  // still around. If the webview discards blob: object URLs while this tab
-  // sits hidden (display:none) behind another bottom-nav tab, the profile the
-  // user left on comes back with its URLs still known but no blob - so the
-  // photo falls back to a differently-sized, never-before-fetched optimized
-  // URL (a real cache miss, unlike the raw blob-sourced URL) and shows blank
-  // for a few seconds until something re-preloads it. Previously nothing did
-  // that until the *next* swipe warmed the *next* card - hence "requires
-  // swiping" to bring the current photo back. This re-warms the current card
-  // specifically, right when the tab becomes visible again.
-  useEffect(() => {
-    if (!isActiveTab) return;
-    if (isAndroidPlatform()) return; // Android intentionally skips blob preloading entirely
-    const current = potentialMatches[currentIndex];
-    if (!current || isAd(current)) return;
-    if (preloadedBlobImages[current.id]) return; // already warm
-    const urls = userImagesRef.current[current.id];
-    if (!urls || urls.length === 0) return;
-
-    let cancelled = false;
-    (async () => {
-      const blobMap: { [url: string]: string } = {};
-      await Promise.all(
-        urls.map(async (originalUrl) => {
-          try {
-            blobMap[originalUrl] = await preloadImageToBlob(originalUrl);
-          } catch {
-            blobMap[originalUrl] = originalUrl;
-          }
-        })
-      );
-      if (cancelled) return;
-      setPreloadedBlobImages((prev) => ({ ...prev, [current.id]: blobMap }));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isActiveTab, currentIndex, potentialMatches, preloadedBlobImages]);
+  // (Coming back to this tab re-warms the current card through the per-swipe
+  // effect above - it depends on isActiveTab. The blob re-warm that used to
+  // live here went with the blob copies.)
 
   // Helper to persist swipe count to database using the proper RPC.
   // Returns the server's authoritative usage figures whenever we actually
