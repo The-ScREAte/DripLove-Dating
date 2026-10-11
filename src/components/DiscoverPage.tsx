@@ -90,8 +90,10 @@ const SWIPES_BEFORE_VERIFY_PROMPT = 1;
 // supabase/migrations). Previously "29"/"200" were hardcoded separately in
 // five different places in this file, which is exactly how they drift out
 // of sync with each other and with the server.
-const FREE_DAILY_SWIPE_LIMIT = 30;
+const FREE_DAILY_SWIPE_LIMIT = 50;
 const PREMIUM_DAILY_SWIPE_LIMIT = 200;
+// With this many real cards left, a refill runs on every swipe (see moveToNext).
+const URGENT_REFILL_AT = 5;
 
 // Free users are capped at this distance (km) regardless of their own
 // max_distance/distance_preference setting. This was independently
@@ -5454,30 +5456,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         }
       }
       
-      // ⭐ SMART BACKGROUND LOADING: Check if we're running low on profiles and trigger background load
+      // ⭐ KEEP THE DECK FULL. Three layers, so the next cards are already
+      // there when the swipe reaches them:
+      //  1. The main refill starts in the background with REFILL_THRESHOLD
+      //     cards left (25, Android 14) - the auto-refill effect below.
+      //  2. If the deck still gets down to URGENT_REFILL_AT (5) or fewer, a
+      //     refill runs right away on each swipe (1.5s apart at most, so a
+      //     burst of swipes doesn't fire duplicates) - by the time those last
+      //     few cards are swiped, the next ones have landed.
+      //  3. Emergency only: a swipe that empties the deck refills at once and
+      //     shows a short loading state (see the empty-deck effect).
+      // Scheduled with setTimeout - this runs inside a state update.
       const remainingProfiles = newMatches.filter(m => !isAd(m)).length;
-      if (remainingProfiles <= 5 && !isLoadingMore && hasCompletedInitialFetch && !noMoreProfiles) {
-        // Running low on profiles - trigger background load.
-        // remainingProfiles > 0 means the deck still has at least one real
-        // card left (this is a proactive prefetch); 0 means this swipe was
-        // the last card and the deck is genuinely empty right now.
-        const stillHasCards = remainingProfiles > 0;
+      if (remainingProfiles <= URGENT_REFILL_AT && !isLoadingMore && hasCompletedInitialFetch && !noMoreProfiles) {
         const now = Date.now();
-        const COOLDOWN_MS = 4_000;
-        if (!stillHasCards) {
-          // That was the last card: refill straight away, never behind a
-          // cooldown (scheduled - this runs inside a state update). The
-          // screen shows a short loading state meanwhile - see the empty-deck
-          // effect after the auto-refill effect.
+        if (remainingProfiles === 0) {
           lastAutoRefillAttemptAtRef.current = now;
           setTimeout(() => {
             loadMoreMatches(false);
           }, 0);
-        } else if (now - lastAutoRefillAttemptAtRef.current >= COOLDOWN_MS) {
+        } else if (now - lastAutoRefillAttemptAtRef.current >= 1_500) {
           lastAutoRefillAttemptAtRef.current = now;
           setTimeout(() => {
             loadMoreMatches(true);
-          }, 100); // Small delay to not block the swipe animation
+          }, 0);
         }
       }
       
