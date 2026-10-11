@@ -291,3 +291,4 @@ begin
 end;
 $$;
 revoke all on function public.cancel_stopped_scheduled_sends() from public, anon, authenticated;
+ 

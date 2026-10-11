@@ -92,3 +92,4 @@
     <!-- Microphone permission for Circle Up's live camera/mic preview and video calls -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest>
+ 

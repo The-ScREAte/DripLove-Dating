@@ -127,7 +127,7 @@ public class MainActivity extends BridgeActivity {
             // (navigateFromNotification stamps __dlNotificationRoute) - don't
             // apply it a second time.
             + "var m=window.__dlNotificationRoute;"
-            + "if(m&&m.route==='" + escapedRoute + "'&&Date.now()-m.at<8000)return;"
+            + "if(m&&m.route==='" + escapedRoute + "'&&Date.now()-m.at<2500)return;"
             + "window.__dlNotificationRoute={route:'" + escapedRoute + "',at:Date.now()};"
             + "history.replaceState({},'','" + escapedRoute + "');"
             + "window.dispatchEvent(new Event('popstate'));"
@@ -331,3 +331,4 @@ public class MainActivity extends BridgeActivity {
         }
     }
 }
+ 

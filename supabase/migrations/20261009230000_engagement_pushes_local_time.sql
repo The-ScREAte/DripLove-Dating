@@ -379,3 +379,4 @@ select cron.alter_job((select jobid from cron.job where jobname = 'send-streak-r
 select cron.unschedule(jobname) from cron.job
  where jobname in ('send-game-notifications-sunday', 'send-game-notifications-thursday', 'send-game-notifications-tuesday');
 select cron.schedule('send-game-notifications-hourly', '45 * * * *', $$select public.send_game_notifications();$$);
+ 

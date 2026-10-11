@@ -1422,6 +1422,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange('chat');
       } else if (tab === 'liked' || tab === 'profile' || tab === 'dripcheck') {
         handleTabChange(tab);
+        // Streak-reminder tap (route /?tab=dripcheck&showStreak=1).
+        if (tab === 'dripcheck' && params.get('showStreak') === '1') setShowStreakBannerFromTap(true);
       }
     };
     window.addEventListener('popstate', handleNativeRoute);
@@ -1889,3 +1891,4 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 };
 
 export default MainApp;
+ 

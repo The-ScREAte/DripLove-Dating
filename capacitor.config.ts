@@ -88,6 +88,12 @@ const config: CapacitorConfig = {
       // has to say "alert", not "banner".
       presentationOptions: ["badge", "sound", "alert"]
     },
+    // The second push plugin (@capacitor-firebase/messaging, used for the FCM
+    // token) also claims iOS's notification handler and can be the one that
+    // presents foreground pushes - same options, so they show either way.
+    FirebaseMessaging: {
+      presentationOptions: ["badge", "sound", "alert"]
+    },
     // StatusBar config removed - @capacitor/status-bar is replaced by
     // @capacitor-community/safe-area (see src/main.tsx), which handles system
     // bar styling and makes env(safe-area-inset-*) reliable on Android too.
@@ -195,3 +201,4 @@ const config: CapacitorConfig = {
 };
 
 export default config;
+ 

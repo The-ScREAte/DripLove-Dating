@@ -121,14 +121,15 @@ export const navigateFromNotification = (
   // makes the destination durable no matter when the remount lands.
   const route = resolveNotificationRoute(resolvedType, normalized);
 
-  // On Android the same tap can arrive twice - here (Capacitor's tap event)
-  // and from MainActivity, which routes the intent itself (it has to, for
-  // notifications it builds while the app is open). If the second copy lands
-  // after the screen already used the first, it would open the same chat or
-  // profile again. Both paths stamp the route they applied; a repeat of the
-  // same route within a few seconds is the same tap and is skipped.
+  // The same tap can arrive more than once - from either push plugin's tap
+  // event and, on Android, from MainActivity, which routes the intent itself
+  // (it has to, for notifications it builds while the app is open). If a
+  // second copy lands after the screen already used the first, it would open
+  // the same chat or profile again. Every path stamps the route it applied; a
+  // repeat of the same route within 2.5 seconds is the same tap and is
+  // skipped (kept short so a real second tap by the person still works).
   const marker = (window as unknown as { __dlNotificationRoute?: { route: string; at: number } }).__dlNotificationRoute;
-  if (marker && marker.route === route && Date.now() - marker.at < 8000) return;
+  if (marker && marker.route === route && Date.now() - marker.at < 2500) return;
   (window as unknown as { __dlNotificationRoute?: { route: string; at: number } }).__dlNotificationRoute = {
     route,
     at: Date.now(),
@@ -170,8 +171,8 @@ let notificationTapListenerRegistered = false;
 export const ensureNotificationTapListener = (): void => {
   if (notificationTapListenerRegistered || !Capacitor.isNativePlatform()) return;
   notificationTapListenerRegistered = true;
-  PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
-    const data = normalizeNotificationData(notification.notification.data);
+  const handleTap = (rawData: unknown) => {
+    const data = normalizeNotificationData(rawData);
     // send-push-notification puts the inbox row's id in every push; record
     // the open (and clear its unread dot) so we can see which pushes work.
     // .then() is what actually fires the request - a bare rpc() call is lazy.
@@ -181,7 +182,23 @@ export const ensureNotificationTapListener = (): void => {
         .then(() => undefined, () => undefined);
     }
     navigateFromNotification(data?.type as string | undefined, data);
+  };
+
+  // Two push plugins are installed (@capacitor/push-notifications and
+  // @capacitor-firebase/messaging) and on iOS both claim Capacitor's single
+  // notification-tap slot (NotificationRouter.pushNotificationHandler) when
+  // they load. Capacitor loads plugins from a Set, so which one loads last -
+  // and gets every tap - can change from one app launch to the next. Taps
+  // that went to the Firebase plugin fired only ITS event, which nothing
+  // listened to, so the app opened without going anywhere. Listening to both
+  // covers either plugin; navigateFromNotification's same-route check keeps a
+  // tap delivered by both from being applied twice.
+  PushNotifications.addListener('pushNotificationActionPerformed', (notification: ActionPerformed) => {
+    handleTap(notification.notification.data);
   });
+  FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+    handleTap(event.notification?.data);
+  }).catch(() => undefined);
 };
 
 // Dismiss only the notifications belonging to ONE conversation/thread, called
@@ -781,3 +798,4 @@ export const markNotificationRead = (notificationId: string) => pushNotification
 export const getUnreadNotifications = (userId: string) => pushNotificationService.getUnreadNotifications(userId);
 export const removePushToken = (userId: string) => pushNotificationService.removeToken(userId);
 export const cleanupPushNotifications = () => pushNotificationService.cleanup();
+ 

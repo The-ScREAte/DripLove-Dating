@@ -6561,3 +6561,4 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 }
 
 export default React.memo(DiscoverPage);
+ 

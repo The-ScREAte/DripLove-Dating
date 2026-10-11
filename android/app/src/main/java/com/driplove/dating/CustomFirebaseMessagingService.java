@@ -290,3 +290,4 @@ public class CustomFirebaseMessagingService extends FirebaseMessagingService {
         // Token refresh is handled by Capacitor plugin
     }
 }
+ 

@@ -554,3 +554,4 @@ from (values
   ('Open to something new? 🌍', 'Meet people who share your values. Take a look today.', null::text[])
 ) as v(title, message, windows)
 where not exists (select 1 from public.scheduled_broadcasts b where b.title = v.title);
+ 
