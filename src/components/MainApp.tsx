@@ -219,6 +219,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     }
   });
   const [isChatDetailOpen, setIsChatDetailOpen] = useState(false);
+  // Bumped when a notification should show the Chat LIST (a new match, "say
+  // hello"): ChatPage closes whatever conversation is open.
+  const [chatListSignal, setChatListSignal] = useState(0);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -1196,6 +1199,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     return () => window.clearTimeout(timer);
   }, [profile]);
 
+  // Circle builds its Recommended/Similar rows and loads their photos when it
+  // first mounts - only its people list was preloaded - so opening it the
+  // first time took a moment, while Chat and Profile opened instantly. Mount
+  // it hidden once the app has settled after launch (after Discover's first
+  // cards, when the phone is idle), so it's ready before it's opened.
+  useEffect(() => {
+    if (!userId || visitedTabs.has('circle')) return;
+    const timer = window.setTimeout(() => {
+      const mount = () => setVisitedTabs((prev) => (prev.has('circle') ? prev : new Set(prev).add('circle')));
+      const w = window as Window & { requestIdleCallback?: (callback: () => void) => number };
+      if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(mount);
+      else mount();
+    }, isAndroidPlatform() ? 3500 : 2500);
+    return () => window.clearTimeout(timer);
+  }, [userId, visitedTabs]);
+
   // Preload tab-specific data without mutating unread state.
   useEffect(() => {
     if (!userId) return;
@@ -1347,7 +1366,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const action = data?.action as string | undefined;
       const profileId = data?.profileId as string | undefined;
       const chatId = data?.chatId as string | undefined;
-      const matchId = data?.matchId as string | undefined;
       const showStreakBanner = data?.showStreakBanner === true || data?.showStreakBanner === 'true';
 
       // action wins over type (a broadcast can carry both - type there only
@@ -1373,9 +1391,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange('circle');
         return;
       }
+      if (action === 'open_chat') {
+        setChatListSignal((n) => n + 1);
+        handleTabChange('chat');
+        return;
+      }
       // Scheduled messages pick the screen a tap opens (tap_action).
       const actionTabs: Record<string, string> = {
-        open_chat: 'chat',
         open_liked: 'liked',
         open_liked_me: 'liked',
         open_profile: 'profile',
@@ -1385,11 +1407,16 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange(actionTabs[action]);
         return;
       }
-      // A message or a new match opens that conversation; the Chat list if
-      // the push didn't say which one.
+      // A message opens its conversation (switching from any other open
+      // one). A new match - or a message that doesn't say which conversation
+      // - shows the Chat list, closing whatever conversation is open.
+      if (type === 'message' && chatId) {
+        setChatDeepLinkMatchId(chatId);
+        handleTabChange('chat');
+        return;
+      }
       if (type === 'message' || type === 'match') {
-        const conversationId = type === 'message' ? chatId : matchId;
-        if (conversationId) setChatDeepLinkMatchId(conversationId);
+        setChatListSignal((n) => n + 1);
         handleTabChange('chat');
         return;
       }
@@ -1419,6 +1446,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       } else if (tab === 'chat') {
         const matchId = params.get('matchId');
         if (matchId) setChatDeepLinkMatchId(matchId);
+        else setChatListSignal((n) => n + 1);
         handleTabChange('chat');
       } else if (tab === 'liked' || tab === 'profile' || tab === 'dripcheck') {
         handleTabChange(tab);
@@ -1678,6 +1706,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   onUnreadChange={forceRefreshUnreadCount}
                   onDetailViewChange={setIsChatDetailOpen}
                   deepLinkMatchId={chatDeepLinkMatchId}
+                  showListSignal={chatListSignal}
                   onDeepLinkConsumed={() => {
                     setChatDeepLinkMatchId(null);
                     clearNotificationParams(['tab', 'matchId']);
@@ -1726,7 +1755,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         </div>
 
         {/* Fixed Bottom Nav - always visible */}
-  {!showTerms && !showPrivacy && !isKeyboardOpen && !isChatDetailOpen && (
+  {!showTerms && !showPrivacy && !isKeyboardOpen && !(isChatDetailOpen && activeTab === 'chat') && (
           <div
             data-driplove-bottom-nav
             // A real flex child (last item in MainApp's own flex column), not
@@ -1891,4 +1920,3 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 };
 
 export default MainApp;
-  

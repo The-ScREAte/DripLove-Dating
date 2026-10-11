@@ -41,6 +41,9 @@ interface ChatPageProps {
   // and another conversation is open.
   deepLinkMatchId?: string | null;
   onDeepLinkConsumed?: () => void;
+  // Bumped when a notification should show the Chat list (a new match):
+  // closes whatever conversation is open.
+  showListSignal?: number;
 }
 
 // Dormant conversations constants
@@ -163,7 +166,7 @@ const markExpirationWarningSent = (matchId: string): void => {
   }
 };
 
-const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMatchId, onDeepLinkConsumed }: ChatPageProps) => {
+const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMatchId, onDeepLinkConsumed, showListSignal = 0 }: ChatPageProps) => {
   const { t } = useTranslation();
   const [topCompensation, setTopCompensation] = useState(0);
   
@@ -555,6 +558,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     }
     onDeepLinkConsumed?.();
   }, [deepLinkMatchId, matches, selectedMatch?.id, onDeepLinkConsumed]);
+
+  // A notification asked for the Chat list (e.g. a new match): leave any open
+  // conversation. Only on a new signal - not on mount.
+  const lastListSignalRef = useRef(showListSignal);
+  useEffect(() => {
+    if (showListSignal === lastListSignalRef.current) return;
+    lastListSignalRef.current = showListSignal;
+    setSelectedMatch(null);
+  }, [showListSignal]);
 
   // Keep matchesRef in sync
   useEffect(() => {
@@ -2753,4 +2765,3 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
 };
 
 export default React.memo(ChatPage);
- 

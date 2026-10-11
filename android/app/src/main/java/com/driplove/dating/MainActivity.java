@@ -93,11 +93,13 @@ public class MainActivity extends BridgeActivity {
             route = "/?tab=circle";
         } else if (type == null) {
             return;
-        } else if ("message".equals(type) || "match".equals(type)) {
+        } else if ("message".equals(type)) {
             // That conversation; the Chat list if the push didn't say which.
-            String conversationId = "message".equals(type)
-                ? intent.getStringExtra("chatId") : intent.getStringExtra("matchId");
+            String conversationId = intent.getStringExtra("chatId");
             route = conversationId != null ? "/?tab=chat&matchId=" + conversationId : "/?tab=chat";
+        } else if ("match".equals(type)) {
+            // A new match: the Chat list, where it shows at the top.
+            route = "/?tab=chat";
         } else if ("like".equals(type)) {
             route = "/?tab=liked";
         } else if ("image_rejected".equals(type)) {
@@ -331,4 +333,3 @@ public class MainActivity extends BridgeActivity {
         }
     }
 }
-  

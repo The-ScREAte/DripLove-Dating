@@ -866,8 +866,11 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     // refetching every single time the effect's deps happen to re-run.
     if (isFresh) return;
 
+    // A list restored from the device is already on screen: refresh it quietly
+    // (no spinner), and keep it if the refresh fails.
+    const showingSaved = pool.length > 0;
     const load = async () => {
-      if (!cached) setLoading(true);
+      if (!cached && !showingSaved) setLoading(true);
       try {
         const withPhotos = await fetchCirclePool(currentUser, isPremium);
         if (!cancelled) {
@@ -877,7 +880,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           writeCirclePoolCache(userId, withPhotos);
         }
       } catch {
-        if (!cancelled && !cached) { setPool([]); setLoading(false); }
+        if (!cancelled && !cached && !showingSaved) setPool([]);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -1144,6 +1148,40 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
     return () => { cancelled = true; };
   }, [rowCooldownsLoaded, loading, pool, me, rankByActiveThenCompatibility, rowCooldowns, rowCooldownMs, recommendedBatch, similarBatch, isPremium, currentUser?.id, markRowExhausted]);
+
+  // Rows restored from a saved copy show straight away. Once per visit, check
+  // them in the background: anyone decided since (liked/passed/matched/
+  // blocked - in Circle, Discover, Liked Me, anywhere) is removed, the stored
+  // batch is updated to match, and a row left empty starts its cooldown, the
+  // same as deciding the last person in it.
+  const savedRowsCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!currentUser?.id || savedRowsCheckedRef.current) return;
+    if (recommendedBatch === null && similarBatch === null) return;
+    savedRowsCheckedRef.current = true;
+    const userId = currentUser.id;
+    const shown = { recommended: recommendedBatch, similar: similarBatch };
+    // Runs once and always finishes - a swipe while it's in flight must not
+    // cancel it (it never runs again this visit).
+    void (async () => {
+      try {
+        const decided = await fetchCircleExclusionIds(userId);
+        const pruneRow = (key: CircleRowKey, setBatch: typeof setRecommendedBatch) => {
+          const current = shown[key];
+          if (!current) return;
+          const next = current.filter((p) => !decided.has(p.id));
+          if (next.length === current.length) return;
+          setBatch((prev) => (prev ? prev.filter((p) => !decided.has(p.id)) : prev));
+          void saveCircleBatch(userId, key, next.map((p) => p.id));
+          if (next.length === 0) void markRowExhausted(key);
+        };
+        pruneRow('recommended', setRecommendedBatch);
+        pruneRow('similar', setSimilarBatch);
+      } catch {
+        // Best-effort - the next decision trims the row anyway.
+      }
+    })();
+  }, [currentUser?.id, recommendedBatch, similarBatch, markRowExhausted]);
 
   // Mirrors both batches into window.circleRowsCache on every change (however
   // they changed - freshly resolved, reconciled, or trimmed after a decision)
@@ -2028,4 +2066,3 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 };
 
 export default CirclePage;
- 

@@ -43,7 +43,8 @@ const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
 // notification tap, the in-app toast click and (when the app is already
 // running) MainApp's in-app navigation, so the three can never disagree.
 //   message -> that exact conversation in Chat (the Chat list if it isn't known)
-//   match   -> the new match's conversation (the Chat list if it isn't known)
+//   match   -> the Chat list (the new match shows at the top; an open
+//              conversation is closed)
 //   like    -> Liked Me
 //   image_rejected -> Profile
 //   action open_circle_profile -> that person's profile inside Circle
@@ -74,7 +75,7 @@ export const resolveNotificationRoute = (
   if (data?.action === 'open_profile') return '/?tab=profile';
   if (data?.action === 'open_circle') return '/?tab=circle';
   if (type === 'message') return data?.chatId ? `/?tab=chat&matchId=${data.chatId}` : '/?tab=chat';
-  if (type === 'match') return data?.matchId ? `/?tab=chat&matchId=${data.matchId}` : '/?tab=chat';
+  if (type === 'match') return '/?tab=chat';
   if (type === 'like') return '/?tab=liked';
   if (type === 'image_rejected') return '/?tab=profile';
   return '/';
@@ -135,7 +136,21 @@ export const navigateFromNotification = (
     at: Date.now(),
   };
 
-  if (route !== '/') window.history.replaceState({}, '', route);
+  // Another top-level screen may be showing - Games, a policy page - where
+  // the main app isn't mounted at all, so neither the in-app handler nor a
+  // quiet address change reaches anything: the tap used to leave you on
+  // Games. Tell the router the address changed (popstate) and it renders the
+  // destination; MainApp, when that's "/", reads the tab and ids from the
+  // address as it mounts.
+  const destinationPath = route.split('?')[0] || '/';
+  const leavingScreen = window.location.pathname !== destinationPath;
+  if (route !== '/' || leavingScreen) window.history.replaceState({}, '', route);
+
+  if (leavingScreen) {
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    pendingNavigation = destinationPath === '/' ? { type: resolvedType, data: normalized } : null;
+    return;
+  }
 
   if (inAppNavHandler) {
     inAppNavHandler(resolvedType, normalized);
@@ -798,4 +813,3 @@ export const markNotificationRead = (notificationId: string) => pushNotification
 export const getUnreadNotifications = (userId: string) => pushNotificationService.getUnreadNotifications(userId);
 export const removePushToken = (userId: string) => pushNotificationService.removeToken(userId);
 export const cleanupPushNotifications = () => pushNotificationService.cleanup();
-  

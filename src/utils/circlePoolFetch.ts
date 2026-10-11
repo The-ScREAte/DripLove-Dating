@@ -47,6 +47,13 @@ export const CIRCLE_CACHE_TTL_MS = 2 * 60 * 1000;
 // actually closes and reopens the app. Mirrors DiscoverPage's own
 // writeDeckCache/readDeckCache (localStorage, same TTL pattern) - Discover
 // already survives a restart this way, Circle never did.
+// How long the copies saved on the device (below) are still shown when the
+// app opens. They're shown straight away and refreshed in the background -
+// CIRCLE_CACHE_TTL_MS only decides how soon that refresh happens - so a
+// copy older than the TTL used to be thrown away instead, and both
+// Recommended and Similar rebuilt from scratch on every reopen after two
+// minutes. A week keeps them useful without showing something ancient.
+export const CIRCLE_STORED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const CIRCLE_POOL_STORAGE_PREFIX = 'driplove_circle_pool_';
 const CIRCLE_ROWS_STORAGE_PREFIX = 'driplove_circle_rows_';
 
@@ -57,7 +64,7 @@ export const readCirclePoolCache = (userId: string): unknown[] | null => {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { ts: number; pool: unknown[] };
     if (!parsed?.ts || !Array.isArray(parsed?.pool)) return null;
-    if (Date.now() - parsed.ts > CIRCLE_CACHE_TTL_MS) return null;
+    if (Date.now() - parsed.ts > CIRCLE_STORED_MAX_AGE_MS) return null;
     return parsed.pool;
   } catch {
     return null;
@@ -80,7 +87,7 @@ export const readCircleRowsCache = (userId: string): { recommended: unknown[]; s
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { ts: number; recommended: unknown[]; similar: unknown[] };
     if (!parsed?.ts || !Array.isArray(parsed?.recommended) || !Array.isArray(parsed?.similar)) return null;
-    if (Date.now() - parsed.ts > CIRCLE_CACHE_TTL_MS) return null;
+    if (Date.now() - parsed.ts > CIRCLE_STORED_MAX_AGE_MS) return null;
     return { recommended: parsed.recommended, similar: parsed.similar };
   } catch {
     return null;
@@ -438,4 +445,3 @@ export const isCircleProfileEligible = async (
   }
   return true;
 };
- 
