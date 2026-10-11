@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2, X, Settings, Save, Pencil, Ruler, Baby, MessageCircle, Gift, PawPrint, Share2, Languages } from 'lucide-react';
+import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2, X, Settings, Save, Pencil, Ruler, Baby, MessageCircle, Gift, PawPrint, Share2, Languages, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
@@ -37,6 +37,37 @@ const formatHeightLabel = (cm: number) => {
 const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
 
 
+// Admin-only numbers for one member (admin_user_activity).
+interface AccountActivity {
+  signed_up: string | null;
+  last_active: string | null;
+  last_sign_in?: string | null;
+  logins: number;
+  times_active?: number | null;
+  photo_count?: number | null;
+  profile_completion?: number | null;
+  likes_received?: number | null;
+  passes_received?: number | null;
+  likes_given?: number | null;
+  matches?: number | null;
+  boost_until?: string | null;
+  devices?: string[] | null;
+}
+
+const formatDateTime = (value?: string | null) =>
+  value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+const formatAgo = (value?: string | null) => {
+  if (!value) return '';
+  const mins = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
+  if (mins < 5) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'yesterday' : `${days}d ago`;
+};
+
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: (wasEdited?: boolean) => void;
@@ -55,6 +86,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [croppingImageUrl, setCroppingImageUrl] = useState<string | null>(null);
+  const [activity, setActivity] = useState<AccountActivity | null>(null);
   
   // Admin editing state
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
@@ -112,6 +144,19 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
       fetchUserImages();
     }
   }, [isOpen, userId]);
+
+  useEffect(() => {
+    if (!isOpen || !userId || !isAdmin) return;
+    let cancelled = false;
+    setActivity(null);
+    supabase.rpc('admin_user_activity' as never, { p_user_id: userId } as never).then(({ data, error }) => {
+      if (cancelled || error || !data) return;
+      setActivity(data as unknown as AccountActivity);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, userId, isAdmin]);
 
   // Reset editing state when profile changes
   useEffect(() => {
@@ -397,6 +442,55 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   </div>
                 )}
               </div>
+
+              {/* Admin: account activity */}
+              {isAdmin && (() => {
+                // Falls back to the profile row until admin_user_activity is available.
+                const a: AccountActivity = activity ?? {
+                  signed_up: profile.created_at ?? null,
+                  last_active: profile.last_login_at ?? null,
+                  logins: profile.login_count ?? 0,
+                  times_active: profile.active_session_count ?? null,
+                };
+                const seen = a.likes_received != null || a.passes_received != null
+                  ? (a.likes_received ?? 0) + (a.passes_received ?? 0)
+                  : null;
+                const rows: Array<[string, string]> = [
+                  ['Signed up', formatDateTime(a.signed_up)],
+                  ['Last active', a.last_active ? `${formatDateTime(a.last_active)} (${formatAgo(a.last_active)})` : 'Never'],
+                  ...(a.last_sign_in ? [['Last sign-in', formatDateTime(a.last_sign_in)] as [string, string]] : []),
+                  ['Logins', String(a.logins ?? 0)],
+                  ...(a.times_active != null ? [['Times active', String(a.times_active)] as [string, string]] : []),
+                  ...(a.profile_completion != null ? [['Profile complete', `${a.profile_completion}%`] as [string, string]] : []),
+                  ...(a.photo_count != null ? [['Photos', String(a.photo_count)] as [string, string]] : []),
+                  ...(seen != null ? [['Seen by', `${seen} (${a.likes_received ?? 0} likes, ${a.passes_received ?? 0} passes)`] as [string, string]] : []),
+                  ...(a.likes_given != null ? [['Likes given', String(a.likes_given)] as [string, string]] : []),
+                  ...(a.matches != null ? [['Matches', String(a.matches)] as [string, string]] : []),
+                  ...(a.devices ? [['Devices', a.devices.length ? a.devices.join(', ') : 'None (no push)'] as [string, string]] : []),
+                  ...(a.boost_until ? [['Feed boost', `Until ${formatDateTime(a.boost_until)}`] as [string, string]] : []),
+                ];
+                return (
+                  <Card className="border-2 border-emerald-700/40 bg-emerald-950/30">
+                    <CardContent className="pt-6">
+                      <h3 className="font-semibold flex items-center text-emerald-300 mb-3">
+                        <Activity className="w-4 h-4 mr-2" />
+                        Account activity
+                      </h3>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        {rows.map(([label, value]) => (
+                          <div key={label} className="min-w-0">
+                            <div className="text-xs text-gray-400">{label}</div>
+                            <div className="text-white break-words">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-3">
+                        Logins count each sign-in (including signing in again after logging out). Times active counts each return to the app after 30+ minutes away.
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Admin Preferences Section */}
               {isAdmin && (

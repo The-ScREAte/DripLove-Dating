@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { getCountriesList, getCountryByCode } from '@/constants/locationData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { defaultPaymentMethods, PaymentMethod } from '@/constants/paymentConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -58,7 +59,8 @@ import {
   Crown,
   Megaphone,
   Link2,
-  Scan
+  Scan,
+  Rocket
 } from 'lucide-react';
 
 interface AdminPageProps {
@@ -85,6 +87,12 @@ interface UserProfile {
   last_login_at?: string | null;
   login_count?: number | null;
   is_archived?: boolean;
+  active_session_count?: number | null;
+  photo_count?: number | null;
+  profile_completion?: number | null;
+  likes_received?: number | null;
+  passes_received?: number | null;
+  boost_until?: string | null;
 }
 
 interface PaymentConfigData {
@@ -171,6 +179,15 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const [premiumFilter, setPremiumFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
   const [archiveFilter, setArchiveFilter] = useState('all');
+  // Debug filter (same idea as Broadcast's): find profiles without photos,
+  // half-finished profiles, people nobody has seen yet - then boost or remove them.
+  const [photosFilter, setPhotosFilter] = useState('all');
+  const [completionFilter, setCompletionFilter] = useState('all');
+  const [seenFilter, setSeenFilter] = useState('all');
+  const [boostFilter, setBoostFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [bulkWorking, setBulkWorking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   // Users-tab table now paginates on the server (admin_search_users_page RPC)
@@ -553,7 +570,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // pointing past the end of a now-smaller result set.
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, archiveFilter]);
+    setSelectedUserIds(new Set());
+  }, [statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, archiveFilter, photosFilter, completionFilter, seenFilter, boostFilter, sortBy, debouncedSearchTerm]);
 
   // Check if current user is admin - useEffect for admin status
   useEffect(() => {
@@ -1048,11 +1066,18 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         p_archive: archiveFilter,
         p_limit: usersPerPage,
         p_offset: (currentPage - 1) * usersPerPage,
-      });
+        // Debug filter + sort - only sent when set, so the list still loads
+        // on a database that doesn't have them yet.
+        ...(photosFilter !== 'all' ? { p_photos: photosFilter } : {}),
+        ...(completionFilter !== 'all' ? { p_completion: completionFilter } : {}),
+        ...(seenFilter !== 'all' ? { p_seen: seenFilter } : {}),
+        ...(boostFilter !== 'all' ? { p_boost: boostFilter } : {}),
+        ...(sortBy !== 'newest' ? { p_sort: sortBy } : {}),
+      } as never);
 
       if (error) throw error;
 
-      const rows = (data || []) as Array<RawUserProfile & { is_premium: boolean; total_count: number }>;
+      const rows = (data || []) as unknown as Array<RawUserProfile & { is_premium: boolean; total_count: number }>;
       setTableUsers(rows.map(({ total_count, ...row }) => ({
         ...row,
         age: calculateAge(row.date_of_birth),
@@ -1060,9 +1085,12 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setTableTotalCount(rows[0]?.total_count ?? 0);
     } catch (error) {
       console.error('Error fetching users page:', error);
+      const missingDebugSupport = (error as ErrorLike)?.message?.includes('admin_search_users_page');
       toast({
         title: 'Error',
-        description: 'Failed to load users',
+        description: missingDebugSupport
+          ? 'The debug filter and sort need the latest database update.'
+          : 'Failed to load users',
         variant: 'destructive'
       });
       setTableUsers([]);
@@ -1070,7 +1098,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     } finally {
       setTableLoading(false);
     }
-  }, [toast, debouncedSearchTerm, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, archiveFilter, currentPage]);
+  }, [toast, debouncedSearchTerm, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, premiumFilter, activityFilter, archiveFilter, photosFilter, completionFilter, seenFilter, boostFilter, sortBy, currentPage]);
 
   // Small standalone fetch for the "Admin Users" card on the Users tab -
   // kept separate from fetchUsers' heavy bulk query since that one now only
@@ -1207,41 +1235,44 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
     }
   };
 
+  // Face record first (AWS Rekognition), then the account and all its data.
+  const deleteUserAndData = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('face_descriptor')
+        .eq('id', userId)
+        .single();
+
+      if (profile?.face_descriptor) {
+        await supabase.functions.invoke('face-verify', {
+          body: {
+            action: 'delete_face',
+            userId: userId,
+            faceId: profile.face_descriptor
+          }
+        });
+      }
+    } catch (faceError) {
+      console.error('Error deleting face from Rekognition:', faceError);
+      // Continue with account deletion even if face deletion fails
+    }
+
+    const { error } = await supabase.rpc('delete_user_and_data', {
+      user_id_to_delete: userId
+    });
+    if (error) throw error;
+  };
+
   const deleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
       return;
     }
 
     try {
-      // First delete face from AWS Rekognition
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('face_descriptor')
-          .eq('id', userId)
-          .single();
+      await deleteUserAndData(userId);
 
-        if (profile?.face_descriptor) {
-          await supabase.functions.invoke('face-verify', {
-            body: {
-              action: 'delete_face',
-              userId: userId,
-              faceId: profile.face_descriptor
-            }
-          });
-        }
-      } catch (faceError) {
-        console.error('Error deleting face from Rekognition:', faceError);
-        // Continue with account deletion even if face deletion fails
-      }
-
-      // Proceed with user deletion
-      const { error } = await supabase.rpc('delete_user_and_data', {
-        user_id_to_delete: userId
-      });
-
-      if (error) throw error;
-
+      toggleUserSelected(userId, false);
       setUsers(users.filter(user => user.id !== userId));
       setTableUsers(prev => prev.filter(user => user.id !== userId));
       setTableTotalCount(prev => Math.max(0, prev - 1));
@@ -1366,6 +1397,102 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   const handleViewProfile = (userId: string) => {
     setSelectedUserId(userId);
     setIsProfileModalOpen(true);
+  };
+
+  const toggleUserSelected = (userId: string, selected: boolean) => {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      if (selected) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+  };
+
+  // Boosted profiles come first in other people's Discover/Circle - but only
+  // for people whose own filters (country, gender, distance...) already
+  // include them. At most half of anyone's batch is boosted.
+  const boostSelectedUsers = async (days = 7) => {
+    const ids = Array.from(selectedUserIds);
+    if (ids.length === 0) return;
+    setBulkWorking(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_boost_profiles' as never, { p_user_ids: ids, p_days: days } as never);
+      if (error) throw error;
+      toast({ title: 'Boosted', description: `${data ?? ids.length} profile(s) will show first in feeds for ${days} days.` });
+      setSelectedUserIds(new Set());
+      fetchUsersPage();
+    } catch (error) {
+      console.error('Error boosting users:', error);
+      toast({ title: 'Error', description: 'Failed to boost - the latest database update may be missing.', variant: 'destructive' });
+    } finally {
+      setBulkWorking(false);
+    }
+  };
+
+  const clearSelectedBoosts = async () => {
+    const ids = Array.from(selectedUserIds);
+    if (ids.length === 0) return;
+    setBulkWorking(true);
+    try {
+      const { error } = await supabase.rpc('admin_clear_boosts' as never, { p_user_ids: ids } as never);
+      if (error) throw error;
+      toast({ title: 'Boost removed', description: `${ids.length} profile(s) back to normal order.` });
+      setSelectedUserIds(new Set());
+      fetchUsersPage();
+    } catch (error) {
+      console.error('Error removing boosts:', error);
+      toast({ title: 'Error', description: 'Failed to remove boost', variant: 'destructive' });
+    } finally {
+      setBulkWorking(false);
+    }
+  };
+
+  // Same job the weekly cron runs: everyone with photos nobody has liked or
+  // passed in 30 days gets a 7-day boost.
+  const boostUnseenNow = async () => {
+    if (!confirm('Boost everyone with photos that nobody has liked or passed in the last 30 days, for 7 days?')) return;
+    setBulkWorking(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_boost_unseen_now' as never);
+      if (error) throw error;
+      toast({ title: 'Unseen profiles boosted', description: `${data ?? 0} profile(s) will show first in feeds this week.` });
+      fetchUsersPage();
+    } catch (error) {
+      console.error('Error boosting unseen users:', error);
+      toast({ title: 'Error', description: 'Failed to boost - the latest database update may be missing.', variant: 'destructive' });
+    } finally {
+      setBulkWorking(false);
+    }
+  };
+
+  const deleteSelectedUsers = async () => {
+    const ids = Array.from(selectedUserIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Permanently delete ${ids.length} user(s) and all their data? This cannot be undone.`)) return;
+    setBulkWorking(true);
+    let deleted = 0;
+    const failed: string[] = [];
+    for (const id of ids) {
+      try {
+        await deleteUserAndData(id);
+        deleted += 1;
+      } catch (error) {
+        console.error('Error deleting user', id, error);
+        failed.push(id);
+      }
+    }
+    setSelectedUserIds(new Set(failed));
+    setUsers(prev => prev.filter(user => !ids.includes(user.id) || failed.includes(user.id)));
+    setBulkWorking(false);
+    fetchUsersPage();
+    fetchAppStats();
+    toast({
+      title: failed.length ? 'Some deletes failed' : 'Deleted',
+      description: failed.length
+        ? `${deleted} deleted, ${failed.length} failed (still selected).`
+        : `${deleted} user(s) permanently deleted.`,
+      variant: failed.length ? 'destructive' : undefined,
+    });
   };
 
   // All 9 filters (search, status, gender, preference, country,
@@ -1662,7 +1789,8 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                       User Management ({tableTotalCount})
                     </CardTitle>
                     {(statusFilter !== 'all' || genderFilter !== 'all' || interestedInFilter !== 'all' || 
-                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || archiveFilter !== 'all') && (
+                      countryFilter !== 'all' || relationshipIntentFilter !== 'all' || premiumFilter !== 'all' || activityFilter !== 'all' || archiveFilter !== 'all' ||
+                      photosFilter !== 'all' || completionFilter !== 'all' || seenFilter !== 'all' || boostFilter !== 'all' || sortBy !== 'newest') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1675,6 +1803,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                           setPremiumFilter('all');
                           setActivityFilter('all');
                           setArchiveFilter('all');
+                          setPhotosFilter('all');
+                          setCompletionFilter('all');
+                          setSeenFilter('all');
+                          setBoostFilter('all');
+                          setSortBy('newest');
                         }}
                         className="text-xs h-7"
                       >
@@ -1801,7 +1934,129 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Debug filter - find profiles to fix, boost or remove */}
+                    <div className="rounded-md border border-dashed p-2 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-gray-700">Debug filter</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={boostUnseenNow}
+                          disabled={bulkWorking}
+                          className="text-[11px] h-7 px-2"
+                        >
+                          <Rocket className="w-3 h-3 mr-1" />
+                          Boost all unseen now
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select value={photosFilter} onValueChange={setPhotosFilter}>
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Photos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">Any Photos</SelectItem>
+                            <SelectItem value="with" className="text-xs">With Photos</SelectItem>
+                            <SelectItem value="without" className="text-xs">No Photos</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={completionFilter} onValueChange={setCompletionFilter}>
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Profile Completion" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">Any Completion</SelectItem>
+                            <SelectItem value="0_25" className="text-xs">Under 25% Complete</SelectItem>
+                            <SelectItem value="25_50" className="text-xs">25–49% Complete</SelectItem>
+                            <SelectItem value="50_75" className="text-xs">50–74% Complete</SelectItem>
+                            <SelectItem value="75_100" className="text-xs">75%+ Complete</SelectItem>
+                            <SelectItem value="incomplete" className="text-xs">Not 100% Complete</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={seenFilter} onValueChange={setSeenFilter}>
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Seen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">Seen or Not</SelectItem>
+                            <SelectItem value="never" className="text-xs">Never Seen</SelectItem>
+                            <SelectItem value="not_30_days" className="text-xs">Not Seen in 30 Days</SelectItem>
+                            <SelectItem value="seen" className="text-xs">Has Been Seen</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={boostFilter} onValueChange={setBoostFilter}>
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Feed Boost" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">Boosted or Not</SelectItem>
+                            <SelectItem value="boosted" className="text-xs">Boosted in Feeds</SelectItem>
+                            <SelectItem value="not_boosted" className="text-xs">Not Boosted</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                          <SelectTrigger className="text-xs h-8 col-span-2">
+                            <SelectValue placeholder="Sort" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="newest" className="text-xs">Sort: Newest Sign-ups</SelectItem>
+                            <SelectItem value="oldest" className="text-xs">Sort: Oldest Sign-ups</SelectItem>
+                            <SelectItem value="last_active" className="text-xs">Sort: Recently Active</SelectItem>
+                            <SelectItem value="most_logins" className="text-xs">Sort: Most Logins</SelectItem>
+                            <SelectItem value="most_active" className="text-xs">Sort: Most Times Active</SelectItem>
+                            <SelectItem value="least_complete" className="text-xs">Sort: Least Complete Profile</SelectItem>
+                            <SelectItem value="most_complete" className="text-xs">Sort: Most Complete Profile</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <p className="text-[10px] text-gray-500">
+                        "Seen" means someone liked or passed them. Boosted profiles show first in Discover and Circle for people whose own filters already include them (at most half of anyone's batch). Every Monday everyone with photos nobody has seen in 30 days is boosted for a week automatically.
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Bulk actions for the people ticked below */}
+                  {paginatedUsers.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <label className="flex items-center gap-1.5 text-[11px] text-gray-700">
+                        <Checkbox
+                          checked={paginatedUsers.length > 0 && paginatedUsers.every(u => selectedUserIds.has(u.id))}
+                          onCheckedChange={(checked) => {
+                            setSelectedUserIds(prev => {
+                              const next = new Set(prev);
+                              paginatedUsers.forEach(u => (checked ? next.add(u.id) : next.delete(u.id)));
+                              return next;
+                            });
+                          }}
+                        />
+                        Select page
+                      </label>
+                      {selectedUserIds.size > 0 && (
+                        <>
+                          <span className="text-[11px] text-gray-500">{selectedUserIds.size} selected</span>
+                          <Button size="sm" variant="outline" disabled={bulkWorking} onClick={() => boostSelectedUsers(7)} className="text-[11px] h-7 px-2 text-pink-600">
+                            <Rocket className="w-3 h-3 mr-1" />
+                            Boost in feeds (7 days)
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={bulkWorking} onClick={clearSelectedBoosts} className="text-[11px] h-7 px-2">
+                            Remove boost
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={bulkWorking} onClick={deleteSelectedUsers} className="text-[11px] h-7 px-2 text-red-600">
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Delete selected
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={bulkWorking} onClick={() => setSelectedUserIds(new Set())} className="text-[11px] h-7 px-2">
+                            Clear
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {/* Users List Container */}
                   <div className="border rounded-lg bg-white">
@@ -1812,8 +2067,14 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                     ) : (
                       <div className="space-y-0 max-h-96 overflow-y-auto">
                         {paginatedUsers.map((user, index) => (
-                          <div key={user.id} className={`p-2 space-y-1 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''}`}>
+                          <div key={user.id} className={`p-2 space-y-1 ${index !== paginatedUsers.length - 1 ? 'border-b' : ''} ${selectedUserIds.has(user.id) ? 'bg-pink-50' : ''}`}>
                             <div className="flex items-start justify-between">
+                              <Checkbox
+                                checked={selectedUserIds.has(user.id)}
+                                onCheckedChange={(checked) => toggleUserSelected(user.id, checked === true)}
+                                className="mr-2 mt-0.5"
+                                aria-label={`Select ${user.first_name} ${user.last_name}`}
+                              />
                               <div className="flex-1 min-w-0">
                                 <h3 className="font-medium text-xs truncate">
                                   {user.first_name} {user.last_name}
@@ -1844,6 +2105,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                       Premium
                                     </Badge>
                                   )}
+                                  {user.boost_until && (
+                                    <Badge className="bg-pink-100 text-pink-700 text-[10px] px-1.5 py-0 h-4">
+                                      Boosted until {new Date(user.boost_until).toLocaleDateString()}
+                                    </Badge>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-gray-500 mt-0.5">
                                   Joined: {new Date(user.created_at).toLocaleDateString()}
@@ -1865,10 +2131,19 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                                     if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
                                     return date.toLocaleDateString();
                                   })()}
-                                  {user.login_count !== null && user.login_count !== undefined && (
-                                    <> • Logins: {user.login_count}</>
+                                  {' • Logins: '}{user.login_count ?? 0}
+                                  {user.active_session_count !== undefined && (
+                                    <> • Active {user.active_session_count ?? 0} times</>
                                   )}
                                 </p>
+                                {user.profile_completion !== undefined && (
+                                  <p className="text-[11px] text-gray-500">
+                                    Photos: {user.photo_count ?? 0}
+                                    {' • Profile: '}{user.profile_completion ?? 0}%
+                                    {' • Seen: '}{(user.likes_received ?? 0) + (user.passes_received ?? 0)}
+                                    {' '}({user.likes_received ?? 0} likes, {user.passes_received ?? 0} passes)
+                                  </p>
+                                )}
                               </div>
                               <div className="ml-2">
                                 {getStatusBadge(user.account_status)}
