@@ -42,8 +42,8 @@ const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
 // Where every notification tap/click goes - ONE table, used by the OS
 // notification tap, the in-app toast click and (when the app is already
 // running) MainApp's in-app navigation, so the three can never disagree.
-//   message -> that exact conversation in Chat
-//   match   -> the Chat list
+//   message -> that exact conversation in Chat (the Chat list if it isn't known)
+//   match   -> the new match's conversation (the Chat list if it isn't known)
 //   like    -> Liked Me
 //   image_rejected -> Profile
 //   action open_circle_profile -> that person's profile inside Circle
@@ -70,11 +70,11 @@ export const resolveNotificationRoute = (
     return `/?tab=circle&circleUserId=${data.profileId}`;
   }
   if (data?.action === 'open_chat') return '/?tab=chat';
-  if (data?.action === 'open_liked') return '/?tab=liked';
+  if (data?.action === 'open_liked' || data?.action === 'open_liked_me') return '/?tab=liked';
   if (data?.action === 'open_profile') return '/?tab=profile';
   if (data?.action === 'open_circle') return '/?tab=circle';
-  if (type === 'message' && data?.chatId) return `/?tab=chat&matchId=${data.chatId}`;
-  if (type === 'match') return '/?tab=chat';
+  if (type === 'message') return data?.chatId ? `/?tab=chat&matchId=${data.chatId}` : '/?tab=chat';
+  if (type === 'match') return data?.matchId ? `/?tab=chat&matchId=${data.matchId}` : '/?tab=chat';
   if (type === 'like') return '/?tab=liked';
   if (type === 'image_rejected') return '/?tab=profile';
   return '/';

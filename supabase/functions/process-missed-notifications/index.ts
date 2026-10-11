@@ -42,22 +42,29 @@ type Summary = {
   likes: number;
   matches: number;
   matchSenders: string[];
+  /** Conversation (match) ids, so a single match/message opens that chat. */
+  matchIds: string[];
   messages: number;
   messageSenders: string[];
+  chatIds: string[];
   notices: Array<{ title: string; body: string | null }>;
 };
 
 const summarize = (items: Item[]): Summary => {
-  const sum: Summary = { likes: 0, matches: 0, matchSenders: [], messages: 0, messageSenders: [], notices: [] };
+  const sum: Summary = {
+    likes: 0, matches: 0, matchSenders: [], matchIds: [], messages: 0, messageSenders: [], chatIds: [], notices: [],
+  };
   for (const item of items) {
     const sender = item.data?.senderId;
     if (item.kind === 'like') sum.likes += 1;
     else if (item.kind === 'match') {
       sum.matches += 1;
       if (sender) sum.matchSenders.push(sender);
+      if (item.data?.matchId) sum.matchIds.push(item.data.matchId);
     } else if (item.kind === 'message') {
       sum.messages += 1;
       if (sender) sum.messageSenders.push(sender);
+      if (item.data?.chatId) sum.chatIds.push(item.data.chatId);
     } else if (item.title) {
       sum.notices.push({ title: item.title, body: item.body });
     }
@@ -103,7 +110,12 @@ async function sendPush(supabase: SupabaseClient, due: Due, sum: Summary, names:
       title: "It's a match! 💕",
       body: name ? `You and ${name} liked each other. Say hello!` : `You have ${sum.matches} new matches. Say hello!`,
       type: 'match', kind: 'match', category: 'event',
-      data: { catchup: 'true', ...(sum.matches === 1 && sum.matchSenders[0] ? { senderId: sum.matchSenders[0] } : {}) },
+      data: {
+        catchup: 'true',
+        ...(sum.matches === 1 && sum.matchSenders[0] ? { senderId: sum.matchSenders[0] } : {}),
+        // One new match: the tap opens that conversation.
+        ...(new Set(sum.matchIds).size === 1 ? { matchId: sum.matchIds[0] } : {}),
+      },
     });
   }
   if (sum.messages > 0) {
@@ -113,7 +125,8 @@ async function sendPush(supabase: SupabaseClient, due: Due, sum: Summary, names:
       title: name ?? 'New messages 💬',
       body: name ? (sum.messages > 1 ? `Sent you ${sum.messages} messages` : 'Sent you a message') : `You have ${sum.messages} new messages`,
       type: 'message', kind: 'message', category: 'event',
-      data: { catchup: 'true' },
+      // All from one conversation: the tap opens it (otherwise the Chat list).
+      data: { catchup: 'true', ...(new Set(sum.chatIds).size === 1 ? { chatId: sum.chatIds[0] } : {}) },
     });
   }
   if (sum.likes > 0) {

@@ -85,7 +85,7 @@ public class MainActivity extends BridgeActivity {
             route = "/?tab=circle&circleUserId=" + profileId;
         } else if ("open_chat".equals(action)) {
             route = "/?tab=chat";
-        } else if ("open_liked".equals(action)) {
+        } else if ("open_liked".equals(action) || "open_liked_me".equals(action)) {
             route = "/?tab=liked";
         } else if ("open_profile".equals(action)) {
             route = "/?tab=profile";
@@ -93,10 +93,11 @@ public class MainActivity extends BridgeActivity {
             route = "/?tab=circle";
         } else if (type == null) {
             return;
-        } else if ("message".equals(type) && intent.getStringExtra("chatId") != null) {
-            route = "/?tab=chat&matchId=" + intent.getStringExtra("chatId");
-        } else if ("match".equals(type)) {
-            route = "/?tab=chat";
+        } else if ("message".equals(type) || "match".equals(type)) {
+            // That conversation; the Chat list if the push didn't say which.
+            String conversationId = "message".equals(type)
+                ? intent.getStringExtra("chatId") : intent.getStringExtra("matchId");
+            route = conversationId != null ? "/?tab=chat&matchId=" + conversationId : "/?tab=chat";
         } else if ("like".equals(type)) {
             route = "/?tab=liked";
         } else if ("image_rejected".equals(type)) {

@@ -1347,6 +1347,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const action = data?.action as string | undefined;
       const profileId = data?.profileId as string | undefined;
       const chatId = data?.chatId as string | undefined;
+      const matchId = data?.matchId as string | undefined;
       const showStreakBanner = data?.showStreakBanner === true || data?.showStreakBanner === 'true';
 
       // action wins over type (a broadcast can carry both - type there only
@@ -1376,6 +1377,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       const actionTabs: Record<string, string> = {
         open_chat: 'chat',
         open_liked: 'liked',
+        open_liked_me: 'liked',
         open_profile: 'profile',
         open_circle: 'circle',
       };
@@ -1383,12 +1385,11 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange(actionTabs[action]);
         return;
       }
-      if (type === 'message' && chatId) {
-        setChatDeepLinkMatchId(chatId);
-        handleTabChange('chat');
-        return;
-      }
-      if (type === 'match') {
+      // A message or a new match opens that conversation; the Chat list if
+      // the push didn't say which one.
+      if (type === 'message' || type === 'match') {
+        const conversationId = type === 'message' ? chatId : matchId;
+        if (conversationId) setChatDeepLinkMatchId(conversationId);
         handleTabChange('chat');
         return;
       }
