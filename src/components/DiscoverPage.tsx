@@ -1330,7 +1330,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, []);
 
   // Shared data fetching logic - optimized for speed
-  const fetchPotentialMatchesData = useCallback(async (userId: string, allowedGenders: string[], opts?: { isRefill?: boolean }) => {
+  const fetchPotentialMatchesData = useCallback(async (
+    userId: string,
+    allowedGenders: string[],
+    opts?: { isRefill?: boolean; excludeIds?: string[]; wide?: boolean }
+  ) => {
     // A background top-up (loadMoreMatches) must see the FULL eligible pool
     // this call found - the "fast first paint" caps below exist only for the
     // very first screen, but were being applied here too, silently discarding
@@ -1456,7 +1460,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       (circleReservedRows || []).flatMap((r) => ((r.profile_ids as string[] | null) || []))
     );
 
-    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, ...circleReservedIds, userId]);
+    // A refill also leaves out the cards already waiting in the deck: the feed
+    // order is a stable nightly shuffle, so otherwise every refill spent most
+    // of its limit re-returning those same cards and added few or none.
+    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, ...circleReservedIds, ...(opts?.excludeIds || []), userId]);
     
     const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
     const userMaxDistance = Number(userMaxDistanceRaw);
@@ -1665,7 +1672,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       if (!baseCountryCode) {
         // Free user with no country set - return empty feed (fail closed)
         filteredProfiles = [];
-      } else if (locationProfileIdsForQuery.length > 0) {
+      } else if (locationProfileIdsForQuery.length > 0 && !opts?.wide) {
+        // (A wide refill skips this branch: the candidate set below is only
+        // the nearest 500 people, including ones already swiped, so a heavy
+        // swiper can use it up while many more are inside their distance -
+        // the radius search in the next branch covers all of them.)
         // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
         // indexed column reshuffled nightly, not a fresh random() per call)
         // within the location service's candidate set - see
@@ -4054,8 +4065,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
       // ✅ Refill should use the *same* eligibility rules as the initial fetch.
       // We call the shared fetch routine, then append only *new* profiles (deduped).
-      const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true });
-      if (!result) return;
+      const deckIds = potentialMatches
+        .filter((p): p is PotentialMatch => !isAd(p))
+        .map((p) => p.id);
+      const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true, excludeIds: deckIds });
+      if (!result) {
+        if (!hasRemainingCards) {
+          setNoMoreProfiles(true);
+          setEmptyStateMode('transient-error');
+        }
+        return;
+      }
 
       const { images, distances } = result;
       // Same sign-compatibility narrowing fetchPotentialMatches applies to
@@ -4089,15 +4109,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // CRITICAL FIX: Don't set noMoreProfiles if we got results but they're duplicates
       // This happens when the query returns profiles we already have
       // Instead, only set noMoreProfiles if the DB returned 0 profiles at all
-      if (matches.length === 0) {
-        if (!hasRemainingCards) {
-          // Truly no profiles available from DB, and the deck is genuinely
-          // empty right now - this is the real last-resort case.
-          setNoMoreProfiles(true);
-          setEmptyStateMode('exhausted');
-        }
-        return;
-      }
+      // (an empty result falls through to the wide retry below first).
 
       const existingProfileIds = new Set(
         potentialMatches
@@ -4116,12 +4128,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // batch can easily land zero compatible people by chance even when
         // plenty exist overall - non-sign-match keeps the original single
         // retry, which was already enough for the plain duplicate case.
+        // Every retry searches wide (the whole distance radius, not just the
+        // nearest-500 window) and still leaves out the deck.
         const isSignMatch = discoverCategoryRef.current === 'signMatch';
         const maxRetries = isSignMatch ? 3 : 1;
         let retryAttempt = 0;
         while (retryAttempt < maxRetries && refillChunk.length === 0) {
           retryAttempt += 1;
-          const retryResult = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true }).catch(() => null);
+          const retryResult = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true, excludeIds: deckIds, wide: true }).catch(() => null);
           const retryMatches = retryResult && isSignMatch
             ? filterBySignCompatibility(retryResult.matches, currentUser?.adinkra_symbols || [])
             : retryResult?.matches;
@@ -4133,6 +4147,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
         if (refillChunk.length === 0) {
           setEmptyStateMode('exhausted');
+          // Nobody new anywhere and nothing left to swipe: now it really is
+          // the end (the empty-state recovery keeps checking in the background).
+          if (!hasRemainingCards) setNoMoreProfiles(true);
           return;
         }
       }
@@ -4170,7 +4187,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       preloadProfileImages(refillChunk, 0);
       batchFetchLanguages(refillChunk.map((p) => p.id).filter(Boolean));
     } catch {
-      // ignore load more errors; UI will retry via refill effect
+      // While cards remain, the refill effect simply tries again; with an
+      // empty deck, settle on the refreshable empty state instead of loading.
+      if (!hasRemainingCards) {
+        setNoMoreProfiles(true);
+        setEmptyStateMode('transient-error');
+      }
     } finally {
       setIsLoadingMore(false);
     }
@@ -4208,8 +4230,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     // Avoid tight loops when the deck is empty. Retry occasionally so new profiles
     // (or newly-indexed location matches) can appear without requiring a manual refresh.
+    // Short gap between background refills: a refill that found nobody new
+    // used to wait 30 seconds before trying again - long enough for a fast
+    // swiper to empty the deck and land on "no more profiles".
     const now = Date.now();
-    const COOLDOWN_MS = 30_000;
+    const COOLDOWN_MS = 6_000;
     if (now - lastAutoRefillAttemptAtRef.current < COOLDOWN_MS) return;
     lastAutoRefillAttemptAtRef.current = now;
 
@@ -4218,6 +4243,29 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // on screen, never the true last-resort case.
     loadMoreMatches(true);
   }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
+
+  // An empty deck that isn't confirmed exhausted (noMoreProfiles false) shows
+  // a short loading state, never "no more profiles" - so this makes sure a
+  // refill always runs to settle it: either cards arrive, or loadMoreMatches
+  // (called with no cards left) confirms the end by setting noMoreProfiles,
+  // which also hands over to the empty-state recovery below. At most two
+  // tries per empty spell (a refill already in flight is waited for, not
+  // counted); after that the honest empty state shows with its refresh button.
+  const emptyDeckRefillTriesRef = useRef(0);
+  useEffect(() => {
+    if (potentialMatches.length > 0) {
+      emptyDeckRefillTriesRef.current = 0;
+      return;
+    }
+    if (!hasCompletedInitialFetch || noMoreProfiles || isLoadingMore) return;
+    if (emptyDeckRefillTriesRef.current >= 2) {
+      setNoMoreProfiles(true);
+      return;
+    }
+    emptyDeckRefillTriesRef.current += 1;
+    lastAutoRefillAttemptAtRef.current = Date.now();
+    void loadMoreMatches(false);
+  }, [potentialMatches.length, hasCompletedInitialFetch, noMoreProfiles, isLoadingMore, loadMoreMatches]);
 
   // ⭐ SWIPE FATIGUE RESCUE (Mechanism B): Inject active profiles after long
   // no-match streaks. This prevents user fatigue and increases retention
@@ -5415,11 +5463,20 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // the last card and the deck is genuinely empty right now.
         const stillHasCards = remainingProfiles > 0;
         const now = Date.now();
-        const COOLDOWN_MS = 10_000; // 10 second cooldown
-        if (now - lastAutoRefillAttemptAtRef.current >= COOLDOWN_MS) {
+        const COOLDOWN_MS = 4_000;
+        if (!stillHasCards) {
+          // That was the last card: refill straight away, never behind a
+          // cooldown (scheduled - this runs inside a state update). The
+          // screen shows a short loading state meanwhile - see the empty-deck
+          // effect after the auto-refill effect.
           lastAutoRefillAttemptAtRef.current = now;
           setTimeout(() => {
-            loadMoreMatches(stillHasCards);
+            loadMoreMatches(false);
+          }, 0);
+        } else if (now - lastAutoRefillAttemptAtRef.current >= COOLDOWN_MS) {
+          lastAutoRefillAttemptAtRef.current = now;
+          setTimeout(() => {
+            loadMoreMatches(true);
           }, 100); // Small delay to not block the swipe animation
         }
       }
@@ -5886,12 +5943,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     );
   }
 
-  // Deck hit zero exactly while a background refill is already in flight (e.g. fast
-  // swiping outran the fetch). Show the same lightweight loading state instead of the
-  // "no more profiles" dead end - loadMoreMatches always resolves (its finally block
-  // clears isLoadingMore), so this can't get stuck, and it closes the visible gap
-  // where the empty screen would flash before the refill silently lands a moment later.
-  if (potentialMatches.length === 0 && hasCompletedInitialFetch && isLoadingMore) {
+  // Deck hit zero while a refill is in flight or before one has confirmed the
+  // end (noMoreProfiles still false - e.g. fast swiping outran the background
+  // refill). Show the same lightweight loading state instead of the "no more
+  // profiles" dead end. It can't get stuck: the empty-deck effect above always
+  // runs a refill that either brings cards or sets noMoreProfiles.
+  if (potentialMatches.length === 0 && hasCompletedInitialFetch && (isLoadingMore || !noMoreProfiles)) {
     return (
       <>
         {topBar}

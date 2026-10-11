@@ -634,6 +634,18 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // Recommended/Similar rows above.
   const [categoryBrowse, setCategoryBrowse] = useState<{ label: string; profiles: CircleProfile[] } | null>(null);
   const [categoryBrowseIndex, setCategoryBrowseIndex] = useState(0);
+  // Keeps a category deck loading as it's swiped: the open category's page
+  // loader (built in handleCategoryClick with that category's filters and
+  // exclusions), whether a fresh load found nobody new, and any load in flight.
+  const categoryMoreRef = useRef<{
+    loadPage: (skipIds: string[]) => Promise<CircleProfile[]>;
+    exhausted: boolean;
+    inFlight: Promise<CircleProfile[]> | null;
+  } | null>(null);
+  const categoryBrowseRef = useRef<{ label: string; profiles: CircleProfile[] } | null>(null);
+  useEffect(() => {
+    categoryBrowseRef.current = categoryBrowse;
+  }, [categoryBrowse]);
   const [loadingCategoryKey, setLoadingCategoryKey] = useState<string | null>(null);
 
   // Recommended/Similar row state: null batch = not computed yet (still
@@ -1205,20 +1217,61 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   }, [loadImagesForProfile]);
 
   // Warms the browser cache for the exact URLs the card will render, so the
-  // next card paints instantly instead of decoding on arrival.
-  const prefetchProfileImages = useCallback(async (profile: CircleProfile | undefined) => {
+  // next card paints instantly instead of decoding on arrival. The first
+  // photo is also decoded ahead; `allPhotos` warms the whole set (the very
+  // next person, so swiping through their photos doesn't wait either).
+  const prefetchProfileImages = useCallback(async (profile: CircleProfile | undefined, allPhotos = false) => {
     if (!profile) return;
     try {
       const urls = await fetchAndCacheImages(profile);
-      urls.slice(0, 2).forEach((url) => {
+      urls.slice(0, allPhotos ? urls.length : 1).forEach((url, i) => {
         const img = new Image();
         img.decoding = 'async';
         img.src = getDetailImageUrl(url);
+        if (i === 0 && typeof img.decode === 'function') img.decode().catch(() => undefined);
       });
     } catch {
       // Prefetch is best-effort - a failure just means the normal load runs.
     }
   }, [fetchAndCacheImages]);
+
+  // The person shown at `index` and the next three: every photo of the
+  // current and next person, the first photo of the two after.
+  const prefetchUpcoming = useCallback((profiles: CircleProfile[], index: number) => {
+    void prefetchProfileImages(profiles[index], true);
+    void prefetchProfileImages(profiles[index + 1], true);
+    void prefetchProfileImages(profiles[index + 2]);
+    void prefetchProfileImages(profiles[index + 3]);
+  }, [prefetchProfileImages]);
+
+  // Loads the open category's next page (people not already in the deck) and
+  // appends it. Returns who was added; nobody new means the category really
+  // is used up for now. Concurrent calls share the same load.
+  const loadMoreCategory = useCallback(async (): Promise<CircleProfile[]> => {
+    const more = categoryMoreRef.current;
+    if (!more || more.exhausted) return [];
+    if (more.inFlight) return more.inFlight;
+    const loaded = (categoryBrowseRef.current?.profiles || []).map((p) => p.id);
+    more.inFlight = (async () => {
+      try {
+        const page = await more.loadPage(loaded);
+        const have = new Set(loaded);
+        const fresh = page.filter((p) => !have.has(p.id));
+        if (categoryMoreRef.current !== more) return [];
+        if (fresh.length === 0) {
+          more.exhausted = true;
+          return [];
+        }
+        setCategoryBrowse((prev) => (prev ? { ...prev, profiles: [...prev.profiles, ...fresh] } : prev));
+        return fresh;
+      } catch {
+        return [];
+      } finally {
+        more.inFlight = null;
+      }
+    })();
+    return more.inFlight;
+  }, []);
 
   const applyProfileImages = useCallback(async (profile: CircleProfile) => {
     imagesOwnerRef.current = profile.id;
@@ -1238,6 +1291,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
   const closeProfileView = useCallback(() => {
     imagesOwnerRef.current = null;
+    categoryMoreRef.current = null;
     setSelectedProfile(null);
     setCategoryBrowse(null);
     setCategoryBrowseIndex(0);
@@ -1390,15 +1444,27 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
     if (categoryBrowse) {
       const nextIndex = categoryBrowseIndex + 1;
+      // Keep the deck loading: with 5 or fewer people left, quietly fetch the
+      // next page of this category so swiping never runs dry.
+      if (categoryBrowse.profiles.length - nextIndex <= 5) void loadMoreCategory();
       if (nextIndex < categoryBrowse.profiles.length) {
         const nextProfile = categoryBrowse.profiles[nextIndex];
         setCategoryBrowseIndex(nextIndex);
         void applyProfileImages(nextProfile);
-        // Stay one card ahead so the deck never stalls on a photo fetch.
-        void prefetchProfileImages(categoryBrowse.profiles[nextIndex + 1]);
+        // Stay ahead so the deck never stalls on a photo fetch.
+        prefetchUpcoming(categoryBrowse.profiles, nextIndex);
       } else {
-        toast({ title: "That's everyone", description: `You've seen everyone in "${categoryBrowse.label}" for now.` });
-        closeProfileView();
+        // End of what's loaded: load more first - "That's everyone" only when
+        // a fresh load finds nobody new.
+        const more = await loadMoreCategory();
+        if (more.length > 0) {
+          setCategoryBrowseIndex(nextIndex);
+          void applyProfileImages(more[0]);
+          prefetchUpcoming(more, 0);
+        } else {
+          toast({ title: "That's everyone", description: `You've seen everyone in "${categoryBrowse.label}" for now.` });
+          closeProfileView();
+        }
       }
     } else {
       closeProfileView();
@@ -1447,7 +1513,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     } finally {
       setIsSwipeActionPending(false);
     }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, applyProfileImages, prefetchProfileImages, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
+  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, applyProfileImages, prefetchUpcoming, loadMoreCategory, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
@@ -1529,14 +1595,16 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
 
       type ProfileRow = Omit<CircleProfile, 'firstImage'>;
-      const fetchCategoryRows = async (codes: string[], applyRadius: boolean, limit: number): Promise<ProfileRow[]> => {
+      const fetchCategoryRows = async (
+        codes: string[], applyRadius: boolean, limit: number, skip: Set<string>
+      ): Promise<ProfileRow[]> => {
         if (codes.length === 0 || limit <= 0) return [];
         const useBox = applyRadius && hasCoords;
         const { data, error } = await supabase.rpc('get_circle_category_profiles', {
           p_country_codes: codes,
           p_allowed_genders: allowedGenders,
           p_viewer_gender: currentUser.gender || '',
-          p_excluded_ids: Array.from(excluded),
+          p_excluded_ids: Array.from(skip),
           p_limit: limit,
           p_relationship_intent: tile.filter?.relationshipIntent ?? null,
           p_family_plans: tile.filter?.familyPlans ?? null,
@@ -1554,16 +1622,20 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         return Array.isArray(data) ? (data as unknown as ProfileRow[]) : [];
       };
 
+      // One page of this category - everyone in it except the exclusions
+      // above and `skipIds` (people already loaded into the deck). Used for
+      // the first page here and, through categoryMoreRef, to keep the deck
+      // loading while it's swiped.
+      const loadPage = async (skipIds: string[]): Promise<CircleProfile[]> => {
+      const skip = new Set(excluded);
+      skipIds.forEach((id) => skip.add(id));
       const homeLimit = unlockedCountryCodes.length > 0 ? 30 : 60;
       const [homeRows, unlockedRows] = await Promise.all([
-        fetchCategoryRows(homeCountryCodes, true, homeLimit),
-        fetchCategoryRows(unlockedCountryCodes, false, unlockedCountryCodes.length > 0 ? 60 - homeLimit : 0),
+        fetchCategoryRows(homeCountryCodes, true, homeLimit, skip),
+        fetchCategoryRows(unlockedCountryCodes, false, unlockedCountryCodes.length > 0 ? 60 - homeLimit : 0, skip),
       ]);
       const rows = [...homeRows, ...unlockedRows];
-      if (rows.length === 0) {
-        setEmptyCategoryLabel(tile.label);
-        return;
-      }
+      if (rows.length === 0) return [];
 
       const eligible = rows
         .filter((p) => {
@@ -1587,26 +1659,29 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       const firstImageByUser: Record<string, string> = {};
       (imageRows || []).forEach((row) => { if (!firstImageByUser[row.user_id]) firstImageByUser[row.user_id] = row.image_url; });
 
-      const withPhotos: CircleProfile[] = eligible
+      return eligible
         .filter((p) => firstImageByUser[p.id])
         .map((p) => ({ ...p, favorites: parseFavorites(p.favorites), firstImage: firstImageByUser[p.id] }));
+      };
 
+      const withPhotos = await loadPage([]);
       if (withPhotos.length === 0) {
         setEmptyCategoryLabel(tile.label);
         return;
       }
 
+      categoryMoreRef.current = { loadPage, exhausted: false, inFlight: null };
       setCategoryBrowse({ label: tile.label, profiles: withPhotos });
       setCategoryBrowseIndex(0);
       void applyProfileImages(withPhotos[0]);
-      void prefetchProfileImages(withPhotos[1]);
+      prefetchUpcoming(withPhotos, 0);
     } catch (err) {
       console.error('Error loading category browse:', err);
       toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
     } finally {
       setLoadingCategoryKey(null);
     }
-  }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, applyProfileImages, prefetchProfileImages, recommendedBatch, similarBatch]);
+  }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, applyProfileImages, prefetchUpcoming, recommendedBatch, similarBatch]);
 
   // Both tiers see the same 4-card batch. Free: only index 0 is unlocked -
   // the other 3 are a locked, tap-opens-upsell teaser (see recommendedItems/
