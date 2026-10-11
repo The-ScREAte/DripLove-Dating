@@ -62,9 +62,10 @@ public class MainActivity extends BridgeActivity {
     // "/" - the replaceState+popstate dispatch below is what makes
     // BrowserRouter itself switch which route renders, same mechanism as
     // every tab-query-param case), open_circle_profile -> that one Circle
-    // profile, message -> the specific conversation, match -> the chat list,
-    // like -> Liked Me, image_rejected -> Profile, everything else ->
-    // Discover (default).
+    // profile, open_chat/open_liked/open_profile/open_circle -> that tab
+    // (scheduled messages choose it), message -> the specific conversation,
+    // match -> the chat list, like -> Liked Me, image_rejected -> Profile,
+    // everything else -> Discover (default).
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getStringExtra("action");
@@ -82,6 +83,14 @@ public class MainActivity extends BridgeActivity {
             route = "/games";
         } else if ("open_circle_profile".equals(action) && profileId != null) {
             route = "/?tab=circle&circleUserId=" + profileId;
+        } else if ("open_chat".equals(action)) {
+            route = "/?tab=chat";
+        } else if ("open_liked".equals(action)) {
+            route = "/?tab=liked";
+        } else if ("open_profile".equals(action)) {
+            route = "/?tab=profile";
+        } else if ("open_circle".equals(action)) {
+            route = "/?tab=circle";
         } else if (type == null) {
             return;
         } else if ("message".equals(type) && intent.getStringExtra("chatId") != null) {
@@ -99,12 +108,27 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge() != null ? getBridge().getWebView() : null;
         if (webView == null) return;
         String escapedRoute = route.replace("\\", "\\\\").replace("'", "\\'");
-        // Queue the destination immediately. The tiny readiness loop replaces
-        // the old blind 1.5-second reload, preserves the SPA, and hands the
-        // route to MainApp as soon as its document exists.
-        webView.post(() -> webView.evaluateJavascript(
-            "(function go(){if(document&&document.documentElement){history.replaceState({},'', '" + escapedRoute + "');window.dispatchEvent(new Event('popstate'));}else{setTimeout(go,25);}})();",
-            null));
+        String tapId = escapedRoute + "#" + System.currentTimeMillis();
+        // On a cold start (app closed when the notification was tapped) this
+        // runs while the WebView is still loading - a script evaluated then
+        // lands in the blank placeholder page and is thrown away when the app
+        // page replaces it, so the tap opened Discover. So it's tried a few
+        // times over several seconds and only applied inside the real app page
+        // (http/https with #root), once per tap; when the app is already open
+        // the first try applies it straight away. MainApp reads the URL on
+        // mount and listens for popstate, so either moment works.
+        final String script =
+            "(function(){try{"
+            + "if((location.protocol!=='https:'&&location.protocol!=='http:')||!document.getElementById('root'))return;"
+            + "if(window.__dlNotificationTap==='" + tapId + "')return;"
+            + "window.__dlNotificationTap='" + tapId + "';"
+            + "history.replaceState({},'','" + escapedRoute + "');"
+            + "window.dispatchEvent(new Event('popstate'));"
+            + "}catch(e){}})();";
+        long[] delays = {0, 300, 800, 1500, 2500, 4000, 6000, 9000};
+        for (long delay : delays) {
+            webView.postDelayed(() -> webView.evaluateJavascript(script, null), delay);
+        }
     }
     
     private void configureWebViewForVideo() {

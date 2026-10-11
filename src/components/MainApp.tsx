@@ -1372,6 +1372,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange('circle');
         return;
       }
+      // Scheduled messages pick the screen a tap opens (tap_action).
+      const actionTabs: Record<string, string> = {
+        open_chat: 'chat',
+        open_liked: 'liked',
+        open_profile: 'profile',
+        open_circle: 'circle',
+      };
+      if (action && actionTabs[action]) {
+        handleTabChange(actionTabs[action]);
+        return;
+      }
       if (type === 'message' && chatId) {
         setChatDeepLinkMatchId(chatId);
         handleTabChange('chat');

@@ -47,6 +47,8 @@ const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
 //   like    -> Liked Me
 //   image_rejected -> Profile
 //   action open_circle_profile -> that person's profile inside Circle
+//   action open_chat / open_liked / open_profile / open_circle -> that tab
+//     (scheduled messages choose where a tap goes - see scheduled_broadcasts.tap_action)
 //   action open_games -> the Games hub (/games is its own top-level route,
 //     not a tab on "/" like everything else here - see navigateFromNotification
 //     and MainApp's nav handler for how a plain URL change alone isn't enough
@@ -67,6 +69,10 @@ export const resolveNotificationRoute = (
   if (data?.action === 'open_circle_profile' && data?.profileId) {
     return `/?tab=circle&circleUserId=${data.profileId}`;
   }
+  if (data?.action === 'open_chat') return '/?tab=chat';
+  if (data?.action === 'open_liked') return '/?tab=liked';
+  if (data?.action === 'open_profile') return '/?tab=profile';
+  if (data?.action === 'open_circle') return '/?tab=circle';
   if (type === 'message' && data?.chatId) return `/?tab=chat&matchId=${data.chatId}`;
   if (type === 'match') return '/?tab=chat';
   if (type === 'like') return '/?tab=liked';

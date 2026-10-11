@@ -137,9 +137,11 @@
   </head>
 
   <body>
-    <!-- Inside the iOS/Android app (served from localhost) the app paints right
-         away, so the web summary below is never shown there. -->
-    <script>if (location.hostname === 'localhost') document.documentElement.classList.add('native-shell');</script>
+    <!-- The summary below is for search engines and AI crawlers, which read the
+         page's HTML. Anyone actually running the page (the iOS/Android app,
+         which is served as www.driplove.love, and every browser with
+         JavaScript) never sees it - only the app, once it loads. -->
+    <script>document.documentElement.classList.add('js');</script>
     <style>
       #seo-shell { min-height: 100vh; background: #000; color: #d4d4d4; font: 15px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         padding: calc(env(safe-area-inset-top, 0px) + 40px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 40px) max(20px, env(safe-area-inset-left, 0px)); }
@@ -149,7 +151,7 @@
       #seo-shell h3 { color: #f5f5f5; font-size: 15px; margin: 16px 0 4px; }
       #seo-shell p, #seo-shell ul { margin: 0 0 10px; }
       #seo-shell a { color: #f472b6; }
-      .native-shell #seo-shell { display: none; }
+      .js #seo-shell { display: none; }
     </style>
     <div id="root">
       <main id="seo-shell">
