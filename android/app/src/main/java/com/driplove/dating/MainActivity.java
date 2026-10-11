@@ -123,6 +123,12 @@ public class MainActivity extends BridgeActivity {
             + "if((location.protocol!=='https:'&&location.protocol!=='http:')||!document.getElementById('root'))return;"
             + "if(window.__dlNotificationTap==='" + tapId + "')return;"
             + "window.__dlNotificationTap='" + tapId + "';"
+            // Capacitor's own tap event may already have routed this same tap
+            // (navigateFromNotification stamps __dlNotificationRoute) - don't
+            // apply it a second time.
+            + "var m=window.__dlNotificationRoute;"
+            + "if(m&&m.route==='" + escapedRoute + "'&&Date.now()-m.at<8000)return;"
+            + "window.__dlNotificationRoute={route:'" + escapedRoute + "',at:Date.now()};"
             + "history.replaceState({},'','" + escapedRoute + "');"
             + "window.dispatchEvent(new Event('popstate'));"
             + "}catch(e){}})();";

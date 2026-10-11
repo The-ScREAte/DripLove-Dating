@@ -120,6 +120,20 @@ export const navigateFromNotification = (
   // tab/matchId/circleUserId back out of it on mount - so setting it here
   // makes the destination durable no matter when the remount lands.
   const route = resolveNotificationRoute(resolvedType, normalized);
+
+  // On Android the same tap can arrive twice - here (Capacitor's tap event)
+  // and from MainActivity, which routes the intent itself (it has to, for
+  // notifications it builds while the app is open). If the second copy lands
+  // after the screen already used the first, it would open the same chat or
+  // profile again. Both paths stamp the route they applied; a repeat of the
+  // same route within a few seconds is the same tap and is skipped.
+  const marker = (window as unknown as { __dlNotificationRoute?: { route: string; at: number } }).__dlNotificationRoute;
+  if (marker && marker.route === route && Date.now() - marker.at < 8000) return;
+  (window as unknown as { __dlNotificationRoute?: { route: string; at: number } }).__dlNotificationRoute = {
+    route,
+    at: Date.now(),
+  };
+
   if (route !== '/') window.history.replaceState({}, '', route);
 
   if (inAppNavHandler) {

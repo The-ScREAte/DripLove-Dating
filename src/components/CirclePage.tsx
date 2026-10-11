@@ -1297,7 +1297,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         try {
           const [profile] = await fetchCircleProfilesByIds([circleUserId]);
           if (cancelled) return;
-          if (profile && await isCircleProfileEligible(currentUser, profile, isPremium)) {
+          if (profile && await isCircleProfileEligible(currentUser, profile, isPremium, { fromNotification: true })) {
             openCircleRowProfile('recommended', profile);
           } else {
             toast({ title: 'Profile unavailable', description: 'This profile is no longer available in your Circle.' });

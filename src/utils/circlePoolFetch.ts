@@ -397,24 +397,38 @@ export const fetchCircleProfilesByIds = async (ids: string[]): Promise<CirclePro
     .map((p) => ({ ...p, favorites: parseFavorites(p.favorites), firstImage: firstImageByUser[p.id] }));
 };
 
-/** Validates a directly linked profile against the same eligibility rules as Circle. */
+/**
+ * Validates a directly linked profile against the same eligibility rules as Circle.
+ *
+ * `fromNotification`: the link came from a push that named this person ("Ama,
+ * you might like Kofi"). Those are picked server-side within the viewer's
+ * countries and preferences, but not always inside their age range or
+ * distance (when nobody inside them was left to recommend), and rejecting
+ * them there turned the tap into "Profile unavailable". For these the
+ * browsing filters (age, distance) are skipped; everything that makes someone
+ * genuinely unavailable still applies - already liked/passed/matched, a block
+ * either way, gender/preference and country.
+ */
 export const isCircleProfileEligible = async (
   currentUser: CurrentUser,
   profile: CircleProfile,
-  isPremium?: boolean
+  isPremium?: boolean,
+  options: { fromNotification?: boolean } = {}
 ): Promise<boolean> => {
   if (!currentUser.id || profile.id === currentUser.id) return false;
   const excluded = await fetchCircleExclusionIds(currentUser.id);
   if (excluded.has(profile.id)) return false;
   if (!getCircleGenderFilter(currentUser.preference || 'everyone').includes(profile.gender)) return false;
   if (!matchesReciprocalPreference(currentUser.gender, profile.preference)) return false;
-  if (!profile.date_of_birth) return false;
-  const age = calculateAge(profile.date_of_birth);
-  if (age < (currentUser.min_age || 18) || age > (currentUser.max_age || 99)) return false;
 
   const split = getCircleCountrySplit(currentUser, isPremium);
   const profileCountry = normalizeCountryCode(profile.country_code || '');
   if (profileCountry !== split.baseCountryCode && !split.unlockedCountryCodes.includes(profileCountry)) return false;
+  if (options.fromNotification) return true;
+
+  if (!profile.date_of_birth) return false;
+  const age = calculateAge(profile.date_of_birth);
+  if (age < (currentUser.min_age || 18) || age > (currentUser.max_age || 99)) return false;
 
   if (profileCountry === split.baseCountryCode) {
     const { userLat, userLon, hasCoords, maxDistanceKm } = getCircleDistanceParams(currentUser, isPremium);
