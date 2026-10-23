@@ -963,7 +963,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         <div
           className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
           style={{
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 45%, rgba(0,0,0,0.94) 58%, rgba(0,0,0,1) 70%)',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
           }}
         >
           <div className="flex justify-between items-start">

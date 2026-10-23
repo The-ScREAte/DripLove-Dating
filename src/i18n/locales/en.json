@@ -23,9 +23,9 @@
     "apply": "Apply",
     "reset": "Reset",
     "select": "Select",
-    "findYourPerfectMatch": "Slide Into Real Love Here",
-    "findYour": "Slide Into",
-    "perfectMatch": "Real Love Here 💖",
+    "findYourPerfectMatch": "Slide In. Fall Into Real Love Here!",
+    "findYour": "Slide In.",
+    "perfectMatch": "Fall Into Real Love Here! 💖",
     "clickToClose": "Click to close"
   },
   "auth": {
@@ -781,7 +781,7 @@
     "unavailable": "This user's profile is not available or has been removed."
   },
   "welcome": {
-    "tagline": "Real People, Real Love, Drip In Love",
+    "tagline": "Slide In. Fall Into Real Love Here!",
     "getStarted": "Get Started",
     "joinThousands": "Join thousands finding love across continents",
     "aboutLink": "About DripLove",

@@ -234,13 +234,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLogin, onAbout, onTerms
         >
           {t('welcome.tagline')}
         </p>
-        <p className="text-lg sm:text-2xl text-white/95 text-center break-words mt-1 font-bold tracking-wide px-2" 
-           style={{ 
-             fontFamily: 'cursive, serif',
-             textShadow: '0 2px 8px rgba(0,0,0,0.3), 0 0 20px rgba(255,255,255,0.2)',
-             letterSpacing: '0.05em'
-           }}>
-        </p>
       </div>
 
       {/* Auth Buttons - Moved closer to footer */}

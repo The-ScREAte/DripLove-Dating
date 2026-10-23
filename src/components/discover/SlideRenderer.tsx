@@ -7,6 +7,7 @@ import styles from './MatchCard.module.css';
 import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { dropBlobUrl } from '@/utils/imageCache';
+import { isAndroidPlatform } from '@/utils/platformUtils';
 
 interface SlideRendererProps {
   slide: SlideContent;
@@ -46,6 +47,8 @@ const ImageSlide = React.memo<{
   showLoader: boolean;
 }>(({ imageSrc, originalUrl, matchFirstName, matchLastName, usingBlob, showLoader }) => {
   const [hasError, setHasError] = React.useState(false);
+  // Photo's natural width/height, set on load - sizes the reflection box.
+  const [photoAspect, setPhotoAspect] = React.useState<number | null>(null);
   // Once the live network request fails, this holds a persistent-cache
   // fallback (IndexedDB, survives app restarts) so the photo can still show
   // with no internet, as long as it loaded successfully at least once before.
@@ -143,6 +146,8 @@ const ImageSlide = React.memo<{
     if (!fallbackSrc) warmImageCache(originalUrl);
   }, [fallbackSrc, originalUrl]);
 
+  const displaySrc = fallbackSrc ?? transformSrc ?? (blobAbandoned ? originalUrl : imageSrc);
+
   // Show placeholder if image failed to load
   if (hasError) {
     return (
@@ -175,7 +180,76 @@ const ImageSlide = React.memo<{
     // (photos are already cropped to 3:4 by the app's own crop tool, so this
     // is normally a small, symmetric crop, not a jarring one) with zero bars,
     // pure CSS, still no JS measurement involved.
+    //
+    // The photo itself is shown whole (object-contain). Above and below it,
+    // a vertically mirrored copy of the photo's own top/bottom edge acts as
+    // a reflection - only lightly blurred, and fading deeper toward the far
+    // top/bottom of the card - so the leftover space continues the image
+    // instead of showing flat black bars. The mirror box is sized to the
+    // photo's natural aspect ratio (known after load) at full card width,
+    // which is exactly where object-contain places a width-limited photo.
+    // A softly blurred cover copy sits underneath for any side gaps.
     <div className="absolute inset-0 bg-black overflow-hidden">
+      <img
+        src={displaySrc}
+        aria-hidden="true"
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{
+          filter: 'blur(10px) brightness(0.6)',
+          transform: 'scale(1.1)',
+        }}
+        draggable={false}
+      />
+      {photoAspect && (
+        <div
+          aria-hidden="true"
+          className="absolute left-0 right-0 top-1/2 -translate-y-1/2 z-[1] pointer-events-none"
+          style={{ aspectRatio: String(photoAspect) }}
+        >
+          {(['top', 'bottom'] as const).map((side) => (
+            <div
+              key={side}
+              className="absolute left-0 w-full h-full overflow-hidden"
+              style={side === 'top' ? { bottom: '100%' } : { top: '100%' }}
+            >
+              <img
+                src={displaySrc}
+                alt=""
+                className="w-full h-full object-fill"
+                style={{
+                  transform: 'scaleY(-1)',
+                  filter: `blur(${isAndroidPlatform() ? 2 : 3}px)`,
+                }}
+                draggable={false}
+              />
+              {/* Sharp mirror fading out away from the photo: right at the
+                  edge a mirror's pixels are identical to the photo's own edge
+                  row, so this makes the photo flow into its reflection with
+                  no visible line, then hands over to the softer copy below. */}
+              <img
+                src={displaySrc}
+                alt=""
+                className="absolute inset-0 w-full h-full object-fill"
+                style={{
+                  transform: 'scaleY(-1)',
+                  // Mask is applied before the flip, so the opaque end sits at
+                  // the photo-adjacent edge after scaleY(-1).
+                  maskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, black 0%, transparent 25%)`,
+                  WebkitMaskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, black 0%, transparent 25%)`,
+                }}
+                draggable={false}
+              />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(to ${side}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 35%, rgba(0,0,0,0.9) 100%)`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
       <img
         key={imageSrc}
         loading="eager"
@@ -183,11 +257,18 @@ const ImageSlide = React.memo<{
         // blobAbandoned swaps a dead blob: preview for the real network URL
         // (see handleError); originalUrl is never a blob, so this is always a
         // genuinely different, re-fetchable source.
-        src={fallbackSrc ?? transformSrc ?? (blobAbandoned ? originalUrl : imageSrc)}
+        src={displaySrc}
         alt={`${matchFirstName} ${matchLastName}`}
-        className={`absolute inset-0 w-full h-full object-cover object-center ${styles.optimizedImage}`}
+        className={`absolute inset-0 w-full h-full object-contain object-center ${styles.optimizedImage}`}
+        // optimizedImage paints a black background across the whole box,
+        // which would hide the blurred backdrop above/below the photo.
+        style={{ backgroundColor: 'transparent' }}
         draggable={false}
-        onLoad={handleLoad}
+        onLoad={(e) => {
+          const { naturalWidth, naturalHeight } = e.currentTarget;
+          if (naturalWidth && naturalHeight) setPhotoAspect(naturalWidth / naturalHeight);
+          handleLoad();
+        }}
         onError={handleError}
       />
     </div>
