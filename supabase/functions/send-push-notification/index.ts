@@ -227,6 +227,12 @@ serve(async (req) => {
     // Sent by process-missed-notifications for items already in the inbox and
     // already queued once - never store or queue them again.
     const isCatchup = String((data as Record<string, unknown>)?.catchup ?? '') === 'true'
+    // A repeat of an unopened match/like/message push, sent by
+    // send_notification_reminders() (every 2h until it's seen). Also a
+    // catchup, so nothing is stored or queued again; the tap records the
+    // ORIGINAL notification as opened, which stops further reminders.
+    const rawReminderOf = (data as Record<string, unknown>)?.reminderOf
+    const reminderOf = typeof rawReminderOf === 'string' && rawReminderOf ? rawReminderOf : undefined
 
     console.log(`📤 Processing notification for user ${userId}:`, { title, body, type, category, kind })
 
@@ -333,7 +339,7 @@ serve(async (req) => {
     }
 
     // Likes are grouped: say how many arrived since the last like push.
-    if (kind === 'like') {
+    if (kind === 'like' && !reminderOf) {
       const { data: lastLikePush } = await supabase
         .from('push_delivery_log')
         .select('created_at')
@@ -374,7 +380,7 @@ serve(async (req) => {
     const rawNotificationData = {
       ...(resolvedImageUrl ? { ...data, imageUrl: resolvedImageUrl } : data),
       // Lets the app record the tap (mark_notification_opened).
-      notificationId,
+      notificationId: reminderOf ?? notificationId,
     }
     // FCM's "data" payload only accepts string values - a boolean like
     // showStreakBanner: true gets the whole send rejected with a 400,
