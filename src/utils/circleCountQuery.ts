@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export { applyCircleCountFilters } from '@/utils/circleCountFilters';
+export { applyCircleCountFilters, MAX_EXCLUDED_IN_URL } from '@/utils/circleCountFilters';
 export type { CategoryFilter } from '@/utils/circleCountFilters';
 import { fetchBlockRows } from '@/utils/blockCounterparts';
 import type { CategoryFilter } from '@/utils/circleCountFilters';
@@ -66,4 +66,49 @@ export const fetchCircleTotals = async (
   const merged = { ...(prev && Date.now() - prev.at < TOTALS_TTL_MS ? prev.totals : {}), ...totals };
   if (Object.values(totals).some((v) => v !== null)) totalsCache.set(viewer.id, { at: Date.now(), totals: merged });
   return totals;
+};
+
+export interface CircleCountRpcOptions {
+  codes?: string[] | null;
+  allowedGenders?: string[] | null;
+  dob?: { earliest: string; latest: string } | null;
+  excluded?: Set<string>;
+  box?: { lat: number; lon: number; degrees: number } | null;
+  viewerGender?: string;
+  activeOnly?: boolean;
+  filter?: CategoryFilter;
+}
+
+/**
+ * Same count as applyCircleCountFilters(...head) but through the count_circle_profiles RPC, so the (large) exclusion
+ * list travels in the POST body instead of the URL. Returns null when the RPC is unavailable or fails, so the caller
+ * can fall back to the query-builder path.
+ */
+export const countCircleProfilesRpc = async (o: CircleCountRpcOptions): Promise<number | null> => {
+  try {
+    const f = o.filter;
+    const { data, error } = await supabase.rpc('count_circle_profiles' as never, {
+      p_country_codes: o.codes && o.codes.length > 0 ? o.codes : null,
+      p_allowed_genders: o.allowedGenders && o.allowedGenders.length > 0 ? o.allowedGenders : null,
+      p_dob_earliest: o.dob?.earliest ?? null,
+      p_dob_latest: o.dob?.latest ?? null,
+      p_excluded_ids: o.excluded && o.excluded.size > 0 ? Array.from(o.excluded) : null,
+      p_box_lat: o.box?.lat ?? null,
+      p_box_lon: o.box?.lon ?? null,
+      p_box_degrees: o.box?.degrees ?? null,
+      p_viewer_gender: o.viewerGender ?? null,
+      p_active_only: o.activeOnly ?? false,
+      p_relationship_intent: f?.relationshipIntent ?? null,
+      p_is_verified: f?.isVerified ?? null,
+      p_family_plans: f?.familyPlans ?? null,
+      p_interest: f?.interest ?? null,
+      p_has_music: f?.hasMusic ?? null,
+      p_has_social_media: f?.hasSocialMedia ?? null,
+      p_has_pets: f?.hasPets ?? null,
+    } as never);
+    if (error || typeof data !== 'number') return null;
+    return data;
+  } catch {
+    return null;
+  }
 };

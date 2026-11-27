@@ -97,7 +97,7 @@ import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 import { TeaserAvatars } from './circle/TeaserAvatars';
-import { applyCircleCountFilters, fetchCircleTotals, fetchViewerExclusions, type CategoryFilter } from '@/utils/circleCountQuery';
+import { applyCircleCountFilters, countCircleProfilesRpc, fetchCircleTotals, fetchViewerExclusions, MAX_EXCLUDED_IN_URL, type CategoryFilter } from '@/utils/circleCountQuery';
 import { fetchCircleTeaserPhotos } from '@/utils/circleTeaserPhotos';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
@@ -1088,15 +1088,30 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           viewerGender: currentUser.gender || undefined,
           filter,
         });
-        const head = await withFilters(supabase.from('profiles').select('id', { count: 'exact', head: true }));
-        if (head.error || typeof head.count !== 'number') return 0;
+        // A big exclusion list (likes/passes/matches/blocks) cannot go in the URL: count through the RPC instead.
+        const bigExclusions = excluded.size > MAX_EXCLUDED_IN_URL;
+        let headCount: number | null = null;
+        if (bigExclusions) {
+          headCount = await countCircleProfilesRpc({
+            codes, allowedGenders, dob: dobBounds, excluded,
+            box: useBox ? { lat: userLat as number, lon: userLon as number, degrees: radiusDegrees as number } : null,
+            viewerGender: currentUser.gender || undefined, filter,
+          });
+        }
+        if (headCount === null) {
+          const head = await withFilters(supabase.from('profiles').select('id', { count: 'exact', head: true }));
+          if (head.error || typeof head.count !== 'number') return 0;
+          headCount = head.count;
+        }
         const needsCircle = applyRadius && hasCoords;
-        if (!needsCircle) return head.count;
-        if (head.count === 0) return 0;
-        if (head.count > EXACT_RADIUS_REFINE_MAX) return Math.floor(head.count * (Math.PI / 4));
+        if (!needsCircle) return headCount;
+        if (headCount === 0) return 0;
+        if (headCount > EXACT_RADIUS_REFINE_MAX) return Math.floor(headCount * (Math.PI / 4));
         const { data, error } = await withFilters(supabase.from('profiles').select('id, latitude, longitude'));
-        if (error || !data) return Math.floor(head.count * (Math.PI / 4));
-        return (data as { latitude: number | null; longitude: number | null }[]).filter((profile) => {
+        if (error || !data) return Math.floor(headCount * (Math.PI / 4));
+        return (data as { id: string; latitude: number | null; longitude: number | null }[]).filter((profile) => {
+          // exclusions too big for the URL were not applied by the query: apply them here
+          if (bigExclusions && excluded.has(profile.id)) return false;
           if (typeof profile.latitude !== 'number' || typeof profile.longitude !== 'number') return true;
           return calculateDistance(userLat as number, userLon as number, profile.latitude, profile.longitude) <= maxDistanceKm;
         }).length;

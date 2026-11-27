@@ -118,3 +118,23 @@ describe('applyCircleCountFilters: archived members are INCLUDED', () => {
     expect(calls.some(([n, a]) => n === 'not' && a[0] === 'id' && a[1] === 'in')).toBe(true);
   });
 });
+
+describe('applyCircleCountFilters exclusion list size', () => {
+  const recorder = () => {
+    const calls: string[] = [];
+    const q: Record<string, unknown> = new Proxy({}, {
+      get: (_t, prop: string) => (...args: unknown[]) => { calls.push(`${prop}:${String(args[0])}`); return q; },
+    });
+    return { q, calls };
+  };
+  it('puts a small exclusion list in the query', () => {
+    const { q, calls } = recorder();
+    applyCircleCountFilters(q, { excluded: new Set(['a', 'b']) });
+    expect(calls.some((c) => c.startsWith('not:id'))).toBe(true);
+  });
+  it('leaves a huge list out of the URL (it would 400); callers use the RPC / client filter', () => {
+    const { q, calls } = recorder();
+    applyCircleCountFilters(q, { excluded: new Set(Array.from({ length: 400 }, (_, i) => `id-${i}`)) });
+    expect(calls.some((c) => c.startsWith('not:id'))).toBe(false);
+  });
+});

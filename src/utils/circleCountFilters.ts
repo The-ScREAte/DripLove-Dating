@@ -1,5 +1,8 @@
 /** Pure (no Supabase client import): the shared Circle count filters + category filter type. */
 
+/** Most excluded ids that safely fit in a PostgREST URL. */
+export const MAX_EXCLUDED_IN_URL = 100;
+
 /** The one thing a Circle category tile filters people by (exactly one is ever set). */
 export interface CategoryFilter {
   relationshipIntent?: string;
@@ -42,7 +45,11 @@ export const applyCircleCountFilters = (q: any, o: CountFilterOptions) => {
   if (o.codes && o.codes.length > 0) q = q.in('country_code', o.codes);
   if (o.allowedGenders && o.allowedGenders.length > 0) q = q.in('gender', o.allowedGenders);
   if (o.dob) q = q.gte('date_of_birth', o.dob.earliest).lte('date_of_birth', o.dob.latest);
-  if (o.excluded && o.excluded.size > 0) q = q.not('id', 'in', `(${Array.from(o.excluded).join(',')})`);
+  // Big lists do not fit in the request URL (the API answers 400 above ~8 KB, i.e. ~200 uuids), so they are left out
+  // here: callers with large sets count through the count_circle_profiles RPC (POST body) or filter client-side.
+  if (o.excluded && o.excluded.size > 0 && o.excluded.size <= MAX_EXCLUDED_IN_URL) {
+    q = q.not('id', 'in', `(${Array.from(o.excluded).join(',')})`);
+  }
   if (o.box) {
     q = q
       .gte('latitude', o.box.lat - o.box.degrees)
