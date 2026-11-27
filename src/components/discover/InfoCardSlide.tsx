@@ -56,12 +56,11 @@ const chipText = (c: ChipRef, tr: Tr): { emoji: string; label: string } => {
 
 /** Faint icons drifting behind the text: position, size, drift, tip, speed (s) and starting offset. */
 const DECOR: Array<{ x: string; y: string; size: number; dx: string; dy: string; rot: string; dur: string; delay: string; op: number; spark?: boolean }> = [
-  { x: '6%', y: '17%', size: 34, dx: '16px', dy: '-22px', rot: '20deg', dur: '9s', delay: '-1s', op: 0.17 },
-  { x: '78%', y: '12%', size: 24, dx: '-14px', dy: '20px', rot: '-24deg', dur: '11s', delay: '-4s', op: 0.15, spark: true },
-  { x: '88%', y: '46%', size: 40, dx: '-18px', dy: '-16px', rot: '16deg', dur: '13s', delay: '-7s', op: 0.13 },
-  { x: '9%', y: '58%', size: 26, dx: '20px', dy: '18px', rot: '-18deg', dur: '10s', delay: '-3s', op: 0.15, spark: true },
-  { x: '70%', y: '70%', size: 30, dx: '-12px', dy: '-24px', rot: '26deg', dur: '12s', delay: '-9s', op: 0.14 },
-  { x: '24%', y: '76%', size: 20, dx: '14px', dy: '-14px', rot: '-30deg', dur: '8s', delay: '-5s', op: 0.16, spark: true },
+  { x: '7%', y: '15%', size: 30, dx: '14px', dy: '-18px', rot: '16deg', dur: '5.5s', delay: '-1s', op: 0.16 },
+  { x: '80%', y: '13%', size: 22, dx: '-12px', dy: '16px', rot: '-20deg', dur: '6.5s', delay: '-3s', op: 0.15, spark: true },
+  { x: '86%', y: '60%', size: 34, dx: '-14px', dy: '-14px', rot: '14deg', dur: '7.5s', delay: '-5s', op: 0.13 },
+  { x: '10%', y: '62%', size: 24, dx: '16px', dy: '14px', rot: '-16deg', dur: '6s', delay: '-2s', op: 0.15, spark: true },
+  { x: '46%', y: '80%', size: 20, dx: '12px', dy: '-12px', rot: '-24deg', dur: '5s', delay: '-4s', op: 0.14 },
 ];
 
 const Eyebrow: React.FC<{ icon: Icon; children: React.ReactNode }> = ({ icon: I, children }) => (
