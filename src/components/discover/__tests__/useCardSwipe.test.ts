@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { decideSwipe, dragTransform, exitTransform, minSwipeDistance, stampLook } from '../useCardSwipe';
 
 describe('minSwipeDistance', () => {
-  it('uses 25% of the viewport on touch, capped at 120px', () => {
-    expect(minSwipeDistance(320, 'touch')).toBe(80);
-    expect(minSwipeDistance(390, 'touch')).toBeCloseTo(97.5);
-    expect(minSwipeDistance(1280, 'touch')).toBe(120);
+  it('uses 30% of the viewport on touch, between 100 and 140px', () => {
+    expect(minSwipeDistance(320, 'touch')).toBe(100);
+    expect(minSwipeDistance(390, 'touch')).toBeCloseTo(117);
+    expect(minSwipeDistance(1280, 'touch')).toBe(140);
   });
-  it('is a fixed 80px for the mouse', () => {
-    expect(minSwipeDistance(1280, 'mouse')).toBe(80);
+  it('is a fixed 100px for the mouse', () => {
+    expect(minSwipeDistance(1280, 'mouse')).toBe(100);
   });
 });
 
@@ -16,23 +16,28 @@ describe('decideSwipe', () => {
   const base = { vx: 0, viewportWidth: 390, source: 'touch' as const };
   it('snaps back for a short, slow drag', () => {
     expect(decideSwipe({ ...base, deltaX: 60 })).toBeNull();
-    expect(decideSwipe({ ...base, deltaX: -97 })).toBeNull();
+    expect(decideSwipe({ ...base, deltaX: -110 })).toBeNull();
   });
   it('commits past the distance threshold in the dragged direction', () => {
-    expect(decideSwipe({ ...base, deltaX: 100 })).toBe('right');
-    expect(decideSwipe({ ...base, deltaX: -100 })).toBe('left');
+    expect(decideSwipe({ ...base, deltaX: 120 })).toBe('right');
+    expect(decideSwipe({ ...base, deltaX: -120 })).toBe('left');
   });
-  it('commits a short but quick flick in the same direction', () => {
-    expect(decideSwipe({ ...base, deltaX: 50, vx: 0.9 })).toBe('right');
-    expect(decideSwipe({ ...base, deltaX: -50, vx: -0.9 })).toBe('left');
+  it('commits a quick flick only when it also travelled a real distance', () => {
+    expect(decideSwipe({ ...base, deltaX: 80, vx: 0.9 })).toBe('right');
+    expect(decideSwipe({ ...base, deltaX: -80, vx: -0.9 })).toBe('left');
   });
-  it('ignores a flick that is too short or opposite to the drag', () => {
-    expect(decideSwipe({ ...base, deltaX: 30, vx: 0.9 })).toBeNull();
-    expect(decideSwipe({ ...base, deltaX: 50, vx: -0.9 })).toBeNull();
+  it('ignores a small nudge, even a fast one, and a flick against the drag', () => {
+    expect(decideSwipe({ ...base, deltaX: 40, vx: 1.5 })).toBeNull();
+    expect(decideSwipe({ ...base, deltaX: 60, vx: 1.5 })).toBeNull();
+    expect(decideSwipe({ ...base, deltaX: 80, vx: -0.9 })).toBeNull();
+  });
+  it('ignores mostly-vertical drags however far they go sideways', () => {
+    expect(decideSwipe({ ...base, deltaX: 130, deltaY: 160 })).toBeNull();
+    expect(decideSwipe({ ...base, deltaX: 130, deltaY: 40 })).toBe('right');
   });
   it('uses the mouse threshold for desktop drags', () => {
-    expect(decideSwipe({ deltaX: 85, vx: 0, viewportWidth: 1280, source: 'mouse' })).toBe('right');
-    expect(decideSwipe({ deltaX: 85, vx: 0, viewportWidth: 1280, source: 'touch' })).toBeNull();
+    expect(decideSwipe({ deltaX: 105, vx: 0, viewportWidth: 1280, source: 'mouse' })).toBe('right');
+    expect(decideSwipe({ deltaX: 105, vx: 0, viewportWidth: 1280, source: 'touch' })).toBeNull();
   });
 });
 

@@ -44,24 +44,35 @@ const HOLD_SAFETY_MS = 2500; // longest a committed card waits for the parent to
 // Pure helpers (unit tested)
 // ---------------------------------------------------------------------------
 
-/** Horizontal distance that registers as a deliberate swipe on release. */
+/**
+ * Horizontal distance that registers as a deliberate swipe on release: ~30% of the screen on touch (never under 100
+ * or over 140 px) so a small nudge, a tap that wiggled, or a scroll never likes/passes anyone by accident.
+ */
 export function minSwipeDistance(viewportWidth: number, source: 'touch' | 'mouse'): number {
-  return source === 'mouse' ? 80 : Math.min(viewportWidth * 0.25, 120);
+  return source === 'mouse' ? 100 : Math.min(Math.max(viewportWidth * 0.3, 100), 140);
 }
 
+/** A quick flick must still be a real gesture: fast, clearly sideways, and at least this far. */
+const FLICK_MIN_DISTANCE = 70;
+const FLICK_MIN_VELOCITY = 0.8; // px/ms
+
 /**
- * Decide what a released drag means: 'left' / 'right' to commit, or null to
- * snap back. A quick flick commits even when it did not travel far.
+ * Decide what a released drag means: 'left' / 'right' to commit, or null to snap back.
+ * Rules (all must hold to commit): the move is mainly sideways (not a vertical drag / scroll), and it either went
+ * far enough or was a fast flick that also travelled a real distance in the same direction.
  */
 export function decideSwipe(opts: {
   deltaX: number;
+  deltaY?: number;
   vx: number; // px/ms, smoothed
   viewportWidth: number;
   source: 'touch' | 'mouse';
 }): SwipeDir | null {
-  const { deltaX, vx, viewportWidth, source } = opts;
-  const farEnough = Math.abs(deltaX) > minSwipeDistance(viewportWidth, source);
-  const isFlick = Math.abs(vx) > 0.6 && Math.abs(deltaX) > 40 && Math.sign(vx) === Math.sign(deltaX);
+  const { deltaX, deltaY = 0, vx, viewportWidth, source } = opts;
+  const ax = Math.abs(deltaX);
+  if (Math.abs(deltaY) > ax) return null; // mostly vertical: not a swipe
+  const farEnough = ax > minSwipeDistance(viewportWidth, source);
+  const isFlick = Math.abs(vx) > FLICK_MIN_VELOCITY && ax >= FLICK_MIN_DISTANCE && Math.sign(vx) === Math.sign(deltaX);
   if (!farEnough && !isFlick) return null;
   return deltaX > 0 ? 'right' : 'left';
 }
@@ -369,10 +380,12 @@ export function useCardSwipe(options: Options) {
     dragging.current = false;
     cancelFrame(); // a frame left queued would overwrite the exit transform
     lastPushed.current = { dir: null, dist: 0 };
+    const endDy = delta.current.y;
     delta.current = { x: 0, y: 0 };
     const o = opts.current;
     const dir = decideSwipe({
       deltaX: endX - start.current.x,
+      deltaY: endDy,
       vx: velocity.current.vx,
       viewportWidth: window.innerWidth,
       source,
