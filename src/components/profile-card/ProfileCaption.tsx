@@ -78,13 +78,13 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
 
   return (
     <div
-      className={`dl-caption-pad absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}${animateIn ? ' dl-card-enter' : ''}`}
+      className={`dl-caption-pad absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}${animateIn ? ' dl-card-fade-now' : ''}`}
       style={{
         background:
           'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
       }}
     >
-      <div className="flex items-start justify-between gap-1">
+      <div className={`flex items-start justify-between gap-1${animateIn ? ' dl-card-enter' : ''}`}>
         <div className="min-w-0 flex-1 pr-11">
           <div className="mb-1 flex items-center gap-2 leading-tight">
             <h2 dir="auto" className="min-w-0 break-words text-[clamp(15px,4.4vw,18px)] font-bold text-white">

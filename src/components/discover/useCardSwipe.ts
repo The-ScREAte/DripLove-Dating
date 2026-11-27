@@ -32,6 +32,7 @@ const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const SNAP_BACK = `transform 0.35s ${EASE_OUT}`;
 const EDGE_GUARD = 16; // px - screen-edge strip left to the OS back gesture
 const CAPTURE_SLOP = 6; // px of movement before the pointer is captured
+const HOLD_SAFETY_MS = 2500; // longest a committed card waits for the parent to swap in the next one
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit tested)
@@ -146,6 +147,8 @@ export function useCardSwipe(options: Options) {
     opts.current = options;
   });
 
+  const settleTimer = useRef<number | null>(null);
+  const restoreRef = useRef<(() => void) | null>(null);
   const start = useRef({ x: 0, y: 0 });
   const delta = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
@@ -254,7 +257,15 @@ export function useCardSwipe(options: Options) {
       exitTimer.current = null;
       const cur = opts.current;
       cur.onCommit(dir);
-      if (cur.holdAfterCommit) return; // card stays gone until the parent swaps it or restore() runs
+      if (cur.holdAfterCommit) {
+        // Card stays gone until the parent swaps it (settle()) or restore() runs. Safety net: if the parent never
+        // advances, bring the card back rather than leaving an empty screen.
+        settleTimer.current = window.setTimeout(() => {
+          settleTimer.current = null;
+          if (exiting.current) restoreRef.current?.();
+        }, HOLD_SAFETY_MS);
+        return;
+      }
       // Reset the (reused) card in place so the next profile appears without
       // flying in from off-screen.
       const c = cur.cardRef.current;
@@ -268,8 +279,37 @@ export function useCardSwipe(options: Options) {
     }, ms);
   }, [resetStamps]);
 
+  /**
+   * With `holdAfterCommit`: the parent has swapped in the next card - put the (reused) element back at
+   * rest instantly, with no transition, so the new card appears in place the same frame it renders.
+   * Safe to call at any time; does nothing unless a swipe is waiting to be handed on.
+   */
+  const settle = useCallback(() => {
+    if (!exiting.current) return;
+    if (settleTimer.current !== null) {
+      window.clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    const cur = opts.current;
+    const c = cur.cardRef.current;
+    if (c) {
+      c.style.transition = 'none';
+      c.style.transform = CARD_REST_TRANSFORM;
+      c.style.opacity = '';
+      // Make the browser register this jump BEFORE onExitEnd lets React put the card's transition back; otherwise
+      // both land in one style recalc and the card slides in from off-screen instead of appearing in place.
+      void c.offsetWidth;
+    }
+    cur.onExitEnd();
+    exiting.current = false;
+  }, []);
+
   /** Bring a held (flown-away) card back to rest - used when the parent did not advance. */
   const restore = useCallback(() => {
+    if (settleTimer.current !== null) {
+      window.clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
     const o = opts.current;
     const c = o.cardRef.current;
     if (c) {
@@ -280,6 +320,12 @@ export function useCardSwipe(options: Options) {
     o.onExitEnd();
     exiting.current = false;
   }, []);
+  useLayoutEffect(() => {
+    restoreRef.current = restore;
+    return () => {
+      if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+    };
+  }, [restore]);
 
   const finish = (endX: number, source: 'touch' | 'mouse') => {
     if (!dragging.current) return;
@@ -386,6 +432,7 @@ export function useCardSwipe(options: Options) {
       [flyOut],
     ),
     restore,
+    settle,
     isExiting: () => exiting.current,
     /** True if the last gesture moved enough that a trailing click is not a tap. */
     didDrag: () => maxMove.current > 10,

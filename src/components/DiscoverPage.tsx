@@ -17,7 +17,7 @@
 import { fetchBlockRows } from '@/utils/blockCounterparts';
 import { boundingBoxDegrees } from '@/utils/geoBox';
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAndroidPlatform } from '@/utils/platformUtils';
 import { dropBlobUrl } from '@/utils/imageCache';
@@ -25,7 +25,6 @@ import { calculateAge } from '@/utils/dateUtils';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
-import DominantColorImageBg from './discover/DominantColorImageBg';
 import { useDiscoverAds } from './discover/useDiscoverAds';
 import { AdData, MatchOrAd } from './discover/discoverTypes';
 import { useDiscoverLikeBack } from './discover/useDiscoverLikeBack';
@@ -67,6 +66,7 @@ import { readCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { getLanguageName } from '@/utils/languageNames';
 import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
+import { NextCardPreview } from './discover/NextCardPreview';
 import { DiscoverSkeleton, DiscoverEmptyState } from './discover/DiscoverStates';
 import { useBackClose } from '@/utils/backStack';
 import { useCardSwipe, CARD_EXIT_MS, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
@@ -3776,8 +3776,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     onCommit: (dir) => {
       if (dir === 'right') handleLike(); else handlePass();
     },
+    // Keep the old card off-screen after the swipe and put the (reused) card element back only once the NEXT
+    // profile has rendered (see the effect below). Before, it snapped back to centre showing the old profile for a
+    // frame, then switched - a flicker on every swipe.
+    holdAfterCommit: true,
   });
   const cardSwipeHandlers = cardSwipe.handlers;
+  const settleSwipedCard = cardSwipe.settle;
+  const currentCardId = potentialMatches[currentIndex]?.id;
+  useLayoutEffect(() => {
+    settleSwipedCard();
+  }, [currentCardId, settleSwipedCard]);
 
   // Keyboard parity for desktop / switch-control users: Left = pass, Right = like, with the
   // exact same fly-away as a gesture. Never fires while typing or while any dialog is open.
@@ -5888,87 +5897,22 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     justifyContent: 'flex-end',
     paddingBottom: 0
   }}>
-        {/* ...existing code... */}
-        {nextMatch && (
-          <DominantColorImageBg
-            // No backdrop photo: whenever the next match has a photo, the full-bleed
-            // next-card image below covers this backdrop edge to edge, so a blurred
-            // copy here was never visible - it only cost an extra image request,
-            // decode and blur layer on every swipe (noticeable on Android).
-            imageUrl={undefined}
-          >
-            {/* ...existing code for overlays, etc... */}
-            {nextMatchImages.length > 0 && !isAd(nextMatch) ? (
-              // Full-bleed, same as SlideRenderer's ImageSlide - no fixed 3:4
-              // box centered inside this frame (that letterboxed on typical
-              // taller-than-4:3 phone screens instead of filling edge-to-edge).
-              // Keyed by id: once moveToNext() promotes this card to front and
-              // assigns a NEW next-card behind it, this forces a clean remount
-              // instead of reusing the same DOM node. Without the key, the old
-              // node (mid-transition, having just animated to "revealed") got
-              // reused for the brand-new photo and re-animated from that stale
-              // revealed state back to hidden - a visible "reveals, then pops
-              // blurry again" glitch right after every completed swipe, plus
-              // the wasted extra animation pass was the actual slowdown. A
-              // fresh mount just paints its correct hidden state immediately,
-              // no transition to fight.
-              <div key={nextMatch.id} className="relative w-full h-full bg-black overflow-hidden">
-                  <img
-                    src={(() => {
-                      // ⭐ Use blob URL for instant loading if available
-                      const originalUrl = nextMatchImages[0];
-                      const blobUrl = preloadedBlobImages[nextMatch.id]?.[originalUrl];
-                      return (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : getOptimizedUrl(originalUrl);
-                    })()}
-                    alt={`${nextMatch.first_name}'s photo`}
-                    className="absolute inset-0 w-full h-full object-cover object-center"
-                    style={{
-                      filter: `blur(${nextCardBlurPx}px)`,
-                      // Constant scale, never transitioned - only large enough
-                      // to keep the blur's own edge-softening from revealing a
-                      // hairline of the frame's black background. Letting this
-                      // animate too (scale 1.2 -> 1 alongside the blur/opacity
-                      // clearing) was a second simultaneous moving property
-                      // compounding into the reveal looking like a "pop"
-                      // instead of one clean, single fade.
-                      transform: 'scale(1.1)',
-                      transition: swipeUI.isDragging ? 'none' : 'filter 0.25s ease',
-                      willChange: 'filter',
-                    }}
-                    draggable={false}
-                    loading="eager"
-                    decoding="async"
-                  />
-                  {/* Black tint on top of the blur - the blur alone still let too
-                      much of the next photo read through at a glance. Fades out
-                      in lockstep with the blur, so both clear together as one
-                      single smooth reveal right as the swipe actually completes. */}
-                  <div
-                    className="absolute inset-0 pointer-events-none bg-black"
-                    style={{
-                      opacity: nextCardDarkOpacity,
-                      transition: swipeUI.isDragging ? 'none' : 'opacity 0.25s ease',
-                    }}
-                  />
-              </div>
-            ) : nextMatch && !isAd(nextMatch) ? (
-
-              <div className="w-full h-full bg-gradient-to-br from-zinc-800 via-neutral-900 to-black flex items-center justify-center">
-                <span className="text-6xl font-bold text-white/80">
-                  {nextMatch.first_name?.[0]}{nextMatch.last_name?.[0]}
-                </span>
-              </div>
-            ) : null}
-            {/* Grounds the peeking next-card preview in solid black at the bottom edge -
-                stronger and taller than before so the blurred photo underneath reads as
-                a deliberate dark backdrop instead of a messy blur blob peeking out. */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'linear-gradient(to top, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.85) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0) 65%)',
-              }}
-            />
-          </DominantColorImageBg>
+        {/* The card waiting behind: same photo layout as the front card, resting smaller + blurred, growing and
+            sharpening as the front card flies away (see NextCardPreview). */}
+        {nextMatch && !isAd(nextMatch) && (
+          <NextCardPreview
+            key={nextMatch.id}
+            name={{ first: nextMatch.first_name || '', last: nextMatch.last_name || '' }}
+            imageUrl={nextMatchImages[0]}
+            blobUrls={preloadedBlobImages[nextMatch.id]}
+            getOptimizedUrl={getOptimizedUrl}
+            userBackgroundColor="#000"
+            revealed={exitingCard}
+            dragging={swipeUI.isDragging}
+            blurPx={nextCardBlurPx}
+            darkOpacity={nextCardDarkOpacity}
+            durationMs={CARD_EXIT_MS}
+          />
         )}
 
         {/* ...existing code... */}

@@ -48,6 +48,10 @@
 .dl-card-fade {
   animation: dl-card-fade 300ms ease-out 80ms backwards;
 }
+/* the caption's shading fades in at once (the card behind already carries the same shading); the text rises on top */
+.dl-card-fade-now {
+  animation: dl-card-fade 200ms ease-out backwards;
+}
 
 /* --- Card / nav / undo geometry shared by Discover, Circle and the profile preview ---
    The floating undo button sits `--dl-undo-lift` above the nav; the card ends `--dl-card-nav-gap` above the nav.
@@ -175,6 +179,7 @@
   .dl-fold,
   .dl-card-enter,
   .dl-card-fade,
+  .dl-card-fade-now,
   .dl-expand-btn,
   .dl-caption-pad,
   .dl-chevron,
