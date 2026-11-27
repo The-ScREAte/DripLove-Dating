@@ -11,6 +11,8 @@ import { clearAllUserCaches, noteSignedInUser } from "./utils/clearUserCaches";
 import { reloadForStaleChunk } from "./utils/chunkReload";
 import HoppingLogo from "./components/HoppingLogo";
 import SeasonalSplash from "./components/SeasonalSplash";
+import { seasonFor, seasonOverride } from "./utils/seasons";
+import { readSplashRecord, shouldShowSplash, writeSplashRecord } from "./utils/splashPolicy";
 import { getPlatformSync } from "./utils/platformUtils";
 import { ensureNotificationTapListener } from "./services/pushNotifications";
 
@@ -102,15 +104,30 @@ if (import.meta.env.PROD) {
   console.log = () => {};
 }
 
-// The opening splash is held for at least this long (from the first paint), so the seasonal greeting is actually seen.
+// The full opening splash (logo + seasonal greeting) plays on the first launch, once a day on holidays, and at most every
+// 3 days otherwise (see utils/splashPolicy.ts). Every other cold start only shows the quick logo screen, which goes away
+// the moment the app is ready. Decided once per launch, before the first paint.
+const SPLASH_FULL = (() => {
+  try {
+    const forced = seasonOverride();
+    const now = new Date();
+    const season = forced ?? seasonFor(now);
+    const show = shouldShowSplash({ now, season: season.id, last: readSplashRecord(), forced: !!forced });
+    if (show) writeSplashRecord(now, season.id);
+    return show;
+  } catch {
+    return true;
+  }
+})();
 // Data Saver / slow link / reduced-motion users (data-motion="reduced") get a shorter one: nothing should hold them up.
-const SPLASH_MIN_MS = document.documentElement.dataset.motion === 'reduced' ? 2000 : 5000;
+const SPLASH_MIN_MS = !SPLASH_FULL ? 0 : document.documentElement.dataset.motion === 'reduced' ? 2000 : 5000;
 const SPLASH_FADE_MS = 340;
 
 const AppWrapper = () => {
-  const [splashMinElapsed, setSplashMinElapsed] = React.useState(false);
+  const [splashMinElapsed, setSplashMinElapsed] = React.useState(SPLASH_MIN_MS === 0);
   const [splashGone, setSplashGone] = React.useState(false);
   React.useEffect(() => {
+    if (SPLASH_MIN_MS === 0) return undefined;
     const id = window.setTimeout(() => setSplashMinElapsed(true), SPLASH_MIN_MS);
     return () => window.clearTimeout(id);
   }, []);
@@ -414,6 +431,7 @@ const AppWrapper = () => {
         <SeasonalSplash
           leaving={splashDone}
           durationMs={SPLASH_MIN_MS}
+          variant={SPLASH_FULL ? 'full' : 'quick'}
           onSkip={() => setSplashMinElapsed(true)}
         />
       )}

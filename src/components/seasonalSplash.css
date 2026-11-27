@@ -142,3 +142,11 @@ html[data-motion='reduced'] .dl-splash__glyph, html[data-motion='reduced'] .dl-s
   .dl-splash__progress span { transform: scaleX(1); }
 }
 html[data-motion='lite'] .dl-splash__badge::after, html[data-motion='reduced'] .dl-splash__badge::after { display: none; }
+
+/* quick variant: only the logo badge (the app is opening as soon as it is ready) */
+.dl-splash--quick .dl-splash__particles,
+.dl-splash--quick .dl-splash__title,
+.dl-splash--quick .dl-splash__sub,
+.dl-splash--quick .dl-splash__foot,
+.dl-splash--quick .dl-splash__progress { display: none; }
+.dl-splash--quick { transition-duration: 220ms; }
