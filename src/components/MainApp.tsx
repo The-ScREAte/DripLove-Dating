@@ -1890,7 +1890,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // 22px gap above it is now a clamp so a small-screen phone gets a
               // proportionally smaller gap instead of the same absolute value as
               // a large phone.
-              marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + clamp(6px, 2vw, 12px))',
+              // On a phone with a home bar / gesture area the pill used to sit a whole inset (+ gap) above the
+              // screen edge, so it looked much higher than on the web. Now it hangs low, just clearing the OS
+              // home indicator (which lives in the bottom ~14px): inset - 14px, never less than the web gap.
+              marginBottom: 'max(clamp(6px, 2vw, 12px), calc(env(safe-area-inset-bottom, 0px) - 14px))',
               // Bigger side margins than the old flat mx-3 (12px) - that made
               // the bar stretch nearly edge-to-edge, which is what read as
               // "too wide" even after the internal item spacing was tightened.
