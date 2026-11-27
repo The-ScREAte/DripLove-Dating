@@ -243,7 +243,7 @@ const ImageSlide = React.memo<{
         >
           <div
             className="absolute left-0 w-full"
-            style={{ top: '-100%', height: '300%', filter: `blur(${isAndroidPlatform() ? 5 : 10}px)` }}
+            style={{ top: '-100%', height: '300%', filter: `blur(${isAndroidPlatform() ? 4 : 7}px)` }}
           >
             {([
               { top: '0%', flip: true },
