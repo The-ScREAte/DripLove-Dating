@@ -17,7 +17,6 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		69B874407DC4DC2BFCC6C096 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF88E1E997C8035D66C9E6B /* NotificationService.swift */; };
 		71586C37D39245593E22B0EF /* NotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 9AB7453D484B5D5A9862FFD3 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		9173D94E2EAF786E00CED6DB /* Untitled.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9173D94D2EAF786A00CED6DB /* Untitled.swift */; };
 		9173D9502EAF788800CED6DB /* botificationsound.caf in Resources */ = {isa = PBXBuildFile; fileRef = 9173D94F2EAF788800CED6DB /* botificationsound.caf */; };
 		9173D9522EB01BE200CED6DB /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9173D9512EB01BE200CED6DB /* GoogleService-Info.plist */; };
 		91FE0EAD2E83BA0900645BA8 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91FE0EAC2E83BA0900645BA8 /* StoreKit.framework */; };
@@ -64,7 +63,6 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		6523C69EBD6F2998FCB1E332 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
-		9173D94D2EAF786A00CED6DB /* Untitled.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Untitled.swift; sourceTree = "<group>"; };
 		9173D94F2EAF788800CED6DB /* botificationsound.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = botificationsound.caf; sourceTree = "<group>"; };
 		9173D9512EB01BE200CED6DB /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		919EFF3D2E8B86D800A41F7F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -139,7 +137,6 @@
 			children = (
 				9173D9512EB01BE200CED6DB /* GoogleService-Info.plist */,
 				9173D94F2EAF788800CED6DB /* botificationsound.caf */,
-				9173D94D2EAF786A00CED6DB /* Untitled.swift */,
 				919EFF3D2E8B86D800A41F7F /* App.entitlements */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -327,7 +324,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9173D94E2EAF786E00CED6DB /* Untitled.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				AA11BB22CC33DD44EE55FF66 /* SceneDelegate.swift in Sources */,
 			);
