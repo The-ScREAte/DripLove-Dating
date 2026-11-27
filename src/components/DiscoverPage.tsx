@@ -56,6 +56,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useExpandLayoutAnimation } from '@/hooks/useExpandLayoutAnimation';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
@@ -1195,6 +1196,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // ad-card variant - only one is ever rendered at a time, both attach the same ref),
   // plus the heart / X stamps shown over it while dragging.
   const cardElRef = useRef<HTMLDivElement>(null);
+  useExpandLayoutAnimation(cardElRef, showMoreInfo);
   const likeStampRef = useRef<HTMLDivElement>(null);
   const passStampRef = useRef<HTMLDivElement>(null);
 

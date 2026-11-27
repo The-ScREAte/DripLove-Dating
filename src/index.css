@@ -31,20 +31,30 @@
 }
 
 /* Shared expanded/collapsed details layout for Discover, Liked Me,
-   profile preview and Circle. Keep the movement short and controlled so the
-   photo does not jump when the details area opens or closes. */
+   profile preview and Circle.
+
+   The two rows are plain `fr` tracks on purpose: browsers interpolate `fr` <-> `fr` smoothly, but NOT
+   `minmax(176px, 36fr)` <-> `minmax(0, 1fr)` (different minimums), which made the card snap to its final
+   layout in a single frame while only the text faded. Collapsed = photo takes everything; expanded = the
+   details get the larger share (64%) and the photo keeps a floor (see .is-expanded .profile-info-photo). */
 .profile-info-layout {
+  --dl-expand-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dl-expand-ms: 420ms;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 0fr);
-  transition: grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  grid-template-rows: 1fr 0fr;
+  /* no `transition` here on purpose: the swipe code owns this element's inline transition; the open/close
+     is animated by useExpandLayoutAnimation (Web Animations API) */
 }
-/* Expanded: the info area gets the larger share (it carries the actual
-   details); the photo keeps enough height for the name/age header it hosts. */
 .profile-info-layout.is-expanded {
-  grid-template-rows: minmax(176px, 36fr) minmax(0, 64fr);
+  grid-template-rows: 36fr 64fr;
 }
 .profile-info-photo {
   min-height: 0;
+}
+/* the photo keeps enough height for the name/age header it hosts (only matters on very short screens) */
+.profile-info-layout.is-expanded .profile-info-photo,
+.profile-info-layout.is-expanded > .discover-image-area {
+  min-height: 176px;
 }
 
 /* Short landscape screens: stacked photo-over-panel leaves the details no room,
@@ -78,20 +88,50 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 180ms ease, visibility 0s linear 300ms;
+  /* closing: fade quickly, then hide once the layout has finished collapsing */
+  transition: opacity 200ms ease, visibility 0s linear var(--dl-expand-ms, 420ms);
+  /* the panel resizes every frame while the layout animates: keep that work inside the panel */
+  contain: layout paint;
 }
 .profile-info-layout.is-expanded .profile-info-panel {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transition-delay: 80ms, 0ms;
+  transition: opacity 260ms ease 120ms, visibility 0s linear 0s;
 }
+/* the content glides up a little as it fades in (transform + opacity only: compositor-friendly) */
+.profile-info-panel > * {
+  transform: translate3d(0, 18px, 0);
+  transition: transform var(--dl-expand-ms, 420ms) var(--dl-expand-ease, cubic-bezier(0.32, 0.72, 0, 1));
+}
+.profile-info-layout.is-expanded .profile-info-panel > * {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Photo caption: the highlight chips / bio excerpt shown while collapsed fold away smoothly instead of
+   vanishing the instant details open (and unfold again on close). */
+.dl-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 320ms var(--dl-expand-ease, cubic-bezier(0.32, 0.72, 0, 1)), opacity 220ms ease;
+}
+.dl-fold > * { min-height: 0; overflow: hidden; }
+.dl-fold[data-folded="true"] { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
+.dl-caption-pad { transition: padding-bottom 320ms var(--dl-expand-ease, cubic-bezier(0.32, 0.72, 0, 1)); }
+.dl-chevron { transition: transform 320ms var(--dl-expand-ease, cubic-bezier(0.32, 0.72, 0, 1)); }
+.dl-chevron[data-open="true"] { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) {
   .profile-info-layout,
   .profile-info-panel,
+  .profile-info-panel > *,
+  .dl-fold,
+  .dl-caption-pad,
+  .dl-chevron,
   .hopping-logo {
     animation: none !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
 }
 

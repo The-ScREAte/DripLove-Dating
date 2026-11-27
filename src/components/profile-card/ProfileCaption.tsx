@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowDown, ArrowUp, Heart, MapPin } from 'lucide-react';
+import { ArrowDown, Heart, MapPin } from 'lucide-react';
 import { formatFavoriteLabel, type FavoriteEntry } from '@/constants/favorites';
 import { formatHeightShort } from '@/utils/profileFormat';
 import { HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel } from '../discover/MatchCardHelpers';
@@ -68,7 +68,7 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
 
   return (
     <div
-      className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}`}
+      className={`dl-caption-pad absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}`}
       style={{
         background:
           'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
@@ -118,31 +118,35 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
             </div>
           )}
 
-          {!expanded && showAbout && bio ? (
-            <p dir="auto" className="mt-2 line-clamp-2 pr-8 text-[clamp(11px,3.2vw,13px)] text-white/85">
-              {bio}
-            </p>
-          ) : (
-            !expanded &&
-            hasChips && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 pr-8">
-                {highlights.map((highlight, index) => (
-                  <span
-                    key={index}
-                    className={`max-w-[100px] shrink-0 truncate rounded-full border bg-white/10 px-2 py-0.5 text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 min-[400px]:max-w-[140px] ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]}`}
-                  >
-                    {truncateChipLabel(highlight)}
-                  </span>
-                ))}
-                {signHighlights.map((sign) => (
-                  <UserAdinkraDisplay key={sign} adinkraSymbols={[sign]} showLabel />
-                ))}
-                {musicHighlight?.link && (
-                  <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
-                )}
-              </div>
-            )
-          )}
+          {/* Folds away (grid 1fr -> 0fr + fade) while details are open; stays mounted so closing unfolds it again. */}
+          <div className="dl-fold" data-folded={expanded ? 'true' : 'false'} aria-hidden={expanded || undefined}>
+            <div>
+              {showAbout && bio ? (
+                <p dir="auto" className="mt-2 line-clamp-2 pr-8 text-[clamp(11px,3.2vw,13px)] text-white/85">
+                  {bio}
+                </p>
+              ) : (
+                hasChips && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 pr-8">
+                    {highlights.map((highlight, index) => (
+                      <span
+                        key={index}
+                        className={`max-w-[100px] shrink-0 truncate rounded-full border bg-white/10 px-2 py-0.5 text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 min-[400px]:max-w-[140px] ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]}`}
+                      >
+                        {truncateChipLabel(highlight)}
+                      </span>
+                    ))}
+                    {signHighlights.map((sign) => (
+                      <UserAdinkraDisplay key={sign} adinkraSymbols={[sign]} showLabel />
+                    ))}
+                    {musicHighlight?.link && (
+                      <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
 
         </div>
 
@@ -169,7 +173,7 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
             }}
           >
-            {expanded ? <ArrowUp size={15} strokeWidth={2.5} /> : <ArrowDown size={15} strokeWidth={2.5} />}
+            <ArrowDown size={15} strokeWidth={2.5} className="dl-chevron" data-open={expanded ? 'true' : 'false'} />
           </span>
         </button>
       </div>

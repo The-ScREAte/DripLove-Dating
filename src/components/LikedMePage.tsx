@@ -15,6 +15,7 @@ import { uniqueTopic } from '@/utils/realtime';
 import { useToast } from '@/hooks/use-toast';
 import { requestPopup, openPremiumUpgrade } from '@/popups';
 import { ProfileDetailsPanel } from './profile-card/ProfileDetailsPanel';
+import { useExpandLayoutAnimation } from '@/hooks/useExpandLayoutAnimation';
 import { useCaptionedPhotos, toTitleCase } from './profile-card/profileCardUtils';
 import { ProfileCaption } from './profile-card/ProfileCaption';
 import { ProfileReportModal } from './profile-card/ProfileReportModal';
@@ -202,6 +203,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // transform is written straight to the card's own DOM node once per frame and
   // never waits on this page's render to land.
   const swipeCardElRef = useRef<HTMLDivElement>(null);
+  const infoLayoutRef = useRef<HTMLDivElement>(null);
+  useExpandLayoutAnimation(infoLayoutRef, showMoreInfo);
   const latestSwipeDeltaRef = useRef(0);
   const swipeRafScheduledRef = useRef(false);
   const swipeRafIdRef = useRef<number | null>(null);
@@ -1346,6 +1349,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
     return (
       <div
+        ref={infoLayoutRef}
         className={`profile-info-layout ${showMoreInfo ? 'is-expanded' : ''} h-full w-full relative bg-black overflow-hidden`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >

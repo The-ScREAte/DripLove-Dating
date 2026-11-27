@@ -11,6 +11,7 @@ import { buildSlides, getPreviewHighlights, getUserColorHash, seedFromString, mu
 import { findFavoriteWithLink } from '@/constants/favorites';
 
 import { ProfileDetailsPanel } from '../profile-card/ProfileDetailsPanel';
+import { useExpandLayoutAnimation } from '@/hooks/useExpandLayoutAnimation';
 import { useCaptionedPhotos, toTitleCase } from '../profile-card/profileCardUtils';
 import { ProfileCaption } from '../profile-card/ProfileCaption';
 import { ProfileReportModal } from '../profile-card/ProfileReportModal';
@@ -261,6 +262,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
   const [swipeExitDirection, setSwipeExitDirection] = useState<SwipeDir | null>(null);
   const swipeCardElRef = useRef<HTMLDivElement>(null);
+  useExpandLayoutAnimation(swipeCardElRef, showMoreInfo);
   const likeStampRef = useRef<HTMLDivElement>(null);
   const passStampRef = useRef<HTMLDivElement>(null);
   const restoreTimerRef = useRef<number | null>(null);
