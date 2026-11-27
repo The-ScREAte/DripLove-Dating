@@ -49,6 +49,23 @@ const ImageSlide = React.memo<{
   const [hasError, setHasError] = React.useState(false);
   // Photo's natural width/height, set on load - sizes the reflection box.
   const [photoAspect, setPhotoAspect] = React.useState<number | null>(null);
+  // Size of the card frame: tells us whether the photo is letterboxed (shorter than the frame) and where its top and
+  // bottom edges sit, so the reflection can be blended into them.
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  const [frameSize, setFrameSize] = React.useState<{ w: number; h: number } | null>(null);
+  React.useLayoutEffect(() => {
+    const el = frameRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const update = () => setFrameSize((prev) => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      return prev && prev.w === w && prev.h === h ? prev : { w, h };
+    });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // Once the live network request fails, this holds a persistent-cache
   // fallback (IndexedDB, survives app restarts) so the photo can still show
   // with no internet, as long as it loaded successfully at least once before.
@@ -165,6 +182,18 @@ const ImageSlide = React.memo<{
     );
   }
   
+  // Letterboxed = the whole photo is shorter than the frame, so there is room above and below it for a reflection.
+  const letterboxed = !!photoAspect && !!frameSize && frameSize.w > 0 && frameSize.w / photoAspect < frameSize.h - 1;
+  // Fade the sharp photo's own top and bottom edge into the blurred strip beneath it (see the reflection block).
+  const photoEdgeFeather: React.CSSProperties = (() => {
+    if (!letterboxed || !photoAspect || !frameSize) return {};
+    const photoH = frameSize.w / photoAspect;
+    const top = (frameSize.h - photoH) / 2;
+    const f = Math.min(30, photoH * 0.1);
+    const grad = `linear-gradient(to bottom, transparent ${top}px, #000 ${top + f}px, #000 ${top + photoH - f}px, transparent ${top + photoH}px)`;
+    return { maskImage: grad, WebkitMaskImage: grad };
+  })();
+
   return (
     // Absolute + inset 0, not w-full/h-full: this is the one element shared by
     // Discover, Liked Me, and the profile preview, so it's the most direct place
@@ -189,7 +218,7 @@ const ImageSlide = React.memo<{
     // photo's natural aspect ratio (known after load) at full card width,
     // which is exactly where object-contain places a width-limited photo.
     // A softly blurred cover copy sits underneath for any side gaps.
-    <div className="absolute inset-0 bg-black overflow-hidden">
+    <div ref={frameRef} className="absolute inset-0 bg-black overflow-hidden">
       <img
         src={displaySrc}
         decoding="async"
@@ -202,62 +231,46 @@ const ImageSlide = React.memo<{
         }}
         draggable={false}
       />
-      {photoAspect && (
+      {letterboxed && photoAspect && (
+        // The reflection is ONE continuous blurred strip - [mirror | photo | mirror] stacked and blurred together - and
+        // the sharp photo above it dissolves into it along its top and bottom edge (mask below). Because the blurred
+        // strip runs straight through the photo's edges there is no seam, no hairline and no change in colour where
+        // the photo ends: it simply softens into its own reflection. A dark fade takes it to black further out.
         <div
           aria-hidden="true"
           className="absolute left-0 right-0 top-1/2 -translate-y-1/2 z-[1] pointer-events-none"
           style={{ aspectRatio: String(photoAspect) }}
         >
+          <div
+            className="absolute left-0 w-full"
+            style={{ top: '-100%', height: '300%', filter: `blur(${isAndroidPlatform() ? 8 : 16}px)` }}
+          >
+            {([
+              { top: '0%', flip: true },
+              { top: '33.3334%', flip: false },
+              { top: '66.6667%', flip: true },
+            ] as const).map((part) => (
+              <img
+                key={part.top}
+                src={displaySrc}
+                decoding="async"
+                alt=""
+                className="absolute left-0 w-full object-fill"
+                style={{ top: part.top, height: '33.3334%', transform: part.flip ? 'scaleY(-1)' : undefined }}
+                draggable={false}
+              />
+            ))}
+          </div>
           {(['top', 'bottom'] as const).map((side) => (
             <div
               key={side}
-              className="absolute left-0 w-full h-full overflow-hidden"
-              // 1px overlap under the photo so sub-pixel rounding can never
-              // leave a hairline seam between the photo and its reflection.
-              style={side === 'top' ? { bottom: 'calc(100% - 1px)' } : { top: 'calc(100% - 1px)' }}
-            >
-              <img
-                src={displaySrc}
-        decoding="async"
-                alt=""
-                className="w-full h-full object-fill"
-                style={{
-                  transform: 'scaleY(-1)',
-                  // Deeply blurred: the reflection is atmosphere, not a second copy of the photo.
-                  filter: `blur(${isAndroidPlatform() ? 8 : 16}px)`,
-                }}
-                draggable={false}
-              />
-              {/* Sharp mirror fading out away from the photo: right at the
-                  edge a mirror's pixels are identical to the photo's own edge
-                  row, so this makes the photo flow into its reflection with
-                  no visible line, then hands over to the softer copy below. */}
-              <img
-                src={displaySrc}
-        decoding="async"
-                alt=""
-                className="absolute inset-0 w-full h-full object-fill"
-                style={{
-                  transform: 'scaleY(-1)',
-                  // Soft, not razor sharp: still close enough to the photo edge row to join it without a visible
-                  // line, but no longer a crisp second copy of the picture.
-                  filter: `blur(${isAndroidPlatform() ? 3 : 6}px)`,
-                  // Mask is applied before the flip, so the opaque end sits at
-                  // the photo-adjacent edge after scaleY(-1).
-                  // Eased (multi-stop) fade instead of a straight line so the
-                  // hand-off to the softer copy has no visible banding/edge.
-                  maskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.78) 4%, rgba(0,0,0,0.5) 9%, rgba(0,0,0,0.26) 14%, rgba(0,0,0,0.1) 18%, transparent 23%)`,
-                  WebkitMaskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.78) 4%, rgba(0,0,0,0.5) 9%, rgba(0,0,0,0.26) 14%, rgba(0,0,0,0.1) 18%, transparent 23%)`,
-                }}
-                draggable={false}
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(to ${side}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.10) 8%, rgba(0,0,0,0.26) 20%, rgba(0,0,0,0.46) 34%, rgba(0,0,0,0.68) 52%, rgba(0,0,0,0.84) 72%, rgba(0,0,0,0.94) 100%)`,
-                }}
-              />
-            </div>
+              className="absolute left-0 w-full"
+              style={{
+                height: '100%',
+                ...(side === 'top' ? { bottom: '100%' } : { top: '100%' }),
+                background: `linear-gradient(to ${side === 'top' ? 'top' : 'bottom'}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.12) 8%, rgba(0,0,0,0.3) 20%, rgba(0,0,0,0.5) 34%, rgba(0,0,0,0.7) 52%, rgba(0,0,0,0.85) 72%, rgba(0,0,0,0.94) 100%)`,
+              }}
+            />
           ))}
         </div>
       )}
@@ -273,7 +286,8 @@ const ImageSlide = React.memo<{
         className={`absolute inset-0 w-full h-full object-contain object-center ${styles.optimizedImage}`}
         // optimizedImage paints a black background across the whole box,
         // which would hide the blurred backdrop above/below the photo.
-        style={{ backgroundColor: 'transparent' }}
+        // zIndex 2: the blurred reflection strip (z-1) runs through the photo's own area, the sharp photo must sit above it
+        style={{ backgroundColor: 'transparent', zIndex: 2, ...photoEdgeFeather }}
         draggable={false}
         onLoad={(e) => {
           const { naturalWidth, naturalHeight } = e.currentTarget;
