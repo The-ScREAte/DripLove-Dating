@@ -103,7 +103,7 @@ if (import.meta.env.PROD) {
 }
 
 // The opening splash is held for at least this long (from the first paint), so the seasonal greeting is actually seen.
-const SPLASH_MIN_MS = 2000;
+const SPLASH_MIN_MS = 4000;
 const SPLASH_FADE_MS = 340;
 
 const AppWrapper = () => {
@@ -405,14 +405,17 @@ const AppWrapper = () => {
     return () => window.clearTimeout(id);
   }, [splashDone]);
 
-  if (!ready) {
-    return <SeasonalSplash />;
-  }
-
+  // One splash instance for the whole opening (its animation must not restart when the app becomes ready).
   return (
     <>
-      <App user={user} isAuthenticated={hasSession} />
-      {!splashGone && <SeasonalSplash leaving={splashDone} />}
+      {ready && <App user={user} isAuthenticated={hasSession} />}
+      {!splashGone && (
+        <SeasonalSplash
+          leaving={splashDone}
+          durationMs={SPLASH_MIN_MS}
+          onSkip={() => setSplashMinElapsed(true)}
+        />
+      )}
     </>
   );
 };

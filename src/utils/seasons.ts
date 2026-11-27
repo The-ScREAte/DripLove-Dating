@@ -9,9 +9,8 @@ export interface Season {
   /** i18n key + English fallback for the big greeting. */
   key: string;
   text: string;
-  /** Second line (smaller). */
-  subKey: string;
-  sub: string;
+  /** Second line: a warm message about the people using the app. One is chosen per day (stable within a day). */
+  subs: string[];
   /** Falling/rising particles: emoji glyphs, or null for coloured confetti. */
   glyphs: string[] | null;
   /** 'down' falls from the top, 'up' floats up from the bottom. */
@@ -21,13 +20,13 @@ export interface Season {
 }
 
 const SEASONS: Record<SeasonId, Season> = {
-  newyear: { id: 'newyear', key: 'season.newyear', text: 'Happy New Year!', subKey: 'season.newyearSub', sub: 'Here’s to new beginnings and real love.', glyphs: null, flow: 'down', colors: ['#ffd166', '#ff5fa2', '#7c5cff', '#4de1c1', '#ffffff'] },
-  valentine: { id: 'valentine', key: 'season.valentine', text: 'Happy Valentine’s Day', subKey: 'season.valentineSub', sub: 'Love is in the air.', glyphs: ['♥', '\u{1F495}', '\u{1F496}'], flow: 'up', colors: ['#ff5fa2'] },
-  easter: { id: 'easter', key: 'season.easter', text: 'Happy Easter', subKey: 'season.easterSub', sub: 'Wishing you a lovely weekend.', glyphs: ['\u{1F338}', '\u{1F423}', '\u{1F337}'], flow: 'down', colors: ['#ffd166'] },
-  halloween: { id: 'halloween', key: 'season.halloween', text: 'Happy Halloween', subKey: 'season.halloweenSub', sub: 'Find someone to haunt your heart.', glyphs: ['\u{1F383}', '\u{1F987}', '\u{1F47B}'], flow: 'down', colors: ['#ff9f43'] },
-  thanksgiving: { id: 'thanksgiving', key: 'season.thanksgiving', text: 'Happy Thanksgiving', subKey: 'season.thanksgivingSub', sub: 'Grateful for you.', glyphs: ['\u{1F342}', '\u{1F341}', '\u{1F342}'], flow: 'down', colors: ['#ffb347'] },
-  christmas: { id: 'christmas', key: 'season.christmas', text: 'Merry Christmas', subKey: 'season.christmasSub', sub: 'Warm wishes from DripLove.', glyphs: ['❄', '❅', '❆'], flow: 'down', colors: ['#ffffff'] },
-  default: { id: 'default', key: 'season.default', text: 'Slide In & Fall Into Real Love', subKey: 'season.defaultSub', sub: 'Welcome to DripLove.', glyphs: ['♥'], flow: 'up', colors: ['#ff5fa2'] },
+  newyear: { id: 'newyear', key: 'season.newyear', text: 'Happy New Year!', subs: ['Grateful for every person who made this year warmer.', 'Thank you for your effort, your honesty and your hope.', 'May this year bring someone who truly gets you.'], glyphs: null, flow: 'down', colors: ['#ffd166', '#ff5fa2', '#7c5cff', '#4de1c1', '#ffffff'] },
+  valentine: { id: 'valentine', key: 'season.valentine', text: 'Happy Valentine’s Day', subs: ['Love takes courage. We see your effort.', 'Here for every hello, every first date, every hope.', 'Whoever you’re hoping for, we’re rooting for you.'], glyphs: ['♥', '\u{1F495}', '\u{1F496}'], flow: 'up', colors: ['#ff5fa2'] },
+  easter: { id: 'easter', key: 'season.easter', text: 'Happy Easter', subs: ['Wishing you rest, joy and good company.', 'Grateful for the care you bring to every conversation.', 'New beginnings, and people who are glad you’re here.'], glyphs: ['\u{1F338}', '\u{1F423}', '\u{1F337}'], flow: 'down', colors: ['#ffd166'] },
+  halloween: { id: 'halloween', key: 'season.halloween', text: 'Happy Halloween', subs: ['No tricks here, just real people rooting for you.', 'Thanks for being yourself, costume or not.', 'Spooky season is better with good company.'], glyphs: ['\u{1F383}', '\u{1F987}', '\u{1F47B}'], flow: 'down', colors: ['#ff9f43'] },
+  thanksgiving: { id: 'thanksgiving', key: 'season.thanksgiving', text: 'Happy Thanksgiving', subs: ['Grateful for your effort and your kindness.', 'Thank you for showing up as yourself.', 'This community is better with you in it.'], glyphs: ['\u{1F342}', '\u{1F341}', '\u{1F342}'], flow: 'down', colors: ['#ffb347'] },
+  christmas: { id: 'christmas', key: 'season.christmas', text: 'Merry Christmas', subs: ['Thankful for you and the heart you bring here.', 'Wishing you warmth, joy and people who care.', 'You make this community what it is.'], glyphs: ['❄', '❅', '❆'], flow: 'down', colors: ['#ffffff'] },
+  default: { id: 'default', key: 'season.default', text: 'Slide In & Fall Into Real Love', subs: ['We’re glad you’re here.', 'Real connections start with people like you.', 'Every hello matters, and we’re with you.'], glyphs: ['♥'], flow: 'up', colors: ['#ff5fa2'] },
 };
 
 /** Western (Gregorian) Easter Sunday for a year - Meeus/Jones/Butcher. */
@@ -77,6 +76,13 @@ export function seasonFor(date: Date = new Date()): Season {
   if (m === 10 && d >= t - 2 && d <= t + 1) return SEASONS.thanksgiving;
 
   return SEASONS.default;
+}
+
+/** The message for today: rotates daily through the season's lines, so it feels fresh without changing mid-day. */
+export function seasonMessage(season: Season, date: Date = new Date()): { key: string; text: string } {
+  const day = Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86_400_000);
+  const i = ((day % season.subs.length) + season.subs.length) % season.subs.length;
+  return { key: `season.${season.id}Sub${i + 1}`, text: season.subs[i] };
 }
 
 /** For previews/QA: `?season=newyear` in the URL or localStorage `dl_season` (ignored unless it is a known id). */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seasonFor, easterSunday, thanksgivingDay } from '../seasons';
+import { seasonFor, seasonMessage, easterSunday, thanksgivingDay } from '../seasons';
 
 const on = (y: number, m: number, d: number) => seasonFor(new Date(y, m - 1, d, 12)).id;
 
@@ -37,5 +37,15 @@ describe('seasonFor', () => {
   });
   it('an ordinary day has the default greeting', () => {
     expect(on(2026, 6, 10)).toBe('default');
+  });
+});
+
+describe('seasonMessage', () => {
+  it('is stable within a day and rotates through the lines across days', () => {
+    const s = seasonFor(new Date(2026, 11, 25, 12));
+    const a = seasonMessage(s, new Date(2026, 11, 25, 8));
+    expect(seasonMessage(s, new Date(2026, 11, 25, 22))).toEqual(a);
+    const seen = new Set([0, 1, 2].map((d) => seasonMessage(s, new Date(2026, 11, 25 + d, 12)).key));
+    expect(seen.size).toBe(3);
   });
 });
