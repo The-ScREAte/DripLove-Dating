@@ -126,11 +126,12 @@ export const getCircleDistanceParams = (currentUser: CurrentUser, isPremium?: bo
 // Home country (distance-bound) vs. unlocked premium countries (NOT
 // distance-bound) - the same split Discover uses, shared so Circle's pool,
 // its category counts and its category browse decks all agree.
-export const getCircleCountrySplit = (currentUser: CurrentUser, isPremium?: boolean) => {
-  const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
+export const getCircleCountrySplit = (currentUser: CurrentUser | null | undefined, isPremium?: boolean) => {
+  // currentUser is null for a moment after a page refresh (the saved tab renders before the profile loads)
+  const baseCountryCode = normalizeCountryCode(currentUser?.country_code || '');
   const unlockedCountryCodes = (isPremium && baseCountryCode)
     ? Array.from(new Set(
-        normalizeCountryCodeList(currentUser.unlocked_countries, baseCountryCode).filter((c) => c && c !== baseCountryCode)
+        normalizeCountryCodeList(currentUser?.unlocked_countries, baseCountryCode).filter((c) => c && c !== baseCountryCode)
       ))
     : [];
   return { baseCountryCode, homeCountryCodes: baseCountryCode ? [baseCountryCode] : [], unlockedCountryCodes };
