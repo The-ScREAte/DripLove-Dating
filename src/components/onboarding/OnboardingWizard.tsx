@@ -26,6 +26,7 @@ import {
   getPrimaryHint,
   getSteps,
   isBonusStep,
+  isRequired,
   knownStepIds,
   phaseGroup,
   phaseOf,
@@ -34,6 +35,8 @@ import {
   validateStep,
   type StepContext,
 } from './steps';
+import { checkEmailAccount, type EmailAccountKind } from '@/utils/emailAccountCheck';
+import { getPasswordResetRedirectUri } from '@/config/oauth';
 import { submitCompletion } from './completeSubmit';
 import { submitRegistration } from './registerSubmit';
 import { useOnboardingFace } from './useOnboardingFace';
@@ -64,6 +67,10 @@ type Dir = 'fwd' | 'back' | 'none';
 const draftKey = (mode: OnboardingMode) => `dl_onboarding_draft_v2_${mode}`;
 // Passwords and promo state are never written to storage.
 const SENSITIVE: (keyof OnboardingFormData)[] = ['password', 'confirmPassword', 'promoCode', 'promoCodeId'];
+
+// Passwords are never written to storage, but a remount of the form (a hot reload, the OS reclaiming the
+// page) must not silently drop what was typed - so they live in memory for this page's lifetime only.
+const memoryPasswords: Partial<Record<OnboardingMode, { password: string; confirmPassword: string }>> = {};
 
 function readDraft(mode: OnboardingMode): { stepId?: StepId; formData?: Partial<OnboardingFormData> } | null {
   try {
@@ -101,11 +108,12 @@ const OnboardingWizard = ({
     const draft = readDraft(mode)?.formData;
     const safe = { ...(draft || {}) } as Partial<OnboardingFormData>;
     SENSITIVE.forEach((k) => delete safe[k]);
-    return { ...initialFormData, ...safe };
+    return { ...initialFormData, ...safe, ...(memoryPasswords[mode] ?? {}) };
   });
   const [errors, setErrors] = useState<StepErrors>({});
   const formRef = useRef(formData);
   formRef.current = formData;
+  memoryPasswords[mode] = { password: formData.password, confirmPassword: formData.confirmPassword };
 
   // ---- account (sign-up creates it only at the very end; a resumed one exists) ----
   const [accountUserId, setAccountUserId] = useState<string | null>(null);
@@ -115,6 +123,12 @@ const OnboardingWizard = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+  // Is the typed email already registered? (checked when leaving the field / tapping Continue)
+  const [emailCheck, setEmailCheck] = useState<{ email: string; kind: EmailAccountKind } | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const emailCheckInflight = useRef<{ email: string; promise: Promise<EmailAccountKind> } | null>(null);
+  const [resetState, setResetState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   const photos = useOnboardingPhotos({ userId: ownerId, maxPhotos });
   const face = useOnboardingFace(mode, ownerId);
@@ -342,6 +356,7 @@ const OnboardingWizard = ({
   const onBodyBlur = (e: React.FocusEvent<HTMLElement>) => {
     const name = (e.target as HTMLInputElement).name;
     if (!name || activeStep === 'celebrate') return;
+    if (mode === 'register' && activeStep === 'account' && name === 'email' && !validateStep('account', ctx).email) void verifyEmail();
     const found = validateStep(activeStep, ctx)[name];
     setErrors((prev) => {
       if ((prev[name] || '') === (found || '')) return prev;
@@ -358,6 +373,12 @@ const OnboardingWizard = ({
     if (bad) {
       setErrors(bad.errors);
       go(bad.step, 'back');
+      if (bad.step === 'account' && !formData.password) {
+        toast({
+          title: 'Re-enter your password',
+          description: "For your security we don't save passwords. Add it again, then tap Continue - the rest is saved.",
+        });
+      }
       return;
     }
 
@@ -394,8 +415,18 @@ const OnboardingWizard = ({
         faceStorageKey: face.storageKey,
         onRegistrationInProgressChange,
         onSubmit: (data) => onSubmit?.(data),
+        onAccountProblem: (field, message) => {
+          if (field === 'email' && /already has an account/i.test(message)) setEmailCheck({ email: formData.email.trim().toLowerCase(), kind: 'email' });
+          setErrors({ [field]: message });
+          setShake(true);
+          go('account', 'back');
+        },
+        onNeedsEmailConfirmation: () => setNeedsConfirm(true),
       });
-      if (ok) clearDraft(mode);
+      if (ok) {
+        clearDraft(mode);
+        delete memoryPasswords[mode];
+      }
       return;
     }
 
@@ -433,11 +464,56 @@ const OnboardingWizard = ({
     return () => window.clearTimeout(id);
   }, [shake]);
 
+  const emailTaken = emailCheck && emailCheck.email === formData.email.trim().toLowerCase() && ['email', 'google', 'apple'].includes(emailCheck.kind)
+    ? (emailCheck.kind as 'email' | 'google' | 'apple')
+    : null;
+
+  /** Asks the server about this email (once per distinct address). Returns true when it's taken. */
+  const verifyEmail = async (): Promise<boolean> => {
+    const email = formData.email.trim().toLowerCase();
+    if (!email) return false;
+    if (emailCheck && emailCheck.email === email) return ['email', 'google', 'apple'].includes(emailCheck.kind);
+    // a tap on Continue right after leaving the field shares the check already running
+    if (!emailCheckInflight.current || emailCheckInflight.current.email !== email) {
+      setCheckingEmail(true);
+      emailCheckInflight.current = { email, promise: checkEmailAccount(email) };
+    }
+    const { promise } = emailCheckInflight.current;
+    const kind = await promise;
+    emailCheckInflight.current = null;
+    setCheckingEmail(false);
+    setEmailCheck({ email, kind });
+    setResetState('idle');
+    return ['email', 'google', 'apple'].includes(kind);
+  };
+
+  const sendReset = async () => {
+    const email = formData.email.trim().toLowerCase();
+    if (!email || resetState === 'sending') return;
+    setResetState('sending');
+    try {
+      const redirectUri = getPasswordResetRedirectUri();
+      const redirectTo =
+        window.location.hostname === 'localhost' && !redirectUri.includes('localhost')
+          ? `${window.location.origin}/reset-password`
+          : redirectUri;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      setResetState(error ? 'error' : 'sent');
+    } catch {
+      setResetState('error');
+    }
+  };
+
   const onPrimary = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (busy) return;
     (document.activeElement as HTMLElement | null)?.blur();
 
+    if (activeStep === 'face' && !face.faceVerified) {
+      setErrors({});
+      face.setCapturing(true);
+      return;
+    }
     const stepErrors = validateStep(activeStep, ctx);
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
@@ -445,6 +521,14 @@ const OnboardingWizard = ({
       return;
     }
     setErrors({});
+
+    // Sign-up, first screen: find out NOW whether this email already has an account.
+    if (mode === 'register' && activeStep === 'account') {
+      if (await verifyEmail()) {
+        setShake(true);
+        return;
+      }
+    }
 
     if (!isLast) {
       go(steps[stepIndex + 1], 'fwd');
@@ -463,6 +547,11 @@ const OnboardingWizard = ({
   // Android hardware back: one step back (sheets register their own handler and
   // close first). On the first step the default behaviour applies.
   useBackClose(!busy && stepIndex > 0, onBack, { escape: false });
+
+  // leaving the face step (Back) returns it to the intro
+  useEffect(() => {
+    if (activeStep !== 'face') face.setCapturing(false);
+  }, [activeStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSkip = () => {
     if (busy) return;
@@ -518,11 +607,11 @@ const OnboardingWizard = ({
   const progressScreen = busy
     ? mode === 'register'
       ? creatingAccount
-        ? { title: 'Creating your account', subtitle: 'Setting up your profile…' }
+        ? { title: t('onboarding.wait.creating', 'Getting everything ready'), subtitle: t('onboarding.wait.creatingSub', 'A warm welcome is on its way.') }
         : isSubmitting
-          ? { title: 'Uploading your photos', subtitle: 'This only takes a moment.' }
-          : { title: 'Almost there', subtitle: 'Getting your welcome screen ready…' }
-      : { title: 'Saving your profile', subtitle: 'Uploading your photos - this only takes a moment.' }
+          ? { title: t('onboarding.wait.photos', 'Adding your photos'), subtitle: t('onboarding.wait.photosSub', 'Every great story starts with a first look.') }
+          : { title: t('onboarding.wait.done', 'Welcome to DripLove'), subtitle: t('onboarding.wait.doneSub', 'Your people are waiting.') }
+      : { title: t('onboarding.wait.saving', 'Making your profile shine'), subtitle: t('onboarding.wait.savingSub', "Love is closer than you think.") }
     : null;
 
   // ---- copy for this step: one short title + at most one helper line ----
@@ -530,37 +619,52 @@ const OnboardingWizard = ({
   const titleKey = `onboarding.steps.${activeStep}.title`;
   const hintKey =
     activeStep === 'work'
-      ? `onboarding.steps.work.${mode === 'complete' ? 'hintRequired' : 'hintOptional'}`
+      ? 'onboarding.steps.work.hintRequired'
       : activeStep === 'signs'
-        ? `onboarding.steps.signs.${mode === 'register' ? 'hint' : 'hintOptional'}`
+        ? 'onboarding.steps.signs.hint'
         : `onboarding.steps.${activeStep}.hint`;
   // A Google/Apple user lands on their first missing step with a warm one-liner.
   const welcomeBack = mode === 'complete' && isFirst && phase === 'main' && knownName;
   const hintText = welcomeBack
     ? t('onboarding.welcomeBack', { name: knownName })
-    : t(hintKey, { max: activeStep === 'interests' ? MAX_INTERESTS_PICKED : maxPhotos, min: 1 });
+    : activeStep === 'celebrate' && splitFlows(steps).bonus.some((st) => isRequired(st, mode))
+      ? t('onboarding.steps.celebrate.hintRequired', 'A few last touches, then real connections are waiting for you.')
+      : t(hintKey, { max: activeStep === 'interests' ? MAX_INTERESTS_PICKED : maxPhotos, min: 1 });
 
   const primaryHint = getPrimaryHint(activeStep, ctx, images);
   const footerNote = primaryHint
-    ? primaryHint === 'Checking your photos…'
-      ? t('onboarding.checkingPhotos')
-      : t('onboarding.addMorePhotos', { count: 2 - photoCount })
+    ? activeStep !== 'photos'
+      ? primaryHint
+      : primaryHint === 'Checking your photos…'
+        ? t('onboarding.checkingPhotos')
+        : t('onboarding.addMorePhotos', { count: 2 - photoCount })
     : '';
-  const primaryDisabled = busy || (activeStep === 'photos' && !!primaryHint);
+  const primaryDisabled = busy || (['photos', 'interests', 'values'].includes(activeStep) && !!primaryHint);
 
   const onCelebrate = activeStep === 'celebrate';
+  const requiredLeft = splitFlows(steps).bonus.some((st) => isRequired(st, mode));
+  const faceCapturing = activeStep === 'face' && face.capturing && !face.faceVerified;
+  const faceIntro = activeStep === 'face' && !face.faceVerified && !face.capturing;
   const bonus = isBonusStep(steps, activeStep);
   const primaryLabel = onCelebrate
-    ? t('onboarding.celebrate.add')
-    : isLast
+    ? requiredLeft || mode === 'complete'
+      ? t('onboarding.continue')
+      : t('onboarding.celebrate.add')
+    : faceIntro
+      ? t('onboarding.face.verify', 'Verify')
+      : isLast
       ? mode === 'register'
         ? t('registration.createAccount')
         : t('profileCompletion.completeProfile')
       : t('onboarding.continue');
   // One quiet link per screen: skip a bonus question, or skip the whole bonus flow.
+  // Required screens left in the second half: no "skip everything" shortcut then.
+  // complete-profile never offers "skip everything": the member is already signed in and finishing their profile.
   const secondary = onCelebrate
-    ? { label: t('onboarding.celebrate.skip'), run: () => void finish() }
-    : bonus && !isLast
+    ? requiredLeft || mode === 'complete'
+      ? null
+      : { label: t('onboarding.celebrate.skip'), run: () => void finish() }
+    : bonus && !isLast && !isRequired(activeStep, mode)
       ? { label: t('onboarding.skip'), run: onSkip }
       : null;
 
@@ -585,9 +689,37 @@ const OnboardingWizard = ({
     photoCount,
     promoEnabled,
     userId: ownerId,
+    emailTaken,
+    checkingEmail,
+    resetState,
+    onSignIn: () => onBackToLogin?.(),
+    onReset: sendReset,
   };
 
   if (!skipDone) return <OnboardingTransition />;
+
+  if (needsConfirm) {
+    return (
+      <div className="ob-root ob-shell dl-form" style={{ background: FORM_PAGE_BG }}>
+        <div className="ob-body">
+          <div className="ob-container" style={{ justifyContent: 'center', textAlign: 'center', gap: 14 }}>
+            <div className="ob-logo"><HoppingLogo size={60} /></div>
+            <h1 className="ob-title">{t('onboarding.confirmEmail.title', 'Check your email')}</h1>
+            <p className="ob-hint">
+              {t('onboarding.confirmEmail.body', 'We sent a link to {{email}}. Tap it to confirm your account, then sign in to finish.', { email: formData.email.trim() })}
+            </p>
+          </div>
+        </div>
+        <footer className="ob-footer">
+          <div className="ob-footer-inner">
+            <Button type="button" variant="primary" size="lg" className="w-full" onClick={onBackToLogin}>
+              {t('auth.signIn')}
+            </Button>
+          </div>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -597,7 +729,7 @@ const OnboardingWizard = ({
           fraction={fraction}
           phase={phase}
           burstKey={burstKey}
-          cheer={cheer}
+          cheer={heroKind || showLogo ? cheer : null}
           pulseKey={pulseKey}
           backLabel={t('onboarding.back')}
           onBack={stepIndex > 0 || mode === 'register' ? onBack : undefined}
@@ -622,7 +754,7 @@ const OnboardingWizard = ({
             <div className="ob-container">
               <section
                 key={activeStep}
-                className={`ob-step${onCelebrate ? ' ob-celebrate' : ''}`}
+                className={`ob-step${onCelebrate ? ' ob-celebrate' : ''}${activeStep === 'face' ? ' ob-face' : ''}${faceCapturing ? ' ob-face-live' : ''}`}
                 data-dir={dir}
                 aria-labelledby="ob-title"
               >
@@ -634,12 +766,14 @@ const OnboardingWizard = ({
                 ) : heroKind ? (
                   <StepHero kind={heroKind} phase={heroPhase} />
                 ) : null}
+                {!faceCapturing && (
                 <div className={isFirst && phase === 'main' ? 'ob-welcome' : undefined}>
                   <h1 id="ob-title" ref={titleRef} tabIndex={-1} className="ob-title">
                     {t(titleKey)}
                   </h1>
                   <p className="ob-hint">{hintText}</p>
                 </div>
+                )}
                 <div className="ob-step-body">
                   <View {...viewProps} />
                 </div>
@@ -647,6 +781,7 @@ const OnboardingWizard = ({
             </div>
           </div>
 
+          {!faceCapturing && (
           <footer className="ob-footer">
             <div className="ob-footer-inner">
               <p className="ob-cta-note" aria-live="polite">
@@ -672,6 +807,7 @@ const OnboardingWizard = ({
               </div>
             </div>
           </footer>
+          )}
         </form>
       </div>
     </>

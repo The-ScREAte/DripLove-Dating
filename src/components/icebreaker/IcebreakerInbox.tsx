@@ -11,7 +11,8 @@ import { refreshInbox, respondIcebreaker, useIcebreakerInbox, type InboxItem } f
 import { shortAgo } from '@/utils/icebreaker';
 import { useProfileReport } from '@/components/profile-card/useProfileReport';
 import { ProfileReportModal } from '@/components/profile-card/ProfileReportModal';
-import { closeIcebreakerInbox, getIcebreakerHandlers } from './store';
+import { requestPopup } from '@/popups';
+import { closeIcebreakerInbox } from './store';
 import { Avatar } from './IcebreakerSheet';
 import './icebreaker.css';
 
@@ -47,7 +48,6 @@ const RequestDetail: React.FC<{ item: InboxItem; onBack: () => void; onDone: () 
   const { t } = useTranslation();
   const [busy, setBusy] = useState<'accept' | 'decline' | null>(null);
   const [error, setError] = useState(false);
-  const [celebrate, setCelebrate] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const long = item.message.length > 140;
 
@@ -71,12 +71,10 @@ const RequestDetail: React.FC<{ item: InboxItem; onBack: () => void; onDone: () 
       else setError(true);
       return;
     }
-    setCelebrate(true);
-    // A short "it's a match" moment, then straight into the new conversation.
-    window.setTimeout(() => {
-      closeIcebreakerInbox();
-      getIcebreakerHandlers().openChat(res.matchId ?? null);
-    }, 1100);
+    // The one shared "It's a match!" celebration (both photos, heart, "Start Chatting"). It is drawn by the
+    // popup host, so the inbox just closes and asks for it.
+    closeIcebreakerInbox();
+    requestPopup('match', { matchedUserId: item.senderId, matchedUserName: item.firstName, matchedUserImage: item.photoUrl ?? undefined });
   };
 
   const decline = async () => {
@@ -147,21 +145,6 @@ const RequestDetail: React.FC<{ item: InboxItem; onBack: () => void; onDone: () 
           {t('icebreaker.inbox.decline', 'Not now')}
         </Button>
       </footer>
-
-      {celebrate && (
-        <div className="ice-celebrate" role="status" aria-live="polite">
-          <div className="ice-hearts" aria-hidden="true">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <Heart key={i} style={{ ['--i' as string]: i } as React.CSSProperties} />
-            ))}
-          </div>
-          <span className="ice-success" aria-hidden="true">
-            <MessageCircleHeart />
-          </span>
-          <h2 className="ice-big">{t('icebreaker.inbox.matched', "It's a match!")}</h2>
-          <p className="ice-sub">{t('icebreaker.inbox.matchedBody', 'You and {{name}} can chat now.', { name: item.firstName })}</p>
-        </div>
-      )}
 
       <ProfileReportModal report={report} />
     </div>

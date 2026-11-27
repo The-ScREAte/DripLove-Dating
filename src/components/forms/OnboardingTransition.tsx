@@ -20,9 +20,10 @@ const OnboardingTransition = ({ title, subtitle }: OnboardingTransitionProps) =>
   >
     <HoppingLogo size={64} />
     {title && (
-      <div className="dl-fade-in-delayed">
-        <p className="text-base font-semibold text-white">{title}</p>
-        {subtitle && <p className="mt-1.5 text-sm text-white/55">{subtitle}</p>}
+      <div className="dl-fade-in-delayed flex flex-col items-center">
+        <p className="text-[17px] font-semibold tracking-tight text-white">{title}</p>
+        {subtitle && <p className="mt-1.5 max-w-[17rem] text-[14px] leading-snug text-white/55">{subtitle}</p>}
+        <span className="ob-wait-bar mt-5" aria-hidden="true" />
       </div>
     )}
   </div>

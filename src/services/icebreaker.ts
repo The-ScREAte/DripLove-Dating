@@ -53,7 +53,7 @@ export const isIcebreakerPreview = (): boolean => {
     return false;
   }
 };
-const PREVIEW_LIMIT = 3;
+const PREVIEW_LIMIT = 4;
 let previewUsed = 0;
 function previewResponse(fn: string): unknown {
   switch (fn) {
@@ -293,11 +293,12 @@ export async function respondIcebreaker(id: string, accept: boolean, block = fal
   return { ok: true, matchId: data.match_id ?? null };
 }
 
-/** Test/reset helper. */
-export function __resetIcebreakerForTests() {
+/** Logout / user switch + tests: forget every cached quota, status and inbox. */
+export function resetIcebreakerState() {
   available = null;
   quota = null;
   quotaAt = 0;
   statusCache.clear();
   inbox = { items: [], loaded: false };
 }
+export const __resetIcebreakerForTests = resetIcebreakerState;

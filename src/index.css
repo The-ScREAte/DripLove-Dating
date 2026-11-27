@@ -1001,6 +1001,18 @@ body.keyboard-open .chat-messages-container {
 .dl-fade-in-delayed {
   animation: dl-fade-in 0.4s ease-out 0.35s both;
 }
+/* thin indeterminate bar under a waiting message */
+.ob-wait-bar {
+  position: relative; display: block; width: 96px; height: 3px; border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12); overflow: hidden;
+}
+.ob-wait-bar::after {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: inherit;
+  background: linear-gradient(90deg, #ec4899, #a855f7);
+  animation: ob-wait-slide 1.25s var(--dl-ease-in-out, ease-in-out) infinite;
+}
+@keyframes ob-wait-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+@media (prefers-reduced-motion: reduce) { .ob-wait-bar::after { animation: none; width: 100%; opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
   .dl-fade-in,
   .dl-fade-in-delayed {

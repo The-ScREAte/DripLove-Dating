@@ -121,3 +121,14 @@ export const getCachedObjectUrl = async (url: string): Promise<string | null> =>
   if (!blob) return null;
   return URL.createObjectURL(blob);
 };
+
+/** Logout / user switch: the store holds other members' photos, so wipe it. */
+export const clearPersistentImageCache = async (): Promise<void> => {
+  const db = await openDb();
+  if (!db) return;
+  try {
+    db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
+  } catch {
+    // ignore
+  }
+};

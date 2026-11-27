@@ -11,12 +11,12 @@ import {
   type IcebreakerQuota,
 } from '../icebreaker';
 
-const free = (remaining: number, limit = 3): IcebreakerQuota => ({ isPremium: false, limit, used: limit - remaining, remaining });
-const premium: IcebreakerQuota = { isPremium: true, limit: null, used: 40, remaining: null };
+const free = (remaining: number, limit = 4): IcebreakerQuota => ({ isPremium: false, limit, used: limit - remaining, remaining });
+const premium = (remaining = 10, limit = 10): IcebreakerQuota => ({ isPremium: true, limit, used: limit - remaining, remaining });
 const tr = (_k: string, fallback: string, o?: Record<string, unknown>) => fallback.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(o?.[k] ?? ''));
 
 describe('icebreakerAction (button state machine)', () => {
-  const base = { available: true as boolean | null, matched: false, pending: false, quota: free(3) };
+  const base = { available: true as boolean | null, matched: false, pending: false, quota: free(4) };
   it('is hidden when the backend is missing or it is your own profile', () => {
     expect(icebreakerAction({ ...base, available: false })).toBe('hidden');
     expect(icebreakerAction({ ...base, isOwnProfile: true })).toBe('hidden');
@@ -32,21 +32,26 @@ describe('icebreakerAction (button state machine)', () => {
   });
   it('free quota used up -> upgrade; premium never', () => {
     expect(icebreakerAction({ ...base, quota: free(0) })).toBe('upgrade');
-    expect(icebreakerAction({ ...base, quota: premium })).toBe('send');
+    expect(icebreakerAction({ ...base, quota: premium() })).toBe('send');
+    expect(icebreakerAction({ ...base, quota: premium(0) })).toBe('send'); // the server answers with the daily-limit message
     expect(icebreakerAction({ ...base, quota: free(1) })).toBe('send');
   });
 });
 
-describe('chancesDisplay (the "chances" pill)', () => {
-  it('free: all left -> "3 chances left"; some used -> "2 of 3"; one -> "1 chance left"; none -> go Premium', () => {
-    expect(chancesDisplay(free(3))).toEqual({ kind: 'left', count: 3 });
-    expect(chancesDisplay(free(2))).toEqual({ kind: 'of', count: 2, limit: 3 });
-    expect(chancesDisplay(free(1))).toEqual({ kind: 'left', count: 1 });
-    expect(chancesDisplay(free(0))).toEqual({ kind: 'none', limit: 3 });
+describe('chancesDisplay (a heart and a number)', () => {
+  it('free: 4 in total - shows what is left, then none', () => {
+    expect(chancesDisplay(free(4))).toEqual({ kind: 'left', count: 4, limit: 4 });
+    expect(chancesDisplay(free(2))).toEqual({ kind: 'left', count: 2, limit: 4 });
+    expect(chancesDisplay(free(0))).toEqual({ kind: 'none', premium: false });
   });
-  it('premium: unlimited; unknown while loading', () => {
-    expect(chancesDisplay(premium)).toEqual({ kind: 'unlimited' });
+  it('premium: 10 a day - shows what is left today, then none', () => {
+    expect(chancesDisplay(premium(10))).toEqual({ kind: 'left', count: 10, limit: 10 });
+    expect(chancesDisplay(premium(3))).toEqual({ kind: 'left', count: 3, limit: 10 });
+    expect(chancesDisplay(premium(0))).toEqual({ kind: 'none', premium: true });
+  });
+  it('unknown while loading or when the server gives no number', () => {
     expect(chancesDisplay(null)).toEqual({ kind: 'unknown' });
+    expect(chancesDisplay({ isPremium: false, limit: null, used: 0, remaining: null })).toEqual({ kind: 'unknown' });
   });
 });
 

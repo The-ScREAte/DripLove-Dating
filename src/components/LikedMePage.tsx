@@ -1,3 +1,4 @@
+import SlideDots from './discover/SlideDots';
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { CardGridSkeleton } from '@/components/ui/LoadingStates';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -9,17 +10,18 @@ import { Users, Heart, X, ArrowLeft, Crown, Lock } from 'lucide-react';
 import { getPlatformSync } from '@/utils/platformUtils';
 
 import { supabase } from '@/integrations/supabase/client';
+import { uniqueTopic } from '@/utils/realtime';
 import { useToast } from '@/hooks/use-toast';
 import { requestPopup, openPremiumUpgrade } from '@/popups';
 import { ProfileDetailsPanel } from './profile-card/ProfileDetailsPanel';
 import { useCaptionedPhotos, toTitleCase } from './profile-card/profileCardUtils';
 import { ProfileCaption } from './profile-card/ProfileCaption';
-import { icebreakerPillFor } from './icebreaker/target';
 import { ProfileReportModal } from './profile-card/ProfileReportModal';
 import { useProfileReport } from './profile-card/useProfileReport';
 import { useBackClose } from '@/utils/backStack';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
+import { App as CapacitorApp } from '@capacitor/app';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // FIX #1: Import blob cache for instant Android image loading
@@ -738,6 +740,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
     // ⭐ ANDROID FIX: Reduced polling frequency from 30s to 60s
     const interval = setInterval(() => {
+      // No point polling while the app is in the background; resume refreshes (effect below).
+      if (typeof document !== 'undefined' && document.hidden) return;
       void fetchLikersInBackground();
     }, 60000);
 
@@ -748,6 +752,42 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       likedMePollIntervals.delete(currentUser.id);
     };
   }, [currentUser?.id, fetchLikersInBackground]);
+
+  // A new like arrives live (the Discover like-back channel doesn't touch this list).
+  useEffect(() => {
+    const uid = currentUser?.id;
+    if (!uid) return undefined;
+    const channel = supabase
+      .channel(uniqueTopic(`liked-me-list-${uid}`))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: `liked_id=eq.${uid}` }, () => {
+        void fetchLikersInBackground();
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id, fetchLikersInBackground]);
+
+  // Refresh when this tab is opened and whenever the app comes back to the foreground (throttled).
+  // The page stays mounted while hidden, so the mount fetch alone never re-ran and new likes waited
+  // for the next 60 s poll tick.
+  useEffect(() => {
+    if (!currentUser?.id || !isActiveTab) return undefined;
+    const refresh = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const last = likedMeLastBackgroundFetchAt.get(currentUser.id) || 0;
+      if (Date.now() - last > LIKED_ME_BACKGROUND_REFRESH_THROTTLE) void fetchLikersInBackground();
+    };
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('online', refresh);
+    const listenerPromise = CapacitorApp.addListener('resume', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('online', refresh);
+      listenerPromise.then((l) => l.remove()).catch(() => {});
+    };
+  }, [currentUser?.id, isActiveTab, fetchLikersInBackground]);
 
   useEffect(() => {
     setShowMoreInfo(false);
@@ -1392,27 +1432,19 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               showAbout={showAbout}
               expanded={showMoreInfo}
               onToggle={() => setShowMoreInfo((v) => !v)}
-              action={icebreakerPillFor(selectedProfile, slides, { viewerId: currentUser?.id, photoUrl: userImages[selectedProfile.id]?.[0], currentSlide })}
             />
           </div>
 
-          {/* Slide indicators */}
+          {/* Slide indicators - the same centred carousel as Discover, Circle and the preview */}
           <div
-            className="absolute left-1/2 transform -translate-x-1/2 flex gap-1.5 z-10"
+            className="absolute left-0 right-0 z-10 flex justify-center pointer-events-none"
             style={{
               // env(safe-area-inset-top) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx).
               top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 84px)'
             }}
           >
-            {Array.from({ length: totalSlides }).map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  idx === currentSlide ? 'bg-pink-500 w-6' : 'bg-pink-500/30 w-1.5'
-                }`}
-              />
-            ))}
+            <SlideDots total={totalSlides} current={currentSlide} />
           </div>
 
           {/* Header buttons - icon-only, same small glass-circle style as Discover's

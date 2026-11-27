@@ -431,22 +431,6 @@
   "cards": {
     "heroMeet": "Conoce a {{name}}",
     "sharedHeadline": "{{name}} y tú tienen cosas en común",
-    "basicsTitle": "De un vistazo",
-    "basics": {
-      "work": "Trabajo",
-      "education": "Estudios",
-      "height": "Estatura",
-      "lives": "Vive en",
-      "distance": "Distancia",
-      "languages": "Habla",
-      "away": "A {{distance}}"
-    },
-    "lookingTitle": "Busca",
-    "looking": {
-      "family": "Planes de familia",
-      "loveStyle": "Estilo de amor",
-      "communication": "Comunicación"
-    },
     "interestsTitle": "Lo que le gusta a {{name}}",
     "interestsEyebrow": "Intereses",
     "valuesEyebrow": "Valores",
@@ -461,11 +445,6 @@
       "smoking": "Fuma",
       "sleep": "Sueño",
       "pets": "Mascotas"
-    },
-    "signTitle": "Signo cultural",
-    "sign": {
-      "shared": "Comparten este signo ✨",
-      "compatible": "Muy compatible con tu signo ✨"
     },
     "trustTitle": "Bueno saber",
     "trust": {
@@ -486,7 +465,7 @@
       "city": "¿Cuál es tu lugar favorito en {{city}}?",
       "generic": "Hola {{name}} 👋 ¿cómo va tu semana?",
       "hint": "Un primer mensaje fácil: toca el chat cuando hagan match.",
-      "headline": "Saluda a {{name}}"
+      "headline": "Sé el primero en saludar"
     },
     "welcomeTitle": "Nuevo por aquí",
     "welcomeBody": "{{name}} apenas está empezando: sé el primero en saludar.",
@@ -531,8 +510,6 @@
       "emptySub": "Cuando alguien te envíe un primer mensaje, aparecerá aquí.",
       "error": "No se pudo hacer ahora. Inténtalo de nuevo.",
       "intro": "Aceptar crea un match y abre tu chat.",
-      "matched": "¡Es un match!",
-      "matchedBody": "Tú y {{name}} ya podéis chatear.",
       "readMore": "Leer más",
       "reportBlock": "Denunciar o bloquear",
       "requestTitle": "Rompehielos",
@@ -545,26 +522,22 @@
       "cta": "Abrir chat",
       "title": "Ya hicisteis match"
     },
-    "quota": "Te quedan {{remaining}} de {{limit}} gratis",
-    "quotaEmpty": "No te quedan rompehielos gratis",
     "row": {
       "aria": "Abrir rompehielos, {{count}} esperando",
       "sub": "{{count}} te esperan"
     },
     "sayHi": "Saludar",
-    "sentLabel": "Rompehielos enviado",
+    "sentLabel": "Saludo enviado",
     "sheet": {
       "done": "Listo",
-      "hint": "Lo verá primero. Si acepta, hacen match y pueden seguir conversando.",
       "ideas": "¿Necesitas una idea?",
-      "placeholder": "Escribe un primer mensaje amable…",
-      "safety": "Ellos deciden si aceptan. Sé amable: siempre puedes denunciar o bloquear.",
-      "send": "Enviar rompehielos",
+      "placeholder": "Escribe algo dulce…",
+      "send": "Saluda primero",
       "sending": "Enviando…",
       "sentBody": "Te avisaremos si {{name}} responde.",
       "sentTitle": "¡Enviado!",
-      "to": "Para {{name}}",
-      "title": "Envía tu primer mensaje a {{name}}"
+      "title": "Sé el primero en saludar",
+      "more": "Más ideas"
     },
     "someone": "Alguien",
     "title": "Rompe el hielo",
@@ -579,15 +552,23 @@
       "later": "Ahora no",
       "title": "Has usado tus {{limit}} rompehielos gratis"
     },
-    "useOpener": "Usar este mensaje: {{text}}",
-    "copyOpener": "Copiar: {{text}}",
     "copied": "Copiado",
     "chances": {
       "left_one": "Te queda {{count}} oportunidad",
       "left_other": "Te quedan {{count}} oportunidades",
-      "of": "{{remaining}} de {{limit}} oportunidades gratis",
-      "none": "Sin oportunidades - hazte Premium",
-      "unlimited": "Oportunidades ilimitadas"
+      "none": "Sin oportunidades"
+    },
+    "free": {
+      "evening": "Si tuviéramos una noche perfecta, ¿qué haríamos? 🌙",
+      "song": "¿Qué canción tienes pegada ahora mismo? 🎶",
+      "laugh": "¿Qué fue lo último que te hizo reír a carcajadas?",
+      "coffee": "¿Café, té o algo más dulce? ☕💗",
+      "sunday": "Domingo ideal: ¿caminar al amanecer o dormir hasta tarde? ☀️",
+      "secret": "Cuéntame algo de ti que casi nadie sabe 😉",
+      "escape": "Playa, montaña o gran ciudad: ¿adónde escapamos? ✈️",
+      "smile": "Tienes una sonrisa difícil de ignorar. ¿Cuál es su historia? ✨",
+      "dance": "Sé sincero/a: ¿bailas genial o finges genial? 💃",
+      "love": "¿Cómo sería para ti una primera cita perfecta? 💕"
     }
   }
 }

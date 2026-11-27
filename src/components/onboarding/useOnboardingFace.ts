@@ -25,6 +25,8 @@ export function useOnboardingFace(mode: OnboardingMode, userId: string | null) {
   // true once we know whether a face is already on file (local capture or DB),
   // so the wizard can decide which steps to skip without a flash
   const [faceChecked, setFaceChecked] = useState(false);
+  // true once the person taps "Verify": the intro goes away and only the camera shows
+  const [capturing, setCapturing] = useState(false);
 
   // Restore from localStorage on mount.
   useEffect(() => {
@@ -124,6 +126,8 @@ export function useOnboardingFace(mode: OnboardingMode, userId: string | null) {
   return {
     faceVerified,
     faceChecked,
+    capturing,
+    setCapturing,
     isVerifying,
     handleFaceVerified,
     storageKey,

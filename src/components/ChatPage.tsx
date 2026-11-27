@@ -835,10 +835,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     };
 
     document.addEventListener('visibilitychange', resync);
+    // Coming back online is the same situation: anything sent while offline was never streamed.
+    window.addEventListener('online', resync);
     const listenerPromise = App.addListener('resume', resync);
 
     return () => {
       document.removeEventListener('visibilitychange', resync);
+      window.removeEventListener('online', resync);
       listenerPromise.then((listener) => listener.remove()).catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

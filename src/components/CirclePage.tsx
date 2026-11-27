@@ -710,7 +710,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   const categoryMoreRef = useRef<{
     loadPage: (skipIds: string[]) => Promise<CircleProfile[]>;
     exhausted: boolean;
-    inFlight: Promise<CircleProfile[]> | null;
+    inFlight: Promise<CircleProfile[] | null> | null;
   } | null>(null);
   const categoryBrowseRef = useRef<{ label: string; profiles: CircleProfile[] } | null>(null);
   // Ids this Circle session itself just swiped (set right before the decision is published) so the
@@ -726,7 +726,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // multi-query load. openTokenRef lets Back cancel a load that is still in flight.
   const [openingCategory, setOpeningCategory] = useState<string | null>(null);
   // Why the empty screen is showing: nobody matches this circle at all, vs the deck was swiped through.
-  const [emptyCategoryKind, setEmptyCategoryKind] = useState<'none' | 'seen'>('none');
+  const [emptyCategoryKind, setEmptyCategoryKind] = useState<'none' | 'seen' | 'error'>('none');
   const openTokenRef = useRef(0);
 
   // Recommended/Similar row state: null batch = not computed yet (still
@@ -795,6 +795,34 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     })();
     return () => { cancelled = true; };
   }, [currentUser?.id, isPremium]);
+
+  // The count is keyed by (UTC) date: if the app stays open across midnight, or the user is
+  // blocked at the limit, re-read it so the likes come back without a reload.
+  const circleDayRef = useRef(new Date().toISOString().slice(0, 10));
+  const circleLikesSyncedAtRef = useRef(Date.now());
+  const circleAtLimitRef = useRef(false);
+  circleAtLimitRef.current = circleLikesLoaded && circleLikesUsed >= circleDailyLimit;
+  useEffect(() => {
+    const userId = currentUser?.id;
+    if (!userId) return undefined;
+    const check = () => {
+      if (document.hidden) return;
+      const day = new Date().toISOString().slice(0, 10);
+      const dayChanged = day !== circleDayRef.current;
+      if (!dayChanged && !(circleAtLimitRef.current && Date.now() - circleLikesSyncedAtRef.current > 60_000)) return;
+      circleDayRef.current = day;
+      circleLikesSyncedAtRef.current = Date.now();
+      void getCircleLikesUsedToday(userId).then((used) => setCircleLikesUsed(used));
+    };
+    const id = window.setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
+    };
+  }, [currentUser?.id]);
 
   // A decision made in Discover must disappear from every Circle surface
   // immediately, without waiting for cache expiry or a remount.
@@ -1410,14 +1438,21 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // Loads the open category's next page (people not already in the deck) and
   // appends it. Returns who was added; nobody new means the category really
   // is used up for now. Concurrent calls share the same load.
-  const loadMoreCategory = useCallback(async (): Promise<CircleProfile[]> => {
+  const loadMoreCategory = useCallback(async (): Promise<CircleProfile[] | null> => {
     const more = categoryMoreRef.current;
     if (!more || more.exhausted) return [];
     if (more.inFlight) return more.inFlight;
     const loaded = (categoryBrowseRef.current?.profiles || []).map((p) => p.id);
     more.inFlight = (async () => {
       try {
-        const page = await more.loadPage(loaded);
+        // One quiet retry: a network blip must never read as "that's everyone".
+        let page: CircleProfile[];
+        try {
+          page = await more.loadPage(loaded);
+        } catch {
+          await new Promise((r) => setTimeout(r, 1200));
+          page = await more.loadPage(loaded);
+        }
         const have = new Set(loaded);
         const fresh = page.filter((p) => !have.has(p.id));
         if (categoryMoreRef.current !== more) return [];
@@ -1428,7 +1463,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         setCategoryBrowse((prev) => (prev ? { ...prev, profiles: [...prev.profiles, ...fresh] } : prev));
         return fresh;
       } catch {
-        return [];
+        return null; // the load FAILED - different from "nobody new"
       } finally {
         more.inFlight = null;
       }
@@ -1614,7 +1649,11 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         setDeckLoadingMore(true);
         void loadMoreCategory().then((more) => {
           setDeckLoadingMore(false);
-          if (more.length > 0) {
+          if (more === null) {
+            setEmptyCategoryKind('error');
+            setEmptyCategoryLabel(categoryBrowse.label);
+            closeProfileView();
+          } else if (more.length > 0) {
             setCategoryBrowseIndex(nextIndex);
             void applyProfileImages(more[0]);
             prefetchUpcoming(more, 0);
@@ -1656,7 +1695,8 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       try {
         if (wasLike) {
           const result = await recordCircleLike(userId, profile.id, isPremium);
-          setCircleLikesUsed(result.currentUsage);
+          // never let an older response move the counter backwards while newer likes are in flight
+          setCircleLikesUsed((n) => (result.limitReached ? result.currentUsage : Math.max(n, result.currentUsage)));
           if (result.limitReached || !result.success) {
             rollback({ keepUsage: true });
             setShowCircleOutOfLikes(true);
@@ -1815,9 +1855,13 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // above and `skipIds` (people already loaded into the deck). Used for
       // the first page here and, through categoryMoreRef, to keep the deck
       // loading while it's swiped.
-      const loadPage = async (skipIds: string[]): Promise<CircleProfile[]> => {
+      // People a page returned but who can't be shown (age range, distance, no approved photo): remembered
+      // so the next page moves past them instead of returning the same rows and ending the deck early.
+      const rejectedIds = new Set<string>();
+      const loadPage = async (skipIds: string[], attempt = 0): Promise<CircleProfile[]> => {
       const skip = new Set(excluded);
       skipIds.forEach((id) => skip.add(id));
+      rejectedIds.forEach((id) => skip.add(id));
       // Two phases, like Discover: ACTIVE members first; ARCHIVED members (inactive 30+ days) only
       // top the page up when the active supply for this circle is short. Later pages repeat the
       // same order, so the deck flows active -> archived with no visible seam (the prefetch window
@@ -1868,9 +1912,14 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // prefetch window used to cost ~3 extra round trips on every single swipe).
       Object.entries(allImagesByUser).forEach(([uid, urls]) => { imageUrlCacheRef.current.set(uid, urls); });
 
-      return eligible
+      const shown = eligible
         .filter((p) => firstImageByUser[p.id])
         .map((p) => ({ ...p, favorites: parseFavorites(p.favorites), firstImage: firstImageByUser[p.id] }));
+      const shownIds = new Set(shown.map((p) => p.id));
+      rows.forEach((r) => { if (!shownIds.has(r.id)) rejectedIds.add(r.id); });
+      // A full page of people who can't be shown is NOT the end of the circle - look at the next page.
+      if (shown.length === 0 && attempt < 4) return loadPage(skipIds, attempt + 1);
+      return shown;
       };
 
       const withPhotos = await loadPage([]);
@@ -2061,14 +2110,16 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           <CardContent className="p-6 text-center flex flex-col items-center">
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
             <h2 className="text-lg font-semibold mb-1.5 text-white">
-              {emptyCategoryKind === 'seen' ? t('circle.endTitle', "You've seen everyone here") : 'No one matches yet'}
+              {emptyCategoryKind === 'seen' ? t('circle.endTitle', "You've seen everyone here") : emptyCategoryKind === 'error' ? "Couldn't load more people" : 'No one matches yet'}
             </h2>
             <p className="text-gray-400 text-sm mb-5 max-w-xs">
-              {emptyCategoryKind === 'seen'
+              {emptyCategoryKind === 'error'
+                ? 'Check your connection, then open this circle again.'
+                : emptyCategoryKind === 'seen'
                 ? t('circle.endBody', { circle: emptyCategoryLabel, defaultValue: 'You\'ve seen everyone in "{{circle}}" for now. Check back soon, or explore another circle.' })
                 : <>No one new matches &quot;{emptyCategoryLabel}&quot; right now. Check back soon, or adjust your preferences in Profile.</>}
             </p>
-            {!isPremium && (
+            {!isPremium && emptyCategoryKind !== 'error' && (
               <div className="mb-3">
                 <p className="text-yellow-400 text-sm mb-3 max-w-xs mx-auto">
                   Upgrade to Premium to unlock more countries and see more people.

@@ -68,12 +68,8 @@ describe('getSteps: required flow -> celebrate -> bonus flow', () => {
       'interests', 'values', 'music', 'work', 'bio', 'details', 'lifestyle', 'love',
     ]);
   });
-  it('complete-profile: 6 required screens (no account), signs becomes a bonus', () => {
-    expect(getSteps('complete', false)).toEqual([
-      'you', 'looking', 'location', 'work', 'face', 'photos',
-      'celebrate',
-      'interests', 'values', 'music', 'signs', 'bio', 'details', 'lifestyle', 'love',
-    ]);
+  it('complete-profile: the same screens as sign-up, minus the account', () => {
+    expect(getSteps('complete', false)).toEqual(getSteps('register', false).slice(1));
   });
   it('a resumed sign-up (account exists) drops the account step', () => {
     expect(getSteps('register', true)).not.toContain('account');
@@ -132,20 +128,22 @@ describe('cheerKey: short encouragement that escalates and otherwise stays quiet
 });
 
 describe('required rules per flow (kept exactly as the two original forms had them)', () => {
-  it('work is required only when completing a profile', () => {
-    expect(isRequired('work', 'complete')).toBe(true);
-    expect(isRequired('work', 'register')).toBe(false);
+  it('work, interests and what-matters-most are required in both flows', () => {
+    for (const s of ['work', 'interests', 'values'] as const) {
+      expect(isRequired(s, 'complete')).toBe(true);
+      expect(isRequired(s, 'register')).toBe(true);
+    }
   });
-  it('cultural signs are required only in sign-up', () => {
-    expect(isRequired('signs', 'register')).toBe(true);
-    expect(isRequired('signs', 'complete')).toBe(false);
+  it('every screen is required or optional the same way in sign-up and complete-profile', () => {
+    for (const s of getSteps('register', false)) expect(isRequired(s, 'complete')).toBe(isRequired(s, 'register'));
+    expect(isRequired('signs', 'complete')).toBe(true);
   });
   it('the core screens are always required; the extras never are', () => {
     for (const s of ['account', 'you', 'looking', 'location', 'face', 'photos'] as const) {
       expect(isRequired(s, 'register')).toBe(true);
       expect(isRequired(s, 'complete')).toBe(true);
     }
-    for (const s of ['celebrate', 'bio', 'details', 'lifestyle', 'interests', 'values', 'music', 'love'] as const) {
+    for (const s of ['celebrate', 'bio', 'details', 'lifestyle', 'music', 'love'] as const) {
       expect(isRequired(s, 'register')).toBe(false);
       expect(validateStep(s, ctx({ formData: initialFormData }))).toEqual({});
     }
@@ -182,9 +180,12 @@ describe('validateStep (original messages)', () => {
     expect(validateStep('you', ctx())).toEqual({});
   });
 
-  it('looking: preference always; relationship intent only when completing', () => {
+  it('looking: preference and relationship intent, in both flows', () => {
     const blank = filled({ preference: '', relationshipIntent: '' });
-    expect(validateStep('looking', ctx({ formData: blank }))).toEqual({ preference: 'Preference is required' });
+    expect(validateStep('looking', ctx({ formData: blank }))).toEqual({
+      preference: 'Preference is required',
+      relationshipIntent: 'Relationship intent is required',
+    });
     expect(validateStep('looking', ctx({ mode: 'complete', formData: blank }))).toEqual({
       preference: 'Preference is required',
       relationshipIntent: 'Relationship intent is required',
@@ -196,9 +197,9 @@ describe('validateStep (original messages)', () => {
     expect(validateStep('location', ctx({ formData: filled({ country: '' }) }))).toEqual({});
   });
 
-  it('work: only enforced when completing, using the localised messages', () => {
+  it('work: enforced in both flows, using the localised messages', () => {
     const blank = filled({ occupation: '', industry: '', educationLevel: '' });
-    expect(validateStep('work', ctx({ formData: blank }))).toEqual({});
+    expect(Object.keys(validateStep('work', ctx({ formData: blank })))).toHaveLength(3);
     const t = (k: string) => `T:${k}`;
     expect(validateStep('work', ctx({ mode: 'complete', formData: blank, t }))).toEqual({
       occupation: 'T:profileCompletion.errors.occupationRequired',
@@ -208,10 +209,10 @@ describe('validateStep (original messages)', () => {
     expect(validateStep('work', ctx({ mode: 'complete', formData: blank, t: (k) => k })).occupation).toBe('Occupation is required');
   });
 
-  it('signs: sign-up needs one; complete-profile does not', () => {
+  it('signs: at least one in both flows', () => {
     const none = filled({ adinkraSymbols: [] });
     expect(validateStep('signs', ctx({ formData: none })).adinkraSymbols).toBe('Please select at least one cultural sign');
-    expect(validateStep('signs', ctx({ mode: 'complete', formData: none }))).toEqual({});
+    expect(validateStep('signs', ctx({ mode: 'complete', formData: none })).adinkraSymbols).toBe('Please select at least one cultural sign');
   });
 
   it('face + photos', () => {
@@ -224,7 +225,7 @@ describe('validateStep (original messages)', () => {
 
 describe('firstInvalidStep', () => {
   it('returns null when every step is valid', () => {
-    expect(firstInvalidStep(getSteps('register', false), ctx())).toBeNull();
+    expect(firstInvalidStep(getSteps('register', false), ctx({ formData: filled({ interests: ['a', 'b', 'c'], values: ['x'] }) }))).toBeNull();
   });
   it('returns the earliest failing step so a final-submit error can jump back to it', () => {
     const bad = firstInvalidStep(getSteps('register', false), ctx({ formData: filled({ city: '', adinkraSymbols: [] }), photoCount: 0 }));
@@ -244,7 +245,7 @@ describe('knownStepIds (complete-profile skips what is already on file)', () => 
     expect(knownStepIds('complete', { ...initialFormData, firstName: 'Ama', lastName: 'Mensah' }, false, 0)).toEqual([]);
   });
   it('skips each screen whose required data is complete', () => {
-    expect(knownStepIds('complete', filled(), true, 2)).toEqual(['you', 'looking', 'location', 'work', 'signs', 'face', 'photos']);
+    expect(knownStepIds('complete', filled({ interests: ['a', 'b', 'c'], values: ['x'] }), true, 2)).toEqual(['you', 'looking', 'location', 'work', 'signs', 'interests', 'values', 'face', 'photos']);
   });
   it('does not treat placeholder or partial answers as known', () => {
     const f = filled({ dateOfBirth: '', relationshipIntent: '', educationLevel: '', adinkraSymbols: [] });
@@ -285,11 +286,13 @@ describe('passwordStrength', () => {
 });
 
 describe('vibe screens (interests / values / music)', () => {
-  it('come first among the optional screens and are never required', () => {
+  it('come first in the second half: interests + values are required, music is not', () => {
     for (const mode of ['register', 'complete'] as const) {
       const { bonus } = splitFlows(getSteps(mode, false));
       expect(bonus.slice(0, 3)).toEqual(['interests', 'values', 'music']);
-      for (const s of ['interests', 'values', 'music'] as const) expect(isRequired(s, mode)).toBe(false);
+      expect(isRequired('interests', mode)).toBe(true);
+      expect(isRequired('values', mode)).toBe(true);
+      expect(isRequired('music', mode)).toBe(false);
     }
   });
   it('a music share link must be playable (https Spotify/Apple Music/YouTube/SoundCloud) - otherwise one calm error, skip still works', () => {
@@ -298,5 +301,17 @@ describe('vibe screens (interests / values / music)', () => {
     const ok = validateStep('music', ctx({ formData: { ...initialFormData, musicLink: 'https://open.spotify.com/track/abc123' } }));
     expect(ok).toEqual({});
     expect(validateStep('music', ctx({ formData: initialFormData }))).toEqual({});
+  });
+});
+
+describe('interests / values / email checks', () => {
+  it('need at least 3 interests and 1 value', () => {
+    expect(validateStep('interests', ctx({ formData: filled({ interests: ['a', 'b'] }) })).interests).toBeTruthy();
+    expect(validateStep('interests', ctx({ formData: filled({ interests: ['a', 'b', 'c'] }) }))).toEqual({});
+    expect(validateStep('values', ctx({ formData: filled({ values: [] }) })).values).toBeTruthy();
+    expect(validateStep('values', ctx({ formData: filled({ values: ['x'] }) }))).toEqual({});
+  });
+  it('catches a mistyped email domain', () => {
+    expect(validateStep('account', ctx({ formData: filled({ email: 'ama@gmial.com' }) })).email).toBe('Did you mean ama@gmail.com?');
   });
 });

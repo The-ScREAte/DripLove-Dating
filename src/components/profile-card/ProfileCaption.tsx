@@ -30,8 +30,6 @@ export interface ProfileCaptionProps {
   showAbout: boolean;
   expanded: boolean;
   onToggle: () => void;
-  /** Optional action under the caption (e.g. the Break the ice pill). Never shown on your own profile. */
-  action?: React.ReactNode;
 }
 
 /**
@@ -57,7 +55,6 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
   showAbout,
   expanded,
   onToggle,
-  action,
 }) => {
   const { t } = useTranslation();
 
@@ -147,7 +144,6 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
             )
           )}
 
-          {action && <div className="mt-2.5">{action}</div>}
         </div>
 
         {/* 44px hit area around the 30px glass circle (visual size unchanged). */}

@@ -26,6 +26,10 @@ export interface RegisterSubmitContext {
   faceStorageKey: string;
   onRegistrationInProgressChange?: (inProgress: boolean) => void;
   onSubmit: (data: unknown) => void;
+  /** The account step has to be fixed (email taken, weak password...): the wizard jumps back to it. */
+  onAccountProblem: (field: 'email' | 'password', message: string) => void;
+  /** The account exists but the project requires email confirmation first (no session yet). */
+  onNeedsEmailConfirmation: () => void;
 }
 
 /**
@@ -41,8 +45,9 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
   const {
     formData, images, setImages, accountUserId, setAccountUserId, profileSavedRef,
     setCreatingAccount, setIsSubmitting, setIsFinishing, toast, t, faceStorageKey,
-    onRegistrationInProgressChange, onSubmit,
+    onRegistrationInProgressChange, onSubmit, onAccountProblem, onNeedsEmailConfirmation,
   } = ctx;
+  const email = formData.email.trim().toLowerCase();
 
   if (images.some((img) => img.status === 'moderating')) {
     toast({
@@ -94,26 +99,26 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
   setCreatingAccount(true);
 
   if (!userId) {
+    // Hold the app's auto-routing BEFORE signUp: signUp fires SIGNED_IN straight away, and routing on it
+    // would swap this screen for the terms/loading screens mid-submit (and unmount the form).
+    onRegistrationInProgressChange?.(true);
     try {
       // Does a profile for this email already exist? (the only check that matters)
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
-        .eq('email', formData.email)
-        .single();
+        .eq('email', email)
+        .maybeSingle();
 
       if (existingProfile) {
-        toast({
-          title: 'Account exists',
-          description: 'An account with this email already exists. Please sign in instead.',
-          variant: 'destructive',
-        });
         setCreatingAccount(false);
+        onRegistrationInProgressChange?.(false);
+        onAccountProblem('email', 'This email already has an account - go back and sign in instead.');
         return false;
       }
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
+        email,
         password: formData.password,
         options: {
           data: {
@@ -135,8 +140,21 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
       });
 
       if (signUpError) {
-        toast({ title: 'Registration failed', description: signUpError.message, variant: 'destructive' });
         setCreatingAccount(false);
+        onRegistrationInProgressChange?.(false);
+        const msg = signUpError.message || 'Registration failed';
+        if (/already|registered|exists/i.test(msg)) onAccountProblem('email', 'This email already has an account - go back and sign in instead.');
+        else if (/password/i.test(msg)) onAccountProblem('password', msg);
+        else if (/email/i.test(msg)) onAccountProblem('email', msg);
+        else toast({ title: 'Registration failed', description: msg, variant: 'destructive' });
+        return false;
+      }
+
+      // An already-registered email comes back as a fake "user" with no identities and no session.
+      if (signUpData?.user && Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
+        setCreatingAccount(false);
+        onRegistrationInProgressChange?.(false);
+        onAccountProblem('email', 'This email already has an account - go back and sign in instead.');
         return false;
       }
 
@@ -148,6 +166,7 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
           variant: 'destructive',
         });
         setCreatingAccount(false);
+        onRegistrationInProgressChange?.(false);
         return false;
       }
 
@@ -157,8 +176,26 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
       // profile data and photos are saved. Tell the parent to hold off until
       // this handler explicitly hands off via onSubmit.
       onRegistrationInProgressChange?.(true);
+
+      // No session means the project wants the email confirmed first (or the session didn't stick).
+      // Try signing straight in; if it really needs confirmation, say so clearly instead of
+      // silently dropping the person on the login page with everything they typed lost.
+      if (!signUpData.session) {
+        const { data: signedIn, error: signInError } = await supabase.auth.signInWithPassword({ email, password: formData.password });
+        if (signInError || !signedIn?.session) {
+          setCreatingAccount(false);
+          onRegistrationInProgressChange?.(false);
+          if (/confirm/i.test(signInError?.message || '') || !signInError) {
+            onNeedsEmailConfirmation();
+          } else {
+            toast({ title: 'Registration failed', description: signInError.message, variant: 'destructive' });
+          }
+          return false;
+        }
+      }
     } catch (err: unknown) {
       setCreatingAccount(false);
+      onRegistrationInProgressChange?.(false);
       toast({
         title: 'Account Creation Error',
         description:
@@ -190,7 +227,7 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
 
       const profileData = {
         id: userId,
-        email: formData.email,
+        email,
         first_name: formData.firstName,
         last_name: formData.lastName,
         date_of_birth: formData.dateOfBirth,

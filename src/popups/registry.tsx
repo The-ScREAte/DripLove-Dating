@@ -49,6 +49,8 @@ registerPopup<MatchPayload>(
     return (
       <MatchAnimation
         currentUserName={services.currentUserName}
+        currentUserImage={services.currentUserImage ?? undefined}
+        currentUserId={services.currentUser?.id ?? undefined}
         matchedUserName={payload.matchedUserName}
         matchedUserImage={payload.matchedUserImage}
         matchedUserId={payload.matchedUserId}

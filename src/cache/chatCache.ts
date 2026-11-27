@@ -76,6 +76,15 @@ export const cacheUserName = (userId: string, firstName: string, lastName: strin
  * Clear all cache (logout scenario)
  */
 export const clearChatCache = (): void => {
+  Object.values(chatCache.avatars || {}).forEach((u) => {
+    if (typeof u === 'string' && u.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(u);
+      } catch {
+        // ignore
+      }
+    }
+  });
   chatCache.ownerUserId = '';
   chatCache.chats = [];
   chatCache.avatars = {};

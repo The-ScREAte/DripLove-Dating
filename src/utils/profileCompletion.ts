@@ -167,6 +167,27 @@ export const calculateProfileCompletion = (
 
 
 // Get current user's swipe count for today
+/**
+ * Today's swipe count, or null when it could not be read. getTodaySwipeCount() answers 0 on any error, which is
+ * fine for a first load but WRONG for a re-check while the user is out of swipes (a flaky network would look like
+ * a reset). Day = the server's UTC date, the same key update_user_usage uses.
+ */
+export const getTodaySwipeCountStrict = async (userId: string): Promise<number | null> => {
+  if (!userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('user_usage')
+      .select('swipes_used')
+      .eq('user_id', userId)
+      .eq('date', new Date().toISOString().split('T')[0])
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') return null;
+    return data?.swipes_used || 0;
+  } catch {
+    return null;
+  }
+};
+
 export const getTodaySwipeCount = async (userId: string): Promise<number> => {
   if (!userId) return 0;
 

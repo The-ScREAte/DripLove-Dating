@@ -41,6 +41,8 @@ export interface PopupRenderArgs<P = any> {
 export interface PopupServices {
   currentUser: ({ id?: string | null; email?: string | null; first_name?: string | null } & Record<string, unknown>) | null;
   currentUserName: string;
+  /** The viewer's main photo (for celebrations like "It's a match"). */
+  currentUserImage?: string | null;
   onNavigateToChat: (userId: string) => void;
   onNavigateToVerify: () => void;
 }

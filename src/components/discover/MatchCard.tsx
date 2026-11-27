@@ -1,3 +1,4 @@
+import SlideDots from './SlideDots';
 import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import ReportButton from '../ReportButton';
@@ -12,7 +13,6 @@ import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { ProfileDetailsPanel } from '../profile-card/ProfileDetailsPanel';
 import { useCaptionedPhotos, toTitleCase } from '../profile-card/profileCardUtils';
 import { ProfileCaption } from '../profile-card/ProfileCaption';
-import { icebreakerPillFor } from '../icebreaker/target';
 import { ProfileReportModal } from '../profile-card/ProfileReportModal';
 import { useProfileReport } from '../profile-card/useProfileReport';
 import { formatDistance } from '@/utils/distanceUnits';
@@ -395,28 +395,20 @@ const MatchCard: React.FC<MatchCardProps> = ({
           )}
 
           {/* Slide indicators */}
-          {/* Same stacking-context ceiling as the sign display above — portaled out so the
+          {/* Same stacking-context ceiling as the sign display above - portaled out so the
               slide dots can render above the global header instead of underneath it.
-              Sits just below DiscoverTopBar's row, slim (thin bars, no
-              border) and deep pink instead of white/grey. */}
+              Centred just below DiscoverTopBar's row. */}
           {isActiveTab && slides && slides.length > 1 && createPortal(
             <div
-              className="dl-under-popup fixed left-4 flex space-x-1.5 z-[9999]"
+              className="dl-under-popup fixed z-[9999] flex justify-center"
               style={{
-                top: 'calc(var(--app-header-height, 72px) + 52px)',
-                pointerEvents: 'none'
+                left: 0,
+                right: 0,
+                top: 'calc(var(--app-header-height, 72px) + 48px)',
+                pointerEvents: 'none',
               }}
             >
-              {slides.map((_, index) => (
-                <div
-                  key={index}
-                  className={`h-1 rounded-full transition-all duration-300 ${
-                    index === currentSlide
-                      ? 'w-4 bg-pink-600'
-                      : 'w-1 bg-pink-600/40'
-                  }`}
-                />
-              ))}
+              <SlideDots total={slides.length} current={currentSlide} />
             </div>,
             document.body
           )}
@@ -443,7 +435,6 @@ const MatchCard: React.FC<MatchCardProps> = ({
             showAbout={showAbout}
             expanded={showMoreInfo}
             onToggle={onToggleInfo}
-            action={icebreakerPillFor(stableMatch, slides, { viewerId: viewerVibe.id, photoUrl: memoUserImages[0], currentSlide })}
           />
 
           <ProfileReportModal report={report} />

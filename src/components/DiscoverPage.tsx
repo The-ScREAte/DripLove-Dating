@@ -58,7 +58,7 @@ import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { calculateDistance } from '@/constants/locationData';
 import { checkAndTriggerRefill } from '@/utils/performanceOptimizer';
 import { locationService } from '@/services/locationService';
-import { calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileCompletion';
+import { calculateProfileCompletion, getTodaySwipeCount, getTodaySwipeCountStrict } from '@/utils/profileCompletion';
 import { parseFavorites } from '@/constants/favorites';
 import { readCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { getLanguageName } from '@/utils/languageNames';
@@ -78,6 +78,8 @@ import { CurrentUser, PotentialMatch } from '@/types';
 import { publishSwipeDecision } from '@/utils/swipeSync';
 import { getGenderFilter } from '@/utils/genderPreference';
 import { markAppContentReady } from '@/utils/appContentReady';
+import { discoverSwipeRpc, undoPassRpc } from '@/utils/discoverSwipe';
+import { nextRecoveryDelayMs, refillCooldownMs, shouldResyncSwipeCount, urgentRefillGapMs, RECOVERY_BASE_DELAY_MS } from './discover/swipePipeline';
 
 // How many lifetime swipes before an unverified user sees the "verify your
 // identity" prompt (shown once, ever - see verifyPromptStorage.ts). Set to 1
@@ -91,6 +93,8 @@ const SWIPES_BEFORE_VERIFY_PROMPT = 1;
 // of sync with each other and with the server.
 const FREE_DAILY_SWIPE_LIMIT = 50;
 const PREMIUM_DAILY_SWIPE_LIMIT = 200;
+// Free undos per day: must match update_user_usage's 'reverse_dislike' limit (2).
+const FREE_DAILY_UNDO_LIMIT = 2;
 // With this many real cards left, a refill runs on every swipe (see moveToNext).
 const URGENT_REFILL_AT = 5;
 
@@ -384,6 +388,12 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const [imageIndex, setImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  // Single-flight guard for background refills. `isLoadingMore` is React state, so two triggers in the same
+  // tick (auto-refill effect + the per-swipe urgent refill) can both read a stale `false`; this ref cannot.
+  const loadMoreInFlightRef = useRef(false);
+  // Consecutive refills that brought nobody new (or failed). Drives the exponential back-off below so a drained
+  // pool is not re-queried every few seconds forever.
+  const refillEmptyStreakRef = useRef(0);
   const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
   const hasCompletedInitialFetchRef = useRef(false);
   // Tells the sign-up hand-off screen (Index.tsx) the first tab has real content.
@@ -443,6 +453,11 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // The upgrade page, match celebration, verify nudge and swipe tutorial are all popups owned by
   // the popup coordinator (src/popups): this page only ASKS for them, it never opens its own.
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
+  // Mirror for callbacks that must not wait for a render (the per-swipe refill runs inside a state updater).
+  const isOutOfSwipesRef = useRef(false);
+  useEffect(() => {
+    isOutOfSwipesRef.current = isOutOfSwipes;
+  }, [isOutOfSwipes]);
   // The out-of-swipes screen is itself the upsell: keep every other calm popup off it.
   usePopupBusy('blocking-screen', isOutOfSwipes);
 
@@ -969,6 +984,45 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     return () => {
       cancelled = true;
+    };
+  }, [currentUser?.id]);
+
+  // Daily-limit RESET while the app stays open. The count above is read once per login, so without this a user
+  // who hit the limit stayed "out of swipes" past the UTC day change (or after an admin reset / a plan change on
+  // another device) until they reloaded. Re-reads the count when (a) the UTC day changed, or (b) they are
+  // out of swipes and it has been a minute - on focus/visibility and every 30s while visible. Cheap: one tiny
+  // query, only in those two situations. A failed read is ignored (it must never look like a reset).
+  const swipeDayRef = useRef(todayStr());
+  const swipeCountSyncedAtRef = useRef(Date.now());
+  useEffect(() => {
+    const userId = currentUser?.id;
+    if (!userId) return undefined;
+    swipeDayRef.current = todayStr();
+    swipeCountSyncedAtRef.current = Date.now();
+    let cancelled = false;
+    const check = () => {
+      if (document.hidden) return;
+      const day = todayStr();
+      const dayChanged = day !== swipeDayRef.current;
+      if (!shouldResyncSwipeCount({ hidden: false, dayChanged, outOfSwipes: isOutOfSwipesRef.current, msSinceSync: Date.now() - swipeCountSyncedAtRef.current })) return;
+      swipeCountSyncedAtRef.current = Date.now();
+      void getTodaySwipeCountStrict(userId).then((count) => {
+        if (cancelled || count === null) return;
+        if (dayChanged) swipeDayRef.current = day;
+        pendingSwipesRef.current = 0; // optimistic swipes belong to the old day / are already in the server count
+        setTodaySwipeCount(count);
+        writeCachedSwipeCount(userId, count);
+        setHasLoadedSwipeCountFromDb(true);
+      });
+    };
+    const timer = window.setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+      window.removeEventListener('focus', check);
     };
   }, [currentUser?.id]);
 
@@ -2834,6 +2888,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     // Reset the initialized ref to force re-initialization
     initializedUserRef.current = null;
+    // A manual refresh starts the back-off over: refills and recovery checks run at their normal pace again.
+    refillEmptyStreakRef.current = 0;
+    recoveryDelayRef.current = RECOVERY_BASE_DELAY_MS;
 
     // Reset deck state
     fetchSequenceRef.current += 1;
@@ -2871,17 +2928,35 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // with, seeing no change at all.
   const [emptyStateRetryTick, setEmptyStateRetryTick] = useState(0);
   const EMPTY_STATE_RECOVERY_COOLDOWN_MS = 15_000;
+  // Gap before the next recovery check: starts at 15s and doubles (30s, 60s, max 120s) while the pool stays
+  // empty, so a drained pool is not hammered all day. Resets when cards arrive, on a manual refresh, or when
+  // the user/plan changes.
+  const recoveryDelayRef = useRef(EMPTY_STATE_RECOVERY_COOLDOWN_MS);
   useEffect(() => {
     lastEmptyStateRecoveryAtRef.current = 0;
+    recoveryDelayRef.current = EMPTY_STATE_RECOVERY_COOLDOWN_MS;
   }, [currentUser?.id, premiumActive]);
+  useEffect(() => {
+    if (potentialMatches.length > 0) recoveryDelayRef.current = EMPTY_STATE_RECOVERY_COOLDOWN_MS;
+  }, [potentialMatches.length]);
+  // Coming back to the app while the "no more profiles" screen is up: check again (still honours the back-off).
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden) setEmptyStateRetryTick((t) => t + 1);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   useEffect(() => {
     if (!currentUser?.id) return;
     if (!hasCompletedInitialFetch) return;
     if (!noMoreProfiles) return;
     if (potentialMatches.length > 0) return;
+    // Not looking at Discover (other tab / app in the background): don't poll; the visibility + tab effects re-run this.
+    if (!isActiveTab || (typeof document !== 'undefined' && document.hidden)) return;
     const now = Date.now();
-    if (now - lastEmptyStateRecoveryAtRef.current < EMPTY_STATE_RECOVERY_COOLDOWN_MS) return;
+    if (now - lastEmptyStateRecoveryAtRef.current < recoveryDelayRef.current) return;
 
     lastEmptyStateRecoveryAtRef.current = now;
     let isCancelled = false;
@@ -3116,11 +3191,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // "no more profiles" would stick even if a candidate becomes eligible
       // moments later (someone else's account/like activity, a swipe elsewhere
       // freeing a slot, etc.), only fixable by the user manually refreshing.
+      const nextDelay = recoveryDelayRef.current;
+      recoveryDelayRef.current = nextRecoveryDelayMs(nextDelay);
       retryTimerRef.current = setTimeout(() => {
         if (isCancelled) return;
         lastEmptyStateRecoveryAtRef.current = 0; // allow the next run immediately
         setEmptyStateRetryTick((t) => t + 1);
-      }, EMPTY_STATE_RECOVERY_COOLDOWN_MS);
+      }, nextDelay);
     };
 
     void runRecovery();
@@ -3140,6 +3217,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     getGenderFilter,
     injectAds,
     emptyStateRetryTick,
+    isActiveTab,
   ]);
 
   // Expose force refresh to window for ProfilePage to trigger
@@ -3730,9 +3808,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
   // Function to load more matches when running low - optimized for 5 at a time
   const loadMoreMatches = useCallback(async (hasRemainingCards: boolean = false) => {
-    if (!currentUser?.id || isLoadingMore) return;
+    if (!currentUser?.id || isLoadingMore || loadMoreInFlightRef.current) return;
 
     try {
+      loadMoreInFlightRef.current = true;
       setIsLoadingMore(true);
 
       // ✅ Refill should use the *same* eligibility rules as the initial fetch.
@@ -3742,6 +3821,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         .map((p) => p.id);
       const result = await fetchPotentialMatchesData(currentUser.id, allowedGenders, { isRefill: true, excludeIds: deckIds });
       if (!result) {
+        refillEmptyStreakRef.current += 1;
         if (!hasRemainingCards) {
           setNoMoreProfiles(true);
           setEmptyStateMode('transient-error');
@@ -3818,6 +3898,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         }
 
         if (refillChunk.length === 0) {
+          refillEmptyStreakRef.current += 1;
           setEmptyStateMode('exhausted');
           // Nobody new anywhere and nothing left to swipe: now it really is
           // the end (the empty-state recovery keeps checking in the background).
@@ -3826,6 +3907,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         }
       }
 
+      refillEmptyStreakRef.current = 0; // somebody new arrived: back to the fast cadence
       setNoMoreProfiles(false);
       setEmptyStateMode('exhausted');
       if (premiumTrulyEmptyAfterRetry) setPremiumTrulyEmptyAfterRetry(false);
@@ -3861,11 +3943,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     } catch {
       // While cards remain, the refill effect simply tries again; with an
       // empty deck, settle on the refreshable empty state instead of loading.
+      refillEmptyStreakRef.current += 1;
       if (!hasRemainingCards) {
         setNoMoreProfiles(true);
         setEmptyStateMode('transient-error');
       }
     } finally {
+      loadMoreInFlightRef.current = false;
       setIsLoadingMore(false);
     }
   }, [
@@ -3896,6 +3980,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
     if (!hasCompletedInitialFetch) return;
     if (isLoadingMore) return;
+    // Out of daily swipes: nothing to feed, so stop loading in the background. The effect re-runs (and
+    // prefetching resumes) the moment the limit resets or the user upgrades.
+    if (isOutOfSwipes) return;
     // When the empty state is shown, keep it stable until the user manually refreshes.
     if (potentialMatches.length === 0 || noMoreProfiles) return;
     if (remainingReal > REFILL_THRESHOLD) return;
@@ -3906,7 +3993,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // used to wait 30 seconds before trying again - long enough for a fast
     // swiper to empty the deck and land on "no more profiles".
     const now = Date.now();
-    const COOLDOWN_MS = 6_000;
+    // 6s while refills keep finding people; doubles (12s, 24s, ... max 60s) after refills that find nobody new.
+    const COOLDOWN_MS = refillCooldownMs(refillEmptyStreakRef.current);
     if (now - lastAutoRefillAttemptAtRef.current < COOLDOWN_MS) return;
     lastAutoRefillAttemptAtRef.current = now;
 
@@ -3914,7 +4002,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // returned) - this is always a background prefetch with real cards still
     // on screen, never the true last-resort case.
     loadMoreMatches(true);
-  }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches]);
+  }, [potentialMatches, currentIndex, isLoadingMore, hasCompletedInitialFetch, noMoreProfiles, loadMoreMatches, isOutOfSwipes]);
 
   // An empty deck that isn't confirmed exhausted (noMoreProfiles false) shows
   // a short loading state, never "no more profiles" - so this makes sure a
@@ -3930,6 +4018,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       return;
     }
     if (!hasCompletedInitialFetch || noMoreProfiles || isLoadingMore) return;
+    if (isOutOfSwipes) return; // out of swipes: no point loading; resumes when the limit resets
     if (emptyDeckRefillTriesRef.current >= 2) {
       setNoMoreProfiles(true);
       return;
@@ -3937,7 +4026,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     emptyDeckRefillTriesRef.current += 1;
     lastAutoRefillAttemptAtRef.current = Date.now();
     void loadMoreMatches(false);
-  }, [potentialMatches.length, hasCompletedInitialFetch, noMoreProfiles, isLoadingMore, loadMoreMatches]);
+  }, [potentialMatches.length, hasCompletedInitialFetch, noMoreProfiles, isLoadingMore, loadMoreMatches, isOutOfSwipes]);
 
   // ⭐ SWIPE FATIGUE RESCUE (Mechanism B): Inject active profiles after long
   // no-match streaks. This prevents user fatigue and increases retention
@@ -4422,14 +4511,26 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         swipeDebug('handleLike: DB persist starting', { likerId, likedId, premiumParam });
         
         // Attempt the batched RPC to record the like and detect mutual
-        const rpcName = 'like_and_usage_batched';
-        const { data: rpcData, error: rpcError } = await (supabase as unknown as {
-          rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-        }).rpc(rpcName, {
-          liker_id_param: likerId,
-          liked_id_param: likedId,
-          premium_param: premiumParam,
-        });
+        // One server call does limit + like + usage; older databases fall back to the two-call path.
+        const server = await discoverSwipeRpc('like', likedId);
+        const serverCounted = server.available && !server.error;
+        if (server.available && server.limitReached) {
+          // Refused by the server: the swipe didn't happen. Show the real count and let the card come back.
+          reconcileSwipeCountFromServer(server.usage);
+          setIsOutOfSwipes(true);
+          locallySwipedProfileIds.current.delete(likedId);
+          persistSwipedIds();
+          return;
+        }
+        const { data: rpcData, error: rpcError } = server.available
+          ? { data: server.data, error: server.error }
+          : await (supabase as unknown as {
+              rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+            }).rpc('like_and_usage_batched', {
+              liker_id_param: likerId,
+              liked_id_param: likedId,
+              premium_param: premiumParam,
+            });
 
         swipeDebug('handleLike: RPC completed', { rpcData, rpcError });
 
@@ -4525,9 +4626,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         } else {
           // RPC succeeded — increment swipe count after successful DB write
           swipeDebug('handleLike: RPC succeeded');
-          {
-            await persistSwipeAndReconcile(currentUser.id);
-          }
+          if (serverCounted) reconcileSwipeCountFromServer(server.usage);
+          else await persistSwipeAndReconcile(currentUser.id);
 
           // Notify other parts of the app (e.g., Profile stats) immediately
           if (typeof window !== 'undefined') {
@@ -4735,14 +4835,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // This keeps DB usage in sync even if the user refreshes/closes quickly after swiping.
     void (async () => {
       try {
-        const rpcName = 'pass_and_usage_batched';
-        const { error: rpcError } = await (supabase as unknown as {
-          rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-        }).rpc(rpcName, {
-          passer_id_param: passerId,
-          passed_id_param: passedId,
-          premium_param: premiumParam,
-        });
+        const server = await discoverSwipeRpc('pass', passedId);
+        const serverCounted = server.available && !server.error;
+        if (server.available && server.limitReached) {
+          reconcileSwipeCountFromServer(server.usage);
+          setIsOutOfSwipes(true);
+          locallySwipedProfileIds.current.delete(passedId);
+          persistSwipedIds();
+          setPassedUsers((prev) => prev.filter((p) => p.user_id !== passedId));
+          return;
+        }
+        const { error: rpcError } = server.available
+          ? { error: server.error }
+          : await (supabase as unknown as {
+              rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+            }).rpc('pass_and_usage_batched', {
+              passer_id_param: passerId,
+              passed_id_param: passedId,
+              premium_param: premiumParam,
+            });
 
         if (rpcError) {
           swipeDebug('executePassLogic: RPC failed, attempting fallback', { rpcError });
@@ -4783,9 +4894,8 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           }
         } else {
           // RPC succeeded — persist server usage
-          {
-            await persistSwipeAndReconcile(currentUser.id);
-          }
+          if (serverCounted) reconcileSwipeCountFromServer(server.usage);
+          else await persistSwipeAndReconcile(currentUser.id);
 
           // Notify other parts of the app (for debugging/telemetry)
           if (typeof window !== 'undefined') {
@@ -4839,40 +4949,53 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const handleReverse = async () => {
     if (passedUsers.length === 0) return;
 
-    // Check reverse dislike limit for free users
-    if (!premiumActive) {
-      const usageResult = await checkUsageLimit('reverse_dislike');
-      if (!usageResult.success) {
-        toast({
-          title: 'Daily Limit Reached',
-          description: usageResult.message + ' Upgrade to Premium for unlimited reverse dislikes.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    }
-
     const lastPassedUser = passedUsers[0];
-    
+
     try {
-      // Actually delete the pass record from the database
-      const { error: deleteError } = await supabase
-        .from('passes')
-        .delete()
-        .match({ 
-          passer_id: currentUser.id, 
-          passed_id: lastPassedUser.user_id 
-        });
-
-      if (deleteError) {
-        toast({
-          title: t('common.error'),
-          description: t('discover.errors.reverseFailed'),
-          variant: 'destructive'
-        });
-        return;
+      // Server first: it enforces the daily undo limit and gives the swipe back in one step.
+      const serverUndo = await undoPassRpc(lastPassedUser.user_id);
+      if (serverUndo.available) {
+        if (serverUndo.limitReached) {
+          toast({
+            title: 'Daily Limit Reached',
+            description: 'You have used your free undos for today. Upgrade to Premium for unlimited undos.',
+            variant: 'destructive'
+          });
+          return;
+        }
+        if (serverUndo.error || (!serverUndo.data?.success && !serverUndo.notFound)) {
+          toast({ title: t('common.error'), description: t('discover.errors.reverseFailed'), variant: 'destructive' });
+          return;
+        }
+        reconcileSwipeCountFromServer(serverUndo.usage);
+      } else {
+        // Older database: check the limit, delete the pass, then give the swipe back.
+        if (!premiumActive) {
+          const usageResult = await checkUsageLimit('reverse_dislike');
+          if (!usageResult.success) {
+            toast({
+              title: 'Daily Limit Reached',
+              description: usageResult.message + ' Upgrade to Premium for unlimited reverse dislikes.',
+              variant: 'destructive'
+            });
+            return;
+          }
+        }
+        const { error: deleteError } = await supabase
+          .from('passes')
+          .delete()
+          .match({ passer_id: currentUser.id, passed_id: lastPassedUser.user_id });
+        if (deleteError) {
+          toast({ title: t('common.error'), description: t('discover.errors.reverseFailed'), variant: 'destructive' });
+          return;
+        }
+        if ((todaySwipeCount ?? 0) > 0) {
+          const refund = await (supabase as unknown as {
+            rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+          }).rpc('update_user_usage', { user_id_param: currentUser.id, usage_type: 'swipe', increment_by: -1 });
+          if (!refund.error) bumpLocalSwipeCount(-1);
+        }
       }
-
       // Find the passed user data and bring them back to the front
       const passedUserData = potentialMatches.find(match => match.id === lastPassedUser.user_id);
       
@@ -5133,14 +5256,16 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       //     shows a short loading state (see the empty-deck effect).
       // Scheduled with setTimeout - this runs inside a state update.
       const remainingProfiles = newMatches.filter(m => !isAd(m)).length;
-      if (remainingProfiles <= URGENT_REFILL_AT && !isLoadingMore && hasCompletedInitialFetch && !noMoreProfiles) {
+      if (remainingProfiles <= URGENT_REFILL_AT && !isLoadingMore && !loadMoreInFlightRef.current && !isOutOfSwipesRef.current && hasCompletedInitialFetch && !noMoreProfiles) {
         const now = Date.now();
+        // 1.5s apart while refills succeed; backs off (6s .. 60s) once they keep coming back empty.
+        const urgentGapMs = urgentRefillGapMs(refillEmptyStreakRef.current);
         if (remainingProfiles === 0) {
           lastAutoRefillAttemptAtRef.current = now;
           setTimeout(() => {
             loadMoreMatches(false);
           }, 0);
-        } else if (now - lastAutoRefillAttemptAtRef.current >= 1_500) {
+        } else if (now - lastAutoRefillAttemptAtRef.current >= urgentGapMs) {
           lastAutoRefillAttemptAtRef.current = now;
           setTimeout(() => {
             loadMoreMatches(true);
@@ -6052,7 +6177,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         <SwipeButtons
           onReverse={handleReverse}
           canReverse={premiumActive ? true : passedUsers.length > 0}
-          reversesLeft={premiumActive ? undefined : Math.max(0, 2 - reverseUsageToday)}
+          reversesLeft={premiumActive ? undefined : Math.max(0, FREE_DAILY_UNDO_LIMIT - reverseUsageToday)}
           isPremium={premiumActive}
         />
       </div>

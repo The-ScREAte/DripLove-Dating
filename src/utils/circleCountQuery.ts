@@ -28,6 +28,7 @@ export const fetchViewerExclusions = async (viewerId: string): Promise<Set<strin
 };
 
 const totalsCache = new Map<string, { at: number; totals: Record<string, number | null> }>();
+export const clearCircleTotalsCache = (): void => totalsCache.clear();
 const TOTALS_TTL_MS = 10 * 60 * 1000;
 
 /**

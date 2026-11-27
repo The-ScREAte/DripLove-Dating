@@ -1411,22 +1411,6 @@
   "cards": {
     "heroMeet": "认识{{name}}",
     "sharedHeadline": "你和{{name}}有共同点",
-    "basicsTitle": "速览",
-    "basics": {
-      "work": "工作",
-      "education": "学历",
-      "height": "身高",
-      "lives": "居住地",
-      "distance": "距离",
-      "languages": "语言",
-      "away": "相距{{distance}}"
-    },
-    "lookingTitle": "正在寻找",
-    "looking": {
-      "family": "家庭规划",
-      "loveStyle": "爱的方式",
-      "communication": "沟通方式"
-    },
     "interestsTitle": "{{name}}的兴趣",
     "interestsEyebrow": "兴趣",
     "valuesEyebrow": "价值观",
@@ -1441,11 +1425,6 @@
       "smoking": "吸烟",
       "sleep": "作息",
       "pets": "宠物"
-    },
-    "signTitle": "文化符号",
-    "sign": {
-      "shared": "你们有相同的符号 ✨",
-      "compatible": "与你的符号很相配 ✨"
     },
     "trustTitle": "你该知道",
     "trust": {
@@ -1466,7 +1445,7 @@
       "city": "你在{{city}}最喜欢的地方是哪里？",
       "generic": "嗨{{name}} 👋 这周过得怎么样？",
       "hint": "轻松的第一句话 - 配对后点击聊天即可。",
-      "headline": "跟 {{name}} 打个招呼"
+      "headline": "先说声你好吧"
     },
     "welcomeTitle": "新朋友",
     "welcomeBody": "{{name}}刚刚加入 - 来做第一个打招呼的人吧。",
@@ -1511,8 +1490,6 @@
       "emptySub": "当有人给你发来第一条消息时，会显示在这里。",
       "error": "暂时无法完成，请重试。",
       "intro": "接受后会创建配对并打开你的聊天。",
-      "matched": "配对成功！",
-      "matchedBody": "你和 {{name}} 现在可以聊天了。",
       "readMore": "展开",
       "reportBlock": "举报或屏蔽",
       "requestTitle": "破冰消息",
@@ -1525,26 +1502,22 @@
       "cta": "打开聊天",
       "title": "你们已经配对"
     },
-    "quota": "免费次数还剩 {{remaining}}/{{limit}}",
-    "quotaEmpty": "没有免费破冰次数了",
     "row": {
       "aria": "打开破冰消息，{{count}} 条待处理",
       "sub": "{{count}} 条消息等你查看"
     },
     "sayHi": "打招呼",
-    "sentLabel": "破冰消息已发送",
+    "sentLabel": "已打招呼",
     "sheet": {
       "done": "完成",
-      "hint": "对方会先看到。如果对方接受，你们就配对成功，可以继续聊天。",
       "ideas": "需要灵感吗？",
-      "placeholder": "写一条友好的第一条消息…",
-      "safety": "是否接受由对方决定。请友善相待——你随时可以举报或屏蔽。",
-      "send": "发送破冰消息",
+      "placeholder": "说点甜蜜的话…",
+      "send": "先打个招呼",
       "sending": "发送中…",
       "sentBody": "{{name}} 回复时我们会通知你。",
       "sentTitle": "已发送！",
-      "to": "发给 {{name}}",
-      "title": "给 {{name}} 发送你的第一条消息"
+      "title": "先说声你好吧",
+      "more": "更多灵感"
     },
     "someone": "有人",
     "title": "破冰",
@@ -1559,15 +1532,23 @@
       "later": "暂时不要",
       "title": "你的 {{limit}} 条免费破冰消息已用完"
     },
-    "useOpener": "使用这句开场白：{{text}}",
-    "copyOpener": "复制：{{text}}",
     "copied": "已复制",
     "chances": {
       "left_one": "还剩 {{count}} 次机会",
       "left_other": "还剩 {{count}} 次机会",
-      "of": "免费机会还剩 {{remaining}}/{{limit}} 次",
-      "none": "机会已用完 - 升级 Premium",
-      "unlimited": "无限机会"
+      "none": "机会已用完"
+    },
+    "free": {
+      "evening": "如果我们有一个完美的夜晚，会做什么？🌙",
+      "song": "你现在脑子里循环的是哪首歌？🎶",
+      "laugh": "最近一次让你笑出声的事是什么？",
+      "coffee": "咖啡、茶，还是更甜的东西？☕💗",
+      "sunday": "理想的周日：看日出散步，还是睡到自然醒？☀️",
+      "secret": "告诉我一件大多数人不知道的关于你的事 😉",
+      "escape": "海边、山里还是大城市——我们该逃去哪儿？✈️",
+      "smile": "你的笑容让人很难忽视。背后有什么故事？✨",
+      "dance": "说实话：你是舞林高手，还是装得很像？💃",
+      "love": "对你来说，完美的初次约会是什么感觉？💕"
     }
   }
 }

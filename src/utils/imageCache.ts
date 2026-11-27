@@ -8,8 +8,12 @@ const failedImages = new Set<string>(); // Track failed images to avoid retry lo
 // ⭐ ANDROID OPTIMIZATION: Shorter timeout and smaller blob cache for Android
 export const preloadImageToBlob = async (url: string): Promise<string> => {
   // Return cached blob URL if available
-  if (globalImageCache.has(url)) {
-    return globalImageCache.get(url)!;
+  const hit = globalImageCache.get(url);
+  if (hit) {
+    // Touch: most-recently-used entries move to the back of the Map's insertion order.
+    globalImageCache.delete(url);
+    globalImageCache.set(url, hit);
+    return hit;
   }
 
   // Don't retry failed images
@@ -46,6 +50,7 @@ export const preloadImageToBlob = async (url: string): Promise<string> => {
     
     // Cache the blob URL
     globalImageCache.set(url, blobUrl);
+    trimImageCache();
     return blobUrl;
   } catch (error) {
     // Mark as failed and return original URL
@@ -82,5 +87,37 @@ export const dropBlobUrl = (url: string): void => {
   failedImages.delete(url);
 };
 
-// Cleanup blob URLs when needed (optional, for memory management)
-// ⭐ ANDROID FIX: Lower threshold for Android to prevent memory pressure
+// Bounded so a long session (hundreds of swipes, chats, profiles) can't hold unlimited decoded images.
+export const MAX_BLOB_ENTRIES = 250;
+const FAILED_MAX = 500;
+
+const revoke = (blobUrl: string) => {
+  try {
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    // already gone
+  }
+};
+
+/** Evicts the least-recently-used entries beyond the cap (and keeps the failed set small). */
+export const trimImageCache = (max: number = MAX_BLOB_ENTRIES): void => {
+  while (globalImageCache.size > max) {
+    const oldest = globalImageCache.keys().next();
+    if (oldest.done) break;
+    const blobUrl = globalImageCache.get(oldest.value);
+    globalImageCache.delete(oldest.value);
+    if (blobUrl) revoke(blobUrl);
+  }
+  while (failedImages.size > FAILED_MAX) {
+    const oldest = failedImages.values().next();
+    if (oldest.done) break;
+    failedImages.delete(oldest.value);
+  }
+};
+
+/** Logout / user switch: revoke every blob and forget failures. */
+export const clearImageCache = (): void => {
+  globalImageCache.forEach(revoke);
+  globalImageCache.clear();
+  failedImages.clear();
+};

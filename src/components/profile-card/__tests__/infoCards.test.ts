@@ -49,29 +49,27 @@ describe('palettes', () => {
 });
 
 describe('buildInfoCards', () => {
-  it('a rich profile gets at most MAX cards, ending with the conversation starter', () => {
+  it('a rich profile gets exactly 4 cards (3 info + Break the ice), ending with the conversation starter', () => {
     const cards = buildInfoCards(rich, ctx());
+    expect(MAX_INFO_CARDS).toBe(4);
+    expect(cards).toHaveLength(4);
     expect(cards.length).toBeLessThanOrEqual(MAX_INFO_CARDS);
     expect(cards[cards.length - 1].kind).toBe('starter');
     expect(kinds(cards)).toContain('about');
   });
 
-  it('puts "You both like" first when the viewer shares something', () => {
+  it('never builds the removed "You both like" / "At a glance" / "Looking for" cards', () => {
     const cards = buildInfoCards(rich, ctx({ viewerId: 'v1', viewerInterests: ['Travel', 'Chess'], viewerFavorites: [{ category: 'Vibe', values: ['honesty'], genres: [] }] }));
-    expect(cards[0].kind).toBe('shared');
-    expect(cards[0].data.chips?.length).toBeGreaterThan(0);
+    const k = kinds(cards) as string[];
+    expect(k).not.toContain('shared');
+    expect(k).not.toContain('basics');
+    expect(k).not.toContain('looking');
   });
 
-  it('shows no "shared" card on your own profile or when nothing is shared', () => {
-    expect(kinds(buildInfoCards(rich, ctx({ viewerId: 'p1', viewerInterests: ['Travel'] })))).not.toContain('shared');
-    expect(kinds(buildInfoCards(rich, ctx({ viewerId: 'v1', viewerInterests: ['Chess'] })))).not.toContain('shared');
-  });
-
-  it('a bare profile (name/age/city only) still gets at least 3 meaningful cards', () => {
+  it('a bare profile (name/age/city only) still gets a welcome card and the Break the ice card', () => {
     const cards = buildInfoCards(base({ city: 'Kumasi', country: 'Ghana' }), ctx());
-    expect(cards.length).toBeGreaterThanOrEqual(3);
+    expect(cards.length).toBeGreaterThanOrEqual(2);
     expect(kinds(cards)).toContain('starter');
-    expect(kinds(cards)).toContain('basics');
   });
 
   it('an even barer profile still gets a friendly welcome + starter', () => {
@@ -103,11 +101,6 @@ describe('buildInfoCards', () => {
       expect(trust.data.activity).toBe('now');
     }
   });
-
-  it('sign card flags a shared sign', () => {
-    const cards = buildInfoCards(base({ adinkra_symbols: ['Eban'], city: 'Accra' }), ctx({ viewerSigns: ['Eban'] }));
-    expect(cards.find((c) => c.kind === 'sign')?.data.sign?.compat).toBe('shared');
-  });
 });
 
 describe('conversation starters', () => {
@@ -117,9 +110,16 @@ describe('conversation starters', () => {
     expect(st.length).toBeLessThanOrEqual(3);
     expect(new Set(st.map((s) => `${s.basis}:${s.value ?? ''}`)).size).toBe(st.length);
   });
-  it('a bare profile still gets a generic opener', () => {
+  it('a bare profile still gets three openers (free-style ones fill in)', () => {
     const st = buildInfoCards(base(), ctx()).find((c) => c.kind === 'starter')!.data.starters!;
-    expect(st.map((s) => s.basis)).toContain('generic');
+    expect(st).toHaveLength(3);
+    expect(st.filter((s) => s.basis === 'free').length).toBeGreaterThanOrEqual(2);
+  });
+  it('a rich profile mixes personal openers with at least one free-style one', () => {
+    const st = buildInfoCards(rich, ctx({ viewerId: 'v1', viewerInterests: ['Cooking'] })).find((c) => c.kind === 'starter')!.data.starters!;
+    expect(st).toHaveLength(3);
+    expect(st.some((s) => s.basis === 'free')).toBe(true);
+    expect(st.some((s) => s.basis !== 'free')).toBe(true);
   });
   it('leads with something shared when there is overlap', () => {
     const st = buildInfoCards(rich, ctx({ viewerId: 'v1', viewerInterests: ['Cooking'] })).find((c) => c.kind === 'starter')!.data.starters!;
@@ -134,9 +134,8 @@ describe('no-photo ordering', () => {
   it('is stable for the same profile + viewer + day (no reshuffle on re-render/undo)', () => {
     expect(order('2026-11-26')).toEqual(order('2026-11-26'));
   });
-  it('keeps the shared card first and contains every card exactly once', () => {
+  it('contains every card exactly once', () => {
     const o = order('2026-11-26');
-    expect(o[0]).toBe(cards.find((c) => c.kind === 'shared')!.key);
     expect([...o].sort()).toEqual(cards.map((c) => c.key).sort());
   });
   it('varies across profiles/days', () => {

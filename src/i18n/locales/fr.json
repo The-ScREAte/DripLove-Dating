@@ -1430,22 +1430,6 @@
   "cards": {
     "heroMeet": "Rencontrez {{name}}",
     "sharedHeadline": "Vous et {{name}} avez des points communs",
-    "basicsTitle": "En un coup d’œil",
-    "basics": {
-      "work": "Travail",
-      "education": "Études",
-      "height": "Taille",
-      "lives": "Habite à",
-      "distance": "Distance",
-      "languages": "Parle",
-      "away": "À {{distance}}"
-    },
-    "lookingTitle": "Recherche",
-    "looking": {
-      "family": "Projets familiaux",
-      "loveStyle": "Façon d’aimer",
-      "communication": "Communication"
-    },
     "interestsTitle": "Ce qui plaît à {{name}}",
     "interestsEyebrow": "Centres d’intérêt",
     "valuesEyebrow": "Valeurs",
@@ -1460,11 +1444,6 @@
       "smoking": "Tabac",
       "sleep": "Sommeil",
       "pets": "Animaux"
-    },
-    "signTitle": "Signe culturel",
-    "sign": {
-      "shared": "Vous partagez ce signe ✨",
-      "compatible": "Très compatible avec votre signe ✨"
     },
     "trustTitle": "Bon à savoir",
     "trust": {
@@ -1485,7 +1464,7 @@
       "city": "Quel est ton endroit préféré à {{city}} ?",
       "generic": "Salut {{name}} 👋 comment se passe ta semaine ?",
       "hint": "Un premier message facile - touchez le chat après le match.",
-      "headline": "Dis bonjour à {{name}}"
+      "headline": "Soyez le premier à dire bonjour"
     },
     "welcomeTitle": "Nouveau ici",
     "welcomeBody": "{{name}} débute - soyez le premier à dire bonjour.",
@@ -1530,8 +1509,6 @@
       "emptySub": "Quand quelqu'un t'envoie un premier message, il apparaîtra ici.",
       "error": "Impossible pour le moment. Réessaie.",
       "intro": "Accepter crée un match et ouvre ta conversation.",
-      "matched": "C'est un match !",
-      "matchedBody": "Toi et {{name}} pouvez discuter.",
       "readMore": "Lire la suite",
       "reportBlock": "Signaler ou bloquer",
       "requestTitle": "Brise-glaces",
@@ -1544,26 +1521,22 @@
       "cta": "Ouvrir la conversation",
       "title": "Vous avez déjà matché"
     },
-    "quota": "{{remaining}} sur {{limit}} gratuits restants",
-    "quotaEmpty": "Plus de brise-glaces gratuits",
     "row": {
       "aria": "Ouvrir les brise-glaces, {{count}} en attente",
       "sub": "{{count}} en attente"
     },
     "sayHi": "Dire bonjour",
-    "sentLabel": "Brise-glace envoyé",
+    "sentLabel": "Bonjour envoyé",
     "sheet": {
       "done": "Terminé",
-      "hint": "La personne le verra en premier. Si elle accepte, vous matchez et pouvez continuer à discuter.",
       "ideas": "Besoin d'une idée ?",
-      "placeholder": "Écris un premier message sympa…",
-      "safety": "Elle choisit d'accepter ou non. Sois bienveillant : tu peux toujours signaler ou bloquer.",
-      "send": "Envoyer le brise-glace",
+      "placeholder": "Écrivez un mot doux…",
+      "send": "Dire bonjour en premier",
       "sending": "Envoi…",
       "sentBody": "On te prévient si {{name}} répond.",
       "sentTitle": "Envoyé !",
-      "to": "À {{name}}",
-      "title": "Envoyez votre premier message à {{name}}"
+      "title": "Soyez le premier à dire bonjour",
+      "more": "Plus d'idées"
     },
     "someone": "Quelqu'un",
     "title": "Brise la glace",
@@ -1578,15 +1551,23 @@
       "later": "Pas maintenant",
       "title": "Tu as utilisé tes {{limit}} brise-glaces gratuits"
     },
-    "useOpener": "Utiliser cette accroche : {{text}}",
-    "copyOpener": "Copier : {{text}}",
     "copied": "Copié",
     "chances": {
       "left_one": "{{count}} chance restante",
       "left_other": "{{count}} chances restantes",
-      "of": "{{remaining}} sur {{limit}} chances gratuites restantes",
-      "none": "Plus de chances - passez Premium",
-      "unlimited": "Chances illimitées"
+      "none": "Plus de chances"
+    },
+    "free": {
+      "evening": "Si on avait une soirée parfaite, on ferait quoi ? 🌙",
+      "song": "Quelle chanson te trotte dans la tête en ce moment ? 🎶",
+      "laugh": "Qu'est-ce qui t'a fait rire aux éclats récemment ?",
+      "coffee": "Café, thé ou quelque chose de plus doux ? ☕💗",
+      "sunday": "Dimanche idéal : balade au lever du soleil ou grasse matinée ? ☀️",
+      "secret": "Dis-moi une chose que peu de gens savent sur toi 😉",
+      "escape": "Plage, montagne ou grande ville : on s'évade où ? ✈️",
+      "smile": "Ton sourire ne passe pas inaperçu. Quelle est son histoire ? ✨",
+      "dance": "Sois honnête : tu danses bien ou tu fais très bien semblant ? 💃",
+      "love": "Pour toi, c'est quoi un premier rendez-vous parfait ? 💕"
     }
   }
 }

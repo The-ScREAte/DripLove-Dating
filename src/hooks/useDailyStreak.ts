@@ -18,18 +18,27 @@ export interface DailyStreakResult {
  */
 export const useDailyStreak = (userId: string | undefined) => {
   const [streak, setStreak] = useState<DailyStreakResult | null>(null);
-  const hasRunRef = useRef(false);
+  // The UTC day the streak was last recorded for. Re-checked when the app returns to the foreground and
+  // once a minute, so an app that simply stays open across midnight (or is resumed the next day) still
+  // records the new day - it used to be once per session, i.e. until the app was closed.
+  const lastDayRef = useRef<string | null>(null);
+  const inFlightRef = useRef(false);
 
   useEffect(() => {
-    if (!userId || hasRunRef.current) return;
-    hasRunRef.current = true;
+    if (!userId) return undefined;
+    lastDayRef.current = null;
 
-    (async () => {
+    const record = async () => {
+      if (inFlightRef.current) return;
+      const day = new Date().toISOString().slice(0, 10);
+      if (lastDayRef.current === day) return;
+      inFlightRef.current = true;
       try {
         const { data, error } = await supabase.rpc('record_daily_login', {
           p_user_id: userId,
         });
         if (error || !data || data.length === 0) return;
+        lastDayRef.current = day;
 
         const row = data[0];
         // A 7 / 14 / 30 day streak is a proud moment - a good time (after the
@@ -45,8 +54,21 @@ export const useDailyStreak = (userId: string | undefined) => {
       } catch {
         // Silently fail - the streak is a nice-to-have, never block login on it.
         void 0;
+      } finally {
+        inFlightRef.current = false;
       }
-    })();
+    };
+
+    void record();
+    const onVisible = () => {
+      if (!document.hidden) void record();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = window.setInterval(onVisible, 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(timer);
+    };
   }, [userId]);
 
   // Called by the flash UI once it's done showing, so it never reappears

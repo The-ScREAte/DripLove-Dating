@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
@@ -26,21 +26,14 @@ import {
   Search,
   Lightbulb,
   Cigarette,
-  ChevronRight,
-  Check as CheckIcon,
 } from 'lucide-react';
 import type { InfoCard, ChipRef } from '../profile-card/infoCards';
 import { CARD_PALETTES } from '../profile-card/infoCards';
 import { relationshipIntentLabel } from '../profile-card/profileCardUtils';
 import { GENRE_OPTIONS, VALUE_OPTIONS, vibeLabel } from '@/constants/vibe';
-import { formatDistance } from '@/utils/distanceUnits';
-import { formatHeightShort } from '@/utils/profileFormat';
 import MusicPlayerModal from '../MusicPlayerModal';
 import IcebreakerButton from '../icebreaker/IcebreakerButton';
-import { openIcebreaker } from '../icebreaker/store';
-import { getCachedStatus, subscribeStatus, useIcebreakerAvailable } from '@/services/icebreaker';
 import { openerLines } from '@/utils/icebreaker';
-import { copyToClipboard } from '@/utils/copyToClipboard';
 import styles from './InfoCardSlide.module.css';
 
 type Icon = React.ComponentType<{ className?: string }>;
@@ -104,18 +97,7 @@ const Rows: React.FC<{ rows: Array<{ icon: Icon; label: string; value: string }>
   </div>
 );
 
-const FACT_LABELS: Record<string, [string, string]> = {
-  work: ['cards.basics.work', 'Work'],
-  education: ['cards.basics.education', 'Education'],
-  height: ['cards.basics.height', 'Height'],
-  place: ['cards.basics.lives', 'Lives in'],
-  distance: ['cards.basics.distance', 'Distance'],
-  languages: ['cards.basics.languages', 'Speaks'],
-};
 const TRAIT_LABELS: Record<string, [string, string]> = {
-  family: ['cards.looking.family', 'Family plans'],
-  love: ['cards.looking.loveStyle', 'Love style'],
-  communication: ['cards.looking.communication', 'Communication'],
   exercise: ['cards.lifestyle.exercise', 'Exercise'],
   drinking: ['cards.lifestyle.drinking', 'Drinks'],
   smoking: ['cards.lifestyle.smoking', 'Smokes'],
@@ -138,17 +120,6 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
   const { data } = card;
   const palette = CARD_PALETTES[card.palette % CARD_PALETTES.length];
   const [playing, setPlaying] = useState(false);
-  const iceAvailable = useIcebreakerAvailable();
-  const [copiedLine, setCopiedLine] = useState<string | null>(null);
-  // Already sent (pending) or already matched: the openers stop being actions.
-  const iceDone = useSyncExternalStore(
-    subscribeStatus,
-    () => {
-      const st = data.userId ? getCachedStatus(data.userId) : null;
-      return !!(st && (st.pending || st.matched));
-    },
-    () => false
-  );
   const name = data.name || '';
 
   // Fit-to-space: dense cards on short phones scale down instead of colliding with the top bar / caption.
@@ -209,19 +180,6 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       );
       break;
     }
-    case 'shared': {
-      Watermark = Sparkles;
-      title = tr('vibe.sharedTitle', 'You both like');
-      body = (
-        <>
-          <Eyebrow icon={Sparkles}>{title}</Eyebrow>
-          <h3 className={styles.display}>{tr('cards.sharedHeadline', 'You and {{name}} have things in common', { name })}</h3>
-          <Bubbles chips={data.chips || []} extra={data.extra} tr={tr} strongFirst />
-          {data.musicShared && <p className={styles.sub}>🎵 {tr('vibe.musicMatch', 'Music match - you have taste in common')}</p>}
-        </>
-      );
-      break;
-    }
     case 'about': {
       Watermark = Quote;
       title = tr('discover.matchCard.aboutUser', 'About {{name}}', { name });
@@ -252,42 +210,6 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
         <>
           <Eyebrow icon={PROMPT_ICON[pt] || Lightbulb}>{title}</Eyebrow>
           <p dir="auto" className={cx(styles.text, textSize((data.text || '').length))}>{data.text}</p>
-        </>
-      );
-      break;
-    }
-    case 'basics': {
-      Watermark = MapPin;
-      title = tr('cards.basicsTitle', 'At a glance');
-      const rows = (data.facts || []).map((f) => {
-        const [k, d] = FACT_LABELS[f.key];
-        let value = f.value;
-        if (f.key === 'height') value = `${formatHeightShort(Number(f.value))} (${f.value} cm)`;
-        return { icon: FACT_ICON[f.key], label: tr(k, d), value };
-      });
-      if (typeof data.distanceKm === 'number') {
-        rows.push({ icon: Navigation, label: tr('cards.basics.distance', 'Distance'), value: tr('cards.basics.away', '{{distance}} away', { distance: formatDistance(data.distanceKm, data.countryCode) }) });
-      }
-      body = (
-        <>
-          <Eyebrow icon={Sparkles}>{title}</Eyebrow>
-          <Rows rows={rows.slice(0, 5)} />
-        </>
-      );
-      break;
-    }
-    case 'looking': {
-      Watermark = Heart;
-      title = tr('cards.lookingTitle', 'Looking for');
-      const rows = (data.traits || []).map((x) => {
-        const [k, d] = TRAIT_LABELS[x.key] || [`cards.looking.${x.key}`, x.key];
-        return { icon: TRAIT_ICON[x.key] || Heart, label: tr(k, d), value: x.value };
-      });
-      body = (
-        <>
-          <Eyebrow icon={Heart}>{title}</Eyebrow>
-          {intent && <h3 className={styles.display}>{intent}</h3>}
-          {rows.length > 0 && <Rows rows={rows.slice(0, 4)} />}
         </>
       );
       break;
@@ -357,33 +279,6 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       );
       break;
     }
-    case 'sign': {
-      center = true;
-      Watermark = Gem;
-      title = tr('cards.signTitle', 'Cultural sign');
-      const s = data.sign!;
-      const compat =
-        s.compat === 'shared'
-          ? tr('cards.sign.shared', 'You share this sign ✨')
-          : s.compat === 'compatible'
-          ? tr('cards.sign.compatible', 'A great match for your sign ✨')
-          : '';
-      body = (
-        <>
-          <Eyebrow icon={Gem}>{title}</Eyebrow>
-          <div className={styles.signArt} aria-hidden="true" dangerouslySetInnerHTML={{ __html: s.svg }} />
-          <h3 className={cx(styles.display, styles.displayLg)}>{s.name}</h3>
-          <p className={styles.sub}>{s.meaning}</p>
-          {compat && <span className={cx(styles.chip, styles.chipStrong)}>{compat}</span>}
-          {s.others.length > 0 && (
-            <div className={styles.chips}>
-              {s.others.slice(0, 2).map((o) => <span key={o} className={cx(styles.chip, styles.bubbleS)}>{o}</span>)}
-            </div>
-          )}
-        </>
-      );
-      break;
-    }
     case 'trust': {
       Watermark = ShieldCheck;
       title = tr('cards.trustTitle', 'Good to know');
@@ -405,62 +300,13 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       title = tr('cards.starterTitle', 'Break the ice');
       const lines = openerLines(data.starters, name, tr);
       const target = data.userId && !data.isOwn ? { id: data.userId, name, photoUrl: data.photoUrl ?? null, starters: data.starters } : null;
-      // Backend there  -> an opener opens the composer with it filled in (editable, one tap to send).
-      // Backend absent -> the openers are still useful ideas: tapping copies one. Nothing errors.
-      const canSend = !!target && iceAvailable !== false && !iceDone;
-      const canCopy = !!target && iceAvailable === false;
-      const rowContent = (l: string, trailing: React.ReactNode) => (
-        <>
-          <span className={styles.openerText}>{l}</span>
-          {trailing}
-        </>
-      );
+      // One calm call to action: "Say hi" opens the Break the ice popup (openers + editable message +
+      // chances left). Works before the backend exists too (the popup then offers "Copy message").
       body = (
         <>
           <Eyebrow icon={MessageCircle}>{title}</Eyebrow>
-          <h3 className={cx(styles.display, styles.displaySm)}>{tr('cards.starter.headline', 'Say hi to {{name}}', { name })}</h3>
-          <div className={styles.openerList}>
-            {lines.map((l, i) =>
-              canSend || canCopy ? (
-                <button
-                  key={l}
-                  type="button"
-                  className={cx(styles.openerBtn, 'dl-pop', 'dl-focus')}
-                  style={popStyle(i)}
-                  aria-label={canSend ? tr('icebreaker.useOpener', 'Use this opener: {{text}}', { text: l }) : tr('icebreaker.copyOpener', 'Copy: {{text}}', { text: l })}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (canSend && target) {
-                      openIcebreaker({ ...target, prefill: l });
-                    } else {
-                      void copyToClipboard(l).then(() => {
-                        setCopiedLine(l);
-                        window.setTimeout(() => setCopiedLine((c) => (c === l ? null : c)), 1600);
-                      });
-                    }
-                  }}
-                >
-                  {rowContent(
-                    l,
-                    copiedLine === l ? (
-                      <span className={styles.openerTrail}>
-                        <CheckIcon aria-hidden="true" />
-                        {tr('icebreaker.copied', 'Copied')}
-                      </span>
-                    ) : (
-                      <ChevronRight className={styles.openerChev} aria-hidden="true" />
-                    )
-                  )}
-                </button>
-              ) : (
-                <div key={l} className={cx(styles.openerBtn, styles.openerStatic, 'dl-pop')} style={popStyle(i)}>
-                  {rowContent(l, null)}
-                </div>
-              )
-            )}
-          </div>
-          {/* The primary button opens the same sheet with the best opener already in the box (still editable). */}
-          {target && <IcebreakerButton variant="card" target={{ ...target, prefill: lines[0] }} />}
+          <h3 className={cx(styles.display, styles.romance)}>{tr('cards.starter.headline', 'Be the first to say hi')}</h3>
+          {target && <IcebreakerButton alwaysShow compact target={{ ...target, prefill: lines[0] }} />}
         </>
       );
       break;
@@ -472,17 +318,12 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       const meta = [typeof data.age === 'number' ? String(data.age) : '', data.city || ''].filter(Boolean).join(' · ');
       body = (
         <>
-          <div className={cx(styles.badge, styles.badgeEmoji)} aria-hidden="true">👋</div>
-          <h3 className={cx(styles.display, styles.displayLg)}>{title}</h3>
-          <p className={styles.sub}>{tr('cards.welcomeBody', '{{name}} is just getting started - be the first to say hi.', { name })}</p>
-          {(meta || intent) && (
-            <div className={styles.chips}>
-              {meta && <span className={styles.chip}>{meta}</span>}
-              {intent && <span className={styles.chip}>{intent}</span>}
-            </div>
-          )}
+          <div className={cx(styles.badge, styles.badgeEmoji, styles.badgeSm)} aria-hidden="true">👋</div>
+          <h3 className={cx(styles.display, styles.welcomeTitle)}>{title}</h3>
+          <p className={cx(styles.sub, styles.welcomeSub)}>{tr('cards.welcomeBody', '{{name}} is just getting started - be the first to say hi.', { name })}</p>
+          {(meta || intent) && <p className={styles.welcomeMeta}>{[meta, intent].filter(Boolean).join('  ·  ')}</p>}
           {data.userId && !data.isOwn && (
-            <IcebreakerButton variant="card" target={{ id: data.userId, name, photoUrl: data.photoUrl ?? null, starters: data.starters }} />
+            <IcebreakerButton alwaysShow compact target={{ id: data.userId, name, photoUrl: data.photoUrl ?? null, starters: data.starters }} />
           )}
         </>
       );

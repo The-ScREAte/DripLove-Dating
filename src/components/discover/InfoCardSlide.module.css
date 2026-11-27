@@ -303,15 +303,6 @@
 }
 
 /* Cultural sign art */
-.signArt {
-  width: clamp(84px, 14vh, 124px);
-  height: clamp(84px, 14vh, 124px);
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.35));
-}
-.signArt svg {
-  width: 100%;
-  height: 100%;
-}
 
 /* Quote bubble for the conversation starter */
 .quoteBoxSm {
@@ -386,10 +377,6 @@
     width: 52px;
     height: 52px;
   }
-  .signArt {
-    width: 64px;
-    height: 64px;
-  }
 }
 
 .hint {
@@ -415,35 +402,23 @@
   .eyebrow { font-size: 14px; }
 }
 
-/* Break the ice card: calm headline, three full-width tappable opener pills (52px), one primary button. */
-.displaySm { font-size: clamp(20px, 3.1vh, 26px); line-height: 1.2; }
-.openerList { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: clamp(6px, 1.2vh, 12px); }
-.openerBtn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 52px;
-  padding: 10px 14px 10px 18px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  color: #fff;
-  text-align: left;
-  font: inherit;
-  font-weight: 650;
-  font-size: clamp(14px, 2.1vh, 16.5px);
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: background-color var(--dl-dur-fast, 140ms), transform var(--dl-dur-fast, 140ms), border-color var(--dl-dur-fast, 140ms);
-}
-.openerBtn:active { transform: scale(0.985); background: rgba(255, 255, 255, 0.24); border-color: rgba(255, 255, 255, 0.5); }
-.openerText { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.openerChev { flex: 0 0 auto; width: 20px; height: 20px; opacity: 0.8; }
-.openerTrail { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: #fff; }
-.openerTrail svg { width: 16px; height: 16px; }
-.openerStatic { cursor: default; padding-right: 18px; }
-.openerStatic:active { transform: none; background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.26); }
+/* Break the ice card: calm headline, one line of context, one primary "Say hi" button (see IcebreakerButton). */
+
+/* balanced line breaks for display headings (no lone last word; older engines simply ignore this) */
+.display, .displaySm, .displayLg { text-wrap: balance; }
+
+/* Break the ice card: a script headline (like the app slogan) and two faint hearts */
+.romance { font-family: 'Caveat', cursive; font-weight: 700; font-size: clamp(46px, 13vw, 62px); line-height: 1.02; letter-spacing: 0; }
+.shell[data-card-kind='starter'] { overflow: hidden; }
+.shell[data-card-kind='starter']::before,
+.shell[data-card-kind='starter']::after { content: '\2665'; position: absolute; pointer-events: none; z-index: 0; }
+.shell[data-card-kind='starter']::before { top: 12%; right: 8%; font-size: 84px; color: rgba(255, 255, 255, 0.09); transform: rotate(14deg); }
+.shell[data-card-kind='starter']::after { bottom: 22%; left: 4%; font-size: 120px; color: rgba(255, 255, 255, 0.06); transform: rotate(-12deg); }
+
+/* "New here" card: calm and compact - small wave, one title, one line of copy, one quiet meta line */
+.badgeSm { width: clamp(52px, 8vh, 68px); height: clamp(52px, 8vh, 68px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
+.badgeSm.badgeEmoji { font-size: clamp(24px, 4vh, 32px); }
+.welcomeTitle { font-size: clamp(28px, 4.6vh, 38px); margin-top: 4px; }
+.welcomeSub { max-width: 19em; color: rgba(255, 255, 255, 0.78); font-size: clamp(14px, 2vh, 16px); text-wrap: balance; }
+.welcomeMeta { margin: 2px 0 0; font-size: 13px; font-weight: 600; letter-spacing: 0.01em; color: rgba(255, 255, 255, 0.62); }
+@media (max-height: 660px) { .badgeSm { display: none; } }

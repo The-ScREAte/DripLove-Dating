@@ -45,6 +45,8 @@ export const useIcebreakerUi = (): UiState =>
 export interface IcebreakerHandlers {
   openChat: (matchId?: string | null) => void;
   openPremium: () => void;
+  /** Premium status, only used to show a sensible chances number while the backend is unreachable. */
+  isPremium?: boolean;
 }
 let handlers: IcebreakerHandlers = { openChat: () => undefined, openPremium: () => undefined };
 export const setIcebreakerHandlers = (h: IcebreakerHandlers) => {

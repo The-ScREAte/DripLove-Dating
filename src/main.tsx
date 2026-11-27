@@ -7,7 +7,8 @@ import "./motion.css";
 import "./design-tokens.css";
 import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
-import { clearChatCache } from "./cache/chatCache";
+import { clearAllUserCaches, noteSignedInUser } from "./utils/clearUserCaches";
+import { reloadForStaleChunk } from "./utils/chunkReload";
 import HoppingLogo from "./components/HoppingLogo";
 import { getPlatformSync } from "./utils/platformUtils";
 import { ensureNotificationTapListener } from "./services/pushNotifications";
@@ -265,15 +266,7 @@ const AppWrapper = () => {
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
             // ONLY SIGNED_OUT should clear the session
             if (event === 'SIGNED_OUT') {
-              clearChatCache();
-              if (typeof window !== 'undefined') {
-                const w = window as Window & {
-                  chatMatchesCache?: Map<string, unknown>;
-                  chatMessagesCache?: Map<string, unknown>;
-                };
-                w.chatMatchesCache?.clear();
-                w.chatMessagesCache?.clear();
-              }
+              clearAllUserCaches();
               setHasSession(false);
               setUser(null);
               return;
@@ -282,6 +275,7 @@ const AppWrapper = () => {
             // Update session on successful auth events
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               if (nextSession) {
+                noteSignedInUser(nextSession.user?.id);
                 setHasSession(true);
                 setUser(nextSession.user);
               }
@@ -291,6 +285,7 @@ const AppWrapper = () => {
             if (event === 'INITIAL_SESSION') {
               // Only update if we have a session - don't clear on null
               if (nextSession) {
+                noteSignedInUser(nextSession.user?.id);
                 setHasSession(true);
                 setUser(nextSession.user);
               }
@@ -409,6 +404,12 @@ const AppWrapper = () => {
 
   return <App user={user} isAuthenticated={hasSession} />;
 };
+
+// Vite fires this when a lazy chunk (or its CSS) can't be fetched - i.e. a new version replaced the files while
+// this copy of the app stayed open. Reload once (cooldown-guarded) instead of leaving a dead tab.
+window.addEventListener("vite:preloadError", (event) => {
+  if (reloadForStaleChunk()) event.preventDefault();
+});
 
 // Store root to prevent double mount warning in development
 const rootElement = document.getElementById("root")!;

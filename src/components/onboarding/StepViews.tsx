@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle, ChevronDown, Link as LinkIcon, Music2, Clock, Eye, EyeOff, Gift, Lock, Mail, Pencil, Plus, ShieldCheck, Upload, User, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ChevronDown, Heart, Link as LinkIcon, Music2, Clock, Eye, EyeOff, Gift, Lock, Mail, Pencil, Plus, ShieldCheck, Upload, User, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
@@ -67,10 +67,16 @@ export interface StepViewProps {
   photoCount: number;
   promoEnabled: boolean;
   userId: string | null;
+  /** sign-up: this email already has an account (and how it signs in) */
+  emailTaken?: 'email' | 'google' | 'apple' | null;
+  checkingEmail?: boolean;
+  resetState?: 'idle' | 'sending' | 'sent' | 'error';
+  onSignIn?: () => void;
+  onReset?: () => void;
 }
 
 /* ------------------------------ account ------------------------------ */
-export const AccountView = ({ formData, errors, onInput }: StepViewProps) => {
+export const AccountView = ({ formData, errors, onInput, emailTaken, resetState, onSignIn, onReset }: StepViewProps) => {
   const { t } = useTranslation();
   const [show, setShow] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -99,9 +105,39 @@ export const AccountView = ({ formData, errors, onInput }: StepViewProps) => {
         placeholder="name@domain.com"
         value={formData.email}
         onChange={onInput}
-        error={errors.email}
+        error={emailTaken ? ' ' : errors.email}
         required
       />
+      {emailTaken && (
+        <div className="ob-card" role="alert" style={{ marginTop: -8 }}>
+          <p className="text-[14px] font-medium text-white">
+            {emailTaken === 'google'
+              ? t('onboarding.account.usesGoogle', 'This email already uses Google sign-in.')
+              : emailTaken === 'apple'
+                ? t('onboarding.account.usesApple', 'This email already uses Apple sign-in.')
+                : t('onboarding.account.exists', 'This email already has an account.')}
+          </p>
+          {resetState === 'sent' ? (
+            <p className="mt-2 text-[13px] text-green-300">{t('onboarding.account.resetSent', 'Reset link sent - check your email.')}</p>
+          ) : (
+            <>
+              <div className="mt-3 flex gap-2">
+                <Button type="button" variant="primary" size="md" className="flex-1" onClick={onSignIn}>
+                  {t('auth.signIn')}
+                </Button>
+                {emailTaken === 'email' && (
+                  <Button type="button" variant="line" size="md" className="flex-1 text-white" loading={resetState === 'sending'} onClick={onReset}>
+                    {t('onboarding.account.reset', 'Reset password')}
+                  </Button>
+                )}
+              </div>
+              {resetState === 'error' && (
+                <p className="mt-2 text-[13px] text-red-300">{t('onboarding.account.resetError', "Couldn't send the link - try again in a minute.")}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
       <Field
         id="password"
         name="password"
@@ -226,8 +262,7 @@ export const LookingView = ({ mode, formData, errors, setField }: StepViewProps)
         value={formData.relationshipIntent}
         onChange={(v) => setField('relationshipIntent', v)}
         error={errors.relationshipIntent}
-        required={mode === 'complete'}
-        optional={mode !== 'complete'}
+        required
         options={[
           { value: 'casual', label: t('registration.casual') },
           { value: 'serious', label: t('registration.serious') },
@@ -239,7 +274,27 @@ export const LookingView = ({ mode, formData, errors, setField }: StepViewProps)
 };
 
 /* ------------- "You're in!" - the buttons live in the wizard footer ------------- */
-export const CelebrateView = () => <DriftingHearts />;
+export const CelebrateView = () => {
+  const { t } = useTranslation();
+  const rows = [
+    { Icon: ShieldCheck, text: t('onboarding.celebrate.real', 'Real, verified people') },
+    { Icon: Heart, text: t('onboarding.celebrate.match', 'Matches built on what matters to you') },
+    { Icon: Lock, text: t('onboarding.celebrate.private', 'Your details stay private') },
+  ];
+  return (
+    <>
+      <DriftingHearts />
+      <ul className="ob-assure">
+        {rows.map(({ Icon, text }) => (
+          <li key={text}>
+            <Icon aria-hidden="true" />
+            <span>{text}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+};
 
 /* ------------------------------ location ----------------------------- */
 export const LocationView = ({ formData, errors, onLocationChange }: StepViewProps) => (
@@ -258,7 +313,7 @@ export const LocationView = ({ formData, errors, onLocationChange }: StepViewPro
 /* -------------------------------- work ------------------------------- */
 export const WorkView = ({ mode, formData, errors, setField }: StepViewProps) => {
   const { t } = useTranslation();
-  const required = mode === 'complete';
+  const required = true;
   const labelFor = (text: string) => (
     <label className="ob-label">
       {text}
@@ -344,14 +399,19 @@ export const FaceView = ({ errors, face }: StepViewProps) => {
       </div>
     );
   }
-  // Just the animated "face in the oval" picture above the real camera widget -
-  // the one short line under the title says the rest.
-  return (
-    <div className="space-y-4">
-      <FaceDemo />
-      <div className={`rounded-2xl border p-3 ${errors.faceVerification ? 'border-red-400/70' : 'border-white/10'}`}>
-        <FaceVerification onVerified={face.handleFaceVerified} disabled={face.isVerifying} />
+  // Capturing: the intro is gone (the wizard hides title + footer too) - just the camera.
+  if (face.capturing) {
+    return (
+      <div className="ob-face-cam">
+        <FaceVerification onVerified={face.handleFaceVerified} disabled={face.isVerifying} autoStart />
+        {errors.faceVerification && <p role="alert" className={formError}>{errors.faceVerification}</p>}
       </div>
+    );
+  }
+  // Intro: the animated "face in the oval" - the footer's "Verify" button starts the camera.
+  return (
+    <div className="ob-face-intro">
+      <FaceDemo />
       {errors.faceVerification && <p role="alert" className={formError}>{errors.faceVerification}</p>}
     </div>
   );
@@ -364,7 +424,7 @@ const PhotoStatus = ({ image }: { image: ImageUpload }) => {
     case 'moderating':
       return (
         <div className="ob-photo-overlay">
-          <ShieldCheck className="h-6 w-6 animate-pulse" aria-hidden="true" />
+          <ShieldCheck className="h-5 w-5 animate-pulse" aria-hidden="true" />
           {t('profileCompletion.moderating')}
         </div>
       );
@@ -383,7 +443,7 @@ const PhotoStatus = ({ image }: { image: ImageUpload }) => {
     case 'rejected':
       return (
         <div className="ob-photo-overlay" data-tone="bad">
-          <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+          <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           {t('profileCompletion.rejected')}
         </div>
       );
@@ -425,7 +485,7 @@ export const PhotosView = ({ formData, errors, setFormData, photos, maxPhotos, p
   const atMax = images.length >= maxPhotos;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <input
         ref={inputRef}
         id="photos"
@@ -442,13 +502,13 @@ export const PhotosView = ({ formData, errors, setFormData, photos, maxPhotos, p
         <div>
           <button type="button" className="ob-drop" onClick={onAddClick}>
             <span className="ob-drop-icon">
-              <Upload className="h-5 w-5" aria-hidden="true" />
+              <Upload className="h-4 w-4" aria-hidden="true" />
             </span>
             <span className="text-[15px] font-semibold">{t('onboarding.photos.add')}</span>
           </button>
           {/* the do / don't examples live in a sheet - shown once before the first upload, reopen any time */}
-          <div className="mt-1 flex justify-center">
-            <Button variant="link" onClick={() => setTipsOpen(true)} className="h-11 px-5">
+          <div className="flex justify-center">
+            <Button variant="link" onClick={() => setTipsOpen(true)} className="h-9 px-5">
               {t('onboarding.photos.tipsLink')}
             </Button>
           </div>

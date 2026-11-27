@@ -1412,22 +1412,6 @@
   "cards": {
     "heroMeet": "Mjue {{name}}",
     "sharedHeadline": "Wewe na {{name}} mna mambo mnayoshirikiana",
-    "basicsTitle": "Kwa mtazamo",
-    "basics": {
-      "work": "Kazi",
-      "education": "Elimu",
-      "height": "Urefu",
-      "lives": "Anaishi",
-      "distance": "Umbali",
-      "languages": "Anazungumza",
-      "away": "Umbali wa {{distance}}"
-    },
-    "lookingTitle": "Anatafuta",
-    "looking": {
-      "family": "Mipango ya familia",
-      "loveStyle": "Mtindo wa mapenzi",
-      "communication": "Mawasiliano"
-    },
     "interestsTitle": "Anachopenda {{name}}",
     "interestsEyebrow": "Mapendeleo",
     "valuesEyebrow": "Maadili",
@@ -1442,11 +1426,6 @@
       "smoking": "Kuvuta sigara",
       "sleep": "Usingizi",
       "pets": "Wanyama kipenzi"
-    },
-    "signTitle": "Alama ya kitamaduni",
-    "sign": {
-      "shared": "Mnashiriki alama hii ✨",
-      "compatible": "Inaendana vizuri na alama yako ✨"
     },
     "trustTitle": "Vizuri kujua",
     "trust": {
@@ -1467,7 +1446,7 @@
       "city": "Ni sehemu gani unayoipenda {{city}}?",
       "generic": "Hujambo {{name}} 👋 wiki yako inaendeleaje?",
       "hint": "Ujumbe rahisi wa kwanza - gusa gumzo mtakapopatana.",
-      "headline": "Mwambie {{name}} habari"
+      "headline": "Kuwa wa kwanza kusema hujambo"
     },
     "welcomeTitle": "Mgeni hapa",
     "welcomeBody": "{{name}} anaanza tu - kuwa wa kwanza kusalimu.",
@@ -1512,8 +1491,6 @@
       "emptySub": "Mtu akikutumia ujumbe wa kwanza, utaonekana hapa.",
       "error": "Haikuwezekana kwa sasa. Tafadhali jaribu tena.",
       "intro": "Kukubali kunaunda mechi na kufungua gumzo lako.",
-      "matched": "Ni mechi!",
-      "matchedBody": "Wewe na {{name}} mnaweza kuzungumza sasa.",
       "readMore": "Soma zaidi",
       "reportBlock": "Ripoti au zuia",
       "requestTitle": "Ujumbe wa kuanzisha",
@@ -1526,26 +1503,22 @@
       "cta": "Fungua gumzo",
       "title": "Tayari mmekuwa mechi"
     },
-    "quota": "Zimebaki {{remaining}} kati ya {{limit}} bure",
-    "quotaEmpty": "Hakuna ujumbe wa bure uliobaki",
     "row": {
       "aria": "Fungua ujumbe wa kuanzisha, {{count}} wanasubiri",
       "sub": "{{count}} wanakusubiri"
     },
     "sayHi": "Sema habari",
-    "sentLabel": "Ujumbe umetumwa",
+    "sentLabel": "Hujambo imetumwa",
     "sheet": {
       "done": "Sawa",
-      "hint": "Ataona kwanza. Akikubali, mtaoana na mnaweza kuendelea kuzungumza.",
       "ideas": "Unahitaji wazo?",
-      "placeholder": "Andika ujumbe wa kwanza wa kirafiki…",
-      "safety": "Yeye huamua kukubali au la. Kuwa mwema – unaweza kuripoti au kuzuia wakati wowote.",
-      "send": "Tuma ujumbe",
+      "placeholder": "Andika kitu kitamu…",
+      "send": "Sema hujambo kwanza",
       "sending": "Inatuma…",
       "sentBody": "Tutakujulisha {{name}} akijibu.",
       "sentTitle": "Imetumwa!",
-      "to": "Kwa {{name}}",
-      "title": "Tuma ujumbe wako wa kwanza kwa {{name}}"
+      "title": "Kuwa wa kwanza kusema hujambo",
+      "more": "Mawazo zaidi"
     },
     "someone": "Mtu",
     "title": "Anzisha mazungumzo",
@@ -1560,15 +1533,23 @@
       "later": "Si sasa",
       "title": "Umetumia ujumbe wako {{limit}} wa bure"
     },
-    "useOpener": "Tumia ujumbe huu: {{text}}",
-    "copyOpener": "Nakili: {{text}}",
     "copied": "Imenakiliwa",
     "chances": {
       "left_one": "Nafasi {{count}} imebaki",
       "left_other": "Nafasi {{count}} zimebaki",
-      "of": "Nafasi {{remaining}} kati ya {{limit}} za bure zimebaki",
-      "none": "Nafasi zimeisha - pata Premium",
-      "unlimited": "Nafasi zisizo na kikomo"
+      "none": "Nafasi zimeisha"
+    },
+    "free": {
+      "evening": "Tukipata jioni kamilifu, tungefanya nini? 🌙",
+      "song": "Wimbo gani uko kichwani mwako sasa hivi? 🎶",
+      "laugh": "Ni kitu gani cha mwisho kilichokufanya ucheke kwa sauti?",
+      "coffee": "Kahawa, chai au kitu kitamu zaidi? ☕💗",
+      "sunday": "Jumapili ya ndoto: kutembea alfajiri au kulala hadi mchana? ☀️",
+      "secret": "Niambie jambo moja kukuhusu ambalo watu wengi hawajui 😉",
+      "escape": "Ufukweni, milimani au mji mkubwa - tukimbilie wapi? ✈️",
+      "smile": "Tabasamu lako ni gumu kupuuza. Kuna hadithi gani nyuma yake? ✨",
+      "dance": "Kuwa mkweli: unacheza vizuri au unajifanya vizuri? 💃",
+      "love": "Miadi kamilifu ya kwanza ingekuwaje kwako? 💕"
     }
   }
 }

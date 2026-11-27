@@ -2,6 +2,7 @@ import React from 'react';
 import i18n from 'i18next';
 import { Button } from '@/components/ui/button';
 import { logAppError } from '@/utils/errorLog';
+import { CHUNK_ERROR_RE, reloadForStaleChunk } from '@/utils/chunkReload';
 
 interface TabErrorBoundaryProps {
   /** Which tab / area this guards ('dripcheck', 'profile', 'popup-host', …) - used in the error log. */
@@ -16,8 +17,6 @@ interface TabErrorBoundaryState {
   /** Bumped by "Try again" so the guarded subtree is re-created from scratch (fresh state, fresh effects). */
   attempt: number;
 }
-
-const CHUNK_ERROR = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|dynamically imported module|error loading dynamically imported module/i;
 
 /**
  * One of these wraps every tab panel (and the popup host) so a render/effect error inside ONE tab
@@ -34,13 +33,15 @@ class TabErrorBoundary extends React.Component<TabErrorBoundaryProps, TabErrorBo
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logAppError(`tab:${this.props.tab}`, error, info, { tab: this.props.tab });
+    // New version deployed while the app stayed open: pick it up automatically (once per cooldown).
+    if (CHUNK_ERROR_RE.test(error?.message || '')) reloadForStaleChunk();
   }
 
   private retry = () => {
     const { error } = this.state;
     // A lazy chunk that failed to load stays rejected inside React.lazy, so re-rendering can't fix it
     // (this happens e.g. after a new deploy replaced the files, or on a dropped connection).
-    if (error && CHUNK_ERROR.test(error.message || '')) {
+    if (error && CHUNK_ERROR_RE.test(error.message || '')) {
       window.location.reload();
       return;
     }

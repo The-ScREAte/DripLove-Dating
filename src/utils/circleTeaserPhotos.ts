@@ -17,6 +17,7 @@ const hash = (s: string): number => {
 
 const cache = new Map<string, { at: number; photos: Record<string, string[]> }>();
 const TTL_MS = 30 * 60 * 1000;
+export const clearCircleTeaserCache = (): void => cache.clear();
 const PER_CIRCLE_SAMPLE = 20;
 
 const today = (): string => new Date().toISOString().slice(0, 10);

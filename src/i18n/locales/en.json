@@ -1232,12 +1232,12 @@
       },
       "work": {
         "title": "Work & education",
-        "hintRequired": "Tell us what you do.",
+        "hintRequired": "Tell us a little about your work and studies.",
         "hintOptional": "Share what feels right."
       },
       "signs": {
         "title": "Pick your cultural signs",
-        "hint": "Choose at least {{min}}.",
+        "hint": "Pick at least {{min}} that feels like you.",
         "hintOptional": "Choose any that feel like you."
       },
       "face": {
@@ -1262,7 +1262,7 @@
       },
       "interests": {
         "title": "What lights you up?",
-        "hint": "Pick what you love - it helps us match you better."
+        "hint": "Pick at least 3 - it helps us match you better."
       },
       "love": {
         "title": "How do you love?",
@@ -1277,12 +1277,13 @@
         "hint": "Tell us who you'd like to meet."
       },
       "celebrate": {
-        "title": "You're in!",
-        "hint": "Want to make your profile shine?"
+        "title": "You're in the right place",
+        "hint": "Share a little more and meet people who truly fit.",
+        "hintRequired": "A few last touches, then real connections are waiting for you."
       },
       "values": {
         "title": "What matters most to you?",
-        "hint": "Pick up to 5 - they shape who we show you."
+        "hint": "Pick 1 to 5 - they shape who we show you."
       },
       "music": {
         "title": "What do you listen to?",
@@ -1290,6 +1291,7 @@
       }
     },
     "face": {
+      "verify": "Verify",
       "done": "Face verified"
     },
     "photos": {
@@ -1493,22 +1495,6 @@
   "cards": {
     "heroMeet": "Meet {{name}}",
     "sharedHeadline": "You and {{name}} have things in common",
-    "basicsTitle": "At a glance",
-    "basics": {
-      "work": "Work",
-      "education": "Education",
-      "height": "Height",
-      "lives": "Lives in",
-      "distance": "Distance",
-      "languages": "Speaks",
-      "away": "{{distance}} away"
-    },
-    "lookingTitle": "Looking for",
-    "looking": {
-      "family": "Family plans",
-      "loveStyle": "Love style",
-      "communication": "Communication"
-    },
     "interestsTitle": "What {{name}} is into",
     "interestsEyebrow": "Interests",
     "valuesEyebrow": "Values",
@@ -1523,11 +1509,6 @@
       "smoking": "Smokes",
       "sleep": "Sleep",
       "pets": "Pets"
-    },
-    "signTitle": "Cultural sign",
-    "sign": {
-      "shared": "You share this sign ✨",
-      "compatible": "A great match for your sign ✨"
     },
     "trustTitle": "Good to know",
     "trust": {
@@ -1548,7 +1529,7 @@
       "city": "What's your favourite spot in {{city}}?",
       "generic": "Hi {{name}} 👋 how is your week going?",
       "hint": "An easy first message - tap the chat when you match.",
-      "headline": "Say hi to {{name}}"
+      "headline": "Be the first to say hi"
     },
     "welcomeTitle": "New here",
     "welcomeBody": "{{name}} is just getting started - be the first to say hi.",
@@ -1593,8 +1574,6 @@
       "error": "Couldn't do that right now. Please try again.",
       "accept": "Accept & start chatting",
       "decline": "Not now",
-      "matched": "It's a match!",
-      "matchedBody": "You and {{name}} can chat now.",
       "intro": "Accepting creates a match and opens your chat.",
       "empty": "No icebreakers right now",
       "emptySub": "When someone sends you a first message, it'll show up here."
@@ -1605,11 +1584,9 @@
       "body": "Open to read their message",
       "view": "View"
     },
-    "sentLabel": "Icebreaker sent",
+    "sentLabel": "Hi sent",
     "sayHi": "Say hi",
     "title": "Break the ice",
-    "quotaEmpty": "No free icebreakers left",
-    "quota": "{{remaining}} of {{limit}} free left",
     "errors": {
       "rateLimited": "You're sending a lot of icebreakers - try again in a little while.",
       "dailyLimit": "You've reached today's icebreaker limit. Try again tomorrow.",
@@ -1618,17 +1595,15 @@
       "generic": "Couldn't send that - please try again."
     },
     "sheet": {
-      "hint": "They'll see it first. If they accept, you match and can keep chatting.",
-      "to": "To {{name}}",
       "ideas": "Need an idea?",
-      "placeholder": "Write a friendly first message…",
+      "placeholder": "Say something sweet…",
       "sending": "Sending…",
-      "send": "Send icebreaker",
-      "safety": "They choose whether to accept. Be kind - you can always report or block.",
+      "send": "Say hi first",
       "sentTitle": "Sent!",
       "sentBody": "We'll let you know if {{name}} replies.",
       "done": "Done",
-      "title": "Send your first message to {{name}}"
+      "title": "Be the first to say hi",
+      "more": "More ideas"
     },
     "upsell": {
       "title": "You've used your {{limit}} free icebreakers",
@@ -1641,15 +1616,23 @@
       "body": "Say hi in your chat.",
       "cta": "Open chat"
     },
-    "useOpener": "Use this opener: {{text}}",
-    "copyOpener": "Copy: {{text}}",
     "copied": "Copied",
     "chances": {
       "left_one": "{{count}} chance left",
       "left_other": "{{count}} chances left",
-      "of": "{{remaining}} of {{limit}} free chances left",
-      "none": "No chances left - go Premium",
-      "unlimited": "Unlimited chances"
+      "none": "No chances left"
+    },
+    "free": {
+      "evening": "If we had one perfect evening, what would we do? 🌙",
+      "song": "What song is stuck in your head right now? 🎶",
+      "laugh": "What's the last thing that made you laugh out loud?",
+      "coffee": "Coffee, tea, or something sweeter? ☕💗",
+      "sunday": "Dream Sunday: sunrise walk or sleeping in? ☀️",
+      "secret": "Tell me one thing most people don't know about you 😉",
+      "escape": "Beach, mountains or a big city - where should we escape to? ✈️",
+      "smile": "You've got a smile that's hard to ignore. What's the story behind it? ✨",
+      "dance": "Be honest: are you a great dancer or a great pretender? 💃",
+      "love": "What does a perfect first date feel like to you? 💕"
     }
   }
 }

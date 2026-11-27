@@ -70,7 +70,6 @@ export const buildSlides = (
     viewerId: v.id ?? null,
     viewerInterests: v.interests,
     viewerFavorites: v.favorites,
-    viewerSigns: v.signs,
     verified: v.verified,
     distanceKm: v.distanceKm,
     hasPhotos: photos.length > 0,

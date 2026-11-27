@@ -11,6 +11,10 @@ export const MAX_PHOTOS: Record<OnboardingMode, number> = { register: 5, complet
 /** Minimum cultural signs required in sign-up. */
 export const MIN_SIGNS = 1;
 
+/** Needed to finish: enough to match on. */
+export const MIN_INTERESTS = 3;
+export const MIN_VALUES = 1;
+
 /** Most interests a profile can list (same cap the Profile screen enforces). */
 export const MAX_INTERESTS_PICKED = 10;
 /** Most languages offered in onboarding. */
@@ -19,7 +23,21 @@ export const MAX_LANGUAGES_PICKED = 10;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
 const MIN_PASSWORD = 6;
 
-/** "Your vibe": the first bonus screens (interests, what matters most, music). All skippable; they feed matching. */
+const DOMAIN_TYPOS: Record<string, string> = {
+  'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'gmail.co': 'gmail.com', 'gmail.con': 'gmail.com', 'gnail.com': 'gmail.com',
+  'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'yahoo.con': 'yahoo.com',
+  'hotmial.com': 'hotmail.com', 'hotmail.con': 'hotmail.com', 'outlok.com': 'outlook.com', 'outlook.con': 'outlook.com',
+  'icloud.con': 'icloud.com', 'iclod.com': 'icloud.com',
+};
+/** A suggested fix for a common mistyped email domain (gmial.com), or null. */
+export function emailTypoFix(email: string): string | null {
+  const at = email.lastIndexOf('@');
+  if (at < 0) return null;
+  const fixed = DOMAIN_TYPOS[email.slice(at + 1).toLowerCase()];
+  return fixed ? `${email.slice(0, at)}@${fixed}` : null;
+}
+
+/** "Your vibe": interests + what matters most are required (they feed matching); music is optional. */
 export const VIBE_STEPS: StepId[] = ['interests', 'values', 'music'];
 /** The rest of the always-skippable extras in the bonus mini-flow. */
 export const BONUS_STEPS: StepId[] = ['bio', 'details', 'lifestyle', 'love'];
@@ -38,14 +56,10 @@ export function getSteps(mode: OnboardingMode, hasAccount: boolean): StepId[] {
   const bonus: StepId[] = [];
   if (mode === 'register' && !hasAccount) required.push('account');
   required.push('you', 'looking', 'location');
-  if (mode === 'complete') required.push('work');
-  else required.push('signs');
-  required.push('face', 'photos');
+  required.push('signs', 'face', 'photos');
   // Vibe first (it powers matching), then the screens that were required in the other flow, then the rest.
   bonus.push(...VIBE_STEPS);
-  if (mode === 'register') bonus.push('work');
-  else bonus.push('signs');
-  bonus.push(...BONUS_STEPS);
+  bonus.push('work', ...BONUS_STEPS);
   return [...required, 'celebrate', ...bonus];
 }
 
@@ -128,6 +142,8 @@ export function knownStepIds(mode: OnboardingMode, f: OnboardingFormData, faceVe
   if (f.city.trim()) known.push('location');
   if (f.occupation && f.industry && f.educationLevel) known.push('work');
   if (f.adinkraSymbols.length > 0) known.push('signs');
+  if (f.interests.length >= MIN_INTERESTS) known.push('interests');
+  if (f.values.length >= MIN_VALUES) known.push('values');
   if (faceVerified) known.push('face');
   if (photoCount >= MIN_PHOTOS) known.push('photos');
   return known;
@@ -138,15 +154,15 @@ export function knownStepIds(mode: OnboardingMode, f: OnboardingFormData, faceVe
 export function isRequired(step: StepId, mode: OnboardingMode): boolean {
   switch (step) {
     case 'work':
-      return mode === 'complete'; // sign-up always treated work & education as optional
+    case 'interests':
+    case 'values':
+      return true; // they sit after "You're in!" but are needed to finish, in both flows
     case 'signs':
-      return mode === 'register'; // sign-up requires >=1 cultural sign
+      return true;
     case 'celebrate':
     case 'bio':
     case 'details':
     case 'lifestyle':
-    case 'interests':
-    case 'values':
     case 'music':
     case 'love':
       return false;
@@ -179,7 +195,11 @@ export function validateStep(step: StepId, ctx: StepContext): StepErrors {
   switch (step) {
     case 'account': {
       if (!f.email.trim()) e.email = 'Email is required';
-      else if (!EMAIL_RE.test(f.email)) e.email = 'Please enter a valid email address (e.g., name@domain.com)';
+      else if (!EMAIL_RE.test(f.email.trim())) e.email = 'Please enter a valid email address (e.g., name@domain.com)';
+      else {
+        const fix = emailTypoFix(f.email.trim());
+        if (fix) e.email = `Did you mean ${fix}?`;
+      }
       if (!f.password) e.password = 'Password is required';
       else if (f.password.length < MIN_PASSWORD) e.password = 'Password must be at least 6 characters long';
       if (!f.confirmPassword) e.confirmPassword = 'Please confirm your password';
@@ -199,7 +219,7 @@ export function validateStep(step: StepId, ctx: StepContext): StepErrors {
     }
     case 'looking': {
       if (!f.preference) e.preference = 'Preference is required';
-      if (mode === 'complete' && !f.relationshipIntent) e.relationshipIntent = 'Relationship intent is required';
+      if (!f.relationshipIntent) e.relationshipIntent = 'Relationship intent is required';
       break;
     }
     case 'location': {
@@ -208,7 +228,7 @@ export function validateStep(step: StepId, ctx: StepContext): StepErrors {
       break;
     }
     case 'work': {
-      if (mode === 'complete') {
+      {
         if (!f.occupation) e.occupation = tr(ctx, 'profileCompletion.errors.occupationRequired', 'Occupation is required');
         if (!f.industry) e.industry = tr(ctx, 'profileCompletion.errors.industryRequired', 'Industry is required');
         if (!f.educationLevel) e.educationLevel = tr(ctx, 'profileCompletion.errors.educationRequired', 'Education level is required');
@@ -216,7 +236,7 @@ export function validateStep(step: StepId, ctx: StepContext): StepErrors {
       break;
     }
     case 'signs': {
-      if (mode === 'register' && (!Array.isArray(f.adinkraSymbols) || f.adinkraSymbols.length < MIN_SIGNS)) {
+      if ((!Array.isArray(f.adinkraSymbols) || f.adinkraSymbols.length < MIN_SIGNS)) {
         e.adinkraSymbols = 'Please select at least one cultural sign';
       }
       break;
@@ -240,7 +260,11 @@ export function validateStep(step: StepId, ctx: StepContext): StepErrors {
       }
       break;
     case 'interests':
+      if (f.interests.length < MIN_INTERESTS) e.interests = `Pick at least ${MIN_INTERESTS} interests.`;
+      break;
     case 'values':
+      if (f.values.length < MIN_VALUES) e.values = 'Pick at least 1 thing that matters to you.';
+      break;
     case 'love':
       // nothing here can ever block finishing
       break;
@@ -276,6 +300,11 @@ export function getPrimaryHint(step: StepId, ctx: StepContext, images: ImageUplo
     const need = MIN_PHOTOS - ctx.photoCount;
     if (need > 0) return need === 1 ? 'Add 1 more photo' : `Add ${need} more photos`;
   }
+  if (step === 'interests') {
+    const need = MIN_INTERESTS - ctx.formData.interests.length;
+    if (need > 0) return need === 1 ? 'Pick 1 more' : `Pick ${need} more`;
+  }
+  if (step === 'values' && ctx.formData.values.length < MIN_VALUES) return 'Pick at least 1';
   return null;
 }
 

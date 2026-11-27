@@ -1,3 +1,4 @@
+import SlideDots from '../discover/SlideDots';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Heart, ArrowLeft as ArrowLeftIcon, ChevronLeft, X as XIcon } from 'lucide-react';
@@ -12,7 +13,6 @@ import { findFavoriteWithLink } from '@/constants/favorites';
 import { ProfileDetailsPanel } from '../profile-card/ProfileDetailsPanel';
 import { useCaptionedPhotos, toTitleCase } from '../profile-card/profileCardUtils';
 import { ProfileCaption } from '../profile-card/ProfileCaption';
-import { icebreakerPillFor } from '../icebreaker/target';
 import { ProfileReportModal } from '../profile-card/ProfileReportModal';
 import { useProfileReport } from '../profile-card/useProfileReport';
 import { useBackClose } from '@/utils/backStack';
@@ -515,16 +515,11 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           </div>
         )}
 
+        {/* Same centred carousel as Discover and Liked Me (shared SlideDots). With the Circle category label
+            on top it sits just under it, so the two never overlap. */}
         {slides.length > 1 && (
-          <div className={`absolute ${onBack ? 'left-[60px]' : 'left-4'} flex gap-1.5 z-10`} style={{ top: '14px' }}>
-            {slides.map((_, idx) => (
-              <div
-                key={idx}
-                className={`h-1.5 rounded-full transition-all duration-200 ${
-                  idx === currentSlide ? 'bg-pink-500 w-7' : 'bg-pink-500/30 w-1.5'
-                }`}
-              />
-            ))}
+          <div className="absolute left-0 right-0 z-10 flex justify-center pointer-events-none" style={{ top: topLabel ? 34 : 10 }}>
+            <SlideDots total={slides.length} current={currentSlide} />
           </div>
         )}
 
@@ -540,9 +535,10 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           <button
             onClick={(e) => { e.stopPropagation(); setShowCropModal(true); }}
             aria-label="Crop photo"
-            className="absolute right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
+            className="dl-hit absolute right-4 z-10 flex items-center justify-center w-8 h-8 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
             style={{
               top: '4px',
+              minHeight: 0,
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
             }}
@@ -659,7 +655,6 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           showAbout={showAbout}
           expanded={showMoreInfo}
           onToggle={() => setShowMoreInfo((v) => !v)}
-          action={readOnly ? icebreakerPillFor(profile, slides, { photoUrl: images?.[0], currentSlide }) : null}
         />
       </div>
 

@@ -1325,22 +1325,6 @@
   "cards": {
     "heroMeet": "Lerne {{name}} kennen",
     "sharedHeadline": "Du und {{name}} habt Gemeinsamkeiten",
-    "basicsTitle": "Auf einen Blick",
-    "basics": {
-      "work": "Beruf",
-      "education": "Ausbildung",
-      "height": "Größe",
-      "lives": "Wohnt in",
-      "distance": "Entfernung",
-      "languages": "Spricht",
-      "away": "{{distance}} entfernt"
-    },
-    "lookingTitle": "Sucht",
-    "looking": {
-      "family": "Familienplanung",
-      "loveStyle": "Liebesstil",
-      "communication": "Kommunikation"
-    },
     "interestsTitle": "Was {{name}} mag",
     "interestsEyebrow": "Interessen",
     "valuesEyebrow": "Werte",
@@ -1355,11 +1339,6 @@
       "smoking": "Rauchen",
       "sleep": "Schlaf",
       "pets": "Haustiere"
-    },
-    "signTitle": "Kulturelles Zeichen",
-    "sign": {
-      "shared": "Ihr teilt dieses Zeichen ✨",
-      "compatible": "Passt gut zu deinem Zeichen ✨"
     },
     "trustTitle": "Gut zu wissen",
     "trust": {
@@ -1380,7 +1359,7 @@
       "city": "Was ist dein Lieblingsort in {{city}}?",
       "generic": "Hi {{name}} 👋 wie läuft deine Woche?",
       "hint": "Eine einfache erste Nachricht - tippe nach dem Match auf den Chat.",
-      "headline": "Sag Hallo zu {{name}}"
+      "headline": "Sei der Erste, der Hallo sagt"
     },
     "welcomeTitle": "Neu hier",
     "welcomeBody": "{{name}} fängt gerade erst an - sag als Erste/r Hallo.",
@@ -1425,8 +1404,6 @@
       "emptySub": "Wenn dir jemand eine erste Nachricht schickt, erscheint sie hier.",
       "error": "Das hat gerade nicht geklappt. Bitte versuche es erneut.",
       "intro": "Annehmen erstellt ein Match und öffnet deinen Chat.",
-      "matched": "Es ist ein Match!",
-      "matchedBody": "Du und {{name}} könnt jetzt chatten.",
       "readMore": "Mehr lesen",
       "reportBlock": "Melden oder blockieren",
       "requestTitle": "Icebreaker",
@@ -1439,26 +1416,22 @@
       "cta": "Chat öffnen",
       "title": "Ihr habt bereits ein Match"
     },
-    "quota": "{{remaining}} von {{limit}} gratis übrig",
-    "quotaEmpty": "Keine kostenlosen Icebreaker mehr",
     "row": {
       "aria": "Icebreaker öffnen, {{count}} warten",
       "sub": "{{count}} warten auf dich"
     },
     "sayHi": "Hallo sagen",
-    "sentLabel": "Icebreaker gesendet",
+    "sentLabel": "Hallo gesendet",
     "sheet": {
       "done": "Fertig",
-      "hint": "Die Person sieht sie zuerst. Wenn sie annimmt, habt ihr ein Match und könnt weiterschreiben.",
       "ideas": "Brauchst du eine Idee?",
-      "placeholder": "Schreibe eine freundliche erste Nachricht…",
-      "safety": "Sie entscheiden, ob sie annehmen. Sei nett – du kannst jederzeit melden oder blockieren.",
-      "send": "Icebreaker senden",
+      "placeholder": "Schreib etwas Nettes…",
+      "send": "Zuerst Hallo sagen",
       "sending": "Wird gesendet…",
       "sentBody": "Wir sagen dir Bescheid, wenn {{name}} antwortet.",
       "sentTitle": "Gesendet!",
-      "to": "An {{name}}",
-      "title": "Sende deine erste Nachricht an {{name}}"
+      "title": "Sei der Erste, der Hallo sagt",
+      "more": "Mehr Ideen"
     },
     "someone": "Jemand",
     "title": "Icebreaker",
@@ -1473,15 +1446,23 @@
       "later": "Nicht jetzt",
       "title": "Du hast deine {{limit}} kostenlosen Icebreaker verbraucht"
     },
-    "useOpener": "Diesen Einstieg verwenden: {{text}}",
-    "copyOpener": "Kopieren: {{text}}",
     "copied": "Kopiert",
     "chances": {
       "left_one": "{{count}} Chance übrig",
       "left_other": "{{count}} Chancen übrig",
-      "of": "{{remaining}} von {{limit}} kostenlosen Chancen übrig",
-      "none": "Keine Chancen mehr - hol dir Premium",
-      "unlimited": "Unbegrenzte Chancen"
+      "none": "Keine Chancen mehr"
+    },
+    "free": {
+      "evening": "Wenn wir einen perfekten Abend hätten, was würden wir machen? 🌙",
+      "song": "Welcher Song hängt dir gerade im Kopf? 🎶",
+      "laugh": "Was hat dich zuletzt laut zum Lachen gebracht?",
+      "coffee": "Kaffee, Tee oder etwas Süßeres? ☕💗",
+      "sunday": "Traumsonntag: Sonnenaufgangsspaziergang oder ausschlafen? ☀️",
+      "secret": "Erzähl mir etwas über dich, das kaum jemand weiß 😉",
+      "escape": "Strand, Berge oder Großstadt - wohin sollen wir fliehen? ✈️",
+      "smile": "Dein Lächeln ist schwer zu übersehen. Was steckt dahinter? ✨",
+      "dance": "Ehrlich: tanzt du richtig gut oder tust du nur so? 💃",
+      "love": "Wie fühlt sich für dich ein perfektes erstes Date an? 💕"
     }
   }
 }

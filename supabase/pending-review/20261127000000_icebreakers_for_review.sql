@@ -18,7 +18,7 @@
 --
 -- QUOTA / LIMITS - change them in ONE place: public.icebreaker_limits() below (or insert an
 -- app_settings row with id = 'icebreaker_limits' and a json value, e.g.
---   {"free_total": 3, "premium_daily": 25, "hourly": 10, "expire_days": 14, "max_len": 280}).
+--   {"free_total": 4, "premium_daily": 10, "hourly": 10, "expire_days": 14, "max_len": 280}).
 --
 -- ROLLBACK (manual, if ever needed):
 --   drop trigger if exists trg_notify_icebreaker_received on public.icebreakers;
@@ -90,8 +90,8 @@ set search_path = public, pg_temp
 as $$
 declare
   v_default constant jsonb := jsonb_build_object(
-    'free_total',    3,    -- free users: 3 icebreakers in TOTAL (lifetime)
-    'premium_daily', 25,   -- premium: unlimited, but a daily anti-spam cap
+    'free_total',    4,    -- free users: 4 first hellos in TOTAL (lifetime)
+    'premium_daily', 10,   -- premium: 10 first hellos per rolling 24 hours
     'hourly',        10,   -- everyone: max sent per rolling hour
     'expire_days',   14,   -- pending icebreakers expire after this many days
     'max_len',       280
@@ -139,6 +139,7 @@ declare
   v_msg       text;
   v_premium   boolean;
   v_used      int;
+  v_today     int;
   v_free      int := (v_lim->>'free_total')::int;
   v_id        uuid;
   v_match     uuid;
@@ -174,6 +175,7 @@ begin
 
   v_premium := public.icebreaker_is_premium(v_me);
   select count(*) into v_used from public.icebreakers where sender_id = v_me;
+  select count(*) into v_today from public.icebreakers where sender_id = v_me and created_at > now() - interval '1 day';
 
   -- blocked either way, or the recipient already declined this sender: report success but store nothing
   -- and spend no quota ("shadow" success: never reveals a block/decline, protects the recipient).
@@ -182,7 +184,7 @@ begin
      or exists (select 1 from public.icebreakers i
                 where i.sender_id = v_me and i.recipient_id = p_recipient and i.status = 'declined') then
     return jsonb_build_object('ok', true, 'silent', true,
-      'remaining', case when v_premium then null else greatest(v_free - v_used, 0) end,
+      'remaining', case when v_premium then greatest((v_lim->>'premium_daily')::int - v_today, 0) else greatest(v_free - v_used, 0) end,
       'is_premium', v_premium);
   end if;
 
@@ -200,9 +202,8 @@ begin
   if not v_premium and v_used >= v_free then
     return jsonb_build_object('ok', false, 'error', 'quota_exhausted', 'remaining', 0, 'is_premium', false);
   end if;
-  if v_premium and (select count(*) from public.icebreakers where sender_id = v_me and created_at > now() - interval '1 day')
-                   >= (v_lim->>'premium_daily')::int then
-    return jsonb_build_object('ok', false, 'error', 'daily_limit', 'is_premium', true);
+  if v_premium and v_today >= (v_lim->>'premium_daily')::int then
+    return jsonb_build_object('ok', false, 'error', 'daily_limit', 'remaining', 0, 'is_premium', true);
   end if;
   if (select count(*) from public.icebreakers where sender_id = v_me and created_at > now() - interval '1 hour')
      >= (v_lim->>'hourly')::int then
@@ -218,7 +219,7 @@ begin
   end;
 
   return jsonb_build_object('ok', true, 'id', v_id, 'is_premium', v_premium,
-    'remaining', case when v_premium then null else greatest(v_free - (v_used + 1), 0) end);
+    'remaining', case when v_premium then greatest((v_lim->>'premium_daily')::int - (v_today + 1), 0) else greatest(v_free - (v_used + 1), 0) end);
 end;
 $$;
 
@@ -371,13 +372,18 @@ begin
     return jsonb_build_object('ok', false, 'error', 'not_authenticated');
   end if;
   v_premium := public.icebreaker_is_premium(v_me);
-  select count(*) into v_used from public.icebreakers where sender_id = v_me;
+  -- free: lifetime total; premium: the last 24 hours
+  if v_premium then
+    select count(*) into v_used from public.icebreakers where sender_id = v_me and created_at > now() - interval '1 day';
+  else
+    select count(*) into v_used from public.icebreakers where sender_id = v_me;
+  end if;
   return jsonb_build_object(
     'ok', true,
     'is_premium', v_premium,
-    'limit', case when v_premium then null else (v_lim->>'free_total')::int end,
+    'limit', case when v_premium then (v_lim->>'premium_daily')::int else (v_lim->>'free_total')::int end,
     'used', v_used,
-    'remaining', case when v_premium then null else greatest((v_lim->>'free_total')::int - v_used, 0) end);
+    'remaining', greatest(case when v_premium then (v_lim->>'premium_daily')::int else (v_lim->>'free_total')::int end - v_used, 0));
 end;
 $$;
 

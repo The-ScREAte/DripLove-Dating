@@ -22,8 +22,8 @@
 		9173D9522EB01BE200CED6DB /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 9173D9512EB01BE200CED6DB /* GoogleService-Info.plist */; };
 		91FE0EAD2E83BA0900645BA8 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91FE0EAC2E83BA0900645BA8 /* StoreKit.framework */; };
 		91FE0EAF2E83BFD600645BA8 /* DripLove.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 91FE0EAE2E83BFD600645BA8 /* DripLove.storekit */; };
-		AA11BB22CC33DD44EE55FF66 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF67 /* SceneDelegate.swift */; };
 		9A0C1D2E3F4A5B6C7D8E9F02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9A0C1D2E3F4A5B6C7D8E9F01 /* PrivacyInfo.xcprivacy */; };
+		AA11BB22CC33DD44EE55FF66 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF67 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,10 +70,10 @@
 		919EFF3D2E8B86D800A41F7F /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		91FE0EAC2E83BA0900645BA8 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		91FE0EAE2E83BFD600645BA8 /* DripLove.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = DripLove.storekit; sourceTree = "<group>"; };
+		9A0C1D2E3F4A5B6C7D8E9F01 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9AB7453D484B5D5A9862FFD3 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA11BB22CC33DD44EE55FF67 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		ACF88E1E997C8035D66C9E6B /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		9A0C1D2E3F4A5B6C7D8E9F01 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -514,14 +514,14 @@
 				CLANG_WARN_DEPRECATED_DECLARATIONS = NO;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9.1;
+				MARKETING_VERSION = 2.0.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.driplove.dating;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -539,14 +539,14 @@
 				CLANG_WARN_DEPRECATED_DECLARATIONS = NO;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.9.1;
+				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.driplove.dating;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

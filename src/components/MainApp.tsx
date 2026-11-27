@@ -450,7 +450,8 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           // image_order = -1 marks a rejected/superseded row kept only for
           // the admin audit trail - same exclusion ProfilePage/ImageManagement
           // use, so completion here matches what the user actually sees.
-          .neq('image_order', -1);
+          .neq('image_order', -1)
+          .order('image_order', { ascending: true });
 
         if (!imagesError && images) {
           setUserImages(images);
@@ -1119,6 +1120,55 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       listenerPromise.then((listener) => listener.remove()).catch(() => {});
     };
   }, [userId, profile, fetchUserProfile]);
+
+  // Keep premium state and the unread badge fresh while the app stays open. isPremium used to be
+  // read once at start-up (and after a profile edit), so a purchase confirmed by the server, an
+  // admin grant or an expiry never reached Liked Me / Circle / Break the ice until the app was
+  // restarted. Now: a realtime change to this member's subscription row re-checks it straight away,
+  // and coming back to the app (after any time in the background) re-checks premium + unread,
+  // because realtime events are lost while the socket is asleep.
+  useEffect(() => {
+    if (!userId) return undefined;
+    let lastRun = 0;
+    const refreshPremium = async () => {
+      try {
+        const { data: subData, error: subError } = await supabase.rpc('get_current_subscription_status', { p_user_id: userId });
+        if (subError) return; // transient failure: keep the last known state
+        const statusRaw = Array.isArray(subData) ? subData[0] : subData;
+        const status = (statusRaw && typeof statusRaw === 'object')
+          ? (statusRaw as { plan_name?: unknown; is_active?: unknown })
+          : null;
+        const entitled = Boolean(status && status.plan_name === 'premium' && status.is_active === true);
+        setIsPremium(entitled);
+        writeCachedPremiumStatus(userId, entitled);
+      } catch {
+        // keep the last known state
+      }
+    };
+    const onResume = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const now = Date.now();
+      if (now - lastRun < 20_000) return;
+      lastRun = now;
+      void refreshPremium();
+      void fetchUnreadCount();
+    };
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('online', onResume);
+    const listenerPromise = App.addListener('resume', onResume);
+    const channel = supabase
+      .channel(uniqueTopic(`premium-live-${userId}`))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_subscriptions', filter: `user_id=eq.${userId}` }, () => {
+        void refreshPremium();
+      })
+      .subscribe();
+    return () => {
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('online', onResume);
+      listenerPromise.then((listener) => listener.remove()).catch(() => {});
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, fetchUnreadCount]);
 
     // Silent push notification initialization - no user notifications
   useEffect(() => {
@@ -1966,13 +2016,15 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         services={{
           currentUser: profile,
           currentUserName: profile?.first_name || 'You',
+          // main photo (first approved one, ordered by image_order) - shown beside theirs on "It's a match"
+          currentUserImage: userImages.find((i) => i.is_approved !== false && i.moderation_status !== 'rejected')?.image_url ?? null,
           onNavigateToChat: handleNavigateToChat,
           onNavigateToVerify: handleNavigateToVerify,
         }}
       /></TabErrorBoundary>
 
       {/* Break the ice: composer sheet, inbox, realtime + popup request. Renders nothing until the backend exists. */}
-      <TabErrorBoundary tab="icebreaker" silent><IcebreakerHost userId={userId} openChat={openChatForIcebreaker} openPremium={openPremiumForIcebreaker} /></TabErrorBoundary>
+      <TabErrorBoundary tab="icebreaker" silent><IcebreakerHost userId={userId} openChat={openChatForIcebreaker} openPremium={openPremiumForIcebreaker} isPremium={isPremium === true} /></TabErrorBoundary>
 
       {/* Store-review engine (renders nothing): waits for a real happy moment, then calls
           the NATIVE review API - no custom prompt, no reward (store rules). */}

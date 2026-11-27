@@ -14,9 +14,11 @@ import { Camera as CameraIcon, CheckCircle2, RefreshCw } from "lucide-react";
 type FaceVerificationProps = {
   onVerified?: (faceImageBase64: string) => void;
   disabled?: boolean;
+  /** open the camera as soon as this mounts (the caller already showed its own "Verify" button) */
+  autoStart?: boolean;
 };
 
-const CAMERA_SIZE = 280;
+const CAMERA_SIZE = Math.min(280, Math.max(200, Math.round((typeof window !== 'undefined' ? window.innerHeight : 800) * 0.34)));
 
 type CaptureStep = 'front' | 'side';
 
@@ -24,7 +26,7 @@ type CaptureStep = 'front' | 'side';
 // type="button" - a bare <button> defaults to "submit", which made "Take
 // Photo" submit the surrounding form and pop the browser's "Please fill out
 // this field" bubble.
-export default function FaceVerification({ onVerified, disabled }: FaceVerificationProps) {
+export default function FaceVerification({ onVerified, disabled, autoStart }: FaceVerificationProps) {
   const [step, setStep] = useState(0); // 0=start, 1=camera-front, 2=camera-side, 3=review, 4=verifying, 5=done
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImages, setCapturedImages] = useState<{ front: string | null; side: string | null }>({ front: null, side: null });
@@ -52,6 +54,11 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
   // Native live preview
   const [nativeLiveFrame, setNativeLiveFrame] = useState<string | null>(null);
   const nativeFrameIntervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (autoStart) void startCamera('front');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -8,10 +8,9 @@ export const ICEBREAKER_MAX_LEN = 280;
 
 export interface IcebreakerQuota {
   isPremium: boolean;
-  /** null = unlimited (premium). */
+  /** Free: lifetime total (4). Premium: per rolling day (10). null only if unknown. */
   limit: number | null;
   used: number;
-  /** null = unlimited (premium). */
   remaining: number | null;
 }
 
@@ -41,26 +40,17 @@ export function icebreakerAction(input: {
 }
 
 /**
- * What the "chances" pill says. The user sees chances, not quota numbers:
- *  unlimited - Premium                         "Unlimited chances"
- *  none      - free and used up                "No chances left - go Premium"
- *  left      - all free ones still available   "3 chances left" / "1 chance left"
- *  of        - some used                       "2 of 3 free chances left"
+ * The chances indicator is a heart and a NUMBER (no sentence on screen). Screen readers still get words.
+ *  left - count > 0 (free: of 4 total; premium: of 10 today)
+ *  none - used up (free -> upsell; premium -> "tomorrow")
  */
-export type ChancesDisplay =
-  | { kind: 'unknown' }
-  | { kind: 'unlimited' }
-  | { kind: 'none'; limit: number | null }
-  | { kind: 'left'; count: number }
-  | { kind: 'of'; count: number; limit: number };
+export type ChancesDisplay = { kind: 'unknown' } | { kind: 'left'; count: number; limit: number | null } | { kind: 'none'; premium: boolean };
 
 export function chancesDisplay(q: IcebreakerQuota | null): ChancesDisplay {
-  if (!q) return { kind: 'unknown' };
-  if (q.isPremium || q.remaining === null || q.limit === null) return q.isPremium ? { kind: 'unlimited' } : { kind: 'unknown' };
+  if (!q || q.remaining === null) return { kind: 'unknown' };
   const remaining = Math.max(0, q.remaining);
-  if (remaining <= 0) return { kind: 'none', limit: q.limit };
-  if (remaining === 1 || remaining >= q.limit) return { kind: 'left', count: remaining };
-  return { kind: 'of', count: remaining, limit: q.limit };
+  if (remaining <= 0) return { kind: 'none', premium: q.isPremium };
+  return { kind: 'left', count: remaining, limit: q.limit };
 }
 
 /** Same rules as the server: no control chars / angle brackets, trimmed, at most 280 chars. */
@@ -77,7 +67,31 @@ export function icebreakerDraftState(text: string): { length: number; canSend: b
   return { length, canSend: clean.length > 0, nearLimit: length >= ICEBREAKER_MAX_LEN - 20 };
 }
 
-export type Starter = { basis: 'interest' | 'value' | 'music' | 'city' | 'generic'; value?: string };
+export type Starter = { basis: 'interest' | 'value' | 'music' | 'city' | 'generic' | 'free'; value?: string };
+
+/** Free-style, playful openers (not tied to anything on the profile) - the romantic, light-hearted ones. */
+export const FREE_OPENERS: Record<string, string> = {
+  evening: 'If we had one perfect evening, what would we do? 🌙',
+  song: "What song is stuck in your head right now? 🎶",
+  laugh: "What's the last thing that made you laugh out loud?",
+  coffee: 'Coffee, tea, or something sweeter? ☕💗',
+  sunday: 'Dream Sunday: sunrise walk or sleeping in? ☀️',
+  secret: "Tell me one thing most people don't know about you 😉",
+  escape: 'Beach, mountains or a big city - where should we escape to? ✈️',
+  smile: "You've got a smile that's hard to ignore. What's the story behind it? ✨",
+  dance: 'Be honest: are you a great dancer or a great pretender? 💃',
+  love: 'What does a perfect first date feel like to you? 💕',
+};
+export const FREE_OPENER_IDS = Object.keys(FREE_OPENERS);
+
+/** Free quota: first hellos in TOTAL. Premium: per rolling day. (The server is the authority; these only
+ *  fill the number in while the backend isn't reachable.) */
+export const FREE_TOTAL = 4;
+export const PREMIUM_DAILY = 10;
+export const defaultQuota = (isPremium: boolean): IcebreakerQuota => {
+  const limit = isPremium ? PREMIUM_DAILY : FREE_TOTAL;
+  return { isPremium, limit, used: 0, remaining: limit };
+};
 type Tr = (key: string, fallback: string, options?: Record<string, unknown>) => string;
 
 /**
@@ -89,7 +103,17 @@ export function openerText(st: Starter, name: string, tr: Tr): string {
   if (st.basis === 'value') return tr('cards.starter.value', 'What does {{thing}} look like for you?', { thing: vibeLabel('values', st.value || '', tr).toLowerCase() });
   if (st.basis === 'music') return tr('cards.starter.music', 'What song is on repeat for you lately?');
   if (st.basis === 'city') return tr('cards.starter.city', "What's your favourite spot in {{city}}?", { city: st.value });
+  if (st.basis === 'free') {
+    const id = st.value && FREE_OPENERS[st.value] ? st.value : FREE_OPENER_IDS[0];
+    return tr(`icebreaker.free.${id}`, FREE_OPENERS[id], { name });
+  }
   return tr('cards.starter.generic', 'Hi {{name}} 👋 how is your week going?', { name });
+}
+
+/** `count` free-style lines starting at `offset` (cycles), for the "more ideas" shuffle. */
+export function freestyleLines(count: number, offset: number, name: string, tr: Tr): string[] {
+  const n = FREE_OPENER_IDS.length;
+  return Array.from({ length: Math.min(count, n) }, (_, i) => sanitizeIcebreaker(openerText({ basis: 'free', value: FREE_OPENER_IDS[(offset * count + i) % n] }, name, tr)));
 }
 
 /** Up to 3 distinct opener lines, best first; always at least the generic one. */

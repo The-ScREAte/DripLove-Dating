@@ -43,6 +43,10 @@ const CircleUpCall = lazy(() => import('../pages/circle-up/CircleUpCall'));
 // nothing flashes white either.
 const PageLoader = () => <BrandLoader fullScreen />;
 
+/** Members-only routes (the games): signed-out visitors, deep links and expired sessions go to the Welcome screen. */
+const RequireAuth = ({ isAuthenticated, children }: { isAuthenticated: boolean; children: React.ReactElement }) =>
+  isAuthenticated ? children : <Navigate to="/" replace />;
+
 const AppRoutes = ({
   user,
   isAuthenticated,
@@ -97,10 +101,10 @@ const AppRoutes = ({
       <Route path="/safety-tips" element={<SafetyTips onBack={safeBack} />} />
       <Route path="/influencer" element={<InfluencerPortal />} />
       <Route path="/influencer/set-password" element={<InfluencerSetPassword />} />
-      <Route path="/games" element={<Games />} />
-      <Route path="/games/test-your-toast" element={<TestYourToast />} />
-      <Route path="/games/shoot-your-shot" element={<ShootYourShot />} />
-      <Route path="/games/red-flag-green-flag" element={<RedFlagGreenFlag />} />
+      <Route path="/games" element={<RequireAuth isAuthenticated={isAuthenticated}><Games /></RequireAuth>} />
+      <Route path="/games/test-your-toast" element={<RequireAuth isAuthenticated={isAuthenticated}><TestYourToast /></RequireAuth>} />
+      <Route path="/games/shoot-your-shot" element={<RequireAuth isAuthenticated={isAuthenticated}><ShootYourShot /></RequireAuth>} />
+      <Route path="/games/red-flag-green-flag" element={<RequireAuth isAuthenticated={isAuthenticated}><RedFlagGreenFlag /></RequireAuth>} />
       <Route path="/circle-up" element={<CircleUpPrepare />} />
       <Route path="/circle-up/matching" element={<CircleUpMatching />} />
       <Route path="/circle-up/call" element={<CircleUpCall />} />

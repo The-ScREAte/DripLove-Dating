@@ -1,4 +1,5 @@
 import React from 'react';
+import { CHUNK_ERROR_RE, reloadForStaleChunk } from '@/utils/chunkReload';
 
 interface Props {
   children: React.ReactNode;
@@ -14,12 +15,7 @@ interface State {
 // triggered navigation just looks like it silently did nothing. Reloading picks up a fresh,
 // currently-deployed bundle and resolves both cases, so we do that once automatically instead
 // of leaving the user stuck on a page that looks unresponsive.
-const RELOAD_FLAG_KEY = 'driplove_chunk_reload_attempted';
-
-const isChunkLoadError = (error: Error): boolean => {
-  const message = error?.message || '';
-  return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|dynamically imported module|error loading dynamically imported module/i.test(message);
-};
+const isChunkLoadError = (error: Error): boolean => CHUNK_ERROR_RE.test(error?.message || '');
 
 class ChunkLoadBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
@@ -32,21 +28,8 @@ class ChunkLoadBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
-    if (isChunkLoadError(error)) {
-      let alreadyTried = false;
-      try {
-        alreadyTried = sessionStorage.getItem(RELOAD_FLAG_KEY) === '1';
-      } catch {
-        // Storage inaccessible (private browsing, etc.) — fall through to the manual fallback.
-      }
-
-      if (!alreadyTried) {
-        try { sessionStorage.setItem(RELOAD_FLAG_KEY, '1'); } catch { /* ignore */ }
-        window.location.reload();
-        return;
-      }
-    }
-
+    // Once per cooldown window (was once per session, so a second deploy while the app stayed open never healed).
+    if (isChunkLoadError(error) && reloadForStaleChunk()) return;
     console.error('[ChunkLoadBoundary] Caught error:', error);
   }
 

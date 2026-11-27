@@ -10,17 +10,19 @@ import {
   useIcebreakerAvailable,
   useIcebreakerQuota,
 } from '@/services/icebreaker';
-import { icebreakerAction } from '@/utils/icebreaker';
-import { ChancesPill } from './ChancesPill';
+import { chancesDisplay, icebreakerAction } from '@/utils/icebreaker';
+import { useChances } from './useChances';
 import { getIcebreakerHandlers, openIcebreaker, type IcebreakerTarget } from './store';
 import './icebreaker.css';
 
 interface Props {
   target: IcebreakerTarget;
-  /** 'card' = the big call to action inside the Break the ice card; 'pill' = compact, floats on a photo caption. */
-  variant: 'card' | 'pill';
   isOwnProfile?: boolean;
   className?: string;
+  /** Render even when the backend migration isn't applied yet (the popup then runs in copy mode). */
+  alwaysShow?: boolean;
+  /** Smaller, centred pill for use inside a card (instead of a full-width bar). */
+  compact?: boolean;
 }
 
 /**
@@ -28,10 +30,11 @@ interface Props {
  * upgrade / hidden) from the shared status + quota, and hides itself completely when the backend
  * migration isn't applied yet.
  */
-export const IcebreakerButton: React.FC<Props> = ({ target, variant, isOwnProfile, className }) => {
+export const IcebreakerButton: React.FC<Props> = ({ target, isOwnProfile, className, alwaysShow, compact }) => {
   const { t } = useTranslation();
   const available = useIcebreakerAvailable();
   const quota = useIcebreakerQuota();
+  const shown = useChances();
   const status = useSyncExternalStore(
     subscribeStatus,
     () => getCachedStatus(target.id),
@@ -45,7 +48,7 @@ export const IcebreakerButton: React.FC<Props> = ({ target, variant, isOwnProfil
   }, [target.id, isOwnProfile, available]);
 
   const action = icebreakerAction({
-    available,
+    available: alwaysShow ? true : available,
     isOwnProfile,
     matched: !!status?.matched,
     pending: !!status?.pending,
@@ -66,43 +69,36 @@ export const IcebreakerButton: React.FC<Props> = ({ target, variant, isOwnProfil
 
   const label =
     action === 'sent'
-      ? t('icebreaker.sentLabel', 'Icebreaker sent')
+      ? t('icebreaker.sentLabel', 'Hi sent')
       : action === 'say_hi'
         ? t('icebreaker.sayHi', 'Say hi')
-        : t('icebreaker.title', 'Break the ice');
+        : t('icebreaker.sheet.send', 'Say hi first');
+  const d = chancesDisplay(shown);
+  const badgeCount = action === 'sent' || action === 'say_hi' ? null : d.kind === 'left' ? d.count : d.kind === 'none' ? 0 : null;
+  const badge =
+    badgeCount === null ? null : (
+      <span className="ice-badge" data-empty={badgeCount === 0 ? 'true' : undefined} role="status" aria-label={t('icebreaker.chances.left', { count: badgeCount, defaultValue_one: '{{count}} chance left', defaultValue_other: '{{count}} chances left' })}>
+        {badgeCount}
+      </span>
+    );
   const Icon = action === 'sent' ? Check : action === 'upgrade' ? Lock : MessageCircleHeart;
 
-  if (variant === 'pill') {
-    return (
-      <Button
-        variant="overlay"
-        size="sm"
-        className={`ice-pill ${action === 'sent' ? 'ice-pill-sent' : ''} ${className || ''}`}
-        onClick={onClick}
-        onPointerDown={stop}
-        onTouchStart={stop}
-        disabled={action === 'sent'}
-        aria-label={label}
-      >
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        <span>{label}</span>
-      </Button>
-    );
-  }
-
   return (
-    <div className={`ice-cta ${className || ''}`} onPointerDown={stop} onTouchStart={stop}>
-      <Button
-        variant={action === 'sent' ? 'soft' : 'primary'}
-        size="lg"
-        className="w-full"
-        onClick={onClick}
-        disabled={action === 'sent'}
-      >
-        <Icon className="h-5 w-5" aria-hidden="true" />
-        <span>{label}</span>
-      </Button>
-      {action !== 'sent' && <ChancesPill quota={quota} />}
+    <div className={`ice-cta ${className || ''}`} data-compact={compact ? 'true' : undefined} onPointerDown={stop} onTouchStart={stop}>
+      <div className="ice-wrap">
+        <Button
+          variant={action === 'sent' ? 'soft' : 'primary'}
+          size={compact ? 'sm' : 'lg'}
+          className={compact ? 'h-10 px-5 text-[15px] font-semibold [&_svg]:size-4' : 'w-full'}
+          style={compact ? { minHeight: 0 } : undefined}
+          onClick={onClick}
+          disabled={action === 'sent'}
+        >
+          <Icon className={compact ? 'h-4 w-4' : 'h-5 w-5'} aria-hidden="true" />
+          <span>{label}</span>
+        </Button>
+        {badge}
+      </div>
     </div>
   );
 };

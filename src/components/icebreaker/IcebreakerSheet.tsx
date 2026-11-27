@@ -1,16 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Lock, MessageCircleHeart } from 'lucide-react';
+import { Check, Lock, MessageCircleHeart, Shuffle } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useBackClose } from '@/utils/backStack';
-import { getCachedStatus, isIcebreakerPreview, loadQuota, sendIcebreaker, useIcebreakerQuota } from '@/services/icebreaker';
+import { getCachedStatus, loadQuota, sendIcebreaker, useIcebreakerAvailable, useIcebreakerQuota } from '@/services/icebreaker';
+import { copyToClipboard } from '@/utils/copyToClipboard';
 import { ChancesPill } from './ChancesPill';
+import { useChances } from './useChances';
 import {
   ICEBREAKER_MAX_LEN,
   icebreakerDraftState,
   openerLines,
+  freestyleLines,
   sanitizeIcebreaker,
   sendErrorKey,
 } from '@/utils/icebreaker';
@@ -55,7 +58,13 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
     () => (key: string, fallback: string, options?: Record<string, unknown>) => t(key, { defaultValue: fallback, ...(options || {}) }) as string,
     [t]
   );
-  const openers = useMemo(() => openerLines(target.starters, target.name, tr), [target.starters, target.name, tr]);
+  // "more ideas": 0 = the personal + free-style mix for this person, then rounds of free-style lines
+  const [round, setRound] = useState(0);
+  const openers = useMemo(
+    () => (round === 0 ? openerLines(target.starters, target.name, tr) : freestyleLines(3, round - 1, target.name, tr)),
+    [round, target.starters, target.name, tr]
+  );
+  const shownQuota = useChances();
 
   const [text, setText] = useState(target.prefill || '');
   const [mode, setMode] = useState<Mode>('compose');
@@ -65,6 +74,9 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const draft = icebreakerDraftState(text);
+  // Backend not applied yet: the popup still works as a message helper - "Copy message" instead of Send.
+  const unavailable = useIcebreakerAvailable() === false;
+  const [copied, setCopied] = useState(false);
 
   // A fresh quota when the sheet opens; if it is already used up, go straight to the upsell.
   useEffect(() => {
@@ -116,6 +128,12 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
 
   const send = async () => {
     if (sending || !draft.canSend) return;
+    if (unavailable) {
+      const ok = await copyToClipboard(sanitizeIcebreaker(text));
+      setCopied(ok);
+      if (ok) window.setTimeout(() => setCopied(false), 2200);
+      return;
+    }
     setSending(true);
     setError(null);
     const res = await sendIcebreaker(target.id, sanitizeIcebreaker(text));
@@ -174,25 +192,17 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
         <div className="ice-grab" aria-hidden="true" />
         <SheetTitle className="sr-only">{t('icebreaker.title', 'Break the ice')}</SheetTitle>
         <SheetDescription id="ice-sheet-desc" className="sr-only">
-          {t('icebreaker.sheet.hint', "They'll see this first. If they accept, you match and can keep chatting.")}
+          {t('icebreaker.sheet.title', 'Be the first to say hi')}
         </SheetDescription>
 
         {mode === 'compose' && (
-          <div className="ice-body">
-            <header className="ice-head">
-              <Avatar name={name} photoUrl={target.photoUrl} size={48} />
-              <div className="ice-head-text">
-                <p className="ice-eyebrow">{t('icebreaker.title', 'Break the ice')}</p>
-                <h2 className="ice-to" dir="auto">
-                  {t('icebreaker.sheet.title', 'Send your first message to {{name}}', { name })}
-                </h2>
-              </div>
-            </header>
-            <div className="ice-chances">
-              <ChancesPill quota={quota} />
+          <div className="ice-body ice-lean">
+            <div className="ice-top">
+              <h2 className="ice-to" dir="auto">
+                {t('icebreaker.sheet.title', 'Be the first to say hi')}
+              </h2>
+              <ChancesPill quota={shownQuota} />
             </div>
-            <p className="ice-hint">{t('icebreaker.sheet.hint', "They'll see it first. If they accept, you match and can keep chatting.")}</p>
-            {isIcebreakerPreview() && <p className="ice-preview-note">Preview mode - nothing is really sent</p>}
 
             <div className="ice-openers" role="group" aria-label={t('icebreaker.sheet.ideas', 'Need an idea?')}>
               {openers.map((line) => (
@@ -207,6 +217,9 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
                   {line}
                 </button>
               ))}
+              <button type="button" className="ice-more dl-focus dl-press" aria-label={t('icebreaker.sheet.more', 'More ideas')} onClick={() => setRound((r) => r + 1)}>
+                <Shuffle aria-hidden="true" />
+              </button>
             </div>
 
             <div className="ice-field">
@@ -221,8 +234,8 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
                 }}
                 rows={3}
                 maxLength={ICEBREAKER_MAX_LEN}
-                placeholder={t('icebreaker.sheet.placeholder', 'Write a friendly first message…')}
-                aria-label={t('icebreaker.sheet.placeholder', 'Write a friendly first message…')}
+                placeholder={t('icebreaker.sheet.placeholder', 'Say something sweet…')}
+                aria-label={t('icebreaker.sheet.placeholder', 'Say something sweet…')}
                 aria-invalid={error ? true : undefined}
                 className="ice-textarea"
               />
@@ -237,9 +250,8 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
 
             <Button variant="primary" size="lg" className="w-full" loading={sending} disabled={!draft.canSend} onClick={send}>
               <MessageCircleHeart className="h-5 w-5" aria-hidden="true" />
-              <span>{sending ? t('icebreaker.sheet.sending', 'Sending…') : t('icebreaker.sheet.send', 'Send icebreaker')}</span>
+              <span>{sending ? t('icebreaker.sheet.sending', 'Sending…') : unavailable && copied ? t('icebreaker.copied', 'Copied') : t('icebreaker.sheet.send', 'Say hi first')}</span>
             </Button>
-            <p className="ice-hint">{t('icebreaker.sheet.safety', 'They choose whether to accept. Be kind - you can always report or block.')}</p>
           </div>
         )}
 
