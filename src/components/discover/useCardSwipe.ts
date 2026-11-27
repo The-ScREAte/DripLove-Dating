@@ -104,6 +104,14 @@ function setStamp(el: HTMLElement | null | undefined, look: { opacity: number; t
   }
 }
 
+function lockStampEl(on: HTMLElement | null | undefined, off: HTMLElement | null | undefined, dir: SwipeDir) {
+  setStamp(off, null);
+  if (!on) return;
+  on.style.transition = 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease-out';
+  on.style.opacity = '1';
+  on.style.transform = `scale(1.3) rotate(${dir === 'right' ? 8 : -8}deg)`;
+}
+
 function prefersReducedMotion(): boolean {
   if (typeof document === 'undefined') return false;
   if (document.documentElement.dataset.motion === 'reduced') return true;
@@ -239,8 +247,17 @@ export function useCardSwipe(options: Options) {
 
   const resetStamps = useCallback(() => {
     const o = opts.current;
+    for (const el of [o.likeStampRef?.current, o.passStampRef?.current]) {
+      if (el) el.style.transition = 'none';
+    }
     setStamp(o.likeStampRef?.current, null);
     setStamp(o.passStampRef?.current, null);
+  }, []);
+
+  /** While the card falls, the decision stays on it at full strength (heart = like, X = pass) so it is always clear what was chosen. */
+  const lockStamp = useCallback((dir: SwipeDir) => {
+    const o = opts.current;
+    lockStampEl(dir === 'right' ? o.likeStampRef?.current : o.passStampRef?.current, dir === 'right' ? o.passStampRef?.current : o.likeStampRef?.current, dir);
   }, []);
 
   /** Fly the card away in `dir`, then hand the decision to the page. */
@@ -259,7 +276,7 @@ export function useCardSwipe(options: Options) {
       card.style.transform = exitTransform(dir, window.innerWidth, window.innerHeight, reduced);
       if (reduced) card.style.opacity = '0';
     }
-    resetStamps();
+    lockStamp(dir);
     o.onExitStart(dir);
     exitTimer.current = window.setTimeout(() => {
       exitTimer.current = null;
@@ -277,6 +294,7 @@ export function useCardSwipe(options: Options) {
       // Reset the (reused) card in place so the next profile appears without
       // flying in from off-screen.
       const c = cur.cardRef.current;
+      resetStamps();
       if (c) {
         c.style.transition = 'none';
         c.style.transform = CARD_REST_TRANSFORM;
@@ -285,7 +303,7 @@ export function useCardSwipe(options: Options) {
       cur.onExitEnd();
       exiting.current = false;
     }, ms);
-  }, [resetStamps]);
+  }, [resetStamps, lockStamp]);
 
   /**
    * With `holdAfterCommit`: the parent has swapped in the next card - put the (reused) element back at
@@ -300,6 +318,7 @@ export function useCardSwipe(options: Options) {
     }
     const cur = opts.current;
     const c = cur.cardRef.current;
+    resetStamps();
     if (c) {
       c.style.transition = 'none';
       c.style.transform = CARD_REST_TRANSFORM;
@@ -310,7 +329,7 @@ export function useCardSwipe(options: Options) {
     }
     cur.onExitEnd();
     exiting.current = false;
-  }, []);
+  }, [resetStamps]);
 
   /** Bring a held (flown-away) card back to rest - used when the parent did not advance. */
   const restore = useCallback(() => {
@@ -320,6 +339,7 @@ export function useCardSwipe(options: Options) {
     }
     const o = opts.current;
     const c = o.cardRef.current;
+    resetStamps();
     if (c) {
       c.style.transition = `transform 0.35s ${EASE_OUT}, opacity 0.2s ease-out`;
       c.style.transform = CARD_REST_TRANSFORM;
@@ -327,7 +347,7 @@ export function useCardSwipe(options: Options) {
     }
     o.onExitEnd();
     exiting.current = false;
-  }, []);
+  }, [resetStamps]);
   useLayoutEffect(() => {
     restoreRef.current = restore;
     return () => {

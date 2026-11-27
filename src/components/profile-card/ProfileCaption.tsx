@@ -45,6 +45,11 @@ export interface ProfileCaptionProps {
  * photo, with the expand-details control. One component for Discover, Liked
  * Me and the preview so every screen shows the same header.
  */
+/** Eased (smootherstep) scrim under the caption: many small steps instead of 4 hard ones, so there are no visible
+ *  bands/lines where the photo turns dark, and it feathers out gently over the full height of the caption. */
+const CAPTION_SCRIM =
+  'linear-gradient(to bottom, rgba(0,0,0,0.000) 0.0%, rgba(0,0,0,0.003) 5.0%, rgba(0,0,0,0.021) 10.0%, rgba(0,0,0,0.063) 15.0%, rgba(0,0,0,0.130) 20.0%, rgba(0,0,0,0.222) 25.0%, rgba(0,0,0,0.331) 30.0%, rgba(0,0,0,0.450) 35.0%, rgba(0,0,0,0.569) 40.0%, rgba(0,0,0,0.678) 45.0%, rgba(0,0,0,0.770) 50.0%, rgba(0,0,0,0.837) 55.0%, rgba(0,0,0,0.879) 60.0%, rgba(0,0,0,0.897) 65.0%, rgba(0,0,0,0.900) 70.0%, rgba(0,0,0,0.9) 100%)';
+
 export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
   name,
   age,
@@ -79,10 +84,7 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
   return (
     <div
       className={`dl-caption-pad absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}${animateIn ? ' dl-card-fade-now' : ''}`}
-      style={{
-        background:
-          'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
-      }}
+      style={{ background: CAPTION_SCRIM }}
     >
       <div className={`flex items-start justify-between gap-1${animateIn ? ' dl-card-enter' : ''}`}>
         <div className="min-w-0 flex-1 pr-11">
