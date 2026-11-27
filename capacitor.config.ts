@@ -14,7 +14,9 @@ const config: CapacitorConfig = {
     hostname: 'www.driplove.love',
     androidScheme: 'https',
     iosScheme: 'https',
-    cleartext: true,
+    // HTTPS only in production (the WebView serves the bundled app over https://www.driplove.love via
+    // Capacitor's local server; nothing needs cleartext HTTP). No server.url / live-reload is used.
+    cleartext: false,
     // Performance optimizations
     allowNavigation: [
       'https://*.supabase.co',
@@ -50,7 +52,7 @@ const config: CapacitorConfig = {
     backgroundColor: '#00000000'
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
     // Performance optimizations for Android WebView
@@ -62,14 +64,14 @@ const config: CapacitorConfig = {
     useLegacyBridge: false,
     // Improve scrolling performance
     overscrollHistoryNavigation: false,
-    // Optimize for modern Android (SDK 26+)
-    mixedContentMode: 0,
     // Enhanced Android WebView performance settings
     loggingBehavior: 'none',
     // Enable WebView cache and storage for better performance
     appendUserAgent: 'DripLove-Android',
     // Additional performance optimizations
-    minWebViewVersion: '92.0.0.0' // Require modern WebView for better performance
+    // Capacitor reads this with JSONUtils.getInt, so it must be a number (a string like '92.0.0.0' is ignored
+    // and falls back to the default of 60).
+    minWebViewVersion: 92 // Require a modern WebView (Chrome 92+) for performance and CSS/JS support
   },
   plugins: {
     GoogleAuth: {

@@ -215,9 +215,8 @@ const EmailConfirmPage = () => {
               <p className="text-sm text-gray-600">
                 Redirecting you to login in a few seconds...
               </p>
-              <Button 
+              <Button variant="primary" size="md" className="w-full" 
                 onClick={() => navigate('/?login=true')}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
               >
                 Continue to Login
               </Button>
@@ -226,16 +225,13 @@ const EmailConfirmPage = () => {
 
           {(status === 'error' || status === 'already_confirmed') && (
             <div className="space-y-4">
-              <Button 
+              <Button variant="primary" size="md" className="w-full" 
                 onClick={() => navigate('/?login=true')}
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
               >
                 Go to Login
               </Button>
-              <Button 
-                variant="outline"
+              <Button variant="line" size="md" className="w-full"
                 onClick={() => navigate('/')}
-                className="w-full"
               >
                 Back to Home
               </Button>

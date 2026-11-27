@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Chip } from '@/components/ui/chip';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -567,10 +568,9 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
         <p className="text-xs text-white/60 max-w-xs mx-auto">
           Get access to millions of users on DripLove all over the world and reach a larger, specific audience.
         </p>
-        <Button
+        <Button variant="primary" size="md"
           type="button"
           onClick={() => setShowOnboardingForm(true)}
-          className="bg-pink-600 hover:bg-pink-700 text-white"
         >
           Advertise Now
         </Button>
@@ -623,23 +623,23 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
       <form onSubmit={handleContinueToPayment} className="space-y-4">
         <div>
           <Label className="block text-sm font-medium mb-2 text-white">Business / Company Name</Label>
-          <Input
+          <Input tone="dark"
             value={onboardingForm.businessName}
             onChange={(e) => setOnboardingForm(prev => ({ ...prev, businessName: e.target.value }))}
             placeholder="e.g. Meetup Events Ltd"
-            className="bg-black border-pink-500/30 text-white"
+           
             required
           />
         </div>
 
         <div>
           <Label className="block text-sm font-medium mb-2 text-white">Contact Email</Label>
-          <Input
+          <Input tone="dark"
             type="email"
             value={onboardingForm.contactEmail}
             onChange={(e) => setOnboardingForm(prev => ({ ...prev, contactEmail: e.target.value }))}
             placeholder="you@business.com"
-            className="bg-black border-pink-500/30 text-white"
+           
             required
           />
         </div>
@@ -651,7 +651,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
               value={onboardingForm.contactCountryCode}
               onValueChange={(value) => setOnboardingForm(prev => ({ ...prev, contactCountryCode: value }))}
             >
-              <SelectTrigger className="w-32 bg-black border-pink-500/30 text-white">
+              <SelectTrigger tone="dark" className="w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-black border-pink-500/30 max-h-72">
@@ -662,22 +662,22 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                 ))}
               </SelectContent>
             </Select>
-            <Input
+            <Input tone="dark"
               type="tel"
               value={onboardingForm.contactPhone}
               onChange={(e) => setOnboardingForm(prev => ({ ...prev, contactPhone: e.target.value }))}
               placeholder="Phone number"
-              className="flex-1 bg-black border-pink-500/30 text-white"
+              className="flex-1"
               required
             />
           </div>
         </div>
 
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => setShowOnboardingForm(false)} className="flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+          <Button variant="line" size="md" className="text-white flex-1" type="button" onClick={() => setShowOnboardingForm(false)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={loadingPayment} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white">
+          <Button variant="primary" size="md" className="flex-1" type="submit" disabled={loadingPayment}>
             {loadingPayment ? 'Loading...' : 'Continue'}
           </Button>
         </div>
@@ -689,19 +689,19 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
     return (
       <div className="space-y-4">
         <div className="flex gap-2">
-          <Button
+          <Button variant={advertiserSection === 'ads' ? 'primary' : 'line'} size="md" className="flex-1 text-white"
             type="button"
-            variant={advertiserSection === 'ads' ? 'default' : 'outline'}
+           
             onClick={() => setAdvertiserSection('ads')}
-            className={advertiserSection === 'ads' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+           
           >
             Add Ads
           </Button>
-          <Button
+          <Button variant={advertiserSection === 'payment' ? 'primary' : 'line'} size="md" className="flex-1 text-white"
             type="button"
-            variant={advertiserSection === 'payment' ? 'default' : 'outline'}
+           
             onClick={() => setAdvertiserSection('payment')}
-            className={advertiserSection === 'payment' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+           
           >
             <CreditCard className="w-4 h-4 mr-1.5" />
             Payment
@@ -740,19 +740,19 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
     <>
       <div className="space-y-4">
         <div className="flex gap-2">
-          <Button
+          <Button variant={advertiserSection === 'ads' ? 'primary' : 'line'} size="md" className="flex-1 text-white"
             type="button"
-            variant={advertiserSection === 'ads' ? 'default' : 'outline'}
+           
             onClick={() => setAdvertiserSection('ads')}
-            className={advertiserSection === 'ads' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+           
           >
             Add Ads
           </Button>
-          <Button
+          <Button variant={advertiserSection === 'payment' ? 'primary' : 'line'} size="md" className="flex-1 text-white"
             type="button"
-            variant={advertiserSection === 'payment' ? 'default' : 'outline'}
+           
             onClick={() => setAdvertiserSection('payment')}
-            className={advertiserSection === 'payment' ? 'flex-1 bg-pink-600 hover:bg-pink-700 text-white' : 'flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white'}
+           
           >
             <CreditCard className="w-4 h-4 mr-1.5" />
             Payment
@@ -768,7 +768,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
             onOpenChange={(open) => { setShowCreateForm(open); if (!open) resetForm(); }}
           >
             <CollapsibleTrigger asChild>
-              <Button type="button" variant="outline" className="w-full justify-between bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+              <Button variant="line" size="md" className="text-white w-full justify-between" type="button">
                 <span className="text-sm font-semibold">{editingAdId ? 'Edit Ad' : 'Create Ad'}</span>
                 {showCreateForm ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </Button>
@@ -782,11 +782,11 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
 
                 <div>
                   <Label className="block text-sm font-medium mb-2 text-white">Title</Label>
-                  <Input
+                  <Input tone="dark"
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter ad title"
-                    className="bg-black border-pink-500/30 text-white"
+                   
                     required
                   />
                 </div>
@@ -798,12 +798,12 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                       {countWords(formData.about)}/{MAX_ABOUT} words
                     </span>
                   </div>
-                  <Textarea
+                  <Textarea tone="dark"
                     value={formData.about}
                     onChange={(e) => setFormData(prev => ({ ...prev, about: limitWords(e.target.value, MAX_ABOUT) }))}
                     placeholder="A short, one or two sentence description"
                     rows={3}
-                    className="bg-black border-pink-500/30 text-white"
+                   
                     required
                   />
                 </div>
@@ -814,7 +814,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     value={formData.media_type}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, media_type: value }))}
                   >
-                    <SelectTrigger className="bg-black border-pink-500/30 text-white">
+                    <SelectTrigger tone="dark">
                       <SelectValue placeholder="Select media type" />
                     </SelectTrigger>
                     <SelectContent className="bg-black border-pink-500/30">
@@ -832,12 +832,12 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                   <div>
                     <Label className="block text-sm font-medium mb-2 text-white">Image</Label>
                     <div className="flex items-center gap-3">
-                      <Input
+                      <Input tone="dark"
                         type="file"
                         accept="image/*"
                         onChange={handleImageFilePicked}
                         disabled={uploading}
-                        className="flex-1 bg-black border-pink-500/30 text-white file:text-white"
+                        className="flex-1 file:text-white"
                       />
                       {formData.image_url && (
                         <img
@@ -854,23 +854,23 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                 {formData.media_type === 'video' && (
                   <div>
                     <Label className="block text-sm font-medium mb-2 text-white">Video (max 50MB)</Label>
-                    <Input
+                    <Input tone="dark"
                       type="file"
                       accept="video/*"
                       onChange={handleVideoUpload}
                       disabled={uploading}
-                      className="bg-black border-pink-500/30 text-white file:text-white"
+                      className="file:text-white"
                     />
                   </div>
                 )}
 
                 <div>
                   <Label className="block text-sm font-medium mb-2 text-white">Link (Optional)</Label>
-                  <Input
+                  <Input tone="dark"
                     value={formData.link}
                     onChange={(e) => setFormData(prev => ({ ...prev, link: e.target.value }))}
                     placeholder="e.g. www.example.com"
-                    className="bg-black border-pink-500/30 text-white"
+                   
                   />
                   <p className="text-xs text-white/60 mt-1">https:// is added automatically if you leave it off.</p>
                 </div>
@@ -881,7 +881,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     value={formData.link_as}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, link_as: value }))}
                   >
-                    <SelectTrigger className="bg-black border-pink-500/30 text-white">
+                    <SelectTrigger tone="dark">
                       <SelectValue placeholder="Select display text" />
                     </SelectTrigger>
                     <SelectContent className="bg-black border-pink-500/30">
@@ -928,7 +928,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                   </div>
                 )}
 
-                <Button type="submit" disabled={loading || uploading} className="w-full bg-pink-600 hover:bg-pink-700 text-white">
+                <Button variant="primary" size="md" className="w-full" type="submit" disabled={loading || uploading}>
                   {loading ? 'Saving...' : editingAdId ? 'Save Changes' : 'Continue'}
                 </Button>
               </form>
@@ -943,25 +943,23 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     <Label className="block text-sm font-medium mb-2 text-white">1. How much do you want to spend per day?</Label>
                     <div className="flex flex-wrap gap-2">
                       {BUDGET_PRESETS.map((amount) => (
-                        <button
+                        <Chip selected={Number(formData.budgetPerDay) === amount}
                           key={amount}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, budgetPerDay: String(amount) }))}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
-                            Number(formData.budgetPerDay) === amount ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'
-                          }`}
+                         
                         >
                           ${amount}/day
-                        </button>
+                        </Chip>
                       ))}
                     </div>
-                    <Input
+                    <Input tone="dark"
                       type="number"
                       min={1}
                       value={formData.budgetPerDay}
                       onChange={(e) => setFormData(prev => ({ ...prev, budgetPerDay: e.target.value }))}
                       placeholder="Custom amount"
-                      className="mt-2 bg-black border-pink-500/30 text-white"
+                      className="mt-2"
                     />
                   </div>
 
@@ -969,25 +967,23 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                     <Label className="block text-sm font-medium mb-2 text-white">2. How long do you want to advertise? (target, not a cutoff)</Label>
                     <div className="flex flex-wrap gap-2">
                       {DURATION_PRESETS.map((days) => (
-                        <button
+                        <Chip selected={Number(formData.durationDays) === days}
                           key={days}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, durationDays: String(days) }))}
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border ${
-                            Number(formData.durationDays) === days ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'
-                          }`}
+                         
                         >
                           {days} {days === 1 ? 'day' : 'days'}
-                        </button>
+                        </Chip>
                       ))}
                     </div>
-                    <Input
+                    <Input tone="dark"
                       type="number"
                       min={1}
                       value={formData.durationDays}
                       onChange={(e) => setFormData(prev => ({ ...prev, durationDays: e.target.value }))}
                       placeholder="Custom days"
-                      className="mt-2 bg-black border-pink-500/30 text-white"
+                      className="mt-2"
                     />
                   </div>
 
@@ -1015,38 +1011,38 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                       })}
                     </div>
                     <div className="flex gap-2 mb-3">
-                      <Input
+                      <Input tone="dark"
                         type="number"
                         min={13}
                         value={formData.targetAgeMin}
                         onChange={(e) => setFormData(prev => ({ ...prev, targetAgeMin: e.target.value }))}
                         placeholder="Min age"
-                        className="bg-black border-pink-500/30 text-white"
+                       
                       />
-                      <Input
+                      <Input tone="dark"
                         type="number"
                         min={13}
                         value={formData.targetAgeMax}
                         onChange={(e) => setFormData(prev => ({ ...prev, targetAgeMax: e.target.value }))}
                         placeholder="Max age"
-                        className="bg-black border-pink-500/30 text-white"
+                       
                       />
                     </div>
                     <div className="flex gap-2">
                       {GENDER_OPTIONS.map((gender) => {
                         const isSelected = formData.targetGenders.includes(gender);
                         return (
-                          <button
+                          <Chip selected={isSelected}
                             key={gender}
                             type="button"
                             onClick={() => setFormData(prev => ({
                               ...prev,
                               targetGenders: isSelected ? prev.targetGenders.filter(g => g !== gender) : [...prev.targetGenders, gender],
                             }))}
-                            className={`px-3 py-1.5 rounded-full text-sm font-medium border ${isSelected ? 'bg-pink-600 border-pink-600 text-white' : 'border-pink-500/30 text-white/80 hover:bg-pink-500/10'}`}
+                           
                           >
                             {gender}
-                          </button>
+                          </Chip>
                         );
                       })}
                     </div>
@@ -1096,10 +1092,10 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                   })()}
 
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => setAdStep('content')} disabled={launchingCampaign} className="flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+                    <Button variant="line" size="md" className="text-white flex-1" type="button" onClick={() => setAdStep('content')} disabled={launchingCampaign}>
                       Back
                     </Button>
-                    <Button type="button" onClick={handleLaunchCampaign} disabled={launchingCampaign} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white">
+                    <Button variant="primary" size="md" className="flex-1" type="button" onClick={handleLaunchCampaign} disabled={launchingCampaign}>
                       {launchingCampaign ? 'Launching...' : 'Launch Campaign'}
                     </Button>
                   </div>
@@ -1122,7 +1118,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                   const spentSoFar = computeSpentSoFar(ad);
                   const progress = computeDeliveryProgress(ad);
                   return (
-                  <Card key={ad.id} className="bg-black border-pink-500/20">
+                  <Card variant="surface" key={ad.id}>
                     <CardContent className="pt-3 pb-3">
                       <div
                         className={`flex gap-3 ${hasCampaign ? 'cursor-pointer' : ''}`}
@@ -1163,13 +1159,13 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
                             </div>
                           )}
                           <div className="flex gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="outline" size="icon" onClick={() => setPreviewAd(ad)} title="Preview ad" className="h-8 w-8 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+                            <Button variant="line" size="iconSm" className="text-white" onClick={() => setPreviewAd(ad)} title="Preview ad">
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="outline" size="icon" onClick={() => handleEditAd(ad)} title="Edit ad" className="h-8 w-8 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+                            <Button variant="line" size="iconSm" className="text-white" onClick={() => handleEditAd(ad)} title="Edit ad">
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="destructive" size="icon" onClick={() => handleDelete(ad.id)} title="Delete ad" className="h-8 w-8">
+                            <Button variant="danger" size="iconSm" onClick={() => handleDelete(ad.id)} title="Delete ad">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>

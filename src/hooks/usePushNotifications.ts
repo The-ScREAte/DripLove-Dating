@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import {
   initializePushNotifications, 
-  sendPushNotification, 
-  requestNotificationPermission,
+  sendPushNotification,
   markNotificationRead,
   getUnreadNotifications,
   cleanupPushNotifications,

@@ -47,15 +47,15 @@ export const setDistanceUnitCountry = (countryCode: unknown, country?: unknown) 
   }
 };
 
-export const getDistanceUnit = (countryCode?: unknown): DistanceUnit => {
+const getDistanceUnit = (countryCode?: unknown): DistanceUnit => {
   const cc = countryCode ? normalizeCountryCode(String(countryCode)) : readStoredCountry();
   return MILES_COUNTRIES.has(cc) ? 'mi' : 'km';
 };
 
 export const getDistanceUnitLabel = (countryCode?: unknown): string => getDistanceUnit(countryCode);
 
-export const kmToMiles = (km: number): number => km / KM_PER_MILE;
-export const milesToKm = (mi: number): number => mi * KM_PER_MILE;
+const kmToMiles = (km: number): number => km / KM_PER_MILE;
+const milesToKm = (mi: number): number => mi * KM_PER_MILE;
 
 /** Convert a stored km value into the viewer's display unit (rounded). */
 export const toDisplayDistance = (km: number, countryCode?: unknown): number => {

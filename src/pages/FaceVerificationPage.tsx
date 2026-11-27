@@ -76,14 +76,20 @@ export default function FaceVerificationPage() {
 
   return (
     <div className="min-h-screen w-full bg-black relative">
-      <div className="absolute top-4 left-4 z-20">
-        <Button variant="outline" onClick={() => navigate(-1)} className="bg-transparent border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
+      <div
+        className="absolute left-4 z-20"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)', left: 'calc(env(safe-area-inset-left, 0px) + 16px)' }}
+      >
+        <Button variant="line" size="md" className="text-white" onClick={() => navigate(-1)}>
           Back
         </Button>
       </div>
 
       {/* Standalone screen: avoid embedding camera preview in scroll containers */}
-      <div className="min-h-screen w-full flex items-start justify-center px-4 pt-16 pb-8">
+      <div
+        className="min-h-screen w-full flex items-start justify-center px-4"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 64px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)' }}
+      >
         <div className="w-full max-w-md">
           <FaceVerification onVerified={handleVerified} disabled={isIndexing} />
         </div>

@@ -3,12 +3,27 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./motion.css";
+import "./design-tokens.css";
 import "./i18n/config"; // Initialize i18n
 import { supabase } from "./integrations/supabase/client";
 import { clearChatCache } from "./cache/chatCache";
 import HoppingLogo from "./components/HoppingLogo";
 import { getPlatformSync } from "./utils/platformUtils";
 import { ensureNotificationTapListener } from "./services/pushNotifications";
+
+// QA aid for "Break the ice": ?icebreakerPreview=1 turns on a mocked, network-free preview of the send
+// popup (quota of 3 chances, fake successful send) and remembers it; ?icebreakerPreview=0 turns it off.
+// Captured here, before the router can rewrite the URL. Without the flag nothing changes.
+try {
+  const m = /[?&]icebreakerPreview=(0|1)(&|$)/.exec(window.location.search);
+  if (m) {
+    if (m[1] === "1") window.localStorage.setItem("dl_icebreaker_preview", "1");
+    else window.localStorage.removeItem("dl_icebreaker_preview");
+  }
+} catch {
+  /* storage unavailable: preview simply stays off */
+}
 
 // Registers the OS notification-tap listener once, permanently, before
 // React even mounts - deliberately outside any component lifecycle. It used
@@ -26,6 +41,35 @@ ensureNotificationTapListener();
 // this class, even before the Capacitor JS bridge finishes loading.
 if (getPlatformSync() === 'web') {
   document.documentElement.classList.add('platform-web');
+}
+
+// Motion tier, decided once before first paint (see src/motion.css):
+//   reduced = user asked for less motion, Data Saver is on, or the link is 2G/3G
+//   lite    = weak device (<=2GB RAM or <=4 cores): same motion, much shorter
+//   full    = everything else
+try {
+  type NetInfo = { saveData?: boolean; effectiveType?: string };
+  const nav = navigator as Navigator & { deviceMemory?: number; connection?: NetInfo };
+  const conn = nav.connection;
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const slowLink = !!conn && (conn.saveData === true || ['slow-2g', '2g', '3g'].includes(conn.effectiveType ?? ''));
+  const weakDevice =
+    (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 2) ||
+    (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 4);
+  document.documentElement.dataset.motion = reducedMotion || slowLink ? 'reduced' : weakDevice ? 'lite' : 'full';
+
+  // Photo fade-in: <img data-fade> starts transparent and gets .is-loaded on load
+  // (images that never fire load still appear via the CSS fail-safe).
+  document.addEventListener(
+    'load',
+    (event) => {
+      const el = event.target;
+      if (el instanceof HTMLImageElement && el.hasAttribute('data-fade')) el.classList.add('is-loaded');
+    },
+    true,
+  );
+} catch {
+  // Motion is cosmetic - never let detection break startup.
 }
 
 // Suppress non-critical console output in production

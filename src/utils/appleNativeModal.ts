@@ -3,19 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 
 const noopLog = (..._args: unknown[]) => {};
-import { getAppleClientId } from '@/config/oauth';
-
-/**
- * Generate a secure nonce for Apple Sign-In
- */
-function generateNonce(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
 
 /**
  * Native Apple Sign-In Modal (NO Safari, NO Browser, ONLY Modal)
@@ -145,17 +132,4 @@ export async function signInWithAppleNativeModal() {
  */
 export function isAppleSignInAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
-}
-
-/**
- * Fallback for non-iOS platforms - use custom Apple OAuth with Services ID
- */
-export async function signInWithAppleFallback(): Promise<never> {
-  noopLog('🍎 Starting Custom Apple OAuth for Web (Services ID)');
-  
-  // Use our custom Apple OAuth flow that uses the Services ID
-  const { startCustomAppleOAuth } = await import('@/utils/customAppleOAuth');
-  
-  // This will redirect to Apple OAuth (never returns)
-  return await startCustomAppleOAuth();
 }

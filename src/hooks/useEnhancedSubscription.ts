@@ -1,9 +1,11 @@
+import { maybeRequestPaymentIssuePopup } from '@/components/premium/PaymentIssueDialog'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 import { Capacitor } from '@capacitor/core'
 import { readCachedPremiumStatus, writeCachedPremiumStatus, clearCachedPremiumStatus } from '@/utils/premiumStatusCache'
 
+import { isPastGracePeriod } from '@/utils/subscriptionEntitlement'
 interface SubscriptionStatus {
   plan_name: string
   status: string
@@ -11,14 +13,6 @@ interface SubscriptionStatus {
   is_active: boolean
   payment_method?: string
 }
-
-// Mirrors the grace period in get_current_subscription_status
-// (20260926230000_add_grace_period_to_subscription_expiry_check.sql). A
-// blind expires_at <= now() check here had no buffer for Apple/Google's
-// renewal webhook to land, so a user who WAS actually charged successfully
-// could get flipped to free the instant expires_at passed, purely because
-// this client-side check ran before the webhook update arrived.
-const SUBSCRIPTION_GRACE_PERIOD_MS = 30 * 60 * 1000
 
 // Check if we should verify with the native store
 const shouldVerifyWithStore = () => {
@@ -84,7 +78,7 @@ export function useEnhancedSubscription() {
       // If DB says premium but store says not owned - subscription may have expired/been cancelled
       if (dbSubscription?.plan_name === 'premium' && dbSubscription?.status === 'active' && !hasActiveStoreSubscription) {
         // Check expiry date as final confirmation
-        if (dbSubscription.expires_at && new Date(dbSubscription.expires_at).getTime() <= Date.now() - SUBSCRIPTION_GRACE_PERIOD_MS) {
+        if (isPastGracePeriod(dbSubscription.expires_at)) {
           await supabase
             .from('user_subscriptions')
             .update({
@@ -153,7 +147,7 @@ export function useEnhancedSubscription() {
         // Grace period matters here specifically: a renewal webhook landing
         // even a few seconds after expires_at shouldn't cost the user a
         // visible block in the meantime.
-        const isExpired = quickCheck.expires_at && new Date(quickCheck.expires_at).getTime() <= Date.now() - SUBSCRIPTION_GRACE_PERIOD_MS
+        const isExpired = isPastGracePeriod(quickCheck.expires_at)
         
         if (isExpired) {
           // Subscription has expired - update the database and set to free
@@ -226,6 +220,8 @@ export function useEnhancedSubscription() {
         const status = data[0]
         // Update with the comprehensive result
         setSubscriptionStatus(status)
+        // A failed store renewal (billing retry) deserves one clear heads-up; the popup coordinator decides when.
+        maybeRequestPaymentIssuePopup(status)
         // Confirmed answer - remember it for the optimistic seed above, or
         // drop it entirely the moment it's no longer premium.
         const isPremiumNow = status.plan_name === 'premium' && !!status.is_active

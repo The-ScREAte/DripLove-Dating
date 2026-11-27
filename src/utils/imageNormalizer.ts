@@ -4,7 +4,7 @@
  * NOT reliable for HEIC/HEIF: most non-Safari engines (Chrome, Android
  * WebView) have no native HEIC decoder, so createImageBitmap throws on it.
  */
-export async function normalizeToJpeg(file: File): Promise<File> {
+async function normalizeToJpeg(file: File): Promise<File> {
   const bitmap = await createImageBitmap(file);
 
   const canvas = document.createElement('canvas');
@@ -49,7 +49,7 @@ const isHeic = (file: File): boolean =>
 const RAW_EXTENSIONS = ['cr2', 'cr3', 'crw', 'nef', 'nrw', 'arw', 'srf', 'sr2', 'dng', 'raf', 'orf', 'rw2', 'rwl', 'pef', 'srw', '3fr', 'erf', 'kdc', 'mrw', 'x3f', 'iiq'];
 const RAW_EXTENSION_RE = new RegExp(`\\.(${RAW_EXTENSIONS.join('|')})$`, 'i');
 
-export const isCameraRaw = (file: File): boolean =>
+const isCameraRaw = (file: File): boolean =>
   RAW_EXTENSION_RE.test(file.name) || /x-(canon|nikon|sony|adobe-dng|fuji|olympus|panasonic|pentax|samsung)/i.test(file.type);
 
 /** Any photo the upload pipeline can turn into a JPEG. */

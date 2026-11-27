@@ -1,0 +1,30 @@
+/* Rate card - animated stars. Opacity/transform only; off for reduced motion. */
+@keyframes dl-star-pop {
+  0% { opacity: 0; transform: scale(0.4) rotate(-18deg); }
+  60% { opacity: 1; transform: scale(1.22) rotate(6deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes dl-star-twinkle {
+  0%, 70%, 100% { transform: scale(1); filter: brightness(1); }
+  80% { transform: scale(1.18); filter: brightness(1.35); }
+}
+.dl-rate-star {
+  display: inline-flex;
+  animation:
+    dl-star-pop 520ms var(--dl-ease-out, cubic-bezier(.22, 1, .36, 1)) backwards,
+    dl-star-twinkle 3.6s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 90ms), calc(1.2s + var(--i, 0) * 260ms);
+}
+.dl-rate-glow {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(236, 72, 153, 0.22), rgba(236, 72, 153, 0) 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+html[data-motion="reduced"] .dl-rate-star,
+html[data-motion="lite"] .dl-rate-star {
+  animation: dl-star-pop 240ms ease-out backwards;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-rate-star { animation: none; }
+}

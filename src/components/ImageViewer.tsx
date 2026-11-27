@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, CarouselApi } from '@/components/ui/carousel';
 
 interface ImageViewerProps {
@@ -45,11 +45,8 @@ const ImageViewer = ({ isOpen, onClose, images, initialIndex = 0 }: ImageViewerP
       <DialogContent className="max-w-4xl max-h-[90dvh] p-0 bg-black/95 overflow-hidden">
         <div className="relative w-full h-full overflow-hidden">
           {/* Close button */}
-          <Button
+          <Button variant="quiet" size="sm" className="text-white absolute top-4 right-4 z-50"
             onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="absolute top-4 right-4 z-50 text-white hover:bg-white/20"
           >
             <X className="w-5 h-5" />
           </Button>

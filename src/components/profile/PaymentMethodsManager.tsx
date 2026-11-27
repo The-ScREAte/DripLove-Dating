@@ -144,13 +144,10 @@ const PaymentMethodsManager: React.FC = () => {
                   )}
                 </div>
               </div>
-              <Button
-                variant="destructive"
-                size="icon"
+              <Button variant="danger" size="iconSm" className="shrink-0"
                 onClick={() => handleRemove(card.id)}
                 disabled={removingId === card.id || cards.length <= 1}
                 title={cards.length <= 1 ? 'You must keep at least one card on file' : 'Remove card'}
-                className="h-8 w-8 shrink-0"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -159,12 +156,10 @@ const PaymentMethodsManager: React.FC = () => {
         </div>
       )}
 
-      <Button
+      <Button variant="line" size="md" className="text-white w-full"
         type="button"
         onClick={handleOpenAddCard}
         disabled={loadingAdd}
-        variant="outline"
-        className="w-full bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white"
       >
         <Plus className="w-4 h-4 mr-1.5" />
         {loadingAdd ? 'Loading...' : 'Add Another Card'}

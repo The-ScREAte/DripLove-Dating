@@ -16,7 +16,17 @@ export interface FavoriteEntry {
   // Optional share link - currently only offered for Music (e.g. a Spotify/
   // Apple Music/YouTube link), but the shape allows any category to carry one.
   link?: string;
+  // Reserved 'Vibe' entry only (see constants/vibe.ts): language-neutral ids
+  // for what the person values in a relationship, and their music genres.
+  values?: string[];
+  genres?: string[];
 }
+
+import { VIBE_CATEGORY } from '@/constants/vibe';
+
+/** The favorites a person can SEE and edit as favorites (the reserved Vibe entry is hidden). */
+export const displayFavorites = (favorites: readonly FavoriteEntry[] | undefined | null): FavoriteEntry[] =>
+  Array.isArray(favorites) ? favorites.filter((f) => f && f.category !== VIBE_CATEGORY) : [];
 
 export const FAVORITES_MAX = 3;
 
@@ -71,7 +81,7 @@ export const PREDEFINED_FAVORITE_CATEGORIES = Object.keys(FAVORITE_CATEGORY_EMOJ
 // or album, plus an optional share link) instead of a pick-list.
 export const CATEGORIES_WITH_DETAIL = new Set(['Music']);
 
-export const SPORT_OPTIONS = [
+const SPORT_OPTIONS = [
   'Football', 'Basketball', 'Soccer', 'Tennis', 'Boxing', 'Swimming',
   'Athletics', 'Cricket', 'Rugby', 'Golf', 'Volleyball', 'Baseball',
   'American Football', 'Table Tennis', 'Martial Arts', 'Cycling',
@@ -179,9 +189,22 @@ export const formatFavoriteLabel = (favorite: FavoriteEntry): string => {
 export const parseFavorites = (value: unknown): FavoriteEntry[] => {
   if (!Array.isArray(value)) return [];
   const out: FavoriteEntry[] = [];
+  let vibe: FavoriteEntry | null = null;
+  const idList = (raw: unknown, max: number): string[] | undefined => {
+    if (!Array.isArray(raw)) return undefined;
+    const ids = [...new Set(raw.filter((v): v is string => typeof v === 'string' && /^[a-z_]{2,24}$/.test(v)))].slice(0, max);
+    return ids.length > 0 ? ids : undefined;
+  };
   for (const item of value) {
     if (item && typeof item === 'object' && typeof (item as { category?: unknown }).category === 'string') {
-      const entry = item as { category: string; detail?: unknown; topArtists?: unknown; topArtist?: unknown; link?: unknown };
+      const entry = item as { category: string; detail?: unknown; topArtists?: unknown; topArtist?: unknown; link?: unknown; values?: unknown; genres?: unknown };
+      if (entry.category === VIBE_CATEGORY) {
+        // The reserved vibe entry never counts toward FAVORITES_MAX.
+        const values = idList(entry.values, 5);
+        const genres = idList(entry.genres, 5);
+        if (values || genres) vibe = { category: VIBE_CATEGORY, values, genres };
+        continue;
+      }
       // topArtists is the current shape (up to 3); topArtist (singular) is a
       // short-lived earlier shape from before multiple artists were
       // supported - migrated on read so any already-saved rows still show.
@@ -198,12 +221,13 @@ export const parseFavorites = (value: unknown): FavoriteEntry[] => {
       });
     }
   }
-  return out.slice(0, FAVORITES_MAX);
+  const visible = out.slice(0, FAVORITES_MAX);
+  return vibe ? [...visible, vibe] : visible;
 };
 
 // The one favorite (if any) with a usable share link - used to decide
 // whether to show the compact 🎵-style link badge in the highlight row.
 export const findFavoriteWithLink = (favorites: FavoriteEntry[] | undefined | null): FavoriteEntry | null => {
-  if (!favorites) return null;
-  return favorites.find((f) => f.link) || null;
+  if (!Array.isArray(favorites)) return null;
+  return favorites.find((f) => f?.link) || null;
 };

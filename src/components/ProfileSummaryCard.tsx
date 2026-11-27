@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Heart, MessageCircle, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
+import { uniqueTopic } from '@/utils/realtime';
 type SwipePersistedEventDetail = { type: 'like' | 'pass'; delta?: number };
 
 interface ProfileSummaryCardProps {
@@ -33,7 +34,7 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
 
     // Subscribe to likes table changes for this user
     const likesChannel = supabase
-      .channel(`profile-stats-${currentUser.id}`)
+      .channel(uniqueTopic(`profile-stats-${currentUser.id}`))
       .on(
         'postgres_changes',
         {

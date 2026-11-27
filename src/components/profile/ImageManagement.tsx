@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import {
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { uploadPhotoThumbnail, withThumbnailPaths, thumbnailUrlFor, isThumbnailKnownMissing, markThumbnailMissing } from '@/utils/photoThumbnails';
+import { getFileHash } from '@/utils/fileHash';
 
 interface ImageManagementProps {
   currentUser: {
@@ -159,20 +160,17 @@ const SortablePhotoThumb = ({
             Unsaved crop
           </div>
           <div className="absolute bottom-2 inset-x-2 flex gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
+            <Button variant="line" size="sm" className="text-black flex-1 px-2 text-xs"
+              style={{ height: 28, minHeight: 28, backgroundColor: '#fff', backgroundImage: 'none', boxShadow: 'none' }}
               onClick={() => onDiscardWarning(userImage.image_url)}
               disabled={savingCropUrl === userImage.image_url}
-              className="flex-1 h-7 px-2 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
             >
               Cancel
             </Button>
-            <Button
-              size="sm"
+            <Button variant="primary" size="sm" className="flex-1 px-2 text-xs text-white"
+              style={{ height: 28, minHeight: 28, backgroundColor: '#db2777', backgroundImage: 'none', boxShadow: 'none' }}
               onClick={() => onSaveCrop(userImage.image_url)}
               disabled={savingCropUrl === userImage.image_url}
-              className="flex-1 h-7 px-2 text-xs bg-pink-600 hover:bg-pink-700 text-white"
             >
               {savingCropUrl === userImage.image_url ? 'Saving...' : 'Save'}
             </Button>
@@ -296,6 +294,8 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
     return () => flushPendingImageOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const photoRows = useMemo(() => userImages.filter((img) => !!img.image_url), [userImages]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -462,16 +462,6 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
       toast({ title: "File too large", description: "Please upload an image smaller than 80MB.", variant: "destructive" });
       return;
     }
-
-    // Helper function to generate file hash for duplicate detection
-    const getFileHash = async (file: File): Promise<string> => {
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      // Simple hash: combine file size with first and last bytes
-      const firstBytes = Array.from(uint8Array.slice(0, 100)).join(',');
-      const lastBytes = Array.from(uint8Array.slice(-100)).join(',');
-      return `${file.size}-${file.type}-${firstBytes}-${lastBytes}`;
-    };
 
     // Step 1: Compress (typically to JPEG) to keep uploads small and consistent
     setModerating(true);
@@ -849,8 +839,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
           <span>{userImages.length}/7</span>
         </div>
         {!showFaceVerification && (
-          <Button
-            size="sm"
+          <Button variant={isVerified ? 'success' : 'primary'} size="sm"
             onClick={() => {
               if (isVerified) {
                 toast({ title: 'Already verified', description: 'You have been verified already.' });
@@ -858,12 +847,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
               }
               setShowFaceVerification(true);
             }}
-            style={{ height: 20, minHeight: 20, padding: '0 10px' }}
-            className={`text-[11px] gap-1 rounded-full text-white ${
-              isVerified
-                ? 'bg-emerald-600 hover:bg-emerald-700'
-                : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
-            }`}
+            // Compact pill, as before the design-system pass: small (20px), no glow, purple->pink.
+            style={{
+              height: 20, minHeight: 20, padding: '0 10px', fontSize: 11, gap: 4, boxShadow: 'none',
+              backgroundImage: isVerified ? 'none' : 'linear-gradient(to right, #9333ea, #db2777)',
+              backgroundColor: isVerified ? '#059669' : undefined,
+            }}
+            className="text-[11px] gap-1 rounded-full text-white"
           >
             {isVerified ? (
               <CheckCircle size={11} style={{ width: 11, height: 11 }} />
@@ -883,11 +873,8 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                 <Shield className="w-4 h-4" />
                 Face Verification
               </p>
-              <Button
-                variant="ghost"
-                size="sm"
+              <Button variant="quiet" size="sm"
                 onClick={() => setShowFaceVerification(false)}
-                className="text-xs"
               >
                 Cancel
               </Button>
@@ -945,10 +932,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
           )}
         </div>
 
+        {/* A photo row can exist without a URL (e.g. an upload that never finished). dnd-kit's SortableContext
+            throws on a null item ("Cannot use 'in' operator ... null") which took the whole Profile tab down,
+            so the strip only ever sees rows that have a URL. */}
         <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={userImages.map((img) => img.image_url)} strategy={horizontalListSortingStrategy}>
+          <SortableContext items={photoRows.map((img) => img.image_url)} strategy={horizontalListSortingStrategy}>
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-              {userImages.map((userImage, index) => (
+              {photoRows.map((userImage, index) => (
                 <SortablePhotoThumb
                   key={userImage.image_url}
                   userImage={userImage}
@@ -964,7 +954,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                 />
               ))}
 
-              {userImages.length < 5 && (
+              {photoRows.length < 5 && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1041,19 +1031,15 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                   cluster on the right, but on the left since it's a separate,
                   optional concern rather than another destructive/edit action. */}
               <div className="absolute top-3 left-3 flex items-center gap-2">
-                <Button
+                <Button variant={userImages.find((u) => u.image_url === previewUrl)?.caption ? 'primary' : 'overlay'} size="iconSm" className="shrink-0"
                   onClick={() => {
                     const img = userImages.find((u) => u.image_url === previewUrl);
                     setLabelDraft(img?.label || '');
                     setCaptionDraft(img?.caption || '');
                     setLabelPopupUrl(previewUrl);
                   }}
-                  style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
-                  className={`shrink-0 backdrop-blur-sm border rounded-full shadow-sm transition-colors ${
-                    userImages.find((u) => u.image_url === previewUrl)?.caption
-                      ? 'bg-pink-500/80 hover:bg-pink-500 border-pink-300/40 text-white'
-                      : 'bg-black/60 hover:bg-black/80 border-white/15 text-white'
-                  }`}
+                 
+                 
                   title="Add description"
                 >
                   <Tag size={15} style={{ width: 15, height: 15 }} />
@@ -1070,7 +1056,7 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                     <div className="space-y-0.5">
                       <label className="text-[11px] font-medium text-white/60">What's this photo?</label>
                       <Select value={labelDraft || undefined} onValueChange={setLabelDraft}>
-                        <SelectTrigger className="h-7 py-0 bg-white/5 border-white/15 text-white text-sm">
+                        <SelectTrigger tone="dark" className="py-0">
                           <SelectValue placeholder="Pick a vibe (optional)" />
                         </SelectTrigger>
                         <SelectContent className="bg-black border-pink-500/30 text-white">
@@ -1088,13 +1074,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                       {/* Textarea, not Input - a single-line input just scrolls
                           horizontally past its own width instead of wrapping,
                           which hides the end of anything past a few words. */}
-                      <Textarea
+                      <Textarea tone="dark"
                         value={captionDraft}
                         onChange={(e) => setCaptionDraft(e.target.value.slice(0, 50))}
                         placeholder="Say something short..."
                         maxLength={50}
                         rows={2}
-                        className="resize-none bg-white/5 border-white/15 text-white text-sm placeholder:text-white/40 min-h-0 py-1.5"
+                        className="resize-none min-h-0 py-1.5"
                       />
                     </div>
 
@@ -1110,19 +1096,19 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                         </button>
                       ) : <span />}
                       <div className="flex items-center gap-2 ml-auto">
-                        <Button
+                        <Button variant="overlay" size="iconSm" className="shrink-0"
                           onClick={() => handleSaveLabelCaption(previewUrl, labelDraft || null, captionDraft.trim() || null)}
                           disabled={savingLabelCaption}
-                          style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
-                          className="shrink-0 bg-emerald-600/90 hover:bg-emerald-600 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                         
+                         
                           title="Save"
                         >
                           <Check size={15} style={{ width: 15, height: 15 }} />
                         </Button>
-                        <Button
+                        <Button variant="overlay" size="iconSm" className="shrink-0"
                           onClick={() => setLabelPopupUrl(null)}
-                          style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
-                          className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                         
+                         
                           title="Cancel"
                         >
                           <X size={15} style={{ width: 15, height: 15 }} />
@@ -1134,20 +1120,20 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
               })()}
 
               <div className="absolute top-3 right-3 flex items-center gap-2">
-                <Button
+                <Button variant="overlay" size="iconSm" className="shrink-0"
                   onClick={() => { setCroppingImageUrl(previewUrl); setActiveImageUrl(null); }}
-                  style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
-                  className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                 
+                 
                   title="Crop photo"
                 >
                   <Pencil size={15} style={{ width: 15, height: 15 }} />
                 </Button>
 
                 {userImages.length <= 2 ? (
-                  <Button
+                  <Button variant="overlay" size="iconSm" className="shrink-0"
                     onClick={() => { handleReplaceImage(previewUrl); setActiveImageUrl(null); }}
-                    style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
-                    className="shrink-0 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-white"
+                   
+                   
                     title="Replace image"
                   >
                     <RefreshCw size={15} style={{ width: 15, height: 15 }} />
@@ -1165,9 +1151,9 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button
-                          style={{ width: 34, height: 34, minWidth: 34, minHeight: 34, padding: 0 }}
-                          className="shrink-0 bg-black/60 hover:bg-red-600/90 backdrop-blur-sm border border-white/15 rounded-full shadow-sm text-red-400 hover:text-white"
+                        <Button variant="danger" size="iconSm" className="shrink-0"
+                         
+                         
                           title="Delete image"
                         >
                           <Trash2 size={15} style={{ width: 15, height: 15 }} />
@@ -1179,11 +1165,11 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
                           <AlertDialogDescription className="text-white/80">Are you sure you want to delete this image? This action cannot be undone.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-black border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white">Cancel</AlertDialogCancel>
-                          <AlertDialogAction
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction variant="danger"
                             disabled={deleting}
                             onClick={() => { handleDeleteImage(previewUrl); setActiveImageUrl(null); }}
-                            className="bg-red-600 hover:bg-red-700"
+                           
                           >
                             {deleting ? 'Deleting...' : 'Delete'}
                           </AlertDialogAction>
@@ -1226,18 +1212,13 @@ const ImageManagement = ({ currentUser, profile, onProfileUpdate, isEditing = fa
             <p className="text-sm text-white mb-1 font-semibold">Discard your crop?</p>
             <p className="text-xs text-white/80 mb-4">Your cropped photo hasn't been saved yet.</p>
             <div className="flex items-center justify-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
+              <Button variant="line" size="sm" className="text-black"
                 onClick={() => setDiscardWarningUrl(null)}
-                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
               >
                 Keep editing
               </Button>
-              <Button
-                size="sm"
+              <Button variant="danger" size="sm"
                 onClick={() => handleDiscardPendingCrop(discardWarningUrl)}
-                className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white"
               >
                 Discard
               </Button>

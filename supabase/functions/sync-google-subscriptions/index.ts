@@ -4,6 +4,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { isServiceRoleRequest } from '../_shared/caller-auth.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -132,6 +133,10 @@ serve(async (req) => {
   }
 
   try {
+    // Cron-only (cron/cron.js calls it with the service-role key). It used to be
+    // runnable by any logged-in user.
+    if (!isServiceRoleRequest(req)) return json(401, { error: 'Unauthorized' })
+
     console.log('🔄 [GOOGLE-SYNC] Starting daily subscription sync')
     
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)

@@ -4,7 +4,7 @@ const PACK_COUNT = 6;
 const STORAGE_KEY = 'driplove:games:test-your-toast:pack-cycle:v2';
 
 // Seeded shuffle for deterministic randomization
-export const seededShuffle = <T,>(array: T[], seed: number): T[] => {
+const seededShuffle = <T,>(array: T[], seed: number): T[] => {
   const arr = [...array];
   let s = seed;
   for (let i = arr.length - 1; i > 0; i--) {
@@ -16,7 +16,7 @@ export const seededShuffle = <T,>(array: T[], seed: number): T[] => {
 };
 
 // Get and increment pack index for level
-export const getAndBumpPackIndex = (level: number): number => {
+const getAndBumpPackIndex = (level: number): number => {
   const stored = localStorage.getItem(STORAGE_KEY);
   const data = stored ? JSON.parse(stored) : {};
   const currentIndex = data[`level${level}`] || 0;
@@ -27,7 +27,7 @@ export const getAndBumpPackIndex = (level: number): number => {
 };
 
 // Lazy load scenario pack
-export const loadScenarioPack = async (packIndex: number): Promise<ScenarioPack> => {
+const loadScenarioPack = async (packIndex: number): Promise<ScenarioPack> => {
   const packNumber = (packIndex % PACK_COUNT) + 1;
   const module = await import(`./scenarios/testYourToast.pack${packNumber}.ts`);
   return module[`pack${packNumber}`];
@@ -61,6 +61,3 @@ export const getScenariosForLevel = async (level: number): Promise<ScenarioPack>
 };
 
 // Clear pack rotation (useful for testing)
-export const clearPackRotation = () => {
-  localStorage.removeItem(STORAGE_KEY);
-};

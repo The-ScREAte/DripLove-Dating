@@ -11,14 +11,14 @@
  * - Bucket D (Veteran, >6 months): 5 profiles (34%)
  */
 
-export interface ProfileBuckets<T> {
+interface ProfileBuckets<T> {
   veryNew: T[];    // Bucket A: created ≤7 days ago
   new: T[];        // Bucket B: created 8-30 days ago
   regular: T[];    // Bucket C: created 1-6 months ago
   veteran: T[];    // Bucket D: created >6 months ago
 }
 
-export interface BucketQuotas {
+interface BucketQuotas {
   veryNew: number;
   new: number;
   regular: number;
@@ -38,7 +38,7 @@ const DEFAULT_QUOTAS: BucketQuotas = {
 /**
  * Categorize a single profile into its appropriate bucket based on created_at
  */
-export function getBucketForProfile(createdAt: string | Date): keyof ProfileBuckets<any> {
+function getBucketForProfile(createdAt: string | Date): keyof ProfileBuckets<any> {
   const now = new Date();
   const created = new Date(createdAt);
   const daysSinceCreated = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
@@ -57,7 +57,7 @@ export function getBucketForProfile(createdAt: string | Date): keyof ProfileBuck
 /**
  * Categorize profiles into buckets based on account age
  */
-export function categorizeProfilesIntoBuckets<T extends { created_at?: string | null }>(
+function categorizeProfilesIntoBuckets<T extends { created_at?: string | null }>(
   profiles: T[]
 ): ProfileBuckets<T> {
   const buckets: ProfileBuckets<T> = {
@@ -86,7 +86,7 @@ export function categorizeProfilesIntoBuckets<T extends { created_at?: string | 
  * Ensures profiles from all countries are interleaved rather than grouped
  * Uses deterministic round-robin with small batches per country
  */
-export function shuffleCountriesTogether<T extends { country_code?: string | null; id: string }>(
+function shuffleCountriesTogether<T extends { country_code?: string | null; id: string }>(
   profiles: T[],
   seed: string = ''
 ): T[] {
@@ -244,7 +244,7 @@ function redistributeQuotas(
  * @param seed - Seed for deterministic sampling (e.g., `${userId}_${date}`)
  * @returns Shuffled array of profiles with fair distribution
  */
-export function stratifiedSample<T extends { created_at?: string | null }>(
+function stratifiedSample<T extends { created_at?: string | null }>(
   profiles: T[],
   batchSize: number = 15,
   seed: string = ''

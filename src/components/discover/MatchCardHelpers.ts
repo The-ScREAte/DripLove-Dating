@@ -10,173 +10,82 @@ import {
   SOCIAL_MEDIA_OPTIONS,
   traitLabel,
 } from '@/constants/profileTraits';
-import { FAVORITE_CATEGORY_EMOJI, DEFAULT_FAVORITE_EMOJI } from '@/constants/favorites';
+import { FAVORITE_CATEGORY_EMOJI, DEFAULT_FAVORITE_EMOJI, displayFavorites } from '@/constants/favorites';
+
+import type { InfoCard } from '../profile-card/infoCards';
+import {
+  buildHeroCard,
+  buildInfoCards,
+  interleavePhotosAndCards,
+  orderCardsForNoPhotos,
+} from '../profile-card/infoCards';
+import { getViewerVibe } from '@/utils/viewerVibe';
+import { dayKey, mulberry32, seedFromString, seededShuffle } from '@/utils/seededRandom';
+
+// Re-exported so every existing import keeps working (the implementations moved to utils/seededRandom).
+export { mulberry32, seedFromString, seededShuffle };
 
 export interface SlideContent {
-  type:
-    | 'image'
-    | 'bio'
-    | 'fun_fact'
-    | 'perfect_first_date'
-    | 'last_googled'
-    | 'height'
-    | 'family_plans'
-    | 'communication_style'
-    | 'love_style'
-    | 'pets'
-    | 'social_media'
-    | 'placeholder';
+  /** 'image' = a photo (content = url); 'card' = a designed info card (see profile-card/infoCards). */
+  type: 'image' | 'card' | 'placeholder';
+  /** Photo url, or the card's stable key. */
   content: string;
   index: number;
+  card?: InfoCard;
 }
 
-// Seeded RNG (mulberry32) - deterministic shuffling based on user ID
-export const mulberry32 = (a: number) => () => {
-  let t = a += 0x6D2B79F5;
-  t = Math.imul(t ^ t >>> 15, t | 1);
-  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-  return ((t ^ t >>> 14) >>> 0) / 4294967296;
-};
+/** Who is looking at the profile - drives "You both like", sign compatibility and the no-photo order. */
+export interface SlideViewer {
+  id?: string | null;
+  interests?: unknown;
+  favorites?: unknown;
+  signs?: string[];
+  /** The earned verified badge shown on the caption. */
+  verified?: boolean;
+  distanceKm?: number | null;
+}
 
-export const seedFromString = (s: string | number | undefined): number => {
-  const str = s == null ? '' : String(s);
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-};
-
-export const seededShuffle = <T,>(arr: T[], rand: () => number): T[] => {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-// Build slides array - moved outside component for performance
+// Build the slide deck: photos interleaved with designed info cards.
+//  - Photo profiles: the first slide is always a photo; cards are ranked by relevance (shared
+//    things, their own words, facts...) and spread evenly in the gaps between photos.
+//  - No photos: a "Meet {name}" hero card leads, "You both like" follows, and the rest are in an
+//    order that is random per (profile, viewer, day) but stable within the session.
+// Every profile gets at least a couple of cards, even a bare one (see buildInfoCards).
 export const buildSlides = (
   match: PotentialMatch,
-  userImages: string[]
+  userImages: string[],
+  viewer?: SlideViewer
 ): SlideContent[] => {
   // Guard against undefined userImages
   if (!userImages || !Array.isArray(userImages)) {
     return [{ type: 'placeholder' as const, content: '', index: -1 }];
   }
 
-  const seed = seedFromString(match.id || match.first_name || 0);
-  const rand = mulberry32(seed);
+  const v: SlideViewer = viewer ?? (() => {
+    const g = getViewerVibe();
+    return { id: g.id, interests: g.interests, favorites: g.favorites };
+  })();
+  const photos = userImages.filter((u) => typeof u === 'string' && u.length > 0);
+  const ctx = {
+    viewerId: v.id ?? null,
+    viewerInterests: v.interests,
+    viewerFavorites: v.favorites,
+    viewerSigns: v.signs,
+    verified: v.verified,
+    distanceKm: v.distanceKm,
+    hasPhotos: photos.length > 0,
+  };
 
-  const imageSlides: SlideContent[] = userImages.map((image, index) => ({
-    type: 'image' as const,
-    content: image,
-    index
-  }));
+  const toSlide = (card: InfoCard): SlideContent => ({ type: 'card' as const, content: card.key, index: -1, card });
+  let cards = buildInfoCards(match, ctx);
 
-  // Collect all non-image content
-  const nonImageContent: SlideContent[] = [];
-
-  if (match.bio?.trim()) {
-    nonImageContent.push({ type: 'bio' as const, content: match.bio, index: -1 });
+  if (photos.length === 0) {
+    cards = orderCardsForNoPhotos(cards, { profileId: String(match.id || match.first_name || ''), viewerId: v.id, day: dayKey() });
+    return [toSlide(buildHeroCard(match, ctx)), ...cards.map(toSlide)];
   }
 
-  // Choose one fun question deterministically - the pool includes both the
-  // original free-text prompts and the newer trait fields (family plans,
-  // communication/love style, pets, social media), so which one shows up is
-  // random per profile rather than always the same field for everyone or
-  // all of them at once.
-  const funQuestions: SlideContent[] = [];
-  if (match.fun_fact?.trim()) funQuestions.push({ type: 'fun_fact' as const, content: match.fun_fact, index: -1 });
-  if (match.perfect_first_date?.trim()) funQuestions.push({ type: 'perfect_first_date' as const, content: match.perfect_first_date, index: -1 });
-  if (match.last_googled?.trim()) funQuestions.push({ type: 'last_googled' as const, content: match.last_googled, index: -1 });
-  if (typeof match.height_cm === 'number' && match.height_cm > 0) {
-    const totalInches = Math.round(match.height_cm / 2.54);
-    const feet = Math.floor(totalInches / 12);
-    const inches = totalInches % 12;
-    funQuestions.push({ type: 'height' as const, content: `${feet}'${inches}" (${match.height_cm} cm)`, index: -1 });
-  }
-  if (match.family_plans?.trim()) {
-    funQuestions.push({ type: 'family_plans' as const, content: traitLabel(FAMILY_PLANS_OPTIONS, match.family_plans), index: -1 });
-  }
-  if (match.communication_style && match.communication_style.length > 0) {
-    funQuestions.push({
-      type: 'communication_style' as const,
-      content: match.communication_style.map((v) => traitLabel(COMMUNICATION_STYLE_OPTIONS, v)).join(', '),
-      index: -1,
-    });
-  }
-  if (match.love_style && match.love_style.length > 0) {
-    funQuestions.push({
-      type: 'love_style' as const,
-      content: match.love_style.map((v) => traitLabel(LOVE_STYLE_OPTIONS, v)).join(', '),
-      index: -1,
-    });
-  }
-  if (match.pets && match.pets.length > 0) {
-    funQuestions.push({
-      type: 'pets' as const,
-      content: match.pets.map((v) => traitLabel(PETS_OPTIONS, v)).join(', '),
-      index: -1,
-    });
-  }
-  if (match.social_media?.trim()) {
-    funQuestions.push({ type: 'social_media' as const, content: traitLabel(SOCIAL_MEDIA_OPTIONS, match.social_media), index: -1 });
-  }
-
-  if (funQuestions.length > 0) {
-    const idx = Math.floor(rand() * funQuestions.length);
-    nonImageContent.push(funQuestions[idx]);
-  }
-
-  // If no images, show non-image content first, then placeholder
-  if (imageSlides.length === 0) {
-    if (nonImageContent.length > 0) {
-      const shuffled = seededShuffle(nonImageContent, rand);
-      return [...shuffled, { type: 'placeholder' as const, content: '', index: -1 }];
-    }
-    return [{ type: 'placeholder' as const, content: '', index: -1 }];
-  }
-
-  // Structured mixing: image first, then alternate bio/fun facts with images
-  const mixedSlides: SlideContent[] = [];
-
-  // Always start with first image
-  mixedSlides.push(imageSlides[0]);
-
-  let imageIndex = 1; // Track next image to add
-  let contentIndex = 0; // Track next content to add
-
-  // Add bio first if available
-  const bioContent = nonImageContent.find(c => c.type === 'bio');
-  const funContent = nonImageContent.find(c => c.type !== 'bio');
-
-  if (bioContent) {
-    mixedSlides.push(bioContent);
-    contentIndex++;
-  }
-
-  // Add second image if available
-  if (imageIndex < imageSlides.length) {
-    mixedSlides.push(imageSlides[imageIndex]);
-    imageIndex++;
-  }
-
-  // Add fun fact if available
-  if (funContent) {
-    mixedSlides.push(funContent);
-    contentIndex++;
-  }
-
-  // Add remaining images
-  while (imageIndex < imageSlides.length) {
-    mixedSlides.push(imageSlides[imageIndex]);
-    imageIndex++;
-  }
-
-  return mixedSlides;
+  const imageSlides: SlideContent[] = photos.map((image, index) => ({ type: 'image' as const, content: image, index }));
+  return interleavePhotosAndCards(imageSlides, cards.map(toSlide)).map((e) => ('photo' in e ? e.photo : e.card));
 };
 
 // Reads a numeric 0-100 personality slider as a plain-language chip. Each
@@ -200,13 +109,15 @@ const personalitySliderLabel = (
 const buildHighlightPool = (match: PotentialMatch): string[] => {
   const pool: string[] = [];
 
-  if (match.interests) pool.push(...match.interests);
+  // DB json columns can hold unexpected shapes (e.g. {} instead of []) - a
+  // non-array must never crash the card, so everything list-like is checked.
+  if (Array.isArray(match.interests)) pool.push(...match.interests);
   if (match.occupation) pool.push(match.occupation);
   if (match.education_level) pool.push(match.education_level);
-  if (match.languages) pool.push(...match.languages.map((lang) => `🗣️ ${lang}`));
+  if (Array.isArray(match.languages)) pool.push(...match.languages.map((lang) => `🗣️ ${lang}`));
 
-  if (match.favorites) {
-    for (const fav of match.favorites) {
+  if (Array.isArray(match.favorites)) {
+    for (const fav of displayFavorites(match.favorites)) {
       const emoji = FAVORITE_CATEGORY_EMOJI[fav.category] || DEFAULT_FAVORITE_EMOJI;
       pool.push(fav.detail ? `${emoji} ${fav.detail}` : `${emoji} ${fav.category}`);
     }
@@ -301,13 +212,6 @@ export const HIGHLIGHT_CHIP_BORDER_COLORS = [
 // and 5th chip earn their spot. The sign chip is deliberately exempt from
 // this (always shown alongside) since it's a single compact badge, not a
 // variable-width text pill.
-export const getHighlightChipVisibilityClass = (index: number): string => {
-  if (index < 2) return '';
-  if (index === 2) return 'hidden min-[360px]:inline-flex';
-  if (index === 3) return 'hidden min-[400px]:inline-flex';
-  return 'hidden min-[440px]:inline-flex';
-};
-
 // Shortens a highlight-chip label so it never runs into the pill's rounded
 // corners the way CSS text-overflow: ellipsis does (and neither Chromium nor
 // WebKit support a custom ellipsis string, so ".." can't be done in pure CSS

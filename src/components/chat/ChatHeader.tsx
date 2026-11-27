@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Ban, BadgeCheck, Flag, MoreVertical, Trash2, User } from 'lucide-react';
 import { ChatMatch } from '@/types';
 import ChatUserAvatar from '../ChatUserAvatar';
-import { createPortal } from 'react-dom';
-import ReportModal from '@/components/ReportModal';
-import { useToast } from '@/hooks/use-toast';
+import { calculateAgeOrNull } from '@/utils/dateUtils';
+import { useBackClose } from '@/utils/backStack';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -47,14 +46,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   // Determine partner ID correctly
   const partnerId = selectedMatch.partner?.id ||
                    (selectedMatch.user1_id === currentUserId ? selectedMatch.user2_id : selectedMatch.user1_id);
-  const [openReport, setOpenReport] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [partnerLastLoginAt, setPartnerLastLoginAt] = useState<string | null>(null);
   // Recomputed every 30s so "Active now" correctly ages into "Last seen Xm
   // ago" while the conversation stays open, instead of freezing at whatever
   // it read on first fetch.
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const { toast } = useToast();
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch partner's last-login timestamp - the only real presence signal
@@ -99,9 +96,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
     if (days < 7) return { statusText: t('chat.lastSeenDaysAgo', { days }), isOnline: false };
     return { statusText: t('chat.lastSeenLongAgo'), isOnline: false };
   }, [partnerLastLoginAt, nowTick, t]);
+  // Android hardware back (and Escape on the web) closes the overflow menu first.
+  useBackClose(menuOpen, () => setMenuOpen(false));
   // Click outside to close menu
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
       }
@@ -109,112 +108,132 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
 
     if (menuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside as any);
+      document.addEventListener('touchstart', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside as any);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [menuOpen]);
 
-  return (
-    <div
-      className="relative border-b border-pink-500/30 shadow-[0_6px_14px_rgba(0,0,0,0.4)]"
-      style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}
-    >
-      <div className="flex items-center px-4 py-2.5 sm:py-3 justify-between">
-      <div className="flex items-center space-x-3">
-        {isMobile && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onBack}
-            className="p-2 rounded-full text-white hover:bg-pink-500/20"
-            aria-label={t('chat.goBack')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        )}
-        <div className="relative shrink-0">
-          <ChatUserAvatar
-            userId={partnerId}
-            firstName={selectedMatch.first_name}
-            lastName={selectedMatch.last_name}
-            onClick={() => onUserProfileOpen(partnerId)}
-          />
-          {isOnline && (
-            <span
-              className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-black"
-              aria-label={t('chat.activeNow')}
-            />
-          )}
-        </div>
-        <div className="leading-tight">
-          <h3 className="font-semibold text-white text-[15px] sm:text-base">
-            {selectedMatch.first_name} {selectedMatch.last_name}
-          </h3>
-          <p className={`text-xs sm:text-sm mt-0.5 ${isPartnerTyping ? 'text-pink-400 font-medium' : isOnline ? 'text-green-400' : 'text-gray-400'}`}>
-            {isPartnerTyping ? t('chat.typing') : statusText}
-          </p>
-        </div>
-  </div>
-      
-      <div ref={menuRef}>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="p-2 rounded-full text-white hover:bg-pink-500/20"
-          onClick={() => setMenuOpen(!menuOpen)}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'manipulation' }}
-        >
-          <span className="sr-only">{t('chat.moreOptions')}</span>
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-          </svg>
-        </Button>
+  const age = calculateAgeOrNull(selectedMatch.date_of_birth);
+  const fullName = `${selectedMatch.first_name} ${selectedMatch.last_name}`.trim();
 
-        {menuOpen && (
-          <div className="absolute top-14 right-3 z-[999999]">
-              <div className="w-max overflow-hidden rounded-md border border-pink-500/30 bg-black p-1.5 shadow-lg divide-y divide-pink-500/20">
-                <button
-                  className="block text-left px-2 py-2 text-sm text-gray-100 hover:bg-pink-500/15 whitespace-nowrap"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    // delegate to parent to open the report dialog; allow undefined message id
-                    onReport?.(selectedMatch.last_message_obj?.id);
-                  }}
-                >
-                  {t('chat.report')}
-                </button>
-                <button
-                  className="block text-left px-2 py-2 text-sm text-gray-100 hover:bg-pink-500/15 whitespace-nowrap"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDeleteChat();
-                  }}
-                >
-                  {t('chat.deleteChat')}
-                </button>
-                <button
-                  className="block text-left px-2 py-2 text-sm text-red-400 hover:bg-red-500/10 whitespace-nowrap"
-                  onClick={() => { onBlockUser(selectedMatch); setMenuOpen(false); }}
-                >
-                  {t('chat.blockUser')}
-                </button>
-              </div>
+  const menuItem =
+    'flex min-h-[44px] w-full items-center gap-3 px-4 text-left text-sm text-white/90 transition-colors hover:bg-white/10 active:bg-white/15 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-white/60';
+
+  return (
+    <div className="relative" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}>
+      <div className="flex items-center justify-between gap-2 px-2 py-2">
+        <div className="flex min-w-0 items-center gap-1">
+          {isMobile && (
+            <Button variant="quiet" size="iconMd" className="shrink-0 text-white" onClick={onBack} aria-label={t('chat.goBack')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <button
+            type="button"
+            onClick={() => onUserProfileOpen(partnerId)}
+            className="dl-press flex min-w-0 items-center gap-3 rounded-2xl py-1 pl-1 pr-3 text-left outline-none focus-visible:bg-white/[0.06]"
+            aria-label={t('chat.viewProfile')}
+          >
+            <span className="relative shrink-0">
+              <ChatUserAvatar userId={partnerId} firstName={selectedMatch.first_name} lastName={selectedMatch.last_name} size="custom" className="h-11 w-11" />
+              {isOnline && (
+                <span
+                  className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-black bg-success"
+                  role="img"
+                  aria-label={t('chat.activeNow')}
+                />
+              )}
+            </span>
+            <span className="min-w-0 leading-tight">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-[15px] font-semibold text-white sm:text-base">
+                  {fullName}
+                  {age !== null && <span className="font-normal text-white/70">, {age}</span>}
+                </span>
+                {selectedMatch.is_verified && (
+                  <BadgeCheck className="h-4 w-4 shrink-0 text-brand" aria-label={t('chat.verified')} />
+                )}
+              </span>
+              <span
+                className={`mt-0.5 block truncate text-xs ${isPartnerTyping ? 'font-medium text-brand-ink' : isOnline ? 'text-success' : 'text-white/50'}`}
+                aria-live="polite"
+              >
+                {isPartnerTyping ? t('chat.typing') : statusText}
+              </span>
+            </span>
+          </button>
+        </div>
+
+        <div ref={menuRef} className="relative shrink-0">
+          <Button
+            variant="quiet"
+            size="iconMd"
+            className="text-white"
+            onClick={() => setMenuOpen(!menuOpen)}
+            onContextMenu={(e) => e.preventDefault()}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            style={{ WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'manipulation' }}
+          >
+            <span className="sr-only">{t('chat.moreOptions')}</span>
+            <MoreVertical className="h-5 w-5" />
+          </Button>
+
+          {menuOpen && (
+            <div role="menu" className="dl-pop absolute right-1 top-12 z-[999999] w-56 origin-top-right overflow-hidden rounded-2xl border border-white/10 bg-neutral-950 py-1 shadow-[0_12px_32px_rgba(0,0,0,0.55)]">
+              <button
+                role="menuitem"
+                className={menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onUserProfileOpen(partnerId);
+                }}
+              >
+                <User />
+                {t('chat.viewProfile')}
+              </button>
+              <button
+                role="menuitem"
+                className={menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  // delegate to parent to open the report dialog; allow undefined message id
+                  onReport?.(selectedMatch.last_message_obj?.id);
+                }}
+              >
+                <Flag />
+                {t('chat.report')}
+              </button>
+              <button
+                role="menuitem"
+                className={menuItem}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDeleteChat();
+                }}
+              >
+                <Trash2 />
+                {t('chat.deleteChat')}
+              </button>
+              <div className="my-1 h-px bg-white/10" />
+              <button
+                role="menuitem"
+                className={`${menuItem} !text-danger hover:!bg-danger/10 [&_svg]:!text-danger`}
+                onClick={() => {
+                  onBlockUser(selectedMatch);
+                  setMenuOpen(false);
+                }}
+              >
+                <Ban />
+                {t('chat.blockUser')}
+              </button>
             </div>
           )}
-
-        <ReportModal
-          open={Boolean(openReport)}
-          onClose={() => setOpenReport(false)}
-          reporterId={currentUserId || ''}
-          reportedUserId={partnerId || ''}
-          contentId={selectedMatch.last_message_obj?.id}
-        />
-      </div>
+        </div>
       </div>
     </div>
   );

@@ -82,7 +82,30 @@
       "signUpFailed": "创建帐户失败",
       "appleSignInFailed": "使用 Apple 登录失败",
       "googleSignInFailed": "使用 Google 登录失败"
-    }
+    },
+    "invalidCredentials": "邮箱和密码不匹配。",
+    "emailNotConfirmed": "请先验证你的邮箱，查看收件箱。",
+    "resendConfirmation": "重新发送邮件",
+    "confirmationSent": "验证邮件已发送，请检查收件箱和垃圾邮件。",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "resetSentTitle": "请查收邮件",
+    "resetSentBody": "如果 {{email}} 对应的账户存在，我们已发送重置密码的链接。",
+    "usesGoogle": "此账户使用 Google 登录，请继续使用 Google。",
+    "usesApple": "此账户使用 Apple 登录，请继续使用 Apple。",
+    "signingIn": "正在登录…",
+    "signInFailedTitle": "无法登录",
+    "signInFailedBody": "出了点问题，请重试。",
+    "signInCancelled": "登录已取消。",
+    "tryAgain": "重试",
+    "newPassword": "新密码",
+    "updatePassword": "更新密码",
+    "updatingPassword": "正在更新…",
+    "resetLinkExpired": "此链接已过期，请重新申请。",
+    "passwordUpdated": "密码已更新，现在可以登录了。",
+    "passwordHint": "至少 6 个字符",
+    "setNewPasswordTitle": "设置新密码",
+    "signInTakingLong": "登录耗时比预期长，请重试。"
   },
   "profile": {
     "myProfile": "我的资料",
@@ -250,7 +273,14 @@
       "funQuestions": "回答趣味问题",
       "interests": "至少选择3个兴趣"
     },
-    "freeTonight": "今晚有空"
+    "freeTonight": "今晚有空",
+    "height": "身高",
+    "selectHeight": "选择你的身高",
+    "vibe": {
+      "values": "你最看重什么",
+      "genres": "你喜欢的音乐",
+      "empty": "点按“编辑”添加 - 有助于为你找到更合适的人。"
+    }
   },
   "discover": {
     "discover": "发现",
@@ -328,8 +358,37 @@
       "messyVsOrganized": "凌乱 vs 有条理：{{percentage}}%",
       "interests": "兴趣爱好",
       "favorites": "Favorites",
-      "language": "语言"
-    }
+      "language": "语言",
+      "atAGlance": "概览",
+      "communicationStyle": "沟通风格",
+      "loveStyle": "爱的方式",
+      "pets": "宠物",
+      "languagesSpoken": "语言",
+      "socialMedia": "社交媒体",
+      "readMore": "展开",
+      "showLess": "收起",
+      "lookingForSerious": "想找认真的关系",
+      "openToAnything": "顺其自然",
+      "lookingFor": "想找：{{what}}",
+      "showDetails": "显示详情",
+      "hideDetails": "隐藏详情",
+      "verifiedProfile": "已认证资料",
+      "funQuestions": "趣味问答",
+      "funFact": "趣闻",
+      "perfectDate": "完美的第一次约会",
+      "lastGoogled": "最近一次谷歌搜索"
+    },
+    "modeForYou": "为你推荐",
+    "modeSignMatch": "Sign Match",
+    "signMatchHint": "与你的星符相配的人",
+    "filtersAria": "Discover 筛选",
+    "emptySignMatchTitle": "暂时没有星符匹配",
+    "emptySignMatchDesc": "稍后再来看看，或切换到“为你推荐”。",
+    "refreshFailedTitle": "刷新失败",
+    "refreshFailedDesc": "请检查网络后重试。",
+    "adjustFilters": "调整筛选",
+    "playGames": "玩游戏",
+    "tryPremiumFree": "免费试用 Premium"
   },
   "matches": {
     "matches": "匹配",
@@ -361,7 +420,8 @@
     "releaseToRefresh": "释放以刷新",
     "refreshing": "刷新中...",
     "error": "错误",
-    "failedToRefresh": "刷新喜欢你的人失败"
+    "failedToRefresh": "刷新喜欢你的人失败",
+    "noDetailsYet": "暂未分享更多信息。"
   },
   "chat": {
     "messages": "消息",
@@ -425,7 +485,37 @@
     "matchExpiredDescription": "此匹配由于不活跃而过期。在10天内开始对话以保持您的匹配！",
     "matchExpiringTitle": "匹配即将过期！",
     "matchExpiringBody": "您与{{name}}的匹配明天过期。发送消息以保持联系！💬",
-    "daysLeft": "剩余{{days}}天"
+    "daysLeft": "剩余{{days}}天",
+    "search": "搜索聊天",
+    "noResults": "未找到聊天",
+    "yesterday": "昨天",
+    "you": "你",
+    "earlierConversations": "更早的聊天（{{count}}）",
+    "newMatchBadge": "新",
+    "findYourMatch": "寻找你的缘分",
+    "noMatchesTitle": "你的爱情故事从这里开始",
+    "matchedWith": "你与{{name}}配对成功",
+    "matchedAgo": "打个招呼，让它有意义",
+    "icebreakersTitle": "打破僵局",
+    "icebreaker1": "嗨 {{name}}！这周目前最棒的事是什么？",
+    "icebreaker2": "你好 {{name}} 👋 你最近特别喜欢什么？",
+    "icebreaker3": "你的资料让我会心一笑。你理想的周末是什么样的？",
+    "staySafeTitle": "注意安全",
+    "staySafeBody": "在信任对方之前，请继续在 DripLove 上聊天。切勿分享金钱、密码或财务信息。",
+    "dismiss": "关闭",
+    "jumpToLatest": "跳到最新消息",
+    "newMessagesCount": "{{count}} 条新消息",
+    "viewProfile": "查看资料",
+    "replyingTo": "回复 {{name}}",
+    "cancelReply": "取消回复",
+    "verified": "已认证",
+    "unreadCount": "{{count}} 条未读",
+    "openConversation": "打开与{{name}}的聊天",
+    "newMatchesAria": "新配对",
+    "typingAria": "{{name}} 正在输入",
+    "today": "今天",
+    "copy": "复制",
+    "copied": "消息已复制"
   },
   "premium": {
     "goPremium": "升级到高级版",
@@ -511,6 +601,19 @@
         "button": "🎯 一次性付款",
         "subtitle": "不自动续订"
       }
+    },
+    "legal": {
+      "renewalStore": "每月以 {{price}} 自动续订，直至您取消。可随时在 {{store}} 设置中取消。",
+      "renewalWeb": "每 30 天以 {{price}} 自动续订，直至您取消。可随时在个人资料中取消。",
+      "terms": "使用条款",
+      "privacy": "隐私政策"
+    },
+    "paymentIssue": {
+      "title": "付款问题",
+      "body": "我们无法为您续订高级会员。请在 {{store}} 中更新付款方式以保留您的权益。",
+      "until": "您的高级会员将在 {{date}} 前保持有效。",
+      "update": "更新付款方式",
+      "later": "稍后"
     }
   },
   "notifications": {
@@ -544,8 +647,6 @@
     "rateApp": "评价应用",
     "title": "设置",
     "accountActions": "账户操作",
-    "enjoyingDripLove": "⭐ 喜欢DripLove吗？",
-    "rateExperience": "评价您的体验并帮助我们成长！",
     "needHelp": "需要帮助？",
     "contactSupport": "如有任何问题或需要帮助，请联系我们的支持团队：",
     "termsOfService": "服务条款",
@@ -573,7 +674,10 @@
     "deleteFailed": "删除失败",
     "updateFailed": "更新失败",
     "noUserData": "没有用户数据",
-    "unableToLoadUser": "无法加载用户信息。请重新登录。"
+    "unableToLoadUser": "无法加载用户信息。请重新登录。",
+    "tabErrorTitle": "无法加载此标签页",
+    "tabErrorBody": "此部分遇到了问题，其他标签页不受影响。",
+    "tabErrorRetry": "重试"
   },
   "validation": {
     "required": "此字段为必填项",
@@ -815,7 +919,10 @@
       "dobRequired": "出生日期为必填项",
       "mustBe18": "您必须年满18岁",
       "genderRequired": "请选择您的性别",
-      "preferenceRequired": "请选择您的偏好"
+      "preferenceRequired": "请选择您的偏好",
+      "photosRequired": "需要照片",
+      "someImagesRejected": "部分照片被拒绝",
+      "photosNeedReupload": "请重新添加你的照片"
     },
     "createAccount": "创建账户",
     "tellUsMore": "告诉我们更多",
@@ -985,7 +1092,9 @@
     "joinThousands": "加入成千上万跨越大陆寻找爱情的人",
     "aboutLink": "关于DripLove",
     "termsLink": "服务条款",
-    "privacyLink": "隐私政策"
+    "privacyLink": "隐私政策",
+    "legal": "继续即表示你同意我们的<terms>服务条款</terms>和<privacy>隐私政策</privacy>。",
+    "connectLink": "联系"
   },
   "adinkraMeanings": {
     "Aya": "蕨类植物。耐力和足智多谋的象征。",
@@ -1013,5 +1122,452 @@
     "priorityHint": "保持连续登录即可优先获得优质匹配。",
     "continue": "继续",
     "levelComplete": "🎉 等级 {{level}} 完成！"
+  },
+  "onboarding": {
+    "progress": "注册进度",
+    "optional": "选填",
+    "back": "返回",
+    "continue": "继续",
+    "checkingPhotos": "正在检查你的照片…",
+    "addMorePhotos": "再添加 {{count}} 张照片即可继续",
+    "select": "请选择",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "pw": {
+      "tooShort": "太短 - 至少 6 个字符",
+      "okay": "一般",
+      "good": "良好",
+      "strong": "很强"
+    },
+    "steps": {
+      "account": {
+        "title": "创建你的账号",
+        "hint": "请使用你常用的邮箱。"
+      },
+      "location": {
+        "title": "你住在哪里？",
+        "hint": "以便为你推荐附近的人。"
+      },
+      "work": {
+        "title": "工作与教育",
+        "hintRequired": "告诉我们你的职业。",
+        "hintOptional": "分享你觉得合适的内容。"
+      },
+      "signs": {
+        "title": "选择你的文化星座/符号",
+        "hint": "至少选择 {{min}} 个。",
+        "hintOptional": "选择适合你的。"
+      },
+      "face": {
+        "title": "验证是你本人",
+        "hint": "快速自拍让 DripLove 更真实。它不会被显示。"
+      },
+      "photos": {
+        "title": "添加你最好的照片",
+        "hint": "至少添加 2 张清晰的本人照片。"
+      },
+      "bio": {
+        "title": "讲讲你的故事",
+        "hint": "几句真诚的话就够了。"
+      },
+      "details": {
+        "title": "多说一点关于你",
+        "hint": "帮助大家更了解你。"
+      },
+      "lifestyle": {
+        "title": "你的日常",
+        "hint": "选择适合你的。"
+      },
+      "interests": {
+        "title": "什么点亮了你？",
+        "hint": "选择你喜欢的 - 让匹配更准确。"
+      },
+      "love": {
+        "title": "你怎样去爱？",
+        "hint": "你心中美好关系的样子。"
+      },
+      "you": {
+        "title": "先从你开始",
+        "hint": "你的名字、生日和你是谁。"
+      },
+      "looking": {
+        "title": "你在找谁？",
+        "hint": "告诉我们你想认识谁。"
+      },
+      "celebrate": {
+        "title": "你已加入！",
+        "hint": "想让你的资料更出彩吗？"
+      },
+      "values": {
+        "title": "你最看重什么？",
+        "hint": "最多选 5 项 - 它们会影响我们为你推荐的人。"
+      },
+      "music": {
+        "title": "你听什么音乐？",
+        "hint": "选择你的风格 - 我们也会按音乐品味匹配。"
+      }
+    },
+    "face": {
+      "done": "人脸已验证"
+    },
+    "photos": {
+      "tipsLink": "照片技巧",
+      "add": "添加照片",
+      "alt": "你的照片 {{n}}",
+      "crop": "裁剪照片",
+      "remove": "删除照片",
+      "main": "主照片",
+      "approved": "已通过"
+    },
+    "promo": {
+      "toggle": "有优惠码吗？"
+    },
+    "tips": {
+      "title": "最佳头像照片技巧",
+      "subtitle": "清晰、真实的照片能获得更多匹配。最多添加 {{max}} 张。",
+      "doHeading": "建议",
+      "avoidHeading": "请避免",
+      "smile": "自然的微笑",
+      "light": "自然光线",
+      "life": "展示你的生活",
+      "sunglasses": "墨镜",
+      "dark": "光线不足",
+      "group": "合照",
+      "mirror": "镜子自拍",
+      "cta": "选择照片"
+    },
+    "skip": "跳过",
+    "showMore": "显示更多",
+    "showFewer": "收起",
+    "bio": {
+      "placeholder": "写几句关于你的话…",
+      "starter1": "我最开心的时候是…",
+      "starter2": "我理想的周末是…",
+      "starter3": "问问我关于…",
+      "starter4": "我在找一个…的人"
+    },
+    "details": {
+      "languages": "你会说的语言（最多 {{max}} 种）"
+    },
+    "lifestyle": {
+      "pets": "宠物",
+      "social": "社交媒体风格"
+    },
+    "interests": {
+      "counter": "已选 {{count}} / {{max}}"
+    },
+    "love": {
+      "loveStyle": "你表达爱的方式",
+      "communication": "你喜欢的沟通方式",
+      "family": "家庭规划"
+    },
+    "celebrate": {
+      "add": "补充更多（选填）",
+      "skip": "暂时跳过 - 带我进入 DripLove"
+    },
+    "bonus": "让它更出彩",
+    "welcomeBack": "欢迎你，{{name}} - 只差几项就完成了。",
+    "cheer": {
+      "start": "开局不错",
+      "great": "你做得很棒",
+      "almost": "快完成了！",
+      "last": "最后一步！"
+    },
+    "vibe": {
+      "selected": "已选"
+    },
+    "music": {
+      "artists": "喜爱的艺人",
+      "artistN": "艺人 {{n}}",
+      "artistPlaceholder": "例如 Burna Boy",
+      "link": "分享一首歌或歌单",
+      "linkHelp": "直接在你的资料里播放。",
+      "linkInvalid": "请粘贴 Spotify、Apple Music、YouTube 或 SoundCloud 链接。"
+    }
+  },
+  "circleUp": {
+    "permTitle": "相机和麦克风已关闭",
+    "permBody": "请在设备设置中为 DripLove 开启，以便开始直播。",
+    "permBodyIos": "请在“设置”中允许 DripLove 使用相机和麦克风，以便开始直播。",
+    "openSettings": "打开设置",
+    "tryAgain": "重试",
+    "endCallTitle": "结束通话？",
+    "endCallBody": "你将离开通话，并通知你的匹配对象。",
+    "endCall": "结束通话",
+    "stay": "留下",
+    "tapToPlay": "点按开始视频",
+    "finding": "正在为你寻找对象",
+    "searchNear": "先从你附近的人开始",
+    "searchCountry": "再扩大到全国",
+    "searchAbroad": "然后是海外",
+    "reconnecting": "正在重新连接…",
+    "connecting": "正在连接…",
+    "flipCamera": "切换摄像头",
+    "callEnded": "通话已结束",
+    "callEndedBody": "感谢你的连接。",
+    "findNew": "寻找新的对象",
+    "backToCircle": "返回 Circle"
+  },
+  "rating": {
+    "title": "喜欢 DripLove 吗？",
+    "body": "一个简单的评分，能帮助更多人找到真爱。",
+    "rateCta": "为 DripLove 评分",
+    "rateFailed": "无法打开应用商店。请在应用商店中搜索 DripLove 进行评分。",
+    "feedbackCta": "告诉我们需要改进什么",
+    "feedbackTitle": "帮助我们改进",
+    "feedbackSubtitle": "你的留言会直接发送给我们的团队。",
+    "feedbackPlaceholder": "哪里可以做得更好？",
+    "feedbackSend": "发送反馈",
+    "feedbackThanks": "谢谢你，我们会阅读每一条留言。",
+    "feedbackError": "发送失败，请重试。",
+    "cat_matches": "配对",
+    "cat_chat": "聊天",
+    "cat_photos": "照片与认证",
+    "cat_payments": "付款",
+    "cat_bug": "问题与速度",
+    "cat_other": "其他"
+  },
+  "permissions": {
+    "title": {
+      "camera": "相机权限已关闭",
+      "microphone": "麦克风权限已关闭",
+      "cameraMicrophone": "相机和麦克风权限已关闭",
+      "location": "位置权限已关闭",
+      "photos": "照片权限已关闭",
+      "notifications": "通知已关闭"
+    },
+    "bodyIos": "请在“设置”中开启，然后返回 DripLove。",
+    "bodyAndroid": "打开 设置 → 应用 → DripLove → 权限 并开启。",
+    "bodyWeb": "浏览器询问时请允许访问，或在浏览器的网站设置中开启。",
+    "openSettings": "打开设置",
+    "tryAgain": "重试"
+  },
+  "legal": {
+    "contents": "目录",
+    "related": "相关政策",
+    "links": {
+      "terms": "服务条款",
+      "privacy": "隐私政策",
+      "community": "社区准则",
+      "childSafety": "儿童安全",
+      "safetyTips": "安全提示"
+    }
+  },
+  "vibe": {
+    "sharedTitle": "你们都喜欢",
+    "more": "+{{count}}",
+    "musicMatch": "音乐匹配 - 你们有共同的品味",
+    "valuesTitle": "最看重的",
+    "musicTitle": "音乐品味",
+    "values": {
+      "honesty": "诚实",
+      "loyalty": "忠诚",
+      "humor": "幽默",
+      "kindness": "善良",
+      "respect": "尊重",
+      "communication": "沟通",
+      "family": "家庭",
+      "faith": "信仰",
+      "ambition": "上进心",
+      "growth": "成长",
+      "adventure": "冒险",
+      "affection": "温柔",
+      "stability": "稳定",
+      "independence": "独立",
+      "culture": "文化与根源",
+      "fun": "乐趣",
+      "generosity": "慷慨",
+      "intimacy": "亲密"
+    },
+    "genres": {
+      "afrobeats": "非洲节拍",
+      "amapiano": "阿玛皮亚诺",
+      "highlife": "高生活",
+      "hiphop": "嘻哈",
+      "rnb": "R&B",
+      "gospel": "福音",
+      "reggae": "雷鬼与舞厅",
+      "pop": "流行",
+      "rock": "摇滚",
+      "jazz": "爵士",
+      "soul": "灵魂乐",
+      "house": "浩室",
+      "latin": "拉丁",
+      "country": "乡村音乐",
+      "classical": "古典音乐",
+      "alternative": "另类音乐"
+    }
+  },
+  "handoff": {
+    "welcomeName": "欢迎，{{name}}",
+    "welcome": "欢迎来到 DripLove",
+    "line": "正在寻找你附近的人…"
+  },
+  "termsAccept": {
+    "hint": "勾选方框以继续",
+    "saving": "正在保存…",
+    "failed": "无法保存。请检查网络后重试。"
+  },
+  "cards": {
+    "heroMeet": "认识{{name}}",
+    "sharedHeadline": "你和{{name}}有共同点",
+    "basicsTitle": "速览",
+    "basics": {
+      "work": "工作",
+      "education": "学历",
+      "height": "身高",
+      "lives": "居住地",
+      "distance": "距离",
+      "languages": "语言",
+      "away": "相距{{distance}}"
+    },
+    "lookingTitle": "正在寻找",
+    "looking": {
+      "family": "家庭规划",
+      "loveStyle": "爱的方式",
+      "communication": "沟通方式"
+    },
+    "interestsTitle": "{{name}}的兴趣",
+    "interestsEyebrow": "兴趣",
+    "valuesEyebrow": "价值观",
+    "music": {
+      "artists": "单曲循环",
+      "play": "播放TA的歌"
+    },
+    "lifestyleTitle": "生活方式",
+    "lifestyle": {
+      "exercise": "运动",
+      "drinking": "饮酒",
+      "smoking": "吸烟",
+      "sleep": "作息",
+      "pets": "宠物"
+    },
+    "signTitle": "文化符号",
+    "sign": {
+      "shared": "你们有相同的符号 ✨",
+      "compatible": "与你的符号很相配 ✨"
+    },
+    "trustTitle": "你该知道",
+    "trust": {
+      "verified": "已验证资料",
+      "activeNow": "当前在线",
+      "activeToday": "今天活跃",
+      "activeWeek": "本周活跃",
+      "profile": "资料",
+      "lastSeen": "最近在线",
+      "headlineVerified": "{{name}}是真实且已验证的人",
+      "headlineActive": "{{name}}最近来过"
+    },
+    "starterTitle": "打破沉默",
+    "starter": {
+      "interest": "是什么让你爱上{{thing}}的？",
+      "value": "{{thing}}对你来说意味着什么？",
+      "music": "最近单曲循环的是哪首歌？",
+      "city": "你在{{city}}最喜欢的地方是哪里？",
+      "generic": "嗨{{name}} 👋 这周过得怎么样？",
+      "hint": "轻松的第一句话 - 配对后点击聊天即可。",
+      "headline": "跟 {{name}} 打个招呼"
+    },
+    "welcomeTitle": "新朋友",
+    "welcomeBody": "{{name}}刚刚加入 - 来做第一个打招呼的人吧。",
+    "promptFunFact": "趣事",
+    "promptFirstDate": "完美的第一次约会",
+    "promptGoogled": "最近搜索",
+    "heroHint": "点击卡片右侧查看更多"
+  },
+  "circle": {
+    "title": "Circle Up",
+    "subtitle": "找到与你同频的人。",
+    "verifiedNearYou": "附近有 {{count}} 位已认证成员",
+    "premiumTag": "会员",
+    "unlockTitle": "位成员在{{circle}}",
+    "unlockTitleMany": "加入{{circle}}中的众多成员",
+    "unlockBody": "解锁此圈子，遇见与你所求完全契合的成员。",
+    "unlockCta": "升级会员解锁",
+    "unlockCtaTrial": "开始免费试用",
+    "maybeLater": "以后再说",
+    "lockedCardTitle": "解锁后查看",
+    "endTitle": "这里的人你都看过了",
+    "endBody": "你已看完“{{circle}}”中的所有人。请稍后再来，或探索其他圈子。",
+    "endCta": "探索其他圈子",
+    "many": "很多",
+    "members": "成员",
+    "worldwideHint": "显示全应用总数",
+    "pickCountries": "选择你的国家"
+  },
+  "icebreaker": {
+    "errors": {
+      "dailyLimit": "你已达到今日破冰消息上限，请明天再试。",
+      "generic": "发送失败，请重试。",
+      "invalid": "请写一条简短的消息（最多 {{max}} 个字符）。",
+      "rateLimited": "你发送的破冰消息有点多，请稍后再试。",
+      "unavailable": "对方暂时无法接收破冰消息。"
+    },
+    "inbox": {
+      "accept": "接受并开始聊天",
+      "acceptNote": "接受后你将与 {{name}} 配对并打开聊天。如果你没有兴趣，不会有任何回复发出。",
+      "decline": "暂时不要",
+      "empty": "目前没有破冰消息",
+      "emptySub": "当有人给你发来第一条消息时，会显示在这里。",
+      "error": "暂时无法完成，请重试。",
+      "intro": "接受后会创建配对并打开你的聊天。",
+      "matched": "配对成功！",
+      "matchedBody": "你和 {{name}} 现在可以聊天了。",
+      "readMore": "展开",
+      "reportBlock": "举报或屏蔽",
+      "requestTitle": "破冰消息",
+      "said": "{{name}} 说",
+      "showLess": "收起",
+      "title": "破冰消息"
+    },
+    "matched": {
+      "body": "在聊天中打个招呼吧。",
+      "cta": "打开聊天",
+      "title": "你们已经配对"
+    },
+    "quota": "免费次数还剩 {{remaining}}/{{limit}}",
+    "quotaEmpty": "没有免费破冰次数了",
+    "row": {
+      "aria": "打开破冰消息，{{count}} 条待处理",
+      "sub": "{{count}} 条消息等你查看"
+    },
+    "sayHi": "打招呼",
+    "sentLabel": "破冰消息已发送",
+    "sheet": {
+      "done": "完成",
+      "hint": "对方会先看到。如果对方接受，你们就配对成功，可以继续聊天。",
+      "ideas": "需要灵感吗？",
+      "placeholder": "写一条友好的第一条消息…",
+      "safety": "是否接受由对方决定。请友善相待——你随时可以举报或屏蔽。",
+      "send": "发送破冰消息",
+      "sending": "发送中…",
+      "sentBody": "{{name}} 回复时我们会通知你。",
+      "sentTitle": "已发送！",
+      "to": "发给 {{name}}",
+      "title": "给 {{name}} 发送你的第一条消息"
+    },
+    "someone": "有人",
+    "title": "破冰",
+    "toast": {
+      "body": "打开查看他们的消息",
+      "title": "{{name}} 向你破冰",
+      "view": "查看"
+    },
+    "upsell": {
+      "body": "升级 Premium，想和多少人破冰都可以。",
+      "cta": "升级 Premium",
+      "later": "暂时不要",
+      "title": "你的 {{limit}} 条免费破冰消息已用完"
+    },
+    "useOpener": "使用这句开场白：{{text}}",
+    "copyOpener": "复制：{{text}}",
+    "copied": "已复制",
+    "chances": {
+      "left_one": "还剩 {{count}} 次机会",
+      "left_other": "还剩 {{count}} 次机会",
+      "of": "免费机会还剩 {{remaining}}/{{limit}} 次",
+      "none": "机会已用完 - 升级 Premium",
+      "unlimited": "无限机会"
+    }
   }
 }

@@ -4,6 +4,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
+import { claimPaymentReference, isAcceptableGhsPayment } from '../_shared/payment-guards.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -134,6 +135,49 @@ serve(async (req) => {
       return json(403, { ok: false, verified: false, error: 'Reference does not belong to this user' })
     }
 
+    // The reference must also belong to this user per the metadata the server
+    // stamped at init time (when present).
+    const metaFields = (paystackData as unknown as { metadata?: { custom_fields?: unknown } })?.metadata?.custom_fields
+    if (Array.isArray(metaFields)) {
+      for (const f of metaFields as Array<{ variable_name?: unknown; value?: unknown }>) {
+        const name = typeof f?.variable_name === 'string' ? f.variable_name : ''
+        if ((name === 'user_id' || name === 'driplove_user_id') && typeof f.value === 'string' && f.value && f.value !== user.id) {
+          return json(403, { ok: false, verified: false, error: 'Reference does not belong to this user' })
+        }
+      }
+    }
+
+    // The client chooses the amount at init time, so a successful charge only
+    // counts as a premium purchase when the amount is plausibly the real price.
+    const paidAmountMajor = Number(paystackData?.amount || 0) / 100
+    const paidCurrency = paystackData?.currency || 'GHS'
+    const amountCheck = await isAcceptableGhsPayment(supabase, paidAmountMajor, paidCurrency)
+    if (!amountCheck.ok) {
+      console.warn(`[PAYSTACK-VERIFY] Payment not accepted as premium purchase: ${amountCheck.reason} (ref ${reference}, user ${user.id})`)
+      return json(400, {
+        ok: false,
+        verified: false,
+        error: 'This payment amount does not match the premium price. Please contact support if you were charged.',
+      })
+    }
+
+    // Idempotency: a payment reference extends premium exactly once, however
+    // many times this endpoint is called or the webhook also delivers it.
+    const claim = await claimPaymentReference(supabase, {
+      user_id: user.id,
+      amount: paidAmountMajor,
+      currency: paidCurrency,
+      payment_method: 'paystack',
+      transaction_id: reference,
+    })
+    if (!claim.claimed) {
+      console.log(`[PAYSTACK-VERIFY] Reference ${reference} already processed, not extending again`)
+      return json(200, { ok: true, verified: true, reference, already_processed: true })
+    }
+    const releaseClaim = async () => {
+      if (claim.paymentId) await supabase.from('subscription_payments').delete().eq('id', claim.paymentId)
+    }
+
     // Save authorization for recurring billing (if available and reusable)
     const authorization = paystackData?.authorization
     if (authorization?.authorization_code && authorization.reusable !== false) {
@@ -215,6 +259,7 @@ serve(async (req) => {
         .eq('id', existing.id)
 
       if (updateError) {
+        await releaseClaim()
         return json(500, { ok: false, error: 'Failed to update subscription', details: updateError.message })
       }
     } else {
@@ -226,27 +271,13 @@ serve(async (req) => {
 
       const { error: insertError } = await supabase.from('user_subscriptions').insert([insertPayload])
       if (insertError) {
+        await releaseClaim()
         return json(500, { ok: false, error: 'Failed to create subscription', details: insertError.message })
       }
     }
 
-    // Record the payment
-    const { data: paymentRecord, error: paymentError } = await supabase
-      .from('subscription_payments')
-      .insert({
-        user_id: user.id,
-        amount: (paystackData?.amount || 0) / 100, // Convert back to major units
-        currency: paystackData?.currency || 'GHS',
-        payment_method: 'paystack',
-        transaction_id: reference,
-      })
-      .select('id')
-      .single()
-
-    if (paymentError) {
-      console.error('[PAYSTACK-VERIFY] Error recording payment:', paymentError)
-      // Don't fail, subscription is already activated
-    }
+    // The payment row was already recorded when the reference was claimed above.
+    const paymentRecord = claim.paymentId ? { id: claim.paymentId } : null
 
     // Process referral commission if user signed up with a promo code
     if (paymentRecord?.id) {

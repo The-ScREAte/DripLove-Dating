@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { SlidersHorizontal } from 'lucide-react';
 
 export type DiscoverCategory = 'mine' | 'doubleDate' | 'signMatch';
@@ -22,10 +23,21 @@ interface DiscoverTopBarProps {
 // The type/state still supports it (see DiscoverPage's discoverCategory and
 // its "coming soon" overlay) so wiring the tab back in later is just adding
 // a row here, not rebuilding anything.
-const CATEGORIES: { key: DiscoverCategory; label: string }[] = [
-  { key: 'mine', label: 'For You' },
-  { key: 'signMatch', label: 'Sign Match' },
+const CATEGORIES: { key: DiscoverCategory; labelKey: string }[] = [
+  { key: 'mine', labelKey: 'discover.modeForYou' },
+  { key: 'signMatch', labelKey: 'discover.modeSignMatch' },
 ];
+
+// The one-line "what is Sign Match" caption is shown a single time, the first
+// time someone opens that mode, then never again - no standing instructions.
+const SIGN_MATCH_HINT_KEY = 'dl_sign_match_hint_seen';
+const readHintSeen = () => {
+  try {
+    return localStorage.getItem(SIGN_MATCH_HINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
 
 // No outer pill/card - a plain feathered gradient (opaque at the header,
 // fading to nothing into the photo) that reads as one continuous surface
@@ -45,11 +57,62 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
   onCategoryChange,
   onFilterClick,
 }) => {
+  const { t } = useTranslation();
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [indicator, setIndicator] = useState<number | null>(null);
+  const [hintDone, setHintDone] = useState(readHintSeen);
+  const showHint = activeCategory === 'signMatch' && !hintDone;
+
+  // Sliding indicator: the active label's centre is READ from layout, but the move
+  // itself is a transform, so the animation stays compositor-only.
+  const measure = useCallback(() => {
+    const el = tabRefs.current[activeCategory];
+    if (el) setIndicator(el.offsetLeft + el.offsetWidth / 2 - 10);
+  }, [activeCategory]);
+
+  useLayoutEffect(() => {
+    if (isActiveTab) measure();
+  }, [isActiveTab, measure, t]);
+
+  useEffect(() => {
+    if (!isActiveTab) return;
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isActiveTab, measure]);
+
+  // One-time Sign Match caption (auto-hides, never blocks touches).
+  useEffect(() => {
+    if (!isActiveTab || !showHint) return;
+    const id = window.setTimeout(() => {
+      setHintDone(true);
+      try {
+        localStorage.setItem(SIGN_MATCH_HINT_KEY, '1');
+      } catch {
+        /* ignore - the caption may show once more next session */
+      }
+    }, 4000);
+    return () => window.clearTimeout(id);
+  }, [isActiveTab, showHint]);
+
+  // Arrow / Home / End move between modes (roving tabindex, WAI-ARIA tabs pattern).
+  const onTabKeyDown = (e: React.KeyboardEvent, index: number) => {
+    let next = -1;
+    if (e.key === 'ArrowRight') next = (index + 1) % CATEGORIES.length;
+    else if (e.key === 'ArrowLeft') next = (index - 1 + CATEGORIES.length) % CATEGORIES.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = CATEGORIES.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    const key = CATEGORIES[next].key;
+    onCategoryChange(key);
+    tabRefs.current[key]?.focus();
+  };
+
   if (!isActiveTab) return null;
 
   return createPortal(
     <div
-      className="fixed inset-x-0 z-[9999] pointer-events-none"
+      className="dl-under-popup fixed inset-x-0 z-[9999] pointer-events-none"
       style={{
         top: 'var(--app-header-height, 72px)',
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0) 100%)',
@@ -71,8 +134,8 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
         <button
           type="button"
           onClick={onFilterClick}
-          aria-label="Discover filters"
-          className="shrink-0 w-9 h-9 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
+          aria-label={t('discover.filtersAria')}
+          className="dl-hit shrink-0 w-9 h-9 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
         >
           <SlidersHorizontal className="w-[22px] h-[22px]" />
         </button>
@@ -84,24 +147,47 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
             overflow-x-auto, so they stay put; the carousel dots are an
             entirely separate portal in MatchCard.tsx and were never part of
             this row to begin with. */}
-        <div className="flex-1 flex items-center justify-center gap-3 overflow-x-auto scrollbar-hide">
-          {CATEGORIES.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onCategoryChange(key)}
-              className="shrink-0 h-7 min-h-0 flex flex-col items-center justify-center gap-0.5 text-[13px] leading-none font-semibold outline-none focus:outline-none focus-visible:outline-none"
-            >
-              <span className={activeCategory === key ? 'text-white' : 'text-white/70'}>
-                {label}
-              </span>
-              <span
-                className={`h-[2px] rounded-full transition-all duration-200 ${
-                  activeCategory === key ? 'w-5 bg-pink-500' : 'w-0 bg-transparent'
-                }`}
-              />
-            </button>
-          ))}
+        <div
+          role="tablist"
+          aria-label={t('discover.discover')}
+          className="relative flex-1 flex items-center justify-center gap-3 overflow-x-auto scrollbar-hide py-2 -my-2"
+        >
+          {CATEGORIES.map(({ key, labelKey }, i) => {
+            const selected = activeCategory === key;
+            return (
+              <button
+                key={key}
+                ref={(el) => { tabRefs.current[key] = el; }}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => onCategoryChange(key)}
+                onKeyDown={(e) => onTabKeyDown(e, i)}
+                className="dl-hit shrink-0 h-7 min-h-0 px-1 flex items-center justify-center text-[13px] leading-none font-semibold outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-full"
+              >
+                <span
+                  className={selected ? 'text-white' : 'text-white/70'}
+                  style={{ transition: 'color var(--dl-dur) var(--dl-ease-out)' }}
+                >
+                  {t(labelKey)}
+                </span>
+              </button>
+            );
+          })}
+          {/* Sliding indicator: decorative (the selection is announced by aria-selected). */}
+          {indicator !== null && (
+            <span
+              aria-hidden="true"
+              className="absolute left-0 w-5 h-[2px] rounded-full bg-brand-gradient pointer-events-none"
+              style={{
+                bottom: 6,
+                transform: `translate3d(${indicator}px, 0, 0)`,
+                transition: 'transform var(--dl-dur-slow) var(--dl-ease-out)',
+                willChange: 'transform',
+              }}
+            />
+          )}
         </div>
 
         {/* Reserved so the tabs stay centered against the filter icon - this
@@ -110,6 +196,14 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
             this slot at the same top offset. */}
         <div className="w-9 h-9 shrink-0" aria-hidden="true" />
       </div>
+      {showHint && (
+        <p
+          role="status"
+          className="dl-rise absolute inset-x-0 bottom-1.5 text-center text-[11px] leading-none text-white/80 pointer-events-none"
+        >
+          {t('discover.signMatchHint')}
+        </p>
+      )}
     </div>,
     document.body
   );

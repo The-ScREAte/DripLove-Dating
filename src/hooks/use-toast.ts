@@ -1,5 +1,6 @@
 import * as React from "react"
 
+import { recordRatingNegative } from "@/rating/ratingMoments"
 import type {
   ToastActionElement,
   ToastProps,
@@ -71,7 +72,7 @@ const addToRemoveQueue = (toastId: string) => {
   toastTimeouts.set(toastId, timeout)
 }
 
-export const reducer = (state: State, action: Action): State => {
+const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
       return {
@@ -167,6 +168,8 @@ const shouldShowToast = (props: Toast): boolean => {
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  // A visible error is a bad moment - keeps the store-review engine quiet for a while.
+  if (props.variant === "destructive") recordRatingNegative("error_toast")
 
   const update = (props: ToasterToast) =>
     dispatch({

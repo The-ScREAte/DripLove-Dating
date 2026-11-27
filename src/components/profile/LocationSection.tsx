@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -9,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Globe, Crown, ChevronRight } from 'lucide-react';
 import LocationInput from '@/components/forms/LocationInput';
 import UnlockCountriesDialog from './UnlockCountriesDialog';
-import { getCountriesList } from '@/constants/locationData';
+import { getCountriesList, getCountryName } from '@/constants/locationData';
 import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/utils/distanceUnits';
 
 // Must match FREE_USER_MAX_DISTANCE_KM / PREMIUM_USER_MAX_DISTANCE_KM in
@@ -60,12 +58,6 @@ const LocationSection = ({
   const unlockedCountries = editedProfile.unlocked_countries || [];
   const distanceMax = isPremium ? PREMIUM_MAX_DISTANCE_KM : FREE_MAX_DISTANCE_KM;
 
-  const getCountryName = (code: string) => {
-    const countries = getCountriesList();
-    const country = countries.find(c => c.code === code);
-    return country?.name || code;
-  };
-
   return (
     <div className="space-y-6">
       {/* Matching Preferences Section */}
@@ -79,7 +71,7 @@ const LocationSection = ({
             <div>
               <Label htmlFor="gender" className="text-white">{t('profile.gender')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('gender', value)} value={editedProfile.gender}>
-                <SelectTrigger id="gender" className="w-full bg-black/40 border-pink-500/30 text-white">
+                <SelectTrigger tone="dark" id="gender" className="w-full">
                   <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent className="bg-black border-pink-500/30">
@@ -92,7 +84,7 @@ const LocationSection = ({
             <div>
               <Label htmlFor="preference" className="text-white">{t('profile.lookingFor')}</Label>
               <Select disabled={!isEditing} onValueChange={(value) => onSelectChange?.('preference', value)} value={editedProfile.preference}>
-                <SelectTrigger id="preference" className="w-full bg-black/40 border-pink-500/30 text-white">
+                <SelectTrigger tone="dark" id="preference" className="w-full">
                   <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent className="bg-black border-pink-500/30">
@@ -215,11 +207,8 @@ const LocationSection = ({
               </div>
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
+            <Button variant="line" size="sm" className="text-black justify-between"
               onClick={() => setShowCountryDialog(true)}
-              className="h-7 min-h-0 px-1.5 text-xs flex items-center justify-between gap-1.5 bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
               disabled={!isEditing}
             >
               <span className="flex items-center gap-1.5">

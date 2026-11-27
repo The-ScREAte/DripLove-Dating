@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { LogOut, AlertTriangle, Mail, Loader2, MessageCircle, ChevronDown, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import RateAppButton from '@/components/RateAppButton';
+import RateUsCard from '@/rating/RateUsCard';
 import LanguageSelector from '@/components/LanguageSelector';
 import LiveChat from '@/components/LiveChat';
 
@@ -210,10 +210,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
             <span className="font-semibold text-white">{t('settings.needHelp')}</span>
           </div>
 
-          <Button
+          <Button variant="primary" size={isAndroidNative ? 'sm' : 'md'} className="w-full mb-3"
             onClick={() => setShowLiveChat(true)}
-            size={isAndroidNative ? 'sm' : 'default'}
-            className={`w-full mb-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium ${isAndroidNative ? 'text-xs' : ''}`}
+           
+           
           >
             <MessageCircle className="w-4 h-4 mr-2" />
             Chat with Support
@@ -244,16 +244,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
           </div>
         )}
 
-        {/* 3. Rate App - Positive action */}
-        <div className="bg-black p-4 rounded-lg border border-yellow-500/30">
-          <div className="flex flex-col space-y-3">
-            <span className="font-medium text-white">{t('settings.enjoyingDripLove')}</span>
-            <p className={isAndroidNative ? 'text-xs text-white/60' : 'text-sm text-white/60'}>
-              {t('settings.rateExperience')}
-            </p>
-            <RateAppButton className="w-full sm:w-auto" />
-          </div>
-        </div>
+        {/* 3. Rate / feedback - user-initiated: opens the store review page (no reward) */}
+        <RateUsCard />
 
         {/* 4. Legal Links - Reference info */}
         {!hideLogoutTermsPrivacy && (onShowTerms || onShowPrivacy) && (
@@ -338,10 +330,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               <>
                 {/* Paystack - Direct reactivation via button */}
                 {subscriptionStatus.payment_method === 'paystack' && (
-                  <Button
-                    variant="outline"
-                    size={isAndroidNative ? 'sm' : 'default'}
-                    className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                  <Button variant="soft" size={isAndroidNative ? 'sm' : 'md'} className="w-full"
+                   
+                   
+                   
                     onClick={async () => {
                       try {
                         const { data: { user } } = await supabase.auth.getUser();
@@ -385,10 +377,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   subscriptionStatus.payment_method !== 'apple' &&
                   subscriptionStatus.payment_method !== 'google' &&
                   subscriptionStatus.payment_method !== 'iap' && (
-                    <Button
-                      variant="outline"
-                      size={isAndroidNative ? 'sm' : 'default'}
-                      className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                    <Button variant="soft" size={isAndroidNative ? 'sm' : 'md'} className="w-full"
+                     
+                     
+                     
                       onClick={async () => {
                         try {
                           const { data: { user } } = await supabase.auth.getUser();
@@ -436,20 +428,20 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                       iPhone Settings → [Your Name] → Subscriptions → DripLove → Turn on Auto-Renew
                     </p>
                     <div className="mt-3 space-y-2">
-                      <Button
-                        variant="outline"
-                        size={isAndroidNative ? 'sm' : 'default'}
-                        className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                      <Button variant="soft" size={isAndroidNative ? 'sm' : 'md'} className="w-full"
+                       
+                       
+                       
                         onClick={async () => {
                           await openStoreSubscriptionManagement();
                         }}
                       >
                         Continue with Subscription
                       </Button>
-                      <Button
-                        variant="outline"
-                        size={isAndroidNative ? 'sm' : 'default'}
-                        className={`w-full ${isAndroidNative ? 'text-xs' : ''}`}
+                      <Button variant="line" size={isAndroidNative ? 'sm' : 'md'} className="w-full"
+                       
+                       
+                       
                         onClick={async () => {
                           await refetchSubscription();
                           toast({ title: 'Refreshed', description: 'We re-checked your subscription status.' });
@@ -471,20 +463,20 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                       Play Store → Menu → Subscriptions → DripLove → Resubscribe
                     </p>
                     <div className="mt-3 space-y-2">
-                      <Button
-                        variant="outline"
-                        size={isAndroidNative ? 'sm' : 'default'}
-                        className={`w-full flex items-center justify-center space-x-2 border-green-300 text-green-600 hover:bg-green-50 ${isAndroidNative ? 'text-xs' : ''}`}
+                      <Button variant="soft" size={isAndroidNative ? 'sm' : 'md'} className="w-full"
+                       
+                       
+                       
                         onClick={async () => {
                           await openStoreSubscriptionManagement();
                         }}
                       >
                         Continue with Subscription
                       </Button>
-                      <Button
-                        variant="outline"
-                        size={isAndroidNative ? 'sm' : 'default'}
-                        className={`w-full ${isAndroidNative ? 'text-xs' : ''}`}
+                      <Button variant="line" size={isAndroidNative ? 'sm' : 'md'} className="w-full"
+                       
+                       
+                       
                         onClick={async () => {
                           await refetchSubscription();
                           toast({ title: 'Refreshed', description: 'We re-checked your subscription status.' });
@@ -521,10 +513,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                   <p className="text-xs leading-relaxed text-white/50">
                     Cancelling stops auto-renew. You keep Premium until the end of your current billing period.
                   </p>
-                  <Button
+                  <Button variant="line" size="md" className="w-full"
                     type="button"
-                    variant="outline"
-                    className="h-10 w-full rounded-full border-orange-400/40 bg-transparent text-sm font-medium text-orange-300 hover:bg-orange-500/10 hover:text-orange-200"
                     onClick={() => navigate('/unsubscribe')}
                   >
                     {t('settings.cancelSubscription')}
@@ -536,10 +526,8 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               </p>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button
+                  <Button variant="dangerSoft" size="md" className="w-full"
                     type="button"
-                    variant="outline"
-                    className="h-10 w-full rounded-full border-red-500/40 bg-transparent text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300"
                   >
                     Delete account
                   </Button>
@@ -567,10 +555,10 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-black border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white">No, Cancel</AlertDialogCancel>
-                    <AlertDialogAction
+                    <AlertDialogCancel>No, Cancel</AlertDialogCancel>
+                    <AlertDialogAction variant="danger"
                       onClick={handleDeleteAccountRequest}
-                      className="bg-red-600 hover:bg-red-700"
+                     
                     >
                       Yes, Delete My Account
                     </AlertDialogAction>
@@ -619,20 +607,17 @@ const AccountActions = ({ currentUser, onLogout, onShowTerms, onShowPrivacy, hid
               )}
             </div>
             <DialogFooter>
-              <Button
-                variant="outline"
+              <Button variant="line" size="md" className="text-white"
                 onClick={() => {
                   setShowDeleteConfirmDialog(false);
                   setDeleteConfirmText('');
                   setDeleteError('');
                 }}
                 disabled={deletingAccount}
-                className="border-pink-500/30 text-white hover:bg-neutral-800 hover:text-white"
               >
                 Cancel
               </Button>
-              <Button
-                variant="destructive"
+              <Button variant="danger" size="md"
                 onClick={handleDeleteAccount}
                 disabled={deletingAccount || deleteConfirmText.trim().toUpperCase() !== DELETE_CONFIRMATION_PHRASE}
               >

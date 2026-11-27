@@ -1,4 +1,4 @@
-export type AnswerQuality = 'optimal' | 'acceptable' | 'poor';
+type AnswerQuality = 'optimal' | 'acceptable' | 'poor';
 
 export interface Scenario {
   id: number;

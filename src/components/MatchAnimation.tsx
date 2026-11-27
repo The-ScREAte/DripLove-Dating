@@ -136,16 +136,15 @@ const MatchAnimation = ({
           )}
 
           <div className="space-y-3">
-            <Button
+            <Button variant="primary" size="lg" className="w-full"
               onClick={handleStartChat}
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-base py-3"
             >
               <span className="flex items-center justify-center gap-2">
                 <MessageCircle className="w-5 h-5" />
                 {t('match.startChatting')}
               </span>
             </Button>
-            <Button onClick={handleClose} variant="outline" className="w-full bg-transparent border border-pink-500/25 text-gray-300 text-sm font-normal hover:bg-neutral-800 hover:text-white">
+            <Button variant="line" size="md" className="text-white w-full" onClick={handleClose}>
               {t('match.keepSwiping')}
             </Button>
           </div>

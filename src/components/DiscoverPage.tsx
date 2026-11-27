@@ -19,7 +19,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, startTransiti
 import { useNavigate } from 'react-router-dom';
 import { isAndroidPlatform } from '@/utils/platformUtils';
 import { dropBlobUrl } from '@/utils/imageCache';
-import { calculateAge } from '@/utils/discoverCache';
+import { calculateAge } from '@/utils/dateUtils';
 import { normalizeCountryCode } from '@/utils/countryCode';
 import { getStratifiedBatches } from '@/utils/stratifiedSampling';
 import { applyActivityWeighting, getSwipeFatigueRescueCandidates, injectRescueProfiles } from '@/utils/activityWeighting';
@@ -62,23 +62,22 @@ import { calculateProfileCompletion, getTodaySwipeCount } from '@/utils/profileC
 import { parseFavorites } from '@/constants/favorites';
 import { readCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { getLanguageName } from '@/utils/languageNames';
-import PremiumUpgrade from './PremiumUpgrade';
-import MatchAnimation from './MatchAnimation';
 import MatchCard from './discover/MatchCard';
 import SwipeButtons from './discover/SwipeButtons';
+import { DiscoverSkeleton, DiscoverEmptyState } from './discover/DiscoverStates';
+import { useBackClose } from '@/utils/backStack';
+import { useCardSwipe, CARD_EXIT_MS, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
 import AdCard from './discover/AdCard';
 import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar';
 import DiscoverFiltersModal from './discover/DiscoverFiltersModal';
 import { hasSignCompatibility } from '@/utils/signCompatibility';
-import RatingFunnel from './RatingFunnel';
-import VerifyIdentityPrompt from './VerifyIdentityPrompt';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
-import HoppingLogo from '@/components/HoppingLogo';
-import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb } from '@/utils/ratingFunnelStorage';
-import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
-import { isVerifyPromptEligible, markVerifyPromptTriggered } from '@/utils/verifyPromptStorage';
+import { recordRatingMoment, recordRatingNegative } from '@/rating/ratingMoments';
+import { requestPopup, openPremiumUpgrade, closePopup, popupTimesShown, useIsPopupActive, usePopupBusy } from '@/popups';
 import { CurrentUser, PotentialMatch } from '@/types';
 import { publishSwipeDecision } from '@/utils/swipeSync';
+import { getGenderFilter } from '@/utils/genderPreference';
+import { markAppContentReady } from '@/utils/appContentReady';
 
 // How many lifetime swipes before an unverified user sees the "verify your
 // identity" prompt (shown once, ever - see verifyPromptStorage.ts). Set to 1
@@ -133,9 +132,6 @@ const PASS_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 // separate places across this file.
 const DEFAULT_MAX_DISTANCE_KM = 50;
 
-// Fly-off duration (ms) for a committed swipe. The next profile is promoted
-// once this elapses, so it doubles as the gap between back-to-back swipes.
-const CARD_EXIT_MS = 320;
 
 // Resumes the deck at whatever card the user was actually looking at, not
 // index 0 - `driplove_last_profile_<userId>` is written by moveToNext() as
@@ -390,6 +386,27 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasCompletedInitialFetch, setHasCompletedInitialFetch] = useState(false);
   const hasCompletedInitialFetchRef = useRef(false);
+  // Tells the sign-up hand-off screen (Index.tsx) the first tab has real content.
+  useEffect(() => {
+    if (hasCompletedInitialFetch) markAppContentReady();
+  }, [hasCompletedInitialFetch]);
+  // First real card after the loading skeleton: one soft fade/rise. The class is on from the very first
+  // content render (sawSkeletonRef) so there is no full-opacity frame before it, and removed again after
+  // it has played so tab switches - which restart CSS animations - never replay it.
+  const hasDeckContent = potentialMatches.length > 0;
+  const sawSkeletonRef = useRef(false);
+  const [freshReveal, setFreshReveal] = useState(false);
+  useEffect(() => {
+    if (!hasDeckContent) {
+      sawSkeletonRef.current = true;
+      return undefined;
+    }
+    if (!sawSkeletonRef.current) return undefined;
+    sawSkeletonRef.current = false;
+    setFreshReveal(true);
+    const id = window.setTimeout(() => setFreshReveal(false), 600);
+    return () => window.clearTimeout(id);
+  }, [hasDeckContent]);
   useEffect(() => {
     hasCompletedInitialFetchRef.current = hasCompletedInitialFetch;
   }, [hasCompletedInitialFetch]);
@@ -423,42 +440,17 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
   const [passedUsers, setPassedUsers] = useState<PassedUser[]>([]);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
-  const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
-
-  // Navigating away from this tab always drops the premium-upgrade screen, so
-  // coming back to Discover never lands on a stale upgrade screen instead of
-  // the actual swipe deck.
-  useEffect(() => {
-    if (!isActiveTab) {
-      setShowPremiumUpgrade(false);
-    }
-  }, [isActiveTab]);
+  // The upgrade page, match celebration, verify nudge and swipe tutorial are all popups owned by
+  // the popup coordinator (src/popups): this page only ASKS for them, it never opens its own.
   const [isOutOfSwipes, setIsOutOfSwipes] = useState(false);
-  const [showMatchAnimation, setShowMatchAnimation] = useState(false);
-  const [matchedUser, setMatchedUser] = useState<PotentialMatch | null>(null);
-  const [showRatingFunnel, setShowRatingFunnel] = useState(false);
-  const [showVerifyPrompt, setShowVerifyPrompt] = useState(false);
-  // A match just happened and its screen is about to close - the rating
-  // funnel may fire once that settles, subject to isRatingFunnelEligible()
-  // (DB has_rated_app + local cooldown), not just on the user's first-ever
-  // match - a single missed shot at a brand-new, OS-quota-throttled review
-  // prompt should never be the only chance a user ever gets to be asked.
-  const pendingMatchForRatingRef = useRef(false);
+  // The out-of-swipes screen is itself the upsell: keep every other calm popup off it.
+  usePopupBusy('blocking-screen', isOutOfSwipes);
 
-  // The account's has_rated_app flag is the source of truth (survives a
-  // reinstall or a different device, unlike localStorage) - synced into the
-  // local cache once per load so isRatingFunnelEligible()'s synchronous
-  // check (needed at the exact moment a match closes) stays correct.
+  // Hitting the swipe limit is a frustration moment: the rating engine stays
+  // quiet for a while afterwards.
   useEffect(() => {
-    if (!currentUser?.id) return;
-    let cancelled = false;
-    fetchHasRatedAppFromDb(currentUser.id).then((hasRated) => {
-      if (!cancelled) syncRatingFunnelFromDb(hasRated);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser?.id]);
+    if (isOutOfSwipes) recordRatingNegative('out_of_swipes');
+  }, [isOutOfSwipes]);
 
   // Store users who liked the current user (for "they liked you" notification)
   const [usersWhoLikedMeIds, setUsersWhoLikedMeIds] = useState<string[]>([]);
@@ -837,44 +829,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     }
   }, [potentialMatches.length, currentIndex]);
 
-  // --- BEGIN: Swipe Guide Popup State ---
-  const [showSwipeGuide, setShowSwipeGuide] = useState(false);
-  // The timer lives in a ref and is NEVER cancelled by effect cleanup: swiping
-  // updates profile/swipe state, which can re-run this effect (or briefly flip
-  // the page into the loading/out-of-swipes/ad render branch) — the old
-  // clearTimeout-on-cleanup let exactly that kill the guide mid-display. Only
-  // the 25s timeout (or an explicit dismiss below) hides the guide now.
-  const swipeGuideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Dismisses the guide immediately (used when the user actually swipes it,
-  // instead of only auto-hiding after the timer) and permanently marks it
-  // seen either way, same as the timeout path.
-  const dismissSwipeGuide = useCallback(() => {
-    if (swipeGuideTimerRef.current) {
-      clearTimeout(swipeGuideTimerRef.current);
-      swipeGuideTimerRef.current = null;
-    }
-    setShowSwipeGuide(false);
-    if (currentUser?.id) {
-      try {
-        localStorage.setItem(`driplove_swipe_guide_shown_${currentUser.id}`, 'true');
-      } catch {
-        // ignore
-      }
-    }
-  }, [currentUser?.id]);
+  // --- BEGIN: Swipe Guide (a coordinator popup; this page just draws the overlay while it's active) ---
+  const showSwipeGuide = useIsPopupActive('swipe-guide');
+  const dismissSwipeGuide = useCallback(() => closePopup('swipe-guide'), []);
   useEffect(() => {
-    // Only show for new users - keyed per account (not a single blanket
-    // flag), so a fresh signup on a device that's already seen this for a
-    // previous account still gets to see it once for their own account.
-    if (!currentUser?.id) return;
-    const shownKey = `driplove_swipe_guide_shown_${currentUser.id}`;
-    if (localStorage.getItem(shownKey)) return;
-    if (swipeGuideTimerRef.current) return; // timer already running — don't restart
-    setShowSwipeGuide(true);
-    swipeGuideTimerRef.current = setTimeout(() => {
-      dismissSwipeGuide();
-    }, 25000); // 25 seconds
-  }, [currentUser?.id, dismissSwipeGuide]);
+    // Once per account (the coordinator remembers); it waits for a calm moment on this tab and
+    // closes itself after 25 s.
+    if (currentUser?.id) requestPopup('swipe-guide');
+  }, [currentUser?.id]);
 
   // The guide overlay is swipeable, but ONLY itself - it has its own fully
   // separate drag state/handlers here, completely decoupled from the real
@@ -1156,67 +1118,31 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, [currentUser?.id]);
 
   // Swipe tracking (refs avoid stale state)
-  const startXRef = useRef(0);
-  const startYRef = useRef(0);
-  const currentXRef = useRef(0);
-  const currentYRef = useRef(0);
-
+  // Coarse swipe UI state only (drag started / direction / distance in coarse steps).
+  // The per-frame card transform and heart/X stamps are written straight to the DOM
+  // by useCardSwipe, so the page does not re-render on every pointer move.
   const [swipeUI, setSwipeUI] = useState<{
     isDragging: boolean;
-    swipeDirection: 'left' | 'right' | null;
+    swipeDirection: SwipeDir | null;
     swipeDistance: number;
-    dragOffset: number;
-    dragOffsetY: number;
-  }>({ isDragging: false, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 });
+  }>({ isDragging: false, swipeDirection: null, swipeDistance: 0 });
 
-  const isDraggingRef = useRef(false);
   // Blocks the swipe/drag gesture start handlers while the report modal (opened from inside
   // MatchCard) is up — otherwise a touch/drag on the card behind the modal both moves the card
   // and drags the modal along with it, since the modal previously inherited the card's transform.
   const isReportModalOpenRef = useRef(false);
   const [exitingCard, setExitingCard] = useState(false);
-  const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null);
-  const latestDeltaRef = useRef(0);
-  const latestDeltaYRef = useRef(0);
-  const rafScheduledRef = useRef(false);
-  const rafIdRef = useRef<number | null>(null);
-  // Ref to whichever card element is currently mounted (the regular swipe card
-  // or the ad-card variant - only one is ever rendered at a time, both attach
-  // the same ref). During an active drag, the transform is written directly to
-  // this DOM node's style in the rAF callback below, instead of only through
-  // React state - a state update here still re-renders this whole (very large)
-  // page, and on weaker Android hardware that render can take longer than a
-  // frame, which is what shows up as the card stuttering/lagging behind the
-  // finger. The direct write always lands the same frame, independent of how
-  // long the rest of the page's render takes; the state update still happens
-  // too (throttled to the same rAF), for the overlay hint/buttons that read
-  // swipeDistance/swipeDirection, which can tolerate lagging a frame or two.
+  const [exitDirection, setExitDirection] = useState<SwipeDir | null>(null);
+  // Ref to whichever card element is currently mounted (the regular swipe card or the
+  // ad-card variant - only one is ever rendered at a time, both attach the same ref),
+  // plus the heart / X stamps shown over it while dragging.
   const cardElRef = useRef<HTMLDivElement>(null);
-  // Coarse-step gate for the React state updates during a drag (see handleTouchMove):
-  // keeps Android from re-rendering this whole page on every single touchmove frame.
-  const lastPushedDirRef = useRef<'left' | 'right' | null>(null);
-  const lastPushedDistRef = useRef<number>(0);
-  // Smoothed horizontal finger velocity (px/ms) for the current drag, so a quick
-  // flick commits a swipe even when it doesn't travel past the distance threshold.
-  const swipeVelocityRef = useRef({ lastX: 0, lastT: 0, vx: 0 });
-  // True while a committed card is flying off. A new touch landing in that window
-  // used to start a fresh drag on the departing card and snap it back on screen.
-  const isCardExitingRef = useRef(false);
-
-  const getGenderFilter = useCallback((userPreference: string) => {
-    if (userPreference === 'male') {
-      return ['male'];
-    } else if (userPreference === 'female') {
-      return ['female'];
-    } else if (userPreference === 'everyone' || userPreference === 'both') {
-      return ['male', 'female', 'other'];
-    }
-    return ['male', 'female', 'other']; // default to all
-  }, []);
+  const likeStampRef = useRef<HTMLDivElement>(null);
+  const passStampRef = useRef<HTMLDivElement>(null);
 
   const allowedGenders = useMemo(() => 
     getGenderFilter(currentUser?.preference || 'everyone'), 
-    [currentUser?.preference, getGenderFilter]
+    [currentUser?.preference]
   );
 
   const inFlightProfileImageFetchesRef = useRef<Map<string, Promise<string[]>>>(new Map());
@@ -1371,7 +1297,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     ] = await queryTimeout(Promise.all([
       supabase
         .from('profiles')
-        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, gender, interests, introvert_extrovert, spontaneous_planner, messy_organized, unlocked_countries, profile_completion, latitude, longitude')
+        .select('max_distance, distance_preference, country, country_code, min_age, max_age, preference, gender, interests, favorites, introvert_extrovert, spontaneous_planner, messy_organized, unlocked_countries, profile_completion, latitude, longitude')
         .eq('id', userId)
         .single(),
       fetchAllRows<{ liked_id: string }>(() =>
@@ -2236,6 +2162,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         activePool,
         {
           interests: currentUserData?.interests,
+          favorites: parseFavorites(currentUserData?.favorites),
           introvert_extrovert: currentUserData?.introvert_extrovert,
           spontaneous_planner: currentUserData?.spontaneous_planner,
           messy_organized: currentUserData?.messy_organized,
@@ -3745,315 +3672,58 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     return () => window.removeEventListener('resize', measureContentHeight);
   }, [showMoreInfo, currentIndex, potentialMatches]);
 
-  // Every React state update in the gesture handlers below is wrapped in
-  // startTransition. The card's movement, fly-off and spring-back are all
-  // written straight to the DOM, so they never wait on React - but these state
-  // updates re-render this whole (very large) page, and inside a touch event
-  // React would otherwise do that synchronously, holding up the very next
-  // frame. Measured on Android: 25-28% janky frames on drag-and-release with
-  // 117ms hitches before this. As transitions, React renders them in small
-  // slices between frames instead; only the heart/X overlay may trail by a
-  // frame or two, which isn't noticeable.
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isReportModalOpenRef.current || isCardExitingRef.current) return;
-    const touch = e.touches[0];
-    startXRef.current = touch.clientX;
-    startYRef.current = touch.clientY;
-    currentXRef.current = touch.clientX;
-    currentYRef.current = touch.clientY;
-    swipeVelocityRef.current = { lastX: touch.clientX, lastT: e.timeStamp, vx: 0 };
-    // Drop any spring-back still easing from the previous release, so the card
-    // tracks the finger 1:1 from the first frame instead of lagging behind it.
-    if (cardElRef.current) cardElRef.current.style.transition = 'none';
-    isDraggingRef.current = true;
-    lastPushedDirRef.current = null;
-    lastPushedDistRef.current = 0;
-    startTransition(() => setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 })));
-  };
+  // One gesture core for touch, mouse and keyboard (see discover/useCardSwipe). The card
+  // movement, fly-off and spring-back are written straight to the DOM, so they never wait on
+  // React; the coarse UI state below is pushed as a transition so this very large page
+  // re-renders in small slices between frames instead of inside the touch event.
+  const cardSwipe = useCardSwipe({
+    cardRef: cardElRef,
+    likeStampRef,
+    passStampRef,
+    isBlocked: () => isReportModalOpenRef.current,
+    onUiChange: (patch) => startTransition(() => setSwipeUI(prev => ({ ...prev, ...patch }))),
+    onExitStart: (dir) => startTransition(() => {
+      setExitDirection(dir);
+      setExitingCard(true);
+    }),
+    onExitEnd: () => {
+      setExitingCard(false);
+      setExitDirection(null);
+    },
+    onCommit: (dir) => {
+      if (dir === 'right') handleLike(); else handlePass();
+    },
+  });
+  const cardSwipeHandlers = cardSwipe.handlers;
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDraggingRef.current) return;
-    const touch = e.touches[0];
-    currentXRef.current = touch.clientX;
-    currentYRef.current = touch.clientY;
-
-    const vel = swipeVelocityRef.current;
-    const dt = e.timeStamp - vel.lastT;
-    if (dt > 0) {
-      vel.vx = 0.8 * ((touch.clientX - vel.lastX) / dt) + 0.2 * vel.vx;
-      vel.lastX = touch.clientX;
-      vel.lastT = e.timeStamp;
-    }
-
-    const deltaX = currentXRef.current - startXRef.current;
-    const deltaY = currentYRef.current - startYRef.current;
-
-    // The card follows the finger freely in both directions (grab-and-move feel).
-    // Only the horizontal component decides the like/pass direction.
-    latestDeltaRef.current = deltaX;
-    latestDeltaYRef.current = deltaY;
-    if (!rafScheduledRef.current) {
-      rafScheduledRef.current = true;
-      rafIdRef.current = requestAnimationFrame(() => {
-        rafIdRef.current = null;
-        // The drag may have ended (and an exit animation started) between this
-        // frame being scheduled and it running. Writing the transform now would
-        // stomp the exit transform and snap the card back to center.
-        if (!isDraggingRef.current) {
-          rafScheduledRef.current = false;
-          return;
-        }
-        const d = latestDeltaRef.current;
-        const dy = latestDeltaYRef.current;
-        // Write the transform straight to the DOM first, ahead of the state update
-        // below - this always lands this frame regardless of how long the rest of
-        // this page takes to re-render, which is what keeps the card itself glued
-        // to the finger even when the (much larger) surrounding re-render lags on
-        // slower Android hardware.
-        if (cardElRef.current) {
-          cardElRef.current.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
-        }
-        // Android smoothness: the transform above is already on screen this frame.
-        // The React state below only drives the Nope/Yep overlays, so push it in
-        // coarse steps (every ~16px, or when the direction flips) instead of every
-        // frame — a full re-render of this very large page on every touchmove is
-        // what made Android drags stutter.
-        // The overlays stop changing past ~100px (swipeOpacity caps at 0.8), so
-        // beyond that only a direction flip is worth a re-render.
-        const dir: 'left' | 'right' = d > 0 ? 'right' : 'left';
-        const dist = Math.abs(d);
-        if (
-          dir !== lastPushedDirRef.current ||
-          (Math.abs(dist - lastPushedDistRef.current) > 16 &&
-            Math.min(dist, lastPushedDistRef.current) < 112)
-        ) {
-          lastPushedDirRef.current = dir;
-          lastPushedDistRef.current = dist;
-          startTransition(() => setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: dist, swipeDirection: dir })));
-        }
-        rafScheduledRef.current = false;
-      });
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    lastPushedDirRef.current = null;
-    lastPushedDistRef.current = 0;
-    startTransition(() => setSwipeUI(prev => ({ ...prev, isDragging: false })));
-
-    const changedTouch = e.changedTouches && e.changedTouches[0];
-    const endX = changedTouch ? changedTouch.clientX : currentXRef.current;
-
-    const deltaX = endX - startXRef.current;
-    const screenWidth = window.innerWidth;
-
-    // Swipe threshold - distance, or a deliberate flick in the same direction.
-    const SWIPE_RATIO = 0.25;
-    const minSwipeDistance = Math.min(screenWidth * SWIPE_RATIO, 120);
-    const vx = swipeVelocityRef.current.vx;
-    const isFlick = Math.abs(vx) > 0.6 && Math.abs(deltaX) > 40 && Math.sign(vx) === Math.sign(deltaX);
-
-    // Reset visual smear and kill any frame still queued from the drag — if it ran
-    // after this point it would overwrite the exit transform below.
-    latestDeltaRef.current = 0;
-    latestDeltaYRef.current = 0;
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
-    rafScheduledRef.current = false;
-    startTransition(() => setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0 })));
-
-    if (Math.abs(deltaX) > minSwipeDistance || isFlick) {
-      const dir: 'left' | 'right' = deltaX > 0 ? 'right' : 'left';
-      isCardExitingRef.current = true;
-      // Drive the fly-away straight on the element too. The card's live transform was
-      // written imperatively during the drag, so React's own style update alone can be
-      // skipped or land a frame late — which is what made the card spring back to
-      // center before vanishing instead of continuing off-screen the way it was thrown.
-      if (cardElRef.current) {
-        const exitX = dir === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
-        const exitY = window.innerHeight * 0.3;
-        const rotation = dir === 'right' ? 24 : -24;
-        cardElRef.current.style.transition = `transform ${CARD_EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
-        cardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
-      }
-      // Trigger exit animation
-      startTransition(() => {
-        setExitDirection(dir);
-        setExitingCard(true);
-      });
-      startTransition(() => setSwipeUI(prev => ({ ...prev, swipeDirection: null })));
-
-      // Wait for animation to complete before executing action
-      setTimeout(() => {
-        if (deltaX > 0) {
-          handleLike();
-        } else {
-          handlePass();
-        }
-        // Snap the (reused) card element back to center with no transition, so the
-        // next profile appears in place instead of flying in from off-screen.
-        if (cardElRef.current) {
-          cardElRef.current.style.transition = 'none';
-          cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
-        }
-        setExitingCard(false);
-        setExitDirection(null);
-        isCardExitingRef.current = false;
-      }, CARD_EXIT_MS);
-    } else {
-      // Below threshold: spring back to center from wherever the finger left it.
-      if (cardElRef.current) {
-        cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
-        cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
-      }
-      startTransition(() => setSwipeUI(prev => ({ ...prev, swipeDirection: null })));
-    }
-  };
-
-  // The OS took the touch over mid-drag (iOS edge/notification gesture, incoming
-  // call, Android system nav). No touchend follows, so without this the card was
-  // left stuck wherever the finger was and isDragging never cleared.
-  const handleTouchCancel = () => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    lastPushedDirRef.current = null;
-    lastPushedDistRef.current = 0;
-    latestDeltaRef.current = 0;
-    latestDeltaYRef.current = 0;
-    if (rafIdRef.current !== null) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
-    rafScheduledRef.current = false;
-    if (cardElRef.current) {
-      cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
-      cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
-    }
-    startTransition(() => setSwipeUI(prev => ({ ...prev, isDragging: false, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0, swipeDirection: null })));
-  };
-
-  // Mouse event handlers for swipe on desktop
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isReportModalOpenRef.current || isCardExitingRef.current) return;
-    if (cardElRef.current) cardElRef.current.style.transition = 'none';
-    startXRef.current = e.clientX;
-    startYRef.current = e.clientY;
-    currentXRef.current = e.clientX;
-    currentYRef.current = e.clientY;
-    isDraggingRef.current = true;
-    lastPushedDirRef.current = null;
-    lastPushedDistRef.current = 0;
-    startTransition(() => setSwipeUI(prev => ({ ...prev, isDragging: true, swipeDirection: null, swipeDistance: 0, dragOffset: 0, dragOffsetY: 0 })));
-
-    // Attach global mouse listeners to ensure we capture mouseup/move even if pointer leaves the element
-    const onWindowMouseMove = (ev: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      currentXRef.current = ev.clientX;
-      currentYRef.current = ev.clientY;
-      const deltaX = currentXRef.current - startXRef.current;
-      const deltaY = currentYRef.current - startYRef.current;
-      // rAF throttle visual updates — card follows the cursor freely in both directions
-      latestDeltaRef.current = deltaX;
-      latestDeltaYRef.current = deltaY;
-      if (!rafScheduledRef.current) {
-        rafScheduledRef.current = true;
-        rafIdRef.current = requestAnimationFrame(() => {
-          rafIdRef.current = null;
-          if (!isDraggingRef.current) {
-            rafScheduledRef.current = false;
-            return;
-          }
-          const d = latestDeltaRef.current;
-          const dy = latestDeltaYRef.current;
-          if (cardElRef.current) {
-            cardElRef.current.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg) scale(1)`;
-          }
-          const dir: 'left' | 'right' = d > 0 ? 'right' : 'left';
-          const dist = Math.abs(d);
-          if (
-            dir !== lastPushedDirRef.current ||
-            (Math.abs(dist - lastPushedDistRef.current) > 16 &&
-              Math.min(dist, lastPushedDistRef.current) < 112)
-          ) {
-            lastPushedDirRef.current = dir;
-            lastPushedDistRef.current = dist;
-            startTransition(() => setSwipeUI(prev => ({ ...prev, dragOffset: d, dragOffsetY: dy, swipeDistance: dist, swipeDirection: dir })));
-          }
-          rafScheduledRef.current = false;
-        });
-      }
-      // Prevent default to avoid text selection during dragging
-      ev.preventDefault();
+  // Keyboard parity for desktop / switch-control users: Left = pass, Right = like, with the
+  // exact same fly-away as a gesture. Never fires while typing or while any dialog is open.
+  useEffect(() => {
+    if (!isActiveTab) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      if (!potentialMatches[currentIndex]) return;
+      e.preventDefault();
+      cardSwipe.commitSwipe(e.key === 'ArrowRight' ? 'right' : 'left');
     };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isActiveTab, potentialMatches, currentIndex, cardSwipe]);
 
-    const onWindowMouseUp = (ev: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      isDraggingRef.current = false;
-      lastPushedDirRef.current = null;
-      lastPushedDistRef.current = 0;
-      startTransition(() => setSwipeUI(prev => ({ ...prev, isDragging: false })));
-      // compute final deltas
-      const deltaX = ev.clientX - startXRef.current;
+  // Android hardware back closes the TOP overlay instead of leaving the app. Each of these
+  // registers only while open (escape handled by the dialogs themselves).
+  useBackClose(showFiltersModal, () => setShowFiltersModal(false), { escape: false });
+  useBackClose(isOutOfSwipes, () => setIsOutOfSwipes(false), { escape: false });
+  useBackClose(showMoreInfo, () => setShowMoreInfo(false), { escape: false });
 
-      // Swipe threshold
-      const minSwipeDistance = 80;
-      // Reset visual smear and cancel any frame still queued from the drag
-      latestDeltaRef.current = 0;
-      latestDeltaYRef.current = 0;
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      rafScheduledRef.current = false;
-      startTransition(() => setSwipeUI(prev => ({ ...prev, dragOffset: 0, dragOffsetY: 0, swipeDistance: 0, swipeDirection: null })));
-      if (Math.abs(deltaX) > minSwipeDistance) {
-        const dir: 'left' | 'right' = deltaX > 0 ? 'right' : 'left';
-        isCardExitingRef.current = true;
-        if (cardElRef.current) {
-          const exitX = dir === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
-          const exitY = window.innerHeight * 0.3;
-          const rotation = dir === 'right' ? 24 : -24;
-          cardElRef.current.style.transition = `transform ${CARD_EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
-          cardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
-        }
-        // Trigger exit animation
-        startTransition(() => {
-          setExitDirection(dir);
-          setExitingCard(true);
-        });
-
-        // Wait for animation to complete before executing action
-        setTimeout(() => {
-          if (deltaX > 0) handleLike(); else handlePass();
-          if (cardElRef.current) {
-            cardElRef.current.style.transition = 'none';
-            cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
-          }
-          setExitingCard(false);
-          setExitDirection(null);
-          isCardExitingRef.current = false;
-        }, CARD_EXIT_MS);
-      } else if (cardElRef.current) {
-        cardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
-        cardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
-      }
-      window.removeEventListener('mousemove', onWindowMouseMove);
-      window.removeEventListener('mouseup', onWindowMouseUp);
-    };
-
-    window.addEventListener('mousemove', onWindowMouseMove);
-    window.addEventListener('mouseup', onWindowMouseUp);
-  };
-  
-  // Note: mousemove/mouseup handling is wired globally from mouseDown to ensure robust behavior
 
   const handleImageAreaClick = () => {
     // Prevent swipe action if dragging occurred
-    if (Math.abs(swipeUI.dragOffset) > 10) return;
+    if (cardSwipe.didDrag()) return;
 
     // This function is mainly a compatibility shim - slide navigation lives inside MatchCard
   };
@@ -4583,7 +4253,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // verification. Runs after every swipe, like and pass alike.
   const maybeShowVerifyPrompt = async (userId: string) => {
     if (currentUser?.face_descriptor) return; // already verified
-    if (!isVerifyPromptEligible()) return; // already shown once, ever
+    if (popupTimesShown('verify-identity') > 0) return; // already shown once, ever
 
     try {
       const { data: newCount, error } = await supabase.rpc('increment_swipe_count', {
@@ -4596,8 +4266,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       }
 
       if (typeof newCount === 'number' && newCount >= SWIPES_BEFORE_VERIFY_PROMPT) {
-        markVerifyPromptTriggered();
-        setShowVerifyPrompt(true);
+        requestPopup('verify-identity');
       }
     } catch (err) {
       console.error('Error incrementing swipe count:', err);
@@ -4823,9 +4492,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
             if (mutualLike) {
               reportLikedYouOutcome('like', true);
-              setMatchedUser(prevMatch);
-              setShowMatchAnimation(true);
-              pendingMatchForRatingRef.current = true;
+              showMatchPopup(prevMatch);
 
               // Clear chat cache to force refresh when user opens ChatPage
               if (typeof window !== 'undefined') {
@@ -4880,9 +4547,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             // ⭐ SWIPE FATIGUE RESCUE: Reset streak on match
             setNoMatchStreak(0);
 
-            setMatchedUser(prevMatch);
-            setShowMatchAnimation(true);
-            pendingMatchForRatingRef.current = true;
+            showMatchPopup(prevMatch);
 
             // Clear chat cache to force refresh when user opens ChatPage
             if (typeof window !== 'undefined') {
@@ -5536,33 +5201,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, potentialMatches.length]);
 
-  const maybeTriggerRatingFunnel = () => {
-    if (!pendingMatchForRatingRef.current) return;
-    pendingMatchForRatingRef.current = false;
-    if (!isRatingFunnelEligible()) return;
-    setTimeout(() => {
-      // Marked "shown" only now, right as it actually appears - not when we
-      // merely decided to schedule it, so a dismissed/never-displayed prompt
-      // doesn't burn the only chance to ask again.
-      markRatingFunnelShown();
-      setShowRatingFunnel(true);
-    }, 3000);
-  };
-
-  const handleStartChat = (userId: string) => {
-    setShowMatchAnimation(false);
-    maybeTriggerRatingFunnel();
-    if (onNavigateToChat) {
-      onNavigateToChat(userId);
-    }
-  };
-
-  const handleCloseMatch = () => {
-    setShowMatchAnimation(false);
-    setMatchedUser(null);
-    // Profile already moved when like was processed
-    maybeTriggerRatingFunnel();
-  };
+  // The match celebration is a coordinator popup (src/popups/registry.tsx): it shows immediately,
+  // never under another popup, and tells the rating engine a happy moment ended when it closes.
+  function showMatchPopup(match: PotentialMatch) {
+    requestPopup('match', {
+      matchedUserId: match.id,
+      matchedUserName: `${match.first_name} ${match.last_name}`,
+      matchedUserImage: match.images?.[0],
+    });
+  }
 
   // Extracted so it can be rendered from every early-return branch below, not
   // just the main card return - completing a swipe can flip the page into
@@ -5728,26 +5375,6 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     </div>
   ) : null;
 
-  if (showMatchAnimation && matchedUser) {
-    return (
-      <MatchAnimation
-        currentUserName={currentUser?.first_name || 'You'}
-        matchedUserName={`${matchedUser.first_name} ${matchedUser.last_name}`}
-        matchedUserImage={matchedUser.images?.[0]}
-        matchedUserId={matchedUser.id}
-        onClose={handleCloseMatch}
-        onStartChat={handleStartChat}
-      />
-    );
-  }
-
-  if (showPremiumUpgrade) {
-    return (
-      <div className="h-full w-full overflow-y-auto">
-        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
-      </div>
-    );
-  }
 
   // Removed loading indicator - everything loads in background
 
@@ -5756,7 +5383,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       <>
       {swipeGuideOverlay}
       <div className="h-full w-full flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
+        <Card variant="surface" className="max-w-md w-full mx-4">
           <CardContent className="p-6 text-center flex flex-col items-center">
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
             <h2 className="text-lg font-semibold mb-1.5 text-white">{t('discover.outOfSwipes.title')}</h2>
@@ -5768,30 +5395,25 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             </p>
             <div className="w-full space-y-2.5">
             {!premiumActive && (
-              <Button
-                onClick={() => setShowPremiumUpgrade(true)}
-                className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+              <Button variant="premium" size="md" className="w-full"
+                onClick={() => openPremiumUpgrade()}
               >
                 <Crown className="w-4 h-4 mr-2" />
                 {t('discover.outOfSwipes.upgradeButton')}
               </Button>
             )}
-              <Button
+              <Button variant="line" size="md" className="text-white w-full"
                 onClick={() => {
                   // Close the modal and show the last profile they were viewing
                   // They can see the profile but if they try to swipe, the limit will be checked again
                   setIsOutOfSwipes(false);
                 }}
-                variant="outline"
-                className="w-full bg-transparent border border-white/20 text-white hover:bg-white/10"
               >
                 {t('discover.outOfSwipes.okButton')}
               </Button>
 
-              <Button
+              <Button variant="line" size="md" className="text-white w-full"
                 onClick={() => navigate('/games')}
-                variant="outline"
-                className="w-full border border-pink-500/30 text-pink-400 hover:bg-pink-500/10 bg-transparent flex items-center justify-center gap-2"
                 aria-label="Play games"
               >
                 <Gamepad2 className="w-4 h-4" />
@@ -5816,18 +5438,14 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   if (currentMatch && isAd(currentMatch)) {
     const getAdCardTransform = () => {
       if (exitingCard && exitDirection) {
-        const screenWidth = window.innerWidth;
-        const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
-        const exitY = window.innerHeight * 0.3; // Fall down effect
-        const rotation = exitDirection === 'right' ? 30 : -30;
-        return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
+        return exitTransform(exitDirection, window.innerWidth, window.innerHeight);
       }
       // At rest AND mid-drag: the live drag offset is written straight to the DOM in
       // handleTouchMove. Keeping this string constant while dragging means React never
       // re-writes the transform mid-drag - previously each throttled re-render
       // committed a slightly stale offset and yanked the card back a few px, which
       // read as jitter on every drag (worst on Android, where renders are slower).
-      return 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+      return CARD_REST_TRANSFORM;
     };
 
     const adCardTransform = getAdCardTransform();
@@ -5874,11 +5492,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                // full explanation).
                touchAction: 'none',
              }}
-             onTouchStart={handleTouchStart}
-             onTouchMove={handleTouchMove}
-             onTouchEnd={handleTouchEnd}
-             onTouchCancel={handleTouchCancel}
-             onMouseDown={handleMouseDown}>
+             {...cardSwipeHandlers}>
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none transition-opacity duration-200"
@@ -5922,7 +5536,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           onClose={() => setShowFiltersModal(false)}
           currentUser={currentUser}
           isPremium={premiumActive}
-          onUpgradeClick={() => setShowPremiumUpgrade(true)}
+          onUpgradeClick={() => openPremiumUpgrade()}
           onNavigateToProfileSection={onNavigateToProfileSection}
         />
       )}
@@ -5934,13 +5548,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     return (
       <>
         {topBar}
-        <div className="h-full w-full flex items-center justify-center overflow-y-auto">
-          <div className="flex flex-col items-center">
-            <div className="mb-4">
-              <HoppingLogo size={80} />
-            </div>
-          </div>
-        </div>
+        <DiscoverSkeleton />
       </>
     );
   }
@@ -5954,13 +5562,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     return (
       <>
         {topBar}
-        <div className="h-full w-full flex items-center justify-center overflow-y-auto">
-          <div className="flex flex-col items-center">
-            <div className="mb-4">
-              <HoppingLogo size={80} />
-            </div>
-          </div>
-        </div>
+        <DiscoverSkeleton />
       </>
     );
   }
@@ -5968,82 +5570,41 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // When the deck is empty after initial fetch completed - show empty state immediately
   // Do NOT show loading spinner when deck is empty - this prevents infinite reload loop
   if (potentialMatches.length === 0 && hasCompletedInitialFetch) {
-    const emptyTitle = emptyStateMode === 'transient-error'
-      ? 'Refresh didn\'t work'
-      : discoverCategory === 'signMatch'
-        ? 'No sign matches right now'
-        : t('discover.noMoreProfiles');
-
-    const emptyDescription = emptyStateMode === 'transient-error'
-      ? 'We hit a quick connection issue. Tap refresh to retry.'
-      : discoverCategory === 'signMatch'
-        ? 'No profiles available now for your sign compatibility. Check back soon, or switch to For Me.'
-        : t('discover.noProfilesDescription');
-
     // Show empty state - user can manually refresh
     // Background loading will continue silently without showing spinner
     return (
       <>
       {topBar}
-      <div className="h-full w-full flex items-center justify-center overflow-y-auto">
-        <Card className="max-w-md w-full mx-4 bg-black border border-pink-500/25 text-white shadow-2xl">
-          <CardContent className="p-6 text-center flex flex-col items-center">
-            <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
-            <h2 className="text-lg font-semibold mb-1.5 text-white">{emptyTitle}</h2>
-            <p className="text-gray-400 text-sm mb-5 max-w-xs">{emptyDescription}</p>
-            {!premiumActive && (
-              <div className="mb-3">
-                <p className="text-yellow-400 text-sm mb-3 max-w-xs mx-auto">{t('discover.upgradeForMoreCountries')}</p>
-                <Button
-                  onClick={() => setShowPremiumUpgrade(true)}
-                  className="w-auto h-8 !rounded-full px-3.5 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
-                >
-                  <Crown className="w-3.5 h-3.5 mr-1.5" />
-                  {emptyStateTrialEligible ? 'Try now for free' : t('discover.upgradeForMoreCountriesButton')}
-                </Button>
-              </div>
-            )}
-            <div className="flex flex-wrap items-center justify-center gap-2.5">
-              <Button
-                onClick={() => {
-                  // Clear all caches and force a complete refresh
-                  revokeAllBlobUrls();
-                  setPotentialMatches([]);
-                  setUserImages({});
-                  setUserDistances({});
-                  setCurrentIndex(0);
-                  setNoMoreProfiles(false);
-                  setEmptyStateMode('exhausted');
-                  setIsLoading(true);
-                  setIsLoadingMore(false);
-                  setHasCompletedInitialFetch(false);
+      <DiscoverEmptyState
+        mode={emptyStateMode === 'transient-error' ? 'error' : 'exhausted'}
+        isSignMatch={discoverCategory === 'signMatch'}
+        isPremium={premiumActive}
+        trialEligible={!!emptyStateTrialEligible}
+        onRefresh={() => {
+          // Clear all caches and force a complete refresh
+          revokeAllBlobUrls();
+          setPotentialMatches([]);
+          setUserImages({});
+          setUserDistances({});
+          setCurrentIndex(0);
+          setNoMoreProfiles(false);
+          setEmptyStateMode('exhausted');
+          setIsLoading(true);
+          setIsLoadingMore(false);
+          setHasCompletedInitialFetch(false);
 
-                  // Clear image cache
-                  clearCache();
+          // Clear image cache
+          clearCache();
 
-                  // Fetch fresh profiles
-                  setTimeout(() => {
-                    fetchPotentialMatches();
-                  }, 100);
-                }}
-                className="w-auto h-8 !rounded-full px-3.5 text-xs bg-gradient-to-r from-pink-600 to-rose-700 hover:from-pink-500 hover:to-rose-600 text-white"
-              >
-                {t('discover.refresh')}
-              </Button>
-
-              <Button
-                onClick={() => navigate('/games')}
-                variant="outline"
-                className="w-auto h-8 !rounded-full px-3.5 text-xs border border-pink-500/30 text-pink-400 hover:bg-pink-500/10 bg-transparent flex items-center justify-center gap-1.5"
-                aria-label="Play games"
-              >
-                <Gamepad2 className="w-3.5 h-3.5" />
-                Play Love Games
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          // Fetch fresh profiles
+          setTimeout(() => {
+            fetchPotentialMatches();
+          }, 100);
+        }}
+        onAdjustFilters={() => setShowFiltersModal(true)}
+        onPlayGames={() => navigate('/games')}
+        onUpgrade={() => openPremiumUpgrade()}
+      />
       </>
     );
   }
@@ -6064,19 +5625,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     return (
       <>
         {topBar}
-        <div className="h-full w-full flex items-center justify-center overflow-y-auto">
-          <div className="flex flex-col items-center">
-            <div className="mb-4">
-              <HoppingLogo size={80} />
-            </div>
-          </div>
-        </div>
+        <DiscoverSkeleton />
       </>
     );
   }
-
-  // Calculate swipe overlay opacity and transform
-  const swipeOpacity = Math.min(swipeUI.swipeDistance / 100, 0.8);
 
   // Blur + dark tint on the next card visible behind the one being dragged,
   // so a user mid-swipe can't already see who's next before they've actually
@@ -6111,17 +5663,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // Simple card transform for smooth dragging - use translate3d for GPU acceleration
   const cardTransform = (() => {
     if (exitingCard && exitDirection) {
-      const screenWidth = window.innerWidth;
-      const exitX = exitDirection === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
-      const exitY = window.innerHeight * 0.3;
-      const rotation = exitDirection === 'right' ? 24 : -24;
       // Card shrinks away as it flies off — reads as receding into the distance, not zooming in
-      return `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg) scale(0.55)`;
+      return exitTransform(exitDirection, window.innerWidth, window.innerHeight);
     }
     // At rest AND mid-drag: the card follows the finger via the direct DOM write in
     // handleTouchMove. Keeping this constant while dragging stops React from
     // committing a stale (throttled) offset on top of it, which made the card jitter.
-    return 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
+    return CARD_REST_TRANSFORM;
   })();
 
   // Bottom corners stay rounded at all times for a clean, finished edge against the nav below;
@@ -6134,7 +5682,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
 
   return (
     <>
-      <div className="discover-container h-full w-full relative overflow-hidden"
+      <div className={`discover-container h-full w-full relative overflow-hidden${(freshReveal || sawSkeletonRef.current) ? ' dl-first-card-in' : ''}`}
            style={{
              touchAction: 'pan-y', // allow vertical scrolling, prevent horizontal scroll-from-browser during horizontal swipes
              overscrollBehavior: 'contain',
@@ -6158,7 +5706,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           onClose={() => setShowFiltersModal(false)}
           currentUser={currentUser}
           isPremium={premiumActive}
-          onUpgradeClick={() => setShowPremiumUpgrade(true)}
+          onUpgradeClick={() => openPremiumUpgrade()}
           onNavigateToProfileSection={onNavigateToProfileSection}
         />
       )}
@@ -6178,13 +5726,13 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           <span className="text-4xl">👯</span>
           <h3 className="text-lg font-bold text-white">Double Date</h3>
           <p className="text-sm text-gray-400 max-w-xs">Coming soon.</p>
-          <button
+          <Button variant="primary" size="sm" className="mt-2"
             type="button"
             onClick={() => setDiscoverCategory('mine')}
-            className="mt-2 px-4 py-2 rounded-full bg-pink-500 hover:bg-pink-600 text-white text-sm font-semibold transition-colors"
+           
           >
             Back to For Me
-          </button>
+          </Button>
         </div>
       )}
 
@@ -6367,62 +5915,34 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               // to fight.
               touchAction: 'none',
             }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            onTouchCancel={handleTouchCancel}
-            onMouseDown={handleMouseDown}
+            {...cardSwipeHandlers}
             onClick={handleImageAreaClick}
           >
-            {/* ...existing code... */}
-            {swipeUI.isDragging && swipeUI.swipeDirection && (
-              <>
-                {/* Like Overlay - Right Swipe: heart, positioned left, near top */}
-                {swipeUI.swipeDirection === 'right' && (
-                  <>
-                    <div className="absolute inset-0 z-20 flex items-start justify-start pl-10 pointer-events-none" style={{ paddingTop: '35%', willChange: 'transform' }}>
-                      <div
-                        className="relative"
-                        style={{
-                          transform: `scale(${Math.min(0.85 + swipeOpacity * 0.5, 1.35)}) rotate(${swipeUI.swipeDistance * 0.08}deg)`,
-                          opacity: Math.min(0.55 + swipeOpacity, 1),
-                          transition: 'none'
-                        }}
-                      >
-                        {/* Second, softer heart offset behind for a fuller "double love" burst */}
-                        <Heart
-                          className="w-20 h-20 absolute -top-2 -left-2 opacity-50"
-                          style={{ color: '#ef4444', fill: '#ef4444', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.3))' }}
-                        />
-                        <Heart
-                          className="w-20 h-20 relative"
-                          style={{ color: '#dc2626', fill: '#dc2626', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))' }}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Pass Overlay - Left Swipe: white X, positioned right, near top */}
-                {swipeUI.swipeDirection === 'left' && (
-                  <>
-                    <div className="absolute inset-0 z-20 flex items-start justify-end pr-10 pointer-events-none" style={{ paddingTop: '35%', willChange: 'transform' }}>
-                      <X
-                        className="w-28 h-28"
-                        strokeWidth={3}
-                        style={{
-                          color: '#ffffff',
-                          filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))',
-                          transform: `scale(${Math.min(0.85 + swipeOpacity * 0.5, 1.35)}) rotate(${-swipeUI.swipeDistance * 0.08}deg)`,
-                          opacity: Math.min(0.55 + swipeOpacity, 1),
-                          transition: 'none'
-                        }}
-                      />
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+            {/* Like (heart, right swipe) and Pass (X, left swipe) stamps. Always mounted and
+                driven straight on the DOM by useCardSwipe (opacity + scale + tilt follow the
+                finger every frame), so they grow smoothly with the drag instead of stepping. */}
+            <div aria-hidden="true" className="absolute inset-0 z-20 flex items-start justify-start pl-10 pointer-events-none" style={{ paddingTop: '35%' }}>
+              <div ref={likeStampRef} className="relative" style={{ opacity: 0, willChange: 'transform, opacity', transition: 'none' }}>
+                {/* Second, softer heart offset behind for a fuller "double love" burst */}
+                <Heart
+                  className="w-20 h-20 absolute -top-2 -left-2 opacity-50"
+                  style={{ color: '#ef4444', fill: '#ef4444', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.3))' }}
+                />
+                <Heart
+                  className="w-20 h-20 relative"
+                  style={{ color: '#dc2626', fill: '#dc2626', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))' }}
+                />
+              </div>
+            </div>
+            <div aria-hidden="true" className="absolute inset-0 z-20 flex items-start justify-end pr-10 pointer-events-none" style={{ paddingTop: '35%' }}>
+              <div ref={passStampRef} style={{ opacity: 0, willChange: 'transform, opacity', transition: 'none' }}>
+                <X
+                  className="w-28 h-28"
+                  strokeWidth={3}
+                  style={{ color: '#ffffff', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))' }}
+                />
+              </div>
+            </div>
             {/* Render MatchCard for image/swipe area */}
             {currentMatch && !isAd(currentMatch) && (
               <MatchCard
@@ -6495,7 +6015,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               }}
               ref={contentRef}
             >
-              <div className="px-1 pt-1 pb-6">
+              <div>
                 {/* Render MatchCard details area */}
                 {currentMatch && !isAd(currentMatch) && (
                   <MatchCard
@@ -6537,25 +6057,9 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         />
       </div>
       </div>
-      
-      {/* Rating funnel - 3s after a match screen closes, subject to
-          isRatingFunnelEligible() (stops for good only once the user has
-          actually tapped "Yes", tracked on the account itself). */}
-      <RatingFunnel
-        open={showRatingFunnel}
-        onClose={() => setShowRatingFunnel(false)}
-        userId={currentUser?.id}
-      />
-      <VerifyIdentityPrompt
-        open={showVerifyPrompt}
-        onClose={() => setShowVerifyPrompt(false)}
-        onVerifyNow={onNavigateToVerify}
-      />
 
-      {/* The free-trial pitch is shown exactly once, as the centered
-          FreeTrialBottomSheet modal (mounted in MainApp) on its own
-          10-minute-delayed cadence - no separate inline banner here, so
-          users never see two different trial prompts at once. */}
+      {/* The free-trial pitch is a coordinator popup (src/popups/registry.tsx), never an inline banner here,
+          so users never see two different trial prompts at once. */}
     </>
   );
 }

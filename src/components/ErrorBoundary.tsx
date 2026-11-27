@@ -1,4 +1,5 @@
 import React from 'react';
+import { logAppError } from '@/utils/errorLog';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -21,8 +22,23 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+    logAppError('app', error, errorInfo);
   }
+
+  // First "Restart App" tap tries a soft recovery (re-render the subtree with fresh
+  // state, no page reload — keeps the session and avoids a cold start). If the same
+  // subtree throws again straight away, the next tap does the full reload.
+  private softRecoverTried = false;
+  private handleRestart = () => {
+    if (!this.softRecoverTried) {
+      this.softRecoverTried = true;
+      this.setState({ hasError: false, error: undefined });
+      // Allow another soft attempt later if the app stays healthy for a while.
+      window.setTimeout(() => { this.softRecoverTried = false; }, 15000);
+      return;
+    }
+    window.location.reload();
+  };
 
   render() {
     if (this.state.hasError) {
@@ -39,8 +55,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               The app encountered an error. Please restart the app or contact support if the issue persists.
             </p>
             <button 
-              onClick={() => window.location.reload()}
-              className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-full font-medium"
+              onClick={this.handleRestart}
+              className="h-11 px-6 rounded-full bg-brand-gradient text-white font-semibold shadow-dl-brand active:scale-[0.97] dl-focus"
             >
               Restart App
             </button>

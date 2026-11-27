@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -204,8 +204,8 @@ const AdinkraSection = ({ editedProfile, profile, isEditing, onAdinkraChange }: 
 
                               return (
                                 <div key={symbol.name} className="relative">
-                                  <Card
-                                    className="cursor-pointer bg-black border-pink-500/20 hover:border-pink-500/50 p-2 flex flex-col items-center gap-1 hover:scale-105 transition-all relative aspect-square text-white"
+                                  <Card variant="surface"
+                                    className="cursor-pointer hover:border-pink-500/50 p-2 flex flex-col items-center gap-1 hover:scale-105 transition-all relative aspect-square"
                                     onClick={() => handleToggleSymbol(symbol.name)}
                                   >
                                     <button

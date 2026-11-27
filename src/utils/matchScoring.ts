@@ -25,8 +25,12 @@
  * viewer hadn't set interests either.
  */
 
+import { getVibe, normalizeText } from '@/constants/vibe';
+
 export interface ScorableProfile {
   interests?: string[] | null;
+  /** Parsed favorites (carries the Vibe entry: relationship values + music genres, and Music artists). */
+  favorites?: unknown;
   introvert_extrovert?: number | null;
   spontaneous_planner?: number | null;
   messy_organized?: number | null;
@@ -35,6 +39,15 @@ export interface ScorableProfile {
 const INTEREST_WEIGHT = 0.4;
 const PERSONALITY_WEIGHT = 0.3;
 const DISTANCE_WEIGHT = 0.3;
+// Relationship values are a stronger compatibility signal than taste; music is a
+// light one (shared taste alone is a weak predictor - see matching-research notes).
+// Every weight is relative (the final score is a weighted MEAN over only the
+// signals present on BOTH sides), so adding signals can never push a score
+// outside 0-1 and no single signal can dominate.
+const VALUES_WEIGHT = 0.3;
+const MUSIC_WEIGHT = 0.15;
+/** Inside the music score: genres count more than (free-text) artists. */
+const MUSIC_GENRE_SHARE = 0.65;
 
 // Default value every slider is saved with unless actively dragged - see
 // module docblock for why this is treated as "unset" rather than a real
@@ -66,6 +79,39 @@ const interestOverlapScore = (viewerInterests: string[], candidateInterests: str
   const denominator = Math.max(viewerSet.size, candidateSet.size);
   if (denominator === 0) return 0;
   return shared / denominator;
+};
+
+const overlapRatio = (a: string[], b: string[]): number => {
+  const as = new Set(a);
+  const bs = new Set(b);
+  const denominator = Math.max(as.size, bs.size);
+  if (denominator === 0) return 0;
+  let shared = 0;
+  for (const x of as) if (bs.has(x)) shared++;
+  return shared / denominator;
+};
+
+const normalizedSet = (list: string[]): string[] => [...new Set(list.map(normalizeText).filter(Boolean))];
+
+/** Values overlap, or null when either side has none (skip, never zero). */
+const valuesScore = (viewer: ScorableProfile, candidate: ScorableProfile): number | null => {
+  const a = getVibe(viewer.favorites).values;
+  const b = getVibe(candidate.favorites).values;
+  if (a.length === 0 || b.length === 0) return null;
+  return overlapRatio(a, b);
+};
+
+/** Music overlap (genres + artists), or null when there is nothing comparable on both sides. */
+const musicScore = (viewer: ScorableProfile, candidate: ScorableProfile): number | null => {
+  const va = getVibe(viewer.favorites);
+  const vb = getVibe(candidate.favorites);
+  const genresBoth = va.genres.length > 0 && vb.genres.length > 0;
+  const artistsBoth = va.artists.length > 0 && vb.artists.length > 0;
+  if (!genresBoth && !artistsBoth) return null;
+  const g = genresBoth ? overlapRatio(va.genres, vb.genres) : 0;
+  const a = artistsBoth ? overlapRatio(normalizedSet(va.artists), normalizedSet(vb.artists)) : 0;
+  if (genresBoth && artistsBoth) return MUSIC_GENRE_SHARE * g + (1 - MUSIC_GENRE_SHARE) * a;
+  return genresBoth ? g : a;
 };
 
 const personalityProximityScore = (viewer: ScorableProfile, candidate: ScorableProfile): number => {
@@ -108,6 +154,18 @@ export const computeCompatibilityScore = (
   if (hasEngagedInterests(viewerInterests) && hasEngagedInterests(candidateInterests)) {
     weightedSum += interestOverlapScore(viewerInterests, candidateInterests) * INTEREST_WEIGHT;
     totalWeight += INTEREST_WEIGHT;
+  }
+
+  const values = valuesScore(viewer, candidate);
+  if (values !== null) {
+    weightedSum += values * VALUES_WEIGHT;
+    totalWeight += VALUES_WEIGHT;
+  }
+
+  const music = musicScore(viewer, candidate);
+  if (music !== null) {
+    weightedSum += music * MUSIC_WEIGHT;
+    totalWeight += MUSIC_WEIGHT;
   }
 
   if (hasEngagedPersonality(viewer) && hasEngagedPersonality(candidate)) {

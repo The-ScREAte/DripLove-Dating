@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { timingSafeEqual } from '../_shared/caller-auth.ts'
 import { cancelledTrialFields, isCancelledFreeTrial, revokeGoogleSubscription } from '../_shared/google-trial.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
@@ -324,6 +325,22 @@ serve(async (req) => {
 
   try {
     console.log('🔍 [GOOGLE-WEBHOOK] Webhook received')
+
+    // Authenticate the Pub/Sub push. This endpoint has verify_jwt = false, so
+    // without a shared secret anyone could post a forged notification. Configure
+    // RTDN_PUSH_SECRET and put the same value on the Pub/Sub push endpoint URL as
+    // ?token=<secret>. (Until it is set, the fail-safe below still guarantees a
+    // forged notification can never grant or extend premium.)
+    const rtdnSecret = Deno.env.get('RTDN_PUSH_SECRET')
+    if (rtdnSecret) {
+      const provided = new URL(req.url).searchParams.get('token') ?? req.headers.get('x-rtdn-secret') ?? ''
+      if (!timingSafeEqual(provided, rtdnSecret)) {
+        console.warn('[GOOGLE-WEBHOOK] Rejected push with missing/invalid secret')
+        return json(401, { error: 'Unauthorized' })
+      }
+    } else {
+      console.warn('[GOOGLE-WEBHOOK] RTDN_PUSH_SECRET is not set - push sender is not authenticated')
+    }
     
     const body = await req.text()
     const notification = JSON.parse(body)
@@ -443,21 +460,21 @@ serve(async (req) => {
           })
         }
         
-        // CRITICAL FIX: Use actual expiry from Google API, not hardcoded 30 days
-        let newExpiry: Date
-        let autoRenew = true
-        
-        if (googleData && googleData.expiryTimeMillis > Date.now()) {
-          // Use Google's actual expiry time
-          newExpiry = new Date(googleData.expiryTimeMillis)
-          autoRenew = googleData.autoRenewing
-          console.log('[GOOGLE-WEBHOOK] Using Google API expiry:', newExpiry.toISOString())
-        } else {
-          // Fallback: If Google API failed, estimate 30 days from now
-          // This is a safety net, not the primary source
-          newExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          console.warn('[GOOGLE-WEBHOOK] ⚠️ Using fallback 30-day expiry (Google API unavailable)')
+        // The expiry must come from Google itself. A renewal is never granted from
+        // an estimate: an unauthenticated/forged notification (or an already
+        // expired purchase token) used to get a free 30 days through the old
+        // "estimate 30 days from now" fallback.
+        if (!googleData) {
+          console.error('[GOOGLE-WEBHOOK] Renewal could not be verified with the Google API - asking Pub/Sub to retry')
+          return json(500, { error: 'Could not verify renewal with Google, retry' })
         }
+        if (googleData.expiryTimeMillis <= Date.now()) {
+          console.warn('[GOOGLE-WEBHOOK] Renewal notification but Google reports the subscription is not active - ignoring')
+          return json(200, { message: 'Renewal not confirmed by Google, ignored' })
+        }
+        const newExpiry: Date = new Date(googleData.expiryTimeMillis)
+        const autoRenew: boolean = googleData.autoRenewing
+        console.log('[GOOGLE-WEBHOOK] Using Google API expiry:', newExpiry.toISOString())
         
         const { error: renewError } = await updateSubscriptionByToken(supabase, purchaseToken, {
           // If user has turned off auto-renew in Play Store, mark as cancelled (still premium until expires_at)
@@ -643,18 +660,17 @@ serve(async (req) => {
           return json(200, { message: 'Subscription not found for recovery' })
         }
         
-        // Use Google API for accurate expiry
-        let recoveryExpiry: string
-        let recoveryAutoRenew = true
-        
-        if (googleData && googleData.expiryTimeMillis > Date.now()) {
-          recoveryExpiry = new Date(googleData.expiryTimeMillis).toISOString()
-          recoveryAutoRenew = googleData.autoRenewing
-        } else {
-          // Fallback: extend 30 days from now
-          recoveryExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-          console.warn('[GOOGLE-WEBHOOK] ⚠️ Using fallback expiry for recovery')
+        // Same rule as renewals: only Google's own expiry can re-activate access.
+        if (!googleData) {
+          console.error('[GOOGLE-WEBHOOK] Recovery could not be verified with the Google API - asking Pub/Sub to retry')
+          return json(500, { error: 'Could not verify recovery with Google, retry' })
         }
+        if (googleData.expiryTimeMillis <= Date.now()) {
+          console.warn('[GOOGLE-WEBHOOK] Recovery notification but Google reports the subscription is not active - ignoring')
+          return json(200, { message: 'Recovery not confirmed by Google, ignored' })
+        }
+        const recoveryExpiry: string = new Date(googleData.expiryTimeMillis).toISOString()
+        const recoveryAutoRenew: boolean = googleData.autoRenewing
         
         const { error: recoverError } = await updateSubscriptionByToken(supabase, purchaseToken, {
           status: 'active',

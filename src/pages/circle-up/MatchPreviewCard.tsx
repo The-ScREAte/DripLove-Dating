@@ -1,5 +1,5 @@
 import { CircleProfile } from '@/utils/circlePoolFetch';
-import { calculateAge } from '@/utils/discoverCache';
+import { calculateAge } from '@/utils/dateUtils';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import { formatDistance } from '@/utils/distanceUnits';
 import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';

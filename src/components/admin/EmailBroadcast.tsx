@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { fetchAllRows, applyDebugFilter, fetchAllProfiles } from '@/hooks/useBatchFetch';
 import RichTextEditor from './RichTextEditor';
 import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctionError';
+import { getCountryName } from '@/constants/locationData';
 
 interface Country {
   code: string;
@@ -34,17 +35,6 @@ const htmlToPlainText = (html: string): string => {
   const div = document.createElement('div');
   div.innerHTML = html;
   return (div.textContent || div.innerText || '').replace(/\s+\n/g, '\n').trim();
-};
-
-const getCountryName = (code: string): string => {
-  const countryNames: Record<string, string> = {
-    'GH': 'Ghana', 'NG': 'Nigeria', 'US': 'United States', 'GB': 'United Kingdom',
-    'CA': 'Canada', 'KE': 'Kenya', 'ZA': 'South Africa', 'UG': 'Uganda',
-    'TZ': 'Tanzania', 'RW': 'Rwanda', 'CI': "Côte d'Ivoire", 'SN': 'Senegal',
-    'CM': 'Cameroon', 'ET': 'Ethiopia', 'EG': 'Egypt', 'MA': 'Morocco',
-    'DZ': 'Algeria', 'TN': 'Tunisia', 'BW': 'Botswana', 'ZW': 'Zimbabwe',
-  };
-  return countryNames[code] || code || 'Unknown';
 };
 
 interface CloneSeed {

@@ -79,18 +79,15 @@ const CropModal: React.FC<CropModalProps> = ({
         </div>
 
         <div className="flex flex-row items-center justify-end gap-2 mt-4">
-          <Button
-            variant="outline"
+          <Button variant="line" size="sm" className="text-black"
             onClick={onCancel}
             disabled={isProcessing}
-            className="w-auto h-9 px-4 bg-white border-pink-500/30 text-black hover:bg-gray-100"
           >
             Cancel
           </Button>
-          <Button
+          <Button variant="primary" size="sm"
             onClick={handleConfirm}
             disabled={isProcessing || !croppedAreaPixels}
-            className="w-auto h-9 px-4 bg-pink-600 hover:bg-pink-700 text-white"
           >
             {isProcessing ? 'Processing...' : 'OK'}
           </Button>

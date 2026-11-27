@@ -4,6 +4,7 @@ import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+import { uniqueTopic } from '@/utils/realtime';
 export interface NotificationPayload {
   title: string;
   body: string;
@@ -55,7 +56,7 @@ const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
 //     and MainApp's nav handler for how a plain URL change alone isn't enough
 //     to move a mounted app there)
 //   anything else -> Discover, never Chat by default
-export const resolveNotificationRoute = (
+const resolveNotificationRoute = (
   type: string | undefined,
   data: Record<string, unknown> | undefined
 ): string => {
@@ -70,7 +71,7 @@ export const resolveNotificationRoute = (
   if (data?.action === 'open_circle_profile' && data?.profileId) {
     return `/?tab=circle&circleUserId=${data.profileId}`;
   }
-  if (data?.action === 'open_chat') return '/?tab=chat';
+  if (data?.action === 'open_chat' || data?.action === 'open_icebreakers') return '/?tab=chat';
   if (data?.action === 'open_liked' || data?.action === 'open_liked_me') return '/?tab=liked';
   if (data?.action === 'open_profile') return '/?tab=profile';
   if (data?.action === 'open_circle') return '/?tab=circle';
@@ -103,7 +104,7 @@ export const setNotificationNavHandler = (handler: NotificationNavHandler | null
   }
 };
 
-export const navigateFromNotification = (
+const navigateFromNotification = (
   type: string | undefined,
   data: Record<string, unknown> | undefined
 ): void => {
@@ -424,7 +425,7 @@ class SupabasePushNotificationService {
   private async initializeRealtimeNotifications(userId: string): Promise<void> {
     // Subscribe to real-time notifications for this user
     this.realtimeChannel = supabase
-      .channel(`notifications:${userId}`)
+      .channel(uniqueTopic(`notifications:${userId}`))
       .on(
         'postgres_changes',
         {
@@ -803,7 +804,7 @@ class SupabasePushNotificationService {
 }
 
 // Create singleton instance
-export const pushNotificationService = new SupabasePushNotificationService();
+const pushNotificationService = new SupabasePushNotificationService();
 
 // Export convenience functions
 export const initializePushNotifications = (userId: string) => pushNotificationService.initialize(userId);

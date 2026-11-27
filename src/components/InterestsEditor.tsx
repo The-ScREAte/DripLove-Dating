@@ -9,7 +9,10 @@ interface InterestsEditorProps {
   disabled?: boolean;
 }
 
-const PREDEFINED_INTERESTS = [
+/** Most interests a profile can list. */
+export const MAX_INTERESTS = 10;
+
+export const PREDEFINED_INTERESTS = [
   // Travel & Adventure
   'Travel', 'Adventure', 'Road Trips', 'Backpacking', 'Beach Life', 'Mountains', 'Camping', 'Exploring',
   // Arts & Creative
@@ -45,7 +48,7 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
   const [showAddCustom, setShowAddCustom] = useState(false);
 
   const addInterest = (interest: string) => {
-    if (!interests.includes(interest) && interests.length < 10) {
+    if (!interests.includes(interest) && interests.length < MAX_INTERESTS) {
       onInterestsChange([...interests, interest]);
     }
   };
@@ -133,12 +136,12 @@ const InterestsEditor = ({ interests, onInterestsChange, disabled = false }: Int
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <Input
+                <Input tone="dark"
                   placeholder="Enter custom interest..."
                   value={newInterest}
                   onChange={(e) => setNewInterest(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addCustomInterest()}
-                  className="flex-1 h-8 bg-neutral-900 border-pink-500/30 text-white text-xs placeholder:text-white/40"
+                  className="flex-1"
                 />
                 <button
                   type="button"

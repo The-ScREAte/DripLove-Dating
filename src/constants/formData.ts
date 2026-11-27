@@ -1,15 +1,4 @@
-
-export const interests = [
-  'Travel', 'Music', 'Movies', 'Sports', 'Reading', 'Cooking', 'Photography',
-  'Dancing', 'Gaming', 'Art', 'Fitness', 'Nature', 'Technology', 'Fashion',
-  'Food', 'Animals', 'Adventure', 'Comedy', 'Beach', 'Mountains'
-];
-
-export const countries = [
-  'United States', 'Canada', 'United Kingdom', 'Australia', 'Germany',
-  'France', 'Spain', 'Italy', 'Netherlands', 'Sweden', 'Norway', 'Denmark',
-  'Japan', 'South Korea', 'Singapore', 'Brazil', 'Mexico', 'Argentina'
-];
+import type { FavoriteEntry } from '@/constants/favorites';
 
 export const initialFormData = {
   firstName: '',
@@ -47,6 +36,21 @@ export const initialFormData = {
   perfectFirstDate: '',
   lastGoogled: '',
   adinkraSymbols: [] as string[],
+  // Optional profile details collected in onboarding (same columns the Profile screen edits)
+  heightCm: undefined as number | undefined,
+  languages: [] as string[],
+  pets: [] as string[],
+  loveStyle: [] as string[],
+  communicationStyle: [] as string[],
+  familyPlans: '',
+  socialMedia: '',
+  // Vibe (optional): stored in the existing favorites jsonb (see constants/vibe.ts)
+  values: [] as string[],
+  musicGenres: [] as string[],
+  musicArtists: [] as string[],
+  musicLink: '',
+  /** Favorites already on the profile (complete-profile) - carried through untouched. */
+  favorites: [] as FavoriteEntry[],
   promoCode: '',
   promoCodeId: undefined as string | undefined
 };

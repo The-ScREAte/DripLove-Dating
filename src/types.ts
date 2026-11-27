@@ -2,7 +2,7 @@
 import { Database } from '@/integrations/supabase/types';
 import type { FavoriteEntry } from '@/constants/favorites';
 
-export type UserProfile = Database['public']['Tables']['profiles']['Row'];
+type UserProfile = Database['public']['Tables']['profiles']['Row'];
 
 // Enhanced types for better type safety
 export type CurrentUser = UserProfile;
@@ -74,6 +74,9 @@ export interface ChatMatch {
   first_name: string;
   last_name: string;
   last_login_at?: string | null;
+  /** From the partner's profile; the verified badge is only shown when true. */
+  is_verified?: boolean;
+  date_of_birth?: string | null;
   profile_photo?: string;
   unread_messages?: number;
   last_message?: string;
@@ -131,32 +134,5 @@ export interface AdminStats {
   total_admins: number;
   premium_users: number;
   all_time_premium_users: number;
-}
-
-export interface AdminUser {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  account_status: string;
-  gender: string;
-  city: string;
-  country: string;
-  created_at: string;
-  last_login_at: string | null;
-  is_premium: boolean;
-  is_admin: boolean;
-  is_archived?: boolean;
-}
-
-export interface PendingImage {
-  id: string;
-  user_id: string;
-  image_url: string;
-  uploaded_at: string;
-  user?: {
-    first_name: string;
-    last_name: string;
-  };
 }
   

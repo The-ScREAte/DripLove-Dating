@@ -82,7 +82,30 @@
       "signUpFailed": "فشل إنشاء الحساب",
       "appleSignInFailed": "فشل تسجيل الدخول بواسطة Apple",
       "googleSignInFailed": "فشل تسجيل الدخول بواسطة Google"
-    }
+    },
+    "invalidCredentials": "البريد الإلكتروني وكلمة المرور غير متطابقين.",
+    "emailNotConfirmed": "يرجى تأكيد بريدك الإلكتروني أولاً - تحقق من صندوق الوارد.",
+    "resendConfirmation": "إعادة إرسال البريد",
+    "confirmationSent": "تم إرسال رسالة التأكيد. تحقق من صندوق الوارد والرسائل غير المرغوب فيها.",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور",
+    "resetSentTitle": "تحقق من بريدك الإلكتروني",
+    "resetSentBody": "إذا كان هناك حساب لـ {{email}}، فقد أرسلنا رابطًا لإعادة تعيين كلمة المرور.",
+    "usesGoogle": "هذا الحساب يستخدم Google. يرجى المتابعة باستخدام Google.",
+    "usesApple": "هذا الحساب يستخدم Apple. يرجى المتابعة باستخدام Apple.",
+    "signingIn": "جارٍ تسجيل الدخول…",
+    "signInFailedTitle": "تعذر تسجيل الدخول",
+    "signInFailedBody": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
+    "signInCancelled": "تم إلغاء تسجيل الدخول.",
+    "tryAgain": "حاول مرة أخرى",
+    "newPassword": "كلمة مرور جديدة",
+    "updatePassword": "تحديث كلمة المرور",
+    "updatingPassword": "جارٍ التحديث…",
+    "resetLinkExpired": "انتهت صلاحية هذا الرابط. يرجى طلب رابط جديد.",
+    "passwordUpdated": "تم تحديث كلمة المرور. يمكنك الآن تسجيل الدخول.",
+    "passwordHint": "6 أحرف على الأقل",
+    "setNewPasswordTitle": "تعيين كلمة مرور جديدة",
+    "signInTakingLong": "يستغرق تسجيل الدخول وقتًا أطول من المتوقع. يرجى المحاولة مرة أخرى."
   },
   "profile": {
     "myProfile": "ملفي الشخصي",
@@ -250,7 +273,14 @@
       "funQuestions": "أجب على الأسئلة الممتعة",
       "interests": "حدد 3 اهتمامات على الأقل"
     },
-    "freeTonight": "متفرغ الليلة"
+    "freeTonight": "متفرغ الليلة",
+    "height": "الطول",
+    "selectHeight": "اختر طولك",
+    "vibe": {
+      "values": "ما يهمّك أكثر",
+      "genres": "الموسيقى التي تحبها",
+      "empty": "اضغط تعديل للإضافة - يساعدنا ذلك في إيجاد توافق أفضل."
+    }
   },
   "discover": {
     "discover": "اكتشف",
@@ -328,8 +358,37 @@
       "messyVsOrganized": "فوضوي vs منظم: {{percentage}}%",
       "interests": "الاهتمامات",
       "favorites": "Favorites",
-      "language": "اللغة"
-    }
+      "language": "اللغة",
+      "atAGlance": "نظرة سريعة",
+      "communicationStyle": "أسلوب التواصل",
+      "loveStyle": "أسلوب الحب",
+      "pets": "الحيوانات الأليفة",
+      "languagesSpoken": "اللغات",
+      "socialMedia": "وسائل التواصل الاجتماعي",
+      "readMore": "اقرأ المزيد",
+      "showLess": "عرض أقل",
+      "lookingForSerious": "يبحث عن علاقة جادة",
+      "openToAnything": "منفتح على أي شيء",
+      "lookingFor": "يبحث عن {{what}}",
+      "showDetails": "عرض التفاصيل",
+      "hideDetails": "إخفاء التفاصيل",
+      "verifiedProfile": "ملف موثّق",
+      "funQuestions": "أسئلة ممتعة",
+      "funFact": "معلومة طريفة",
+      "perfectDate": "الموعد الأول المثالي",
+      "lastGoogled": "آخر ما بحثت عنه في جوجل"
+    },
+    "modeForYou": "لك",
+    "modeSignMatch": "Sign Match",
+    "signMatchHint": "أشخاص تتوافق علاماتهم مع علاماتك",
+    "filtersAria": "عوامل تصفية Discover",
+    "emptySignMatchTitle": "لا توجد تطابقات علامات الآن",
+    "emptySignMatchDesc": "عد قريبًا أو انتقل إلى «لك».",
+    "refreshFailedTitle": "تعذّر التحديث",
+    "refreshFailedDesc": "تحقق من اتصالك وحاول مرة أخرى.",
+    "adjustFilters": "تعديل عوامل التصفية",
+    "playGames": "العب الألعاب",
+    "tryPremiumFree": "جرّب Premium مجانًا"
   },
   "matches": {
     "matches": "التطابقات",
@@ -361,7 +420,8 @@
     "releaseToRefresh": "حرر للتحديث",
     "refreshing": "جاري التحديث...",
     "error": "خطأ",
-    "failedToRefresh": "فشل تحديث الأشخاص الذين أعجبوا بك"
+    "failedToRefresh": "فشل تحديث الأشخاص الذين أعجبوا بك",
+    "noDetailsYet": "لم تتم مشاركة تفاصيل إضافية بعد."
   },
   "chat": {
     "messages": "الرسائل",
@@ -425,7 +485,37 @@
     "matchExpiredDescription": "انتهت صلاحية هذه المطابقة بسبب عدم النشاط. ابدأ المحادثات خلال 10 أيام للحفاظ على مطابقاتك!",
     "matchExpiringTitle": "المطابقة ستنتهي قريباً!",
     "matchExpiringBody": "مطابقتك مع {{name}} ستنتهي غداً. أرسل رسالة للحفاظ على الاتصال! 💬",
-    "daysLeft": "{{days}} أيام متبقية"
+    "daysLeft": "{{days}} أيام متبقية",
+    "search": "البحث في المحادثات",
+    "noResults": "لم يتم العثور على محادثات",
+    "yesterday": "أمس",
+    "you": "أنت",
+    "earlierConversations": "محادثات سابقة ({{count}})",
+    "newMatchBadge": "جديد",
+    "findYourMatch": "ابحث عن شريكك",
+    "noMatchesTitle": "قصة حبك تبدأ من هنا",
+    "matchedWith": "تم التوافق بينك وبين {{name}}",
+    "matchedAgo": "ألقِ التحية واجعلها مميزة",
+    "icebreakersTitle": "اكسر الجليد",
+    "icebreaker1": "مرحباً {{name}}! ما أفضل شيء في أسبوعك حتى الآن؟",
+    "icebreaker2": "أهلاً {{name}} 👋 ما الذي تحبه كثيراً هذه الأيام؟",
+    "icebreaker3": "ملفك الشخصي جعلني أبتسم. كيف تبدو عطلة نهاية الأسبوع المثالية بالنسبة لك؟",
+    "staySafeTitle": "ابقَ آمناً",
+    "staySafeBody": "استمر في الدردشة على DripLove حتى تثق بالشخص. لا تشارك المال أو كلمات المرور أو البيانات المالية أبداً.",
+    "dismiss": "إغلاق",
+    "jumpToLatest": "الانتقال إلى آخر رسالة",
+    "newMessagesCount": "{{count}} جديدة",
+    "viewProfile": "عرض الملف الشخصي",
+    "replyingTo": "الرد على {{name}}",
+    "cancelReply": "إلغاء الرد",
+    "verified": "موثّق",
+    "unreadCount": "{{count}} غير مقروءة",
+    "openConversation": "فتح المحادثة مع {{name}}",
+    "newMatchesAria": "توافقات جديدة",
+    "typingAria": "{{name}} يكتب",
+    "today": "اليوم",
+    "copy": "نسخ",
+    "copied": "تم نسخ الرسالة"
   },
   "premium": {
     "goPremium": "الترقية إلى Premium",
@@ -511,6 +601,19 @@
         "button": "🎯 دفعة واحدة",
         "subtitle": "لا يوجد تجديد تلقائي"
       }
+    },
+    "legal": {
+      "renewalStore": "يتجدد شهريًا بسعر {{price}} حتى تلغيه. يمكنك الإلغاء في أي وقت من إعدادات {{store}}.",
+      "renewalWeb": "يتجدد كل 30 يومًا بسعر {{price}} حتى تلغيه. يمكنك الإلغاء في أي وقت من ملفك الشخصي.",
+      "terms": "شروط الاستخدام",
+      "privacy": "سياسة الخصوصية"
+    },
+    "paymentIssue": {
+      "title": "مشكلة في الدفع",
+      "body": "تعذّر تجديد اشتراكك المميز. حدّث طريقة الدفع في {{store}} للحفاظ على مزاياك.",
+      "until": "يبقى اشتراكك المميز نشطًا حتى {{date}}.",
+      "update": "تحديث طريقة الدفع",
+      "later": "ليس الآن"
     }
   },
   "notifications": {
@@ -544,8 +647,6 @@
     "rateApp": "تقييم التطبيق",
     "title": "الإعدادات",
     "accountActions": "إجراءات الحساب",
-    "enjoyingDripLove": "⭐ تستمتع بـ DripLove؟",
-    "rateExperience": "قيّم تجربتك وساعدنا على النمو!",
     "needHelp": "تحتاج مساعدة؟",
     "contactSupport": "اتصل بفريق الدعم لدينا لأي أسئلة أو مساعدة:",
     "termsOfService": "شروط الخدمة",
@@ -573,7 +674,10 @@
     "deleteFailed": "فشل الحذف",
     "updateFailed": "فشل التحديث",
     "noUserData": "لا توجد بيانات مستخدم",
-    "unableToLoadUser": "غير قادر على تحميل معلومات المستخدم. يرجى تسجيل الدخول مرة أخرى."
+    "unableToLoadUser": "غير قادر على تحميل معلومات المستخدم. يرجى تسجيل الدخول مرة أخرى.",
+    "tabErrorTitle": "تعذّر تحميل هذا التبويب",
+    "tabErrorBody": "واجه هذا القسم مشكلة. علامات التبويب الأخرى تعمل بشكل طبيعي.",
+    "tabErrorRetry": "حاول مرة أخرى"
   },
   "validation": {
     "required": "هذا الحقل مطلوب",
@@ -815,7 +919,10 @@
       "dobRequired": "تاريخ الميلاد مطلوب",
       "mustBe18": "يجب أن يكون عمرك 18 سنة على الأقل",
       "genderRequired": "الرجاء اختيار جنسك",
-      "preferenceRequired": "الرجاء اختيار تفضيلك"
+      "preferenceRequired": "الرجاء اختيار تفضيلك",
+      "photosRequired": "الصور مطلوبة",
+      "someImagesRejected": "تم رفض بعض الصور",
+      "photosNeedReupload": "يرجى إضافة صورك مرة أخرى"
     },
     "createAccount": "إنشاء حساب",
     "tellUsMore": "أخبرنا المزيد",
@@ -985,7 +1092,9 @@
     "joinThousands": "انضم إلى الآلاف الذين يجدون الحب عبر القارات",
     "aboutLink": "عن DripLove",
     "termsLink": "شروط الخدمة",
-    "privacyLink": "سياسة الخصوصية"
+    "privacyLink": "سياسة الخصوصية",
+    "legal": "بالمتابعة، فإنك توافق على <terms>شروط الخدمة</terms> و<privacy>سياسة الخصوصية</privacy>.",
+    "connectLink": "تواصل"
   },
   "adinkraMeanings": {
     "Aya": "السرخس. رمز للتحمل والبراعة.",
@@ -1014,5 +1123,456 @@
     "priorityHint": "حافظ على تتابعك لتحظى بالأولوية في التطابقات المميزة.",
     "continue": "متابعة",
     "levelComplete": "🎉 اكتمل المستوى {{level}}!"
+  },
+  "onboarding": {
+    "progress": "تقدّم التسجيل",
+    "optional": "اختياري",
+    "back": "رجوع",
+    "continue": "متابعة",
+    "checkingPhotos": "جارٍ فحص صورك…",
+    "addMorePhotos": "أضف {{count}} صورة أخرى للمتابعة",
+    "select": "اختر",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور",
+    "pw": {
+      "tooShort": "قصيرة جدًا - استخدم 6 أحرف على الأقل",
+      "okay": "مقبولة",
+      "good": "جيدة",
+      "strong": "قوية"
+    },
+    "steps": {
+      "account": {
+        "title": "أنشئ حسابك",
+        "hint": "استخدم بريدًا إلكترونيًا تتحقق منه."
+      },
+      "location": {
+        "title": "أين تقيم؟",
+        "hint": "لنعرض لك أشخاصًا قريبين."
+      },
+      "work": {
+        "title": "العمل والتعليم",
+        "hintRequired": "أخبرنا بعملك.",
+        "hintOptional": "شارك ما تراه مناسبًا."
+      },
+      "signs": {
+        "title": "اختر رموزك الثقافية",
+        "hint": "اختر {{min}} على الأقل.",
+        "hintOptional": "اختر ما يشبهك."
+      },
+      "face": {
+        "title": "تأكّد أنك أنت",
+        "hint": "سيلفي سريع يُبقي DripLove حقيقيًا. لا يُعرض أبدًا."
+      },
+      "photos": {
+        "title": "أضف أفضل صورك",
+        "hint": "أضف صورتين واضحتين لك على الأقل."
+      },
+      "bio": {
+        "title": "احكِ قصتك",
+        "hint": "بضع كلمات صادقة تكفي."
+      },
+      "details": {
+        "title": "المزيد عنك",
+        "hint": "يساعد الآخرين على التعرّف عليك."
+      },
+      "lifestyle": {
+        "title": "حياتك اليومية",
+        "hint": "اختر ما يناسبك."
+      },
+      "interests": {
+        "title": "ما الذي يُلهمك؟",
+        "hint": "اختر ما تحب - يحسّن توافقاتك."
+      },
+      "love": {
+        "title": "كيف تحب؟",
+        "hint": "كيف تبدو العلاقة الجيدة بالنسبة لك."
+      },
+      "you": {
+        "title": "لنبدأ بك",
+        "hint": "اسمك وتاريخ ميلادك ومن أنت."
+      },
+      "looking": {
+        "title": "عمّن تبحث؟",
+        "hint": "أخبرنا بمن تودّ أن تلتقي."
+      },
+      "celebrate": {
+        "title": "لقد دخلت!",
+        "hint": "هل تريد أن يتألق ملفك الشخصي؟"
+      },
+      "values": {
+        "title": "ما الذي يهمّك أكثر؟",
+        "hint": "اختر حتى 5 - تؤثر في من نعرضهم لك."
+      },
+      "music": {
+        "title": "ماذا تسمع؟",
+        "hint": "اختر نوعك الموسيقي - نطابق أيضاً حسب الذوق."
+      }
+    },
+    "face": {
+      "done": "تم التحقق من الوجه"
+    },
+    "photos": {
+      "tipsLink": "نصائح الصور",
+      "add": "إضافة صور",
+      "alt": "صورتك {{n}}",
+      "crop": "قص الصورة",
+      "remove": "إزالة الصورة",
+      "main": "الرئيسية",
+      "approved": "مقبولة"
+    },
+    "promo": {
+      "toggle": "هل لديك رمز ترويجي؟"
+    },
+    "tips": {
+      "title": "أفضل نصائح صورة الملف الشخصي",
+      "subtitle": "الصور الواضحة والصادقة تحصل على تطابقات أكثر بكثير. أضف حتى {{max}}.",
+      "doHeading": "افعل",
+      "avoidHeading": "يُرجى تجنّب",
+      "smile": "ابتسامة صادقة",
+      "light": "إضاءة طبيعية",
+      "life": "أظهر حياتك",
+      "sunglasses": "نظارات شمسية",
+      "dark": "إضاءة سيئة",
+      "group": "صور جماعية",
+      "mirror": "سيلفي المرآة",
+      "cta": "اختيار الصور"
+    },
+    "skip": "تخطَّ",
+    "showMore": "عرض المزيد",
+    "showFewer": "عرض أقل",
+    "bio": {
+      "placeholder": "اكتب بضعة أسطر عنك…",
+      "starter1": "أكون أسعد عندما…",
+      "starter2": "عطلة نهاية الأسبوع المثالية لي هي…",
+      "starter3": "اسألني عن…",
+      "starter4": "أبحث عن شخص…"
+    },
+    "details": {
+      "languages": "اللغات التي تتحدثها (حتى {{max}})"
+    },
+    "lifestyle": {
+      "pets": "الحيوانات الأليفة",
+      "social": "أسلوب وسائل التواصل"
+    },
+    "interests": {
+      "counter": "تم اختيار {{count}} من {{max}}"
+    },
+    "love": {
+      "loveStyle": "كيف تُظهر الحب",
+      "communication": "كيف تحب التواصل",
+      "family": "خطط العائلة"
+    },
+    "celebrate": {
+      "add": "إضافة المزيد (اختياري)",
+      "skip": "تخطَّ الآن - خذني إلى DripLove"
+    },
+    "bonus": "اجعله يتألق",
+    "welcomeBack": "مرحبًا، {{name}} - بقيت بضع تفاصيل فقط.",
+    "cheer": {
+      "start": "بداية رائعة",
+      "great": "أنت تبلي بلاءً حسنًا",
+      "almost": "اقتربت!",
+      "last": "الخطوة الأخيرة!"
+    },
+    "vibe": {
+      "selected": "محدد"
+    },
+    "music": {
+      "artists": "الفنانون المفضلون",
+      "artistN": "الفنان {{n}}",
+      "artistPlaceholder": "مثال: Burna Boy",
+      "link": "شارك أغنية أو قائمة تشغيل",
+      "linkHelp": "تُشغَّل مباشرة على ملفك.",
+      "linkInvalid": "الصق رابط Spotify أو Apple Music أو YouTube أو SoundCloud."
+    }
+  },
+  "circleUp": {
+    "permTitle": "الكاميرا والميكروفون متوقفان",
+    "permBody": "فعّلهما لتطبيق DripLove من إعدادات جهازك للانضمام مباشرة.",
+    "permBodyIos": "اسمح بالكاميرا والميكروفون لتطبيق DripLove في الإعدادات للانضمام مباشرة.",
+    "openSettings": "فتح الإعدادات",
+    "tryAgain": "حاول مرة أخرى",
+    "endCallTitle": "إنهاء المكالمة؟",
+    "endCallBody": "ستغادر المكالمة وسيتم إبلاغ تطابقك.",
+    "endCall": "إنهاء",
+    "stay": "البقاء",
+    "tapToPlay": "اضغط لبدء الفيديو",
+    "finding": "نبحث لك عن شخص ما",
+    "searchNear": "نبدأ بالأشخاص القريبين منك",
+    "searchCountry": "ثم نوسّع البحث إلى بلدك كله",
+    "searchAbroad": "ثم خارج البلاد",
+    "reconnecting": "جارٍ إعادة الاتصال…",
+    "connecting": "جارٍ الاتصال…",
+    "flipCamera": "تبديل الكاميرا",
+    "callEnded": "انتهت المكالمة",
+    "callEndedBody": "شكرًا على التواصل.",
+    "findNew": "ابحث عن شخص جديد",
+    "backToCircle": "العودة إلى Circle"
+  },
+  "rating": {
+    "title": "هل تحب DripLove؟",
+    "body": "تقييم سريع يساعد المزيد من الناس على إيجاد الحب الحقيقي.",
+    "rateCta": "قيّم DripLove",
+    "rateFailed": "تعذّر فتح المتجر. ابحث عن DripLove في متجر التطبيقات لتقييمه.",
+    "feedbackCta": "أخبرنا بما يجب تحسينه",
+    "feedbackTitle": "ساعدنا على التحسّن",
+    "feedbackSubtitle": "رسالتك تصل مباشرة إلى فريقنا.",
+    "feedbackPlaceholder": "ما الذي يمكن تحسينه؟",
+    "feedbackSend": "إرسال الملاحظات",
+    "feedbackThanks": "شكرًا لك - نقرأ كل رسالة.",
+    "feedbackError": "تعذّر الإرسال. حاول مرة أخرى.",
+    "cat_matches": "التطابقات",
+    "cat_chat": "الدردشة",
+    "cat_photos": "الصور والتحقق",
+    "cat_payments": "المدفوعات",
+    "cat_bug": "الأخطاء والسرعة",
+    "cat_other": "أخرى"
+  },
+  "permissions": {
+    "title": {
+      "camera": "الوصول إلى الكاميرا متوقف",
+      "microphone": "الوصول إلى الميكروفون متوقف",
+      "cameraMicrophone": "الوصول إلى الكاميرا والميكروفون متوقف",
+      "location": "الوصول إلى الموقع متوقف",
+      "photos": "الوصول إلى الصور متوقف",
+      "notifications": "الإشعارات متوقفة"
+    },
+    "bodyIos": "فعّله من الإعدادات ثم ارجع إلى DripLove.",
+    "bodyAndroid": "افتح الإعدادات ← التطبيقات ← DripLove ← الأذونات وفعّله.",
+    "bodyWeb": "اسمح بالوصول عندما يطلب المتصفح ذلك، أو فعّله من إعدادات الموقع في المتصفح.",
+    "openSettings": "فتح الإعدادات",
+    "tryAgain": "حاول مجددًا"
+  },
+  "legal": {
+    "contents": "المحتويات",
+    "related": "سياسات ذات صلة",
+    "links": {
+      "terms": "شروط الخدمة",
+      "privacy": "سياسة الخصوصية",
+      "community": "إرشادات المجتمع",
+      "childSafety": "سلامة الأطفال",
+      "safetyTips": "نصائح السلامة"
+    }
+  },
+  "vibe": {
+    "sharedTitle": "تحبّان كلاكما",
+    "more": "+{{count}}",
+    "musicMatch": "توافق موسيقي - لديكما ذوق مشترك",
+    "valuesTitle": "ما يهمّ أكثر",
+    "musicTitle": "الذوق الموسيقي",
+    "values": {
+      "honesty": "الصدق",
+      "loyalty": "الوفاء",
+      "humor": "الفكاهة",
+      "kindness": "اللطف",
+      "respect": "الاحترام",
+      "communication": "التواصل",
+      "family": "العائلة",
+      "faith": "الإيمان",
+      "ambition": "الطموح",
+      "growth": "النمو",
+      "adventure": "المغامرة",
+      "affection": "الحنان",
+      "stability": "الاستقرار",
+      "independence": "الاستقلالية",
+      "culture": "الثقافة والجذور",
+      "fun": "المرح",
+      "generosity": "الكرم",
+      "intimacy": "القرب العاطفي"
+    },
+    "genres": {
+      "afrobeats": "أفروبيتس",
+      "amapiano": "أمابيانو",
+      "highlife": "هايلايف",
+      "hiphop": "هيب هوب",
+      "rnb": "آر أند بي",
+      "gospel": "جوسبل",
+      "reggae": "ريغي ودانس هول",
+      "pop": "بوب",
+      "rock": "روك",
+      "jazz": "جاز",
+      "soul": "سول",
+      "house": "هاوس",
+      "latin": "لاتيني",
+      "country": "كانتري",
+      "classical": "كلاسيكية",
+      "alternative": "ألترناتيف"
+    }
+  },
+  "handoff": {
+    "welcomeName": "مرحبًا، {{name}}",
+    "welcome": "مرحبًا بك في DripLove",
+    "line": "نبحث عن أشخاص بالقرب منك…"
+  },
+  "termsAccept": {
+    "hint": "ضع علامة في المربع للمتابعة",
+    "saving": "جارٍ الحفظ…",
+    "failed": "تعذّر الحفظ. تحقق من اتصالك وحاول مرة أخرى."
+  },
+  "cards": {
+    "heroMeet": "تعرّف على {{name}}",
+    "sharedHeadline": "أنت و{{name}} تجمعكما أشياء مشتركة",
+    "basicsTitle": "نظرة سريعة",
+    "basics": {
+      "work": "العمل",
+      "education": "التعليم",
+      "height": "الطول",
+      "lives": "يعيش في",
+      "distance": "المسافة",
+      "languages": "يتحدث",
+      "away": "على بُعد {{distance}}"
+    },
+    "lookingTitle": "يبحث عن",
+    "looking": {
+      "family": "خطط الأسرة",
+      "loveStyle": "أسلوب الحب",
+      "communication": "التواصل"
+    },
+    "interestsTitle": "ما يحبه {{name}}",
+    "interestsEyebrow": "الاهتمامات",
+    "valuesEyebrow": "القيم",
+    "music": {
+      "artists": "على التكرار",
+      "play": "استمع إلى أغنيته"
+    },
+    "lifestyleTitle": "نمط الحياة",
+    "lifestyle": {
+      "exercise": "الرياضة",
+      "drinking": "المشروبات",
+      "smoking": "التدخين",
+      "sleep": "النوم",
+      "pets": "الحيوانات الأليفة"
+    },
+    "signTitle": "رمز ثقافي",
+    "sign": {
+      "shared": "تشتركان في هذا الرمز ✨",
+      "compatible": "يتوافق جيدًا مع رمزك ✨"
+    },
+    "trustTitle": "جدير بالمعرفة",
+    "trust": {
+      "verified": "ملف موثّق",
+      "activeNow": "نشط الآن",
+      "activeToday": "نشط اليوم",
+      "activeWeek": "نشط هذا الأسبوع",
+      "profile": "الملف",
+      "lastSeen": "آخر ظهور",
+      "headlineVerified": "{{name}} شخص حقيقي وموثّق",
+      "headlineActive": "{{name}} كان متواجدًا مؤخرًا"
+    },
+    "starterTitle": "اكسر الجليد",
+    "starter": {
+      "interest": "ما الذي جذبك إلى {{thing}}؟",
+      "value": "ماذا تعني لك {{thing}}؟",
+      "music": "ما الأغنية التي تكررها هذه الأيام؟",
+      "city": "ما مكانك المفضل في {{city}}؟",
+      "generic": "مرحبًا {{name}} 👋 كيف أسبوعك؟",
+      "hint": "رسالة أولى سهلة - اضغط على المحادثة عندما تتطابقان.",
+      "headline": "قل مرحبًا لـ {{name}}"
+    },
+    "welcomeTitle": "جديد هنا",
+    "welcomeBody": "{{name}} في بداية الطريق - كن أول من يقول مرحبًا.",
+    "promptFunFact": "معلومة طريفة",
+    "promptFirstDate": "الموعد الأول المثالي",
+    "promptGoogled": "آخر بحث",
+    "heroHint": "اضغط على الجانب الأيمن من البطاقة لرؤية المزيد"
+  },
+  "circle": {
+    "title": "Circle Up",
+    "subtitle": "اعثر على أشخاص يشاركونك عالمك.",
+    "verifiedNearYou": "{{count}} عضو موثّق بالقرب منك",
+    "premiumTag": "بريميوم",
+    "unlockTitle": "عضو في {{circle}}",
+    "unlockTitleMany": "انضم إلى الكثير من الأعضاء في {{circle}}",
+    "unlockBody": "افتح هذه الدائرة لتتعرّف على الأعضاء الذين يناسبون ما تبحث عنه تمامًا.",
+    "unlockCta": "افتح مع بريميوم",
+    "unlockCtaTrial": "ابدأ التجربة المجانية",
+    "maybeLater": "ربما لاحقًا",
+    "lockedCardTitle": "افتح لتشاهد",
+    "endTitle": "لقد شاهدت الجميع هنا",
+    "endBody": "لقد شاهدت الجميع في \"{{circle}}\" حاليًا. عد قريبًا أو استكشف دائرة أخرى.",
+    "endCta": "استكشف دوائر أخرى",
+    "many": "الكثير",
+    "members": "أعضاء",
+    "worldwideHint": "إجمالي التطبيق بالكامل",
+    "pickCountries": "اختر دولك"
+  },
+  "icebreaker": {
+    "errors": {
+      "dailyLimit": "وصلت إلى حدّ رسائل كسر الجليد اليوم. حاول مرة أخرى غدًا.",
+      "generic": "تعذّر الإرسال. يرجى المحاولة مرة أخرى.",
+      "invalid": "يرجى كتابة رسالة قصيرة (حتى {{max}} حرفًا).",
+      "rateLimited": "أنت ترسل الكثير من رسائل كسر الجليد، حاول مجددًا بعد قليل.",
+      "unavailable": "لا يمكن لهذا الشخص استلام رسائل كسر الجليد حاليًا."
+    },
+    "inbox": {
+      "accept": "قبول وبدء المحادثة",
+      "acceptNote": "بقبولك ستتطابق مع {{name}} وتُفتح محادثتك. إذا لم تكن مهتمًا فلن يُرسل أي شيء.",
+      "decline": "ليس الآن",
+      "empty": "لا توجد رسائل كسر جليد حاليًا",
+      "emptySub": "عندما يرسل لك أحدهم رسالة أولى ستظهر هنا.",
+      "error": "تعذّر تنفيذ ذلك الآن. يرجى المحاولة مرة أخرى.",
+      "intro": "القبول ينشئ تطابقًا ويفتح محادثتك.",
+      "matched": "تطابق!",
+      "matchedBody": "يمكنك أنت و{{name}} الدردشة الآن.",
+      "readMore": "اقرأ المزيد",
+      "reportBlock": "إبلاغ أو حظر",
+      "requestTitle": "رسائل كسر الجليد",
+      "said": "{{name}} يقول",
+      "showLess": "عرض أقل",
+      "title": "كسر الجليد"
+    },
+    "matched": {
+      "body": "قل مرحبًا في محادثتك.",
+      "cta": "فتح المحادثة",
+      "title": "أنتما متطابقان بالفعل"
+    },
+    "quota": "تبقّى {{remaining}} من {{limit}} مجانًا",
+    "quotaEmpty": "لا توجد رسائل مجانية متبقية",
+    "row": {
+      "aria": "فتح رسائل كسر الجليد، {{count}} بالانتظار",
+      "sub": "{{count}} بانتظارك"
+    },
+    "sayHi": "قل مرحبًا",
+    "sentLabel": "تم إرسال رسالة كسر الجليد",
+    "sheet": {
+      "done": "تم",
+      "hint": "سيراها أولاً. إذا قبل، تتطابقان ويمكنكما متابعة الدردشة.",
+      "ideas": "تحتاج فكرة؟",
+      "placeholder": "اكتب رسالة أولى ودّية…",
+      "safety": "هو من يقرر القبول. كن لطيفًا — يمكنك دائمًا الإبلاغ أو الحظر.",
+      "send": "إرسال رسالة كسر الجليد",
+      "sending": "جارٍ الإرسال…",
+      "sentBody": "سنخبرك إذا ردّ {{name}}.",
+      "sentTitle": "تم الإرسال!",
+      "to": "إلى {{name}}",
+      "title": "أرسل رسالتك الأولى إلى {{name}}"
+    },
+    "someone": "شخص ما",
+    "title": "اكسر الجليد",
+    "toast": {
+      "body": "افتح لقراءة رسالته",
+      "title": "{{name}} كسر الجليد",
+      "view": "عرض"
+    },
+    "upsell": {
+      "body": "اشترك في Premium لتكسر الجليد مع أي عدد تريده من الأشخاص.",
+      "cta": "اشترك في Premium",
+      "later": "ليس الآن",
+      "title": "لقد استخدمت رسائلك المجانية الـ {{limit}}"
+    },
+    "useOpener": "استخدم هذه الرسالة: {{text}}",
+    "copyOpener": "نسخ: {{text}}",
+    "copied": "تم النسخ",
+    "chances": {
+      "left_one": "تبقّت فرصة واحدة",
+      "left_other": "تبقّت {{count}} فرصة",
+      "of": "{{remaining}} من {{limit}} فرص مجانية متبقية",
+      "none": "لا توجد فرص متبقية - اشترك في Premium",
+      "unlimited": "فرص غير محدودة",
+      "left_two": "تبقّت فرصتان",
+      "left_few": "تبقّت {{count}} فرص",
+      "left_many": "تبقّت {{count}} فرصة",
+      "left_zero": "لا توجد فرص متبقية"
+    }
   }
 }

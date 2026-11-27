@@ -1,15 +1,22 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { setViewerVibe } from '@/utils/viewerVibe';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, User, Circle } from 'lucide-react';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
-import { isAndroidPlatform, isIOSPlatform, getPlatformSafe } from '@/utils/platformUtils';
+import { isAndroidPlatform } from '@/utils/platformUtils';
 import DripCoupleIcon from '@/components/DripCoupleIcon';
-import AppUpdatePopup from '@/components/AppUpdatePopup';
-import FreeTrialBottomSheet from '@/components/FreeTrialBottomSheet';
+import { useAppUpdateCheck } from '@/components/AppUpdatePopup';
+import PopupHost from '@/popups/PopupHost';
+import IcebreakerHost from '@/components/icebreaker/IcebreakerHost';
+import { openIcebreakerInbox } from '@/components/icebreaker/store';
+import { useIcebreakerInbox } from '@/services/icebreaker';
+import TabErrorBoundary from '@/components/TabErrorBoundary';
+import { usePopupEnvSync, usePopupBusy, requestPopup, cancelPopup, closePopup, setPopupBusy } from '@/popups';
+import { useFreeTrialPopupRequests } from '@/popups/auto';
 import { App } from '@capacitor/app';
-import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -17,18 +24,23 @@ import { loadUserLanguage } from '@/utils/languageSync';
 import { setDistanceUnitCountry } from '@/utils/distanceUnits';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
 import { useDailyStreak } from '@/hooks/useDailyStreak';
-import StreakFlash from '@/components/StreakFlash';
 import type { ChatMatchesCacheValue, CircleCacheValue, CircleRowsCacheValue, LikedMeCacheValue } from '@/types/cacheTypes';
 import { fetchCirclePool, CIRCLE_CACHE_TTL_MS, writeCirclePoolCache } from '@/utils/circlePoolFetch';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
 import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
+import { useBackClose } from '@/utils/backStack';
 import { setNotificationNavHandler } from '@/services/pushNotifications';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type UserImageRow = Database['public']['Tables']['user_images']['Row'];
 
+import { BrandLoader } from '@/components/ui/LoadingStates';
+import RatingHost from '@/rating/RatingHost';
+import { isEntitledToPremium } from '@/utils/subscriptionEntitlement';
+
+import { uniqueTopic } from '@/utils/realtime';
 // Lazy load tab components - reduces initial bundle by ~700KB
 
 // Lazy load tab components - reduces initial bundle by ~700KB
@@ -47,35 +59,8 @@ const PrivacyPolicy = lazy(() => import('@/components/PrivacyPolicy'));
 // pulled it in. Now it's a real lazy chunk like the others.
 const ProfilePage = lazy(() => import('@/components/ProfilePage'));
 
-// Tab loading fallback
-const TabLoader = () => (
-  <div className="flex items-center justify-center h-full">
-    <div className="text-center">
-      <style>{`
-        @keyframes logoHop {
-          0%, 100% { transform: translateY(0) scale(1); }
-          50% { transform: translateY(-15px) scale(1.05); }
-        }
-      `}</style>
-      <div className="mb-2" style={{ animation: 'logoHop 0.8s ease-in-out infinite' }}>
-        <img 
-          src="/driplove-logo.png" 
-          alt="Drip Love" 
-          className="w-16 h-16 mx-auto"
-          onError={(e) => {
-            e.currentTarget.src = '/driplove-logo.webp';
-          }}
-        />
-      </div>
-      <p className="text-sm text-gray-500">Loading...</p>
-    </div>
-  </div>
-);
-
-// Import rating debug utilities for development
-if (import.meta.env.DEV) {
-  import('@/utils/ratingDebug');
-}
+// Tab loading fallback: branded, and only visible if the wait is > ~150ms (no flash on fast loads)
+const TabLoader = () => <BrandLoader transparent />;
 
 // No SafeArea helpers here; header/nav will be fixed to viewport
 
@@ -226,6 +211,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  // Publish the viewer's interests/favorites so profile cards can show what you share.
+  useEffect(() => {
+    if (!profile) return;
+    const p = profile as unknown as { id?: string; interests?: unknown; favorites?: unknown };
+    setViewerVibe({ id: p.id ?? null, interests: p.interests, favorites: p.favorites });
+  }, [profile]);
   // undefined = premium status not yet resolved. DiscoverPage (and others)
   // key off `isPremium !== undefined` to know whether it's safe to enforce
   // the free-tier swipe limit - defaulting this to `false` made every app
@@ -360,7 +351,47 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
   // Daily login streak - records today's login once, surfaces the flash
   // overlay the first time each calendar day it comes back is_new_day.
-  const { streak: dailyStreak, dismiss: dismissStreakFlash } = useDailyStreak(userId);
+  const { streak: dailyStreak } = useDailyStreak(userId);
+
+  // ---- Popups: ONE coordinator decides what shows when (see src/popups/README.md) ----
+  // Keep it informed of where the user is and what they're doing; MainApp never opens popups itself.
+  usePopupEnvSync(userId, {
+    authed: !!userId,
+    onboardingDone: true, // MainApp only mounts after sign-up / profile completion / terms
+    screen: activeTab,
+    isPremium: isPremium === undefined ? null : isPremium,
+    dataReady: !!profile && isPremium !== undefined,
+  });
+  usePopupBusy('chat-detail', isChatDetailOpen && activeTab === 'chat');
+  usePopupBusy('keyboard', isKeyboardOpen);
+  useAppUpdateCheck();
+  // Switching tab (e.g. from a push tap) never leaves a stale upgrade page open.
+  useEffect(() => {
+    closePopup('premium-upgrade');
+  }, [activeTab]);
+  useFreeTrialPopupRequests(userId);
+
+  // Daily streak: once per calendar day, from day 2 on (day 1 has nothing to celebrate yet).
+  const streakToCelebrate = dailyStreak?.isNewDay && dailyStreak.currentStreak >= 2 ? dailyStreak.currentStreak : 0;
+  useEffect(() => {
+    if (streakToCelebrate) requestPopup('streak-flash', { currentStreak: streakToCelebrate });
+  }, [streakToCelebrate]);
+
+  // Tapping the streak-reminder push shows the same banner with the real current progress.
+  const streakFromTap = !dailyStreak?.isNewDay && showStreakBannerFromTap ? (profile?.current_streak ?? 0) : 0;
+  useEffect(() => {
+    if (streakFromTap >= 1) {
+      requestPopup('streak-tap', {
+        currentStreak: streakFromTap,
+        onClosed: () => {
+          setShowStreakBannerFromTap(false);
+          clearNotificationParams(['tab', 'showStreak']);
+        },
+      });
+    } else {
+      cancelPopup('streak-tap');
+    }
+  }, [streakFromTap]);
 
   const fetchUserProfile = useCallback(async () => {
     if (!userId) {
@@ -466,9 +497,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               const cachedPremium = readCachedPremiumStatus(data.id);
               setIsPremium(cachedPremium === true);
             } else {
-              const entitledByStatus = fallback?.status === 'active' || fallback?.status === 'cancelled';
-              const notExpired = !fallback?.expires_at || new Date(fallback.expires_at) > new Date();
-              const entitled = !!fallback && fallback.plan_name === 'premium' && entitledByStatus && notExpired;
+              const entitled = isEntitledToPremium(fallback);
               setIsPremium(entitled);
               writeCachedPremiumStatus(data.id, entitled);
             }
@@ -753,8 +782,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           }
         };
         
-        // Request permission
-        const permissionResult = await PushNotifications.requestPermissions();
+        // Request permission. The OS prompt is itself a popup: keep every in-app popup away while it's up.
+        setPopupBusy('os-permission', true);
+        let permissionResult: Awaited<ReturnType<typeof PushNotifications.requestPermissions>>;
+        try {
+          permissionResult = await PushNotifications.requestPermissions();
+        } finally {
+          setPopupBusy('os-permission', false);
+        }
 
         // Report the answer straight away (useActivityTracker also reports it
         // on every open) so a "no" stops pushes being attempted at once.
@@ -1241,7 +1276,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
     // Use two filtered subscriptions for better performance (matches user1 or user2)
     const channel1 = supabase
-      .channel(`nav-matches-user1-${userId}`)
+      .channel(uniqueTopic(`nav-matches-user1-${userId}`))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -1253,7 +1288,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       .subscribe();
 
     const channel2 = supabase
-      .channel(`nav-matches-user2-${userId}`)
+      .channel(uniqueTopic(`nav-matches-user2-${userId}`))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -1283,7 +1318,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     // table and filtering client-side after receiving it - that old pattern
     // broadcasts every message any user sends to every connected client.
     const channel = supabase
-      .channel(`nav-chats-${userId}`)
+      .channel(uniqueTopic(`nav-chats-${userId}`))
       .on(
         'postgres_changes',
         {
@@ -1324,6 +1359,17 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('chat');
   }, []);
 
+  // Break the ice: open a specific conversation (after accepting) or just the Chat tab.
+  const openChatForIcebreaker = useCallback((matchId?: string | null) => {
+    if (matchId) setChatDeepLinkMatchId(matchId);
+    else setChatListSignal((n) => n + 1);
+    setActiveTab('chat');
+  }, []);
+  const openPremiumForIcebreaker = useCallback(() => {
+    requestPopup('premium-upgrade', { preselectedPlan: 'premium' });
+  }, []);
+  const icebreakerWaiting = useIcebreakerInbox().items.length;
+
   const handleShowTerms = useCallback(() => {
     setShowTerms(true);
   }, []);
@@ -1356,6 +1402,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       setProfileTabSignal((s) => s + 1);
     }
   }, []);
+
+  // Android hardware back: from any other tab go back to Discover first instead
+  // of dropping straight out of the app (the platform convention). Overlays and
+  // the open chat conversation register their own handlers later in the stack,
+  // so they still close first; on Discover itself back keeps its default.
+  useBackClose(activeTab !== 'dripcheck', () => handleTabChange('dripcheck'), { escape: false });
 
   // The single in-app destination for a tapped notification while the app is
   // running. Mirrors resolveNotificationRoute (used for cold starts), but
@@ -1394,6 +1446,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       if (action === 'open_chat') {
         setChatListSignal((n) => n + 1);
         handleTabChange('chat');
+        return;
+      }
+      if (action === 'open_icebreakers') {
+        setChatListSignal((n) => n + 1);
+        handleTabChange('chat');
+        openIcebreakerInbox();
         return;
       }
       // Scheduled messages pick the screen a tap opens (tap_action).
@@ -1464,12 +1522,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         <div className="text-center bg-white rounded-lg p-8 shadow-lg max-w-md w-full">
           <h2 className="text-xl font-bold text-gray-800 mb-4">{t('errors.noUserData')}</h2>
           <p className="text-gray-600 mb-6">{t('errors.unableToLoadUser')}</p>
-          <button
+          <Button variant="primary" size="md"
             onClick={onLogout}
-            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-full font-medium"
+           
           >
             {t('auth.backToLogin')}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -1536,9 +1594,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 aria-hidden="true"
                 className="absolute inset-0"
                 style={{
+                  // 95% opaque: a backdrop blur here is invisible but costs GPU
+                  // time on every frame on weak devices, so there isn't one.
                   background: 'rgba(0,0,0,0.95)',
-                  backdropFilter: 'blur(18px) saturate(160%)',
-                  WebkitBackdropFilter: 'blur(18px) saturate(160%)',
                   borderBottomLeftRadius: '18px',
                   borderBottomRightRadius: '18px',
                 }}
@@ -1555,7 +1613,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                   // ceiling to match) gives a bit more clearance below the safe area
                   // on notched/Dynamic Island devices, where the header previously
                   // sat right at its edge.
-                  paddingTop: 'clamp(16px, calc(env(safe-area-inset-top, 16px) + 8px), 48px)',
+                  paddingTop: 'clamp(16px, calc(env(safe-area-inset-top, 16px) + 8px), 80px)',
                   // Scales with viewport width instead of a fixed px-4 py-2, so a
                   // narrow/small-screen Android phone gets a proportionally smaller
                   // header instead of the same absolute padding as a large phone.
@@ -1667,10 +1725,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {visitedTabs.has('dripcheck') && (
             <Suspense fallback={<TabLoader />}>
               <div 
-                className="w-full h-full" 
+                className="w-full h-full dl-tab-panel" 
                 style={{ display: activeTab === 'dripcheck' ? 'block' : 'none' }}
               > 
-                <DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToProfileSection={handleNavigateToProfileSection} onNavigateToAdvertise={handleNavigateToAdvertise} onNavigateToVerify={handleNavigateToVerify} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} />
+                <TabErrorBoundary tab="dripcheck"><DiscoverPage currentUser={profile} onNavigateToChat={handleNavigateToChat} onNavigateToProfile={() => handleTabChange('profile')} onNavigateToProfileSection={handleNavigateToProfileSection} onNavigateToAdvertise={handleNavigateToAdvertise} onNavigateToVerify={handleNavigateToVerify} isPremium={isPremium} profileCompletion={profileCompletion} isActiveTab={activeTab === 'dripcheck'} /></TabErrorBoundary>
               </div>
             </Suspense>
           )}
@@ -1678,19 +1736,22 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {visitedTabs.has('circle') && (
             <Suspense fallback={<TabLoader />}>
               <div
-                className="w-full h-full"
+                className="w-full h-full dl-tab-panel"
                 style={{ display: activeTab === 'circle' ? 'block' : 'none' }}
               >
-                <CirclePage
-                  currentUser={profile}
-                  isPremium={isPremium}
-                  isActiveTab={activeTab === 'circle'}
-                  deepLinkProfileId={circleDeepLinkProfileId}
-                  onDeepLinkConsumed={() => {
-                    setCircleDeepLinkProfileId(null);
-                    clearNotificationParams(['tab', 'circleUserId']);
-                  }}
-                />
+                <TabErrorBoundary tab="circle">
+                  <CirclePage
+                    currentUser={profile}
+                    isPremium={isPremium}
+                    isActiveTab={activeTab === 'circle'}
+                    onNavigateToProfileSection={handleNavigateToProfileSection}
+                    deepLinkProfileId={circleDeepLinkProfileId}
+                    onDeepLinkConsumed={() => {
+                      setCircleDeepLinkProfileId(null);
+                      clearNotificationParams(['tab', 'circleUserId']);
+                    }}
+                  />
+                </TabErrorBoundary>
               </div>
             </Suspense>
           )}
@@ -1698,20 +1759,23 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {visitedTabs.has('chat') && (
             <Suspense fallback={<TabLoader />}>
               <div 
-                className="w-full h-full" 
+                className="w-full h-full dl-tab-panel" 
                 style={{ display: activeTab === 'chat' ? 'block' : 'none' }}
               > 
-                <ChatPage
-                  currentUser={profile}
-                  onUnreadChange={forceRefreshUnreadCount}
-                  onDetailViewChange={setIsChatDetailOpen}
-                  deepLinkMatchId={chatDeepLinkMatchId}
-                  showListSignal={chatListSignal}
-                  onDeepLinkConsumed={() => {
-                    setChatDeepLinkMatchId(null);
-                    clearNotificationParams(['tab', 'matchId']);
-                  }}
-                />
+                <TabErrorBoundary tab="chat">
+                  <ChatPage
+                    currentUser={profile}
+                    onUnreadChange={forceRefreshUnreadCount}
+                    onDetailViewChange={setIsChatDetailOpen}
+                    deepLinkMatchId={chatDeepLinkMatchId}
+                    showListSignal={chatListSignal}
+                    onNavigateToDiscover={() => handleTabChange('dripcheck')}
+                    onDeepLinkConsumed={() => {
+                      setChatDeepLinkMatchId(null);
+                      clearNotificationParams(['tab', 'matchId']);
+                    }}
+                  />
+                </TabErrorBoundary>
               </div>
             </Suspense>
           )}
@@ -1719,10 +1783,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {visitedTabs.has('liked') && (
             <Suspense fallback={<TabLoader />}>
               <div 
-                className="w-full h-full" 
+                className="w-full h-full dl-tab-panel" 
                 style={{ display: activeTab === 'liked' ? 'block' : 'none' }}
               > 
-                <LikedMePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} onNavigateToChat={handleNavigateToChat} />
+                <TabErrorBoundary tab="liked"><LikedMePage currentUser={profile} isPremium={isPremium} isActiveTab={activeTab === 'liked'} onNavigateToChat={handleNavigateToChat} /></TabErrorBoundary>
               </div>
             </Suspense>
           )}
@@ -1730,23 +1794,25 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
           {visitedTabs.has('profile') && (
             <Suspense fallback={<TabLoader />}>
               <div 
-                className="w-full h-full" 
+                className="w-full h-full dl-tab-panel" 
                 style={{ display: activeTab === 'profile' ? 'block' : 'none' }}
               > 
-                <ProfilePage
-                  currentUser={profile}
-                  profile={profile}
-                  onProfileUpdate={fetchUserProfile}
-                  onLogout={onLogout}
-                  onShowTerms={handleShowTerms}
-                  onShowPrivacy={handleShowPrivacy}
-                  isPremium={isPremium}
-                  isActiveTab={activeTab === 'profile'}
-                  profileTabSignal={profileTabSignal}
-                  advertiseSignal={advertiseSignal}
-                  verifySignal={verifySignal}
-                  openSectionSignal={profileSectionSignal}
-                />
+                <TabErrorBoundary tab="profile">
+                  <ProfilePage
+                    currentUser={profile}
+                    profile={profile}
+                    onProfileUpdate={fetchUserProfile}
+                    onLogout={onLogout}
+                    onShowTerms={handleShowTerms}
+                    onShowPrivacy={handleShowPrivacy}
+                    isPremium={isPremium}
+                    isActiveTab={activeTab === 'profile'}
+                    profileTabSignal={profileTabSignal}
+                    advertiseSignal={advertiseSignal}
+                    verifySignal={verifySignal}
+                    openSectionSignal={profileSectionSignal}
+                  />
+                </TabErrorBoundary>
               </div>
             </Suspense>
           )}
@@ -1765,7 +1831,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             // guess. The floating-pill inset from the screen edges/bottom (which
             // `left-3 right-3` + a fixed `bottom` used to provide) is now plain
             // margin instead.
-            className="z-[99999] flex-shrink-0"
+            className="z-[99999] flex-shrink-0 dl-nav-in dl-under-popup"
             style={{
               // env(safe-area-inset-bottom) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx). The fixed
@@ -1827,7 +1893,12 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 <button
                   key={value}
                   onClick={() => handleTabChange(value)}
-                  className={`flex flex-col items-center gap-0.5 transition-all duration-200 relative ${
+                  // flex-auto + min-w-[44px]: each tab is at least 44px wide (touch
+                  // minimum) and shares spare bar width evenly. The invisible ::after
+                  // stretches the hit area to the full bar height (the bar clips at its
+                  // edge) so the compact bar stays compact but every tab is >=44px tall
+                  // to tap. Labels never wrap.
+                  className={`flex flex-auto min-w-[44px] flex-col items-center justify-center gap-0.5 whitespace-nowrap transition-[color,background-color,padding,margin] duration-200 ease-out relative active:scale-95 [-webkit-tap-highlight-color:transparent] after:absolute after:inset-x-0 after:-inset-y-2 after:content-[''] ${
                     activeTab === value ? 'text-pink-500' : 'text-gray-400'
                   }`}
                   style={{
@@ -1863,17 +1934,19 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                       // and a bigger, cleaner icon+text.
                       paddingTop: '3px',
                       paddingBottom: '3px',
-                      paddingLeft: '18px',
-                      paddingRight: '18px',
+                      // Scales down on narrow phones so the active pill never squeezes
+                      // the other tabs below the 44px touch minimum.
+                      paddingLeft: 'clamp(10px, 3.5vw, 18px)',
+                      paddingRight: 'clamp(10px, 3.5vw, 18px)',
                     } : undefined),
                   }}
                 >
-                  <Icon style={{ width: 'clamp(15px, 4.2vw, 18px)', height: 'clamp(15px, 4.2vw, 18px)' }} className="shrink-0" />
+                  <Icon style={{ width: 'clamp(15px, 4.2vw, 18px)', height: 'clamp(15px, 4.2vw, 18px)' }} className={`shrink-0 ${activeTab === value ? 'dl-nav-pop' : ''}`} />
                   <span className="font-medium" style={{ fontSize: 'clamp(9px, 2.6vw, 10px)' }}>{label}</span>
-                   {value === 'chat' && unreadCount > 0 && (
+                   {value === 'chat' && (unreadCount + icebreakerWaiting) > 0 && (
                      <div className="absolute top-0 right-0.5 h-4 w-4 rounded-full bg-red-500 border border-white z-10 flex items-center justify-center">
                        <span className="text-[9px] text-white font-bold leading-none">
-                         {unreadCount > 9 ? '9+' : unreadCount}
+                         {(unreadCount + icebreakerWaiting) > 9 ? '9+' : (unreadCount + icebreakerWaiting)}
                        </span>
                      </div>
                    )}
@@ -1887,34 +1960,27 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       {/* Rating Dialog - Now triggered by matches instead of timer */}
 
-      {/* App Update Popup - Shows on native apps when update is available */}
-      <AppUpdatePopup />
+      {/* Every popup (match, upgrade, streak, free trial, verify, app update ...) is drawn here, one at a time,
+          at the moment the popup coordinator picks - see src/popups/README.md. */}
+      <TabErrorBoundary tab="popup-host" silent><PopupHost
+        services={{
+          currentUser: profile,
+          currentUserName: profile?.first_name || 'You',
+          onNavigateToChat: handleNavigateToChat,
+          onNavigateToVerify: handleNavigateToVerify,
+        }}
+      /></TabErrorBoundary>
 
-      {/* Free trial offer - one-time bottom sheet, first eligible app open */}
-      <FreeTrialBottomSheet userId={userId} />
+      {/* Break the ice: composer sheet, inbox, realtime + popup request. Renders nothing until the backend exists. */}
+      <TabErrorBoundary tab="icebreaker" silent><IcebreakerHost userId={userId} openChat={openChatForIcebreaker} openPremium={openPremiumForIcebreaker} /></TabErrorBoundary>
 
-      {/* Daily login streak flash - once per calendar day, right after record_daily_login
-          confirms a fresh day. Day 1 of a streak (a brand-new account's first login, or a
-          restart after a lapse) is deliberately excluded - record_daily_login still records
-          it as a real streak day (it feeds Discover's priority weighting either way), but
-          there's nothing to celebrate yet on day 1 itself. The flash starts once there's an
-          actual streak to show, from day 2 on. */}
-      {dailyStreak?.isNewDay && dailyStreak.currentStreak >= 2 && (
-        <StreakFlash currentStreak={dailyStreak.currentStreak} onClose={dismissStreakFlash} />
-      )}
-
-      {/* Tapping the streak-reminder push shows this same banner with their
-          real current progress, instead of silently landing on Discover with
-          nothing to show for the tap - see showStreakBannerFromTap above. */}
-      {!dailyStreak?.isNewDay && showStreakBannerFromTap && (profile?.current_streak ?? 0) >= 1 && (
-        <StreakFlash
-          currentStreak={profile?.current_streak ?? 0}
-          onClose={() => {
-            setShowStreakBannerFromTap(false);
-            clearNotificationParams(['tab', 'showStreak']);
-          }}
-        />
-      )}
+      {/* Store-review engine (renders nothing): waits for a real happy moment, then calls
+          the NATIVE review API - no custom prompt, no reward (store rules). */}
+      <RatingHost
+        userId={userId}
+        accountCreatedAt={profile?.created_at}
+        profileCompletion={profileCompletion}
+      />
     </div>
   );
 };

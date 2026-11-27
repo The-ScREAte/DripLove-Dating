@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { MapPin, BadgeCheck, ChevronDown, Briefcase, GraduationCap, Languages, PawPrint } from 'lucide-react';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
+import { useTranslation } from 'react-i18next';
+import { relationshipIntentLabel } from '@/components/profile-card/profileCardUtils';
 
-const formatRelationshipIntent = (intent?: string | null) => {
-  if (!intent) return '';
-  if (intent === 'serious') return 'Looking for something serious';
-  if (intent === 'open_to_anything') return 'Open to anything';
-  return `Looking for ${intent.replace(/_/g, ' ').toLowerCase()}`;
-};
-
-export interface ProfileInfoOverlayProps {
+interface ProfileInfoOverlayProps {
   firstName: string;
   age?: number;
   online?: boolean;
@@ -53,9 +48,10 @@ const ProfileInfoOverlay = ({
   expandable = false,
   size = 'full',
 }: ProfileInfoOverlayProps) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const chips = interests.slice(0, 3);
-  const intentLabel = formatRelationshipIntent(relationshipIntent);
+  const intentLabel = relationshipIntentLabel(relationshipIntent, t as never);
   const hasExpandedContent = !!(bio || occupation || intentLabel || education || languages.length > 0 || pets.length > 0 || extraPhotos.length > 0);
   const compact = size === 'compact';
 

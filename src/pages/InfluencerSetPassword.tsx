@@ -124,7 +124,7 @@ const InfluencerSetPassword = () => {
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Invalid Link</h2>
             <p className="text-gray-600 mb-6">{error}</p>
-            <Button onClick={() => navigate('/influencer')} variant="outline" className="bg-white">
+            <Button variant="line" size="md" onClick={() => navigate('/influencer')}>
               Go to Login
             </Button>
           </CardContent>
@@ -189,7 +189,7 @@ const InfluencerSetPassword = () => {
                   placeholder="Enter your password"
                   required
                   minLength={6}
-                  className="pr-10 bg-white text-black placeholder:text-black"
+                  className="pr-10"
                 />
                 <button
                   type="button"
@@ -211,7 +211,7 @@ const InfluencerSetPassword = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm your password"
                   required
-                  className="pr-10 bg-white text-black placeholder:text-black"
+                  className="pr-10"
                 />
                 <button
                   type="button"
@@ -227,9 +227,8 @@ const InfluencerSetPassword = () => {
               <p className="text-sm text-red-500">Passwords do not match</p>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+            <Button variant="primary" size="md" className="w-full" 
+              type="submit"
               disabled={loading || password !== confirmPassword || password.length < 6}
             >
               {loading ? 'Setting Password...' : 'Set Password'}

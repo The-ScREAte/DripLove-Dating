@@ -70,7 +70,7 @@ i18n
 export default i18n;
 
 // Map countries to languages
-export const countryToLanguage: { [key: string]: string } = {
+const countryToLanguage: { [key: string]: string } = {
   // English
   'United States': 'en',
   'United Kingdom': 'en',

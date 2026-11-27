@@ -1,0 +1,302 @@
+/* ------------------------------------------------------------------ *
+ * DripLove motion system
+ *
+ * One small set of tokens + utilities so every screen moves the same way.
+ * Rules this file follows (do not break them when adding to it):
+ *  - Only opacity / transform are animated (compositor-only: no layout, no
+ *    repaint of neighbours) so it stays smooth on weak phones.
+ *  - Route/tab wrappers animate OPACITY ONLY. A transform on a wrapper would
+ *    become the containing block of every position:fixed descendant for the
+ *    length of the animation (headers, sheets, nav) and make them jump.
+ *  - <html data-motion="full|lite|reduced"> is set once in main.tsx:
+ *      lite    = weak device (low RAM / few cores): shorter, no stagger
+ *      reduced = prefers-reduced-motion, Data Saver or 2G/3G: effectively none
+ * ------------------------------------------------------------------ */
+
+:root {
+  --dl-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dl-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dl-dur-fast: 140ms;
+  --dl-dur: 220ms;
+  --dl-dur-slow: 320ms;
+  --dl-loader-delay: 150ms; /* a loader only shows if the wait is longer than this */
+}
+
+html[data-motion="lite"] {
+  --dl-dur-fast: 90ms;
+  --dl-dur: 130ms;
+  --dl-dur-slow: 180ms;
+}
+
+html[data-motion="reduced"] {
+  --dl-dur-fast: 0.01ms;
+  --dl-dur: 0.01ms;
+  --dl-dur-slow: 0.01ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dl-dur-fast: 0.01ms;
+    --dl-dur: 0.01ms;
+    --dl-dur-slow: 0.01ms;
+  }
+}
+
+/* ---------- keyframes ---------- */
+@keyframes dl-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes dl-rise {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes dl-pop {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes dl-nav-pop {
+  0%   { transform: scale(0.8); }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes dl-shimmer {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(100%, 0, 0); }
+}
+@keyframes dl-reveal {
+  to { opacity: 1; }
+}
+
+/* ---------- screen / tab entrance (opacity only, see header) ---------- */
+/* Route change: wrapper in AppRoutes, keyed by pathname. */
+.dl-route {
+  /* partial-opacity start (see dl-tab-in): the old screen is gone instantly, so a
+     0 -> 1 fade flashes the whole viewport to the page background for a frame */
+  animation: dl-tab-in var(--dl-dur) var(--dl-ease-out) backwards;
+}
+/* Tab change: tab panels stay mounted and are toggled with display:none/block.
+   A CSS animation restarts every time an element goes display:none -> block, so
+   this plays exactly on a real tab switch - never on a re-render - with no JS. */
+.dl-tab-panel {
+  animation: dl-tab-in var(--dl-dur) var(--dl-ease-out) backwards;
+}
+/* The outgoing tab vanishes instantly (display:none), so fading the incoming one
+   up from 0 dips the whole screen to pure black for a frame - reads as a blink.
+   Starting at partial opacity keeps the soft fade without the flash. */
+@keyframes dl-tab-in {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+
+/* Profile <-> Preview (ProfilePage renders the preview inline in place of the profile):
+   enter = fade + short rise, exit = fade + short drop (played before unmount),
+   back = the profile fades in again. Durations come from the shared tokens, so the
+   reduced/lite tiers and prefers-reduced-motion shorten or disable them automatically. */
+@keyframes dl-preview-in  { from { opacity: 0.35; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes dl-preview-out { from { opacity: 1; transform: translate3d(0, 0, 0); } to { opacity: 0; transform: translate3d(0, 10px, 0); } }
+.dl-preview-in   { animation: dl-preview-in var(--dl-dur-slow) var(--dl-ease-out) backwards; }
+.dl-preview-out  { animation: dl-preview-out var(--dl-dur-fast) var(--dl-ease-in-out) forwards; }
+.dl-preview-back { animation: dl-tab-in var(--dl-dur) var(--dl-ease-out) backwards; }
+
+/* Bottom nav is conditionally mounted (hidden inside a chat conversation); fade it back in
+   instead of popping in for a frame. Opacity only: the nav is a layout flex child. */
+.dl-nav-in { animation: dl-fade var(--dl-dur-fast) var(--dl-ease-out) backwards; }
+
+/* ---------- in-flow content helpers (safe to use transform here) ---------- */
+.dl-rise  { animation: dl-rise var(--dl-dur-slow) var(--dl-ease-out) backwards; }
+.dl-pop   { animation: dl-pop var(--dl-dur) var(--dl-ease-out) backwards; }
+.dl-nav-pop { animation: dl-nav-pop var(--dl-dur-slow) var(--dl-ease-out); }
+
+/* Cheap stagger: set style={{ '--i': index }} on children, cap index in JS (<= 6). */
+.dl-stagger > * {
+  animation: dl-rise var(--dl-dur-slow) var(--dl-ease-out) backwards;
+  animation-delay: calc(min(var(--i, 0), 6) * 35ms);
+}
+html[data-motion="lite"] .dl-stagger > *,
+html[data-motion="reduced"] .dl-stagger > * {
+  animation-delay: 0ms;
+}
+
+/* ---------- loaders: appear only if loading is actually slow ---------- */
+.dl-delayed {
+  animation: dl-fade 200ms ease-out var(--dl-loader-delay) backwards;
+}
+html[data-motion="reduced"] .dl-delayed {
+  animation-duration: 0.01ms; /* keep the delay, drop the fade */
+}
+
+/* ---------- skeleton shimmer ---------- */
+.dl-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+}
+.dl-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(236, 72, 153, 0.12) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translate3d(-100%, 0, 0);
+  animation: dl-shimmer 1.4s var(--dl-ease-in-out) infinite;
+}
+html[data-motion="reduced"] .dl-skeleton::after {
+  animation: none;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-skeleton::after { animation: none; opacity: 0; }
+}
+
+/* ---------- press feedback (buttons, cards, nav) ---------- */
+.dl-press {
+  transition: transform var(--dl-dur-fast) var(--dl-ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.dl-press:active {
+  transform: scale(0.97);
+}
+
+/* Visible keyboard focus everywhere, without changing the look for taps/clicks. */
+:where(button, a, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid rgba(236, 72, 153, 0.9);
+  outline-offset: 2px;
+}
+
+/* ---------- photo fade-in (opt-in with data-fade on an <img>) ----------
+   main.tsx adds .is-loaded on the img's load event. The 1.5s keyframe is a
+   fail-safe: if a load event is ever missed the photo still appears. */
+img[data-fade]:not(.is-loaded) {
+  opacity: 0;
+  animation: dl-reveal 0.01ms 1.5s forwards;
+}
+img[data-fade] {
+  transition: opacity var(--dl-dur) var(--dl-ease-out);
+}
+
+/* Radix Avatar mounts its <img> only after the photo has loaded: soften the swap from the
+   initials fallback to the photo. */
+.dl-img-in { animation: dl-fade var(--dl-dur) var(--dl-ease-out) backwards; }
+html[data-motion="reduced"] .dl-img-in { animation: none; }
+
+/* ---------- shared dialogs / sheets / popovers (tailwindcss-animate) ---------- */
+.animate-in,
+.animate-out {
+  animation-timing-function: var(--dl-ease-out);
+}
+html[data-motion="lite"] .animate-in,
+html[data-motion="lite"] .animate-out {
+  animation-duration: 130ms !important;
+}
+html[data-motion="reduced"] .animate-in,
+html[data-motion="reduced"] .animate-out {
+  animation-duration: 0.01ms !important;
+}
+
+/* ---------- blanket safety net ---------- */
+html[data-motion="reduced"] .dl-route,
+html[data-motion="reduced"] .dl-tab-panel,
+html[data-motion="reduced"] .dl-rise,
+html[data-motion="reduced"] .dl-pop,
+html[data-motion="reduced"] .dl-nav-pop {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dl-route, .dl-tab-panel, .dl-rise, .dl-pop, .dl-nav-pop, .dl-stagger > * {
+    animation: none;
+  }
+  .dl-press, .dl-press:active { transition: none; transform: none; }
+}
+
+/* ---------- web canvas ----------
+   index.css makes html/body/#root transparent (!important) so the NATIVE webview's own
+   background (splash colour) shows through on iOS/Android. In a browser that exposes the
+   white page canvas, which flashed through every fade/overscroll/loading gap. Browser-only
+   fix; native keeps the transparent behaviour untouched. */
+html.platform-web,
+html.platform-web body,
+html.platform-web #root {
+  background: #000 !important;
+  background-color: #000 !important;
+}
+
+/* ---------- chat ----------
+   New-message pop: only ever applied to a bubble that is actually new (see
+   MessageBubble.animatedMessageIds). Opacity/transform only; the duration
+   token already collapses to ~0 for reduced motion. */
+@keyframes dl-bubble-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+.dl-bubble-in {
+  animation: dl-bubble-in var(--dl-dur) var(--dl-ease-out) backwards;
+  transform-origin: left bottom;
+}
+.dl-bubble-in-own { transform-origin: right bottom; }
+html[data-motion="reduced"] .dl-bubble-in { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dl-bubble-in { animation: none; }
+}
+
+/* ---------- terms acceptance + first-run handoff ----------
+   All opacity/transform (compositor-only). Durations/easing come from the shared
+   tokens, and every effect below is switched off in the reduced tier. */
+
+/* Discover skeleton card: the plain white/6% placeholder is near-invisible on the black
+   page (reads as an empty screen). A faint brand-tinted surface reads as "a card is coming". */
+.dl-skeleton-card {
+  background: linear-gradient(165deg, rgba(236, 72, 153, 0.17) 0%, rgba(139, 92, 246, 0.12) 55%, rgba(255, 255, 255, 0.06) 100%);
+}
+/* First real card after the skeleton: soft fade/rise, once. */
+@keyframes dl-first-card { from { opacity: 0.3; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+.dl-first-card-in { animation: dl-first-card var(--dl-dur-slow) var(--dl-ease-out) backwards; }
+
+/* Animated checkmark: the stroke draws in while the box pops. */
+@keyframes dl-check-draw { to { stroke-dashoffset: 0; } }
+@keyframes dl-check-pop { 0% { transform: scale(0.82); } 55% { transform: scale(1.1); } 100% { transform: scale(1); } }
+.dl-check-box { transition: background-color var(--dl-dur-fast) var(--dl-ease-out), border-color var(--dl-dur-fast) var(--dl-ease-out); }
+.dl-check-box[data-state="checked"] { animation: dl-check-pop var(--dl-dur) var(--dl-ease-out); }
+.dl-check-path { stroke-dasharray: 22; stroke-dashoffset: 22; }
+.dl-check-box[data-state="checked"] .dl-check-path { animation: dl-check-draw var(--dl-dur) var(--dl-ease-out) 40ms forwards; }
+html[data-motion="reduced"] .dl-check-path { stroke-dashoffset: 0; }
+html[data-motion="reduced"] .dl-check-box[data-state="checked"] { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dl-check-path { stroke-dashoffset: 0; }
+  .dl-check-box[data-state="checked"], .dl-check-box[data-state="checked"] .dl-check-path { animation: none; }
+}
+
+/* CTA: one gentle attention pulse the moment it becomes enabled. */
+@keyframes dl-cta-ready { 0% { transform: scale(1); } 45% { transform: scale(1.025); } 100% { transform: scale(1); } }
+.dl-cta-ready { animation: dl-cta-ready var(--dl-dur-slow) var(--dl-ease-out) 1; }
+html[data-motion="reduced"] .dl-cta-ready { animation: none; }
+@media (prefers-reduced-motion: reduce) { .dl-cta-ready { animation: none; } }
+
+/* Welcome moment (handoff into the app): glow behind the logo + a few hearts drifting up. */
+@keyframes dl-glow-in { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+.dl-handoff-glow {
+  position: absolute; left: 50%; top: 50%; width: 260px; height: 260px; margin: -150px 0 0 -130px;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(236, 72, 153, 0.28), rgba(139, 92, 246, 0.12) 55%, rgba(0, 0, 0, 0) 100%);
+  animation: dl-glow-in 520ms var(--dl-ease-out) backwards;
+}
+@keyframes dl-heart-float {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
+  25%  { opacity: 0.85; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), -120px, 0) scale(1); }
+}
+.dl-heart {
+  position: absolute; left: 50%; top: 50%; font-size: 16px; line-height: 1; pointer-events: none;
+  animation: dl-heart-float 1.8s var(--dl-ease-out) var(--d, 0s) infinite backwards;
+}
+html[data-motion="reduced"] .dl-heart, html[data-motion="reduced"] .dl-handoff-glow { display: none; }
+html[data-motion="lite"] .dl-heart:nth-child(n+4) { display: none; }
+@media (prefers-reduced-motion: reduce) { .dl-heart, .dl-handoff-glow { display: none; } }
+
+/* A hand-off screen that replaces an identical one already showing: no entrance replay. */
+.dl-handoff-continued .dl-rise, .dl-handoff-continued .dl-handoff-glow { animation: none; }

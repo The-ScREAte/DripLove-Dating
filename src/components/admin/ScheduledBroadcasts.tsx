@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import RichTextEditor from './RichTextEditor';
 import { Checkbox } from '@/components/ui/checkbox';
+import { getCountryName } from '@/constants/locationData';
 
 interface Country {
   code: string;
@@ -187,21 +188,6 @@ const nextLocalSend = (
     }
   }
   return null;
-};
-
-const getCountryName = (code: string): string => {
-  const countryNames: { [key: string]: string } = {
-    US: 'United States', GB: 'United Kingdom', CA: 'Canada', AU: 'Australia',
-    DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain', NL: 'Netherlands',
-    BE: 'Belgium', CH: 'Switzerland', AT: 'Austria', SE: 'Sweden', NO: 'Norway',
-    DK: 'Denmark', FI: 'Finland', PL: 'Poland', CZ: 'Czech Republic',
-    IE: 'Ireland', PT: 'Portugal', GR: 'Greece', NZ: 'New Zealand',
-    SG: 'Singapore', HK: 'Hong Kong', JP: 'Japan', KR: 'South Korea',
-    IN: 'India', BR: 'Brazil', MX: 'Mexico', AR: 'Argentina', CL: 'Chile',
-    ZA: 'South Africa', NG: 'Nigeria', KE: 'Kenya', EG: 'Egypt',
-    AE: 'UAE', SA: 'Saudi Arabia', IL: 'Israel', TR: 'Turkey', RU: 'Russia',
-  };
-  return countryNames[code] || code;
 };
 
 export default function ScheduledBroadcasts() {

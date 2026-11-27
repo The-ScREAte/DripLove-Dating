@@ -143,14 +143,3 @@ export const isNativeGoogleAuthAvailable = () => {
   const platform = Capacitor.getPlatform();
   return Capacitor.isNativePlatform() && platform === 'android';
 };
-
-/**
- * Sign out from Google Auth
- */
-export const signOutGoogleNative = async () => {
-  try {
-    await GoogleAuth.signOut();
-  } catch (err) {
-    console.error('❌ Google sign-out error:', err);
-  }
-};

@@ -13,7 +13,7 @@ export const DEFAULT_AD_RATES: AdRates = { default: 1000 };
 
 // Averages the rate across whichever countries are targeted (falls back to
 // the default rate when none are selected, i.e. "everywhere").
-export const getBlendedRate = (targetCountries: string[], rates: AdRates): number => {
+const getBlendedRate = (targetCountries: string[], rates: AdRates): number => {
   if (targetCountries.length === 0) return rates.default;
   const values = targetCountries.map((c) => rates[c] ?? rates.default);
   return values.reduce((sum, v) => sum + v, 0) / values.length;

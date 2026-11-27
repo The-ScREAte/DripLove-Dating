@@ -56,6 +56,23 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))'
         },
+        brand: {
+          DEFAULT: 'hsl(var(--dl-brand) / <alpha-value>)',
+          strong: 'hsl(var(--dl-brand-strong) / <alpha-value>)',
+          ink: 'hsl(var(--dl-brand-ink) / <alpha-value>)',
+          from: 'hsl(var(--dl-brand-from) / <alpha-value>)',
+          to: 'hsl(var(--dl-brand-to) / <alpha-value>)'
+        },
+        danger: {
+          DEFAULT: 'hsl(var(--dl-danger) / <alpha-value>)',
+          strong: 'hsl(var(--dl-danger-strong) / <alpha-value>)'
+        },
+        success: 'hsl(var(--dl-success) / <alpha-value>)',
+        warning: 'hsl(var(--dl-warning) / <alpha-value>)',
+        surface: {
+          DEFAULT: 'hsl(var(--dl-surface) / <alpha-value>)',
+          raised: 'hsl(var(--dl-surface-raised) / <alpha-value>)'
+        },
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',
@@ -68,10 +85,26 @@ export default {
         }
       },
       borderRadius: {
+        control: 'var(--dl-r-control)',
+        input: 'var(--dl-r-input)',
+        card: 'var(--dl-r-card)',
+        sheet: 'var(--dl-r-sheet)',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
       },
+      boxShadow: {
+        'dl-sm': 'var(--dl-shadow-sm)',
+        'dl-md': 'var(--dl-shadow-md)',
+        'dl-lg': 'var(--dl-shadow-lg)',
+        'dl-brand': 'var(--dl-shadow-brand)'
+      },
+      backgroundImage: {
+        'brand-gradient': 'linear-gradient(135deg, hsl(var(--dl-brand-from)) 0%, hsl(var(--dl-brand-to)) 100%)',
+        'brand-gradient-strong': 'linear-gradient(135deg, hsl(var(--dl-brand-strong)) 0%, hsl(271 81% 48%) 100%)'
+      },
+      minHeight: { touch: 'var(--dl-touch)' },
+      minWidth: { touch: 'var(--dl-touch)' },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },

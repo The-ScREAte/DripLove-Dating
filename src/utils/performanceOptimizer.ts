@@ -3,23 +3,14 @@
 /**
  * Detect if running on Android
  */
-export const isAndroid = (): boolean => {
+const isAndroid = (): boolean => {
   if (typeof window === 'undefined') return false;
   return /Android/i.test(navigator.userAgent);
 };
-
-/**
- * Detect if running on iOS
- */
-export const isIOS = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
-};
-
 /**
  * Get device performance tier (low, medium, high)
  */
-export const getDevicePerformanceTier = (): 'low' | 'medium' | 'high' => {
+const getDevicePerformanceTier = (): 'low' | 'medium' | 'high' => {
   if (typeof window === 'undefined') return 'medium';
   
   const cores = navigator.hardwareConcurrency || 4;
@@ -33,7 +24,7 @@ export const getDevicePerformanceTier = (): 'low' | 'medium' | 'high' => {
 /**
  * Get optimal image quality based on device performance
  */
-export const getOptimalImageQuality = (): number => {
+const getOptimalImageQuality = (): number => {
   const tier = getDevicePerformanceTier();
   
   // Android gets lower quality by default for better performance
@@ -68,22 +59,8 @@ export const debounce = <T extends (...args: any[]) => any>(
 };
 
 // 2. Throttle function for scroll events and other high-frequency events
-export const throttle = <T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): ((...args: Parameters<T>) => void) => {
-  let inThrottle: boolean;
-  return (...args: Parameters<T>) => {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  };
-};
-
 // 3. Image lazy loading and optimization - ULTRA OPTIMIZED FOR SPEED
-export const optimizeImageUrl = (url: string, maxWidth: number = 300): string => {
+const optimizeImageUrl = (url: string, maxWidth: number = 300): string => {
   // Get optimal quality based on device
   const quality = getOptimalImageQuality();
   
@@ -109,7 +86,7 @@ export const checkAndTriggerRefill = (userId: string, currentIndex: number) => {
 };
 
 // 3.1.1. Progressive Image Loading Manager
-export class ProgressiveImageLoader {
+class ProgressiveImageLoader {
   private loadingQueue: string[] = [];
   private loadedImages: Set<string> = new Set();
   private maxConcurrentLoads = 3;
@@ -157,60 +134,11 @@ export class ProgressiveImageLoader {
 }
 
 // Global progressive image loader instance
-export const globalImageLoader = new ProgressiveImageLoader();
+const globalImageLoader = new ProgressiveImageLoader();
 
 // 3.2. Batch image preloader for discover page
-export const preloadImagesBatch = async (imageUrls: string[], maxConcurrent: number = 3): Promise<HTMLImageElement[]> => {
-  const results: HTMLImageElement[] = [];
-  
-  for (let i = 0; i < imageUrls.length; i += maxConcurrent) {
-    const batch = imageUrls.slice(i, i + maxConcurrent);
-    const batchPromises = batch.map((url) => {
-      return new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => {
-          // Create a placeholder image for failed loads
-          const placeholder = new Image();
-          placeholder.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzlmYTZiNyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
-          resolve(placeholder);
-        };
-        // Ultra-optimized image loading for maximum concurrent users
-        img.src = optimizeImageUrl(url, 280);
-      });
-    });
-    
-    const batchResults = await Promise.all(batchPromises);
-    results.push(...batchResults);
-    
-    // Small delay between batches to prevent overwhelming the browser
-    if (i + maxConcurrent < imageUrls.length) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-  }
-  
-  return results;
-};
-
 // 4. Memory cleanup utilities
-export const cleanupLocalStorage = (): void => {
-  const now = Date.now();
-  const oneWeek = 7 * 24 * 60 * 60 * 1000;
-  
-  // Clean old profile data
-  const savedTime = parseInt(localStorage.getItem('driplove_last_profile_time') || '0');
-  if (now - savedTime > oneWeek) {
-    localStorage.removeItem('driplove_last_profile_id');
-    localStorage.removeItem('driplove_last_profile_time');
-  }
-};
-
 // 5. Pagination helper
-export const createPagination = (page: number, limit: number = 20) => ({
-  from: page * limit,
-  to: (page + 1) * limit - 1
-});
-
 // 6. Cache management for user data
 class UserDataCache {
   private cache = new Map<string, { data: any; timestamp: number }>();
@@ -240,19 +168,6 @@ class UserDataCache {
 export const userDataCache = new UserDataCache();
 
 // 7. Batch processing for likes/matches
-export const batchProcess = async <T>(
-  items: T[],
-  processor: (batch: T[]) => Promise<void>,
-  batchSize: number = 10
-): Promise<void> => {
-  for (let i = 0; i < items.length; i += batchSize) {
-    const batch = items.slice(i, i + batchSize);
-    await processor(batch);
-    // Small delay to prevent overwhelming the system
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-};
-
 // 8. Smart image cache with LRU eviction
 class ImageCache {
   private cache = new Map<string, HTMLImageElement>();
@@ -312,4 +227,4 @@ class ImageCache {
   }
 }
 
-export const imageCache = new ImageCache(50);
+const imageCache = new ImageCache(50);

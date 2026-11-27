@@ -9,9 +9,20 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "express": "^4.22.0",
+    "express": "^4.22.3",
     "firebase-admin": "^13.0.0",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^6.10.0"
+    "nodemailer": "^10.6.1"
+  },
+  "overrides": {
+    "protobufjs": "^7.6.5",
+    "@grpc/grpc-js": "^1.14.5",
+    "@protobufjs/codegen": "^2.0.5",
+    "@protobufjs/utf8": "^1.1.1",
+    "@tootallnate/once": "^2.0.1",
+    "uuid": "^11.1.1",
+    "jws": "^4.0.1",
+    "websocket-driver": "^0.8.0",
+    "websocket-extensions": "^0.3.0"
   }
 }

@@ -54,38 +54,7 @@ export const validateRegistrationForm = (formData: any) => {
 
   return newErrors;
 };
-
-export const transformFormDataForSubmission = (formData: any) => {
-  return {
-    first_name: formData.firstName,
-    last_name: formData.lastName,
-    email: formData.email,
-    date_of_birth: formData.dateOfBirth,
-    country: formData.country,
-    city: formData.city,
-    zip_code: formData.zipCode,
-    bio: formData.bio,
-    preference: formData.preference,
-    interests: formData.interests,
-    gender: formData.gender,
-    relationship_intent: formData.relationshipIntent,
-    smoking: formData.smoking,
-    drinking: formData.drinking,
-    exercise_level: formData.exerciseLevel,
-    sleeping_schedule: formData.sleepingSchedule,
-    occupation: formData.occupation,
-    industry: formData.industry,
-    education_level: formData.educationLevel,
-    introvert_extrovert: formData.introvertExtrovert[0],
-    spontaneous_planner: formData.spontaneousPlanner[0],
-    messy_organized: formData.messyOrganized[0],
-    fun_fact: formData.funFact,
-    perfect_first_date: formData.perfectFirstDate,
-    last_googled: formData.lastGoogled
-  };
-};
-
-export const MINIMUM_AGE = 18;
+const MINIMUM_AGE = 18;
 
 /** Latest date of birth that still makes someone MINIMUM_AGE today, as the
  *  YYYY-MM-DD string a date input's `max` expects. */

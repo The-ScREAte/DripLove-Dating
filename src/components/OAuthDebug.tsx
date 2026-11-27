@@ -59,9 +59,7 @@ const OAuthDebug = () => {
             <div>
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 URL Information
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button variant="line" size="sm" 
                   onClick={() => copyToClipboard(JSON.stringify(urlInfo, null, 2))}
                 >
                   <Copy className="w-4 h-4" />
@@ -75,9 +73,7 @@ const OAuthDebug = () => {
             <div>
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 Storage Information
-                <Button 
-                  size="sm" 
-                  variant="outline" 
+                <Button variant="line" size="sm" 
                   onClick={() => copyToClipboard(JSON.stringify(localStorageInfo, null, 2))}
                 >
                   <Copy className="w-4 h-4" />
@@ -89,15 +85,13 @@ const OAuthDebug = () => {
             </div>
 
             <div className="space-y-2">
-              <Button 
+              <Button variant="primary" size="md" className="mr-2" 
                 onClick={() => window.location.href = '/'}
-                className="mr-2"
               >
                 Go to Home
               </Button>
-              <Button 
+              <Button variant="line" size="md" 
                 onClick={() => window.location.reload()}
-                variant="outline"
               >
                 Reload Page
               </Button>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { getCountriesList } from '@/constants/locationData';
-import { Heart, Users, Search, Check, X, Loader2, UserPlus, Filter, Undo2, Clock } from 'lucide-react';
+import { Heart, Users, Search, X, Loader2, UserPlus, Filter, Undo2, Clock } from 'lucide-react';
 
 interface UserProfile {
   id: string;

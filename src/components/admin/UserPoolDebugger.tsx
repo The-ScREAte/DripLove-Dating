@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { calculateAge } from '@/utils/dateUtils';
+import { calculateDistance } from '@/constants/locationData';
 import {
   RefreshCw,
   Users,
@@ -16,7 +18,6 @@ import {
   Clock,
   Database,
   Server,
-  Wifi,
   AlertCircle,
   CheckCircle,
   Bell,
@@ -29,9 +30,10 @@ import {
   Ban,
   Pause,
   Trash2,
-  Play,
   Loader2,
 } from 'lucide-react';
+import { getGenderFilter } from '@/utils/genderPreference';
+import { fetchAllRows } from '@/hooks/useBatchFetch';
 
 interface UserPoolStats {
   totalUsers: number;
@@ -93,89 +95,6 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
   const [lastLoginFilter, setLastLoginFilter] = useState<string>('all');
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
-
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
-
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  const getGenderFilter = (userPreference: string) => {
-    if (userPreference === 'male') {
-      return ['male'];
-    } else if (userPreference === 'female') {
-      return ['female'];
-    } else if (userPreference === 'everyone' || userPreference === 'both') {
-      return ['male', 'female', 'other'];
-    }
-    return ['male', 'female', 'other'];
-  };
-
-  // Batch fetch all rows from a table to bypass 1000 row limit
-  const fetchAllRows = async <T extends Record<string, unknown>>(
-    tableName: 'profiles' | 'likes' | 'blocks' | 'passes' | 'user_images',
-    selectFields: string,
-    filters?: { column: string; op: string; value: string | boolean | number }[]
-  ): Promise<T[]> => {
-    const batchSize = 1000;
-    let allRows: T[] = [];
-    let offset = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      const baseQuery = supabase.from(tableName).select(selectFields);
-      let query = baseQuery.range(offset, offset + batchSize - 1);
-
-      if (filters) {
-        for (const filter of filters) {
-          if (filter.column && filter.op === 'neq') {
-            query = (query as any).neq(filter.column, filter.value);
-          } else if (filter.column && filter.op === 'eq') {
-            query = (query as any).eq(filter.column, filter.value);
-          } else if (filter.column && filter.op === 'gte') {
-            query = (query as any).gte(filter.column, filter.value);
-          } else if (filter.op === 'or') {
-            query = (query as any).or(filter.value);
-          }
-        }
-      }
-
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error(`Error fetching batch from ${tableName}:`, error);
-        break;
-      }
-
-      if (data && data.length > 0) {
-        allRows = [...allRows, ...(data as unknown as T[])];
-        offset += batchSize;
-        hasMore = data.length === batchSize;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    return allRows;
-  };
 
   const formatLastLogin = (lastLoginAt: string | null | undefined): string => {
     if (!lastLoginAt) return 'Never';

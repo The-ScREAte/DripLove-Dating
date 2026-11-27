@@ -1,26 +1,25 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
+import { CardGridSkeleton } from '@/components/ui/LoadingStates';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Users, Heart, X, Calendar, MapPin, ArrowLeft, ArrowUp, ArrowDown,
-  Briefcase, GraduationCap, Crown, Lock, Languages,
-  Ruler, Baby, MessageCircle, Gift, PawPrint, Share2
-} from 'lucide-react';
+import { Users, Heart, X, ArrowLeft, Crown, Lock } from 'lucide-react';
 
 // ANDROID FIX: Use platform utils instead of synchronous Capacitor import
 import { getPlatformSync } from '@/utils/platformUtils';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import PremiumUpgrade from './PremiumUpgrade';
-import MatchAnimation from './MatchAnimation';
-import RatingFunnel from './RatingFunnel';
-import { isRatingFunnelEligible, markRatingFunnelShown, syncRatingFunnelFromDb } from '@/utils/ratingFunnelStorage';
-import { fetchHasRatedAppFromDb } from '@/utils/ratingPlatform';
+import { requestPopup, openPremiumUpgrade } from '@/popups';
+import { ProfileDetailsPanel } from './profile-card/ProfileDetailsPanel';
+import { useCaptionedPhotos, toTitleCase } from './profile-card/profileCardUtils';
+import { ProfileCaption } from './profile-card/ProfileCaption';
+import { icebreakerPillFor } from './icebreaker/target';
+import { ProfileReportModal } from './profile-card/ProfileReportModal';
+import { useProfileReport } from './profile-card/useProfileReport';
+import { useBackClose } from '@/utils/backStack';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { useTranslation } from 'react-i18next';
-import HoppingLogo from './HoppingLogo';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 // FIX #1: Import blob cache for instant Android image loading
@@ -34,45 +33,17 @@ import type { PotentialMatch } from '@/types';
 // Reuse Discover's exact slide-building/rendering so the "view a liker" screen
 // looks and behaves identically to the swipe card's own expanded view.
 import { SlideRenderer } from './discover/SlideRenderer';
-import { buildSlides, getUserColorHash, getPreviewHighlights, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32, seededShuffle } from './discover/MatchCardHelpers';
-import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink, parseFavorites } from '@/constants/favorites';
-import MusicLinkBadge from './discover/MusicLinkBadge';
-import UserAdinkraDisplay from './discover/UserAdinkraDisplay';
+import { buildSlides, getUserColorHash, getPreviewHighlights, seedFromString, mulberry32, seededShuffle } from './discover/MatchCardHelpers';
+import { findFavoriteWithLink, parseFavorites } from '@/constants/favorites';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import ThumbnailImage from '@/components/common/ThumbnailImage';
-import {
-  FAMILY_PLANS_OPTIONS,
-  COMMUNICATION_STYLE_OPTIONS,
-  LOVE_STYLE_OPTIONS,
-  PETS_OPTIONS,
-  SOCIAL_MEDIA_OPTIONS,
-  traitLabel,
-} from '@/constants/profileTraits';
+import { calculateAge } from '@/utils/dateUtils';
+
 
 // Swipe card position/tilt for a given horizontal drag offset (px).
 const swipeCardTransform = (d: number) =>
   `translate3d(${d}px, 0, 0) rotate(${Math.max(-15, Math.min(15, d * 0.05))}deg)`;
-
-const formatHeightLabel = (cm: number) => {
-  const totalInches = Math.round(cm / 2.54);
-  const feet = Math.floor(totalInches / 12);
-  const inches = totalInches % 12;
-  return `${feet}'${inches}" (${cm} cm)`;
-};
-
-// Supabase/Postgrest errors are plain objects, not real Error instances, so
-// `err instanceof Error` misses them and silently falls back to a generic
-// message - masking the actual reason a query failed (RLS denial, a unique
-// constraint, etc.) right when it's most useful to see it.
-const getSupabaseErrorMessage = (err: unknown): string | undefined => {
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === 'object' && 'message' in err) {
-    const message = (err as { message?: unknown }).message;
-    if (typeof message === 'string' && message) return message;
-  }
-  return undefined;
-};
 
 // =========================================================
 // GLOBAL CACHES
@@ -84,14 +55,9 @@ const LIKED_ME_STORAGE_KEY_PREFIX = 'likedMe_v1_';
 // the initial page size and the size of each subsequent "Load More" page.
 const LIKERS_PAGE_SIZE = 500;
 const MIN_REFRESH_VISIBLE_MS = 2000;
-// Where the second captioned photo call-out can land in the expanded details
-// panel - always above Personality. Module-level (not per-render) since it's
-// a fixed constant, not something that needs recreating on every render.
-const PHOTO_ANCHORS = ['lifestyle', 'workEducation', 'personality', 'communicationStyle'] as const;
 // Caption text is capped at 50 characters, matching the limit enforced when
 // saving it in ImageManagement.tsx, so this should rarely ever truncate -
 // it's just a safety net for older captions saved before that cap existed.
-const truncateCaption = (text: string) => (text.length > 50 ? `${text.slice(0, 50).trimEnd()}…` : text);
 
 type CurrentUser = AppUser;
 
@@ -171,6 +137,8 @@ interface LikedMePageProps {
   onNavigateToChat?: (userId: string) => void;
 }
 
+const NO_IMAGES: readonly string[] = [];
+
 const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNavigateToChat }: LikedMePageProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -197,21 +165,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const extraLikersLoadedRef = useRef(false);
   const [selectedProfile, setSelectedProfile] = useState<LikerProfile | null>(null);
   const [userImages, setUserImages] = useState<{ [key: string]: string[] }>({});
-  // Report/block modal - same shape and fields as Discover's swipe card modal.
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reporting, setReporting] = useState(false);
-  const [reportSuccess, setReportSuccess] = useState(false);
-  const [reportError, setReportError] = useState('');
-  const [selectedReportReason, setSelectedReportReason] = useState('');
-  const [isBlocking, setIsBlocking] = useState(false);
-  const [blockReason, setBlockReason] = useState('');
-  const [isBlockSuccess, setIsBlockSuccess] = useState(false);
-  // Same "Undo" window as Discover's report/block modal - the block row is
-  // real in the DB immediately, but removing the liker from this list waits
-  // a few seconds so a mistaken block can be reversed at the same spot.
-  const [lastBlockedUserId, setLastBlockedUserId] = useState<string | null>(null);
-  const [isUndoingBlock, setIsUndoingBlock] = useState(false);
-  const blockCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userImagesRef = useRef(userImages);
+  userImagesRef.current = userImages;
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   // Optional per-photo label/caption (ImageManagement.tsx), keyed by the
@@ -247,45 +202,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   const latestSwipeDeltaRef = useRef(0);
   const swipeRafScheduledRef = useRef(false);
   const swipeRafIdRef = useRef<number | null>(null);
-  const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
-
-  // Navigating away from this tab always drops the premium-upgrade screen, so
-  // coming back to Liked Me never lands on a stale upgrade screen instead of
-  // the actual list.
-  useEffect(() => {
-    if (!isActiveTab) {
-      setShowPremiumUpgrade(false);
-    }
-  }, [isActiveTab]);
+  // The upgrade page and the match celebration are popups owned by the popup coordinator
+  // (src/popups): this page only ASKS for them.
   const [lockoutEndDate, setLockoutEndDate] = useState<Date | null>(null);
   const [hasInteractedToday, setHasInteractedToday] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showRatingFunnel, setShowRatingFunnel] = useState(false);
-  // Liking someone back here can turn into a mutual match without ever
-  // visiting Discover - same "It's a match!" banner as Discover uses.
-  const [showMatchAnimation, setShowMatchAnimation] = useState(false);
-  const [matchedProfile, setMatchedProfile] = useState<LikerProfile | null>(null);
   const { sendMatchNotification } = usePushNotifications(currentUser?.id);
   // ------------------
   // REFS
   // ------------------
-  const pendingMatchForRatingRef = useRef(false);
   const backgroundFetchingRef = useRef(false);
-
-  // See DiscoverPage's identical effect - the account's has_rated_app flag
-  // is the source of truth, synced into the local cache so this page's own
-  // isRatingFunnelEligible() check stays correct even if this page mounts
-  // before Discover's own copy of this sync has run.
-  useEffect(() => {
-    if (!currentUser?.id) return;
-    let cancelled = false;
-    fetchHasRatedAppFromDb(currentUser.id).then((hasRated) => {
-      if (!cancelled) syncRatingFunnelFromDb(hasRated);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser?.id]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const preloadAbortRef = useRef<AbortController | null>(null);
@@ -319,7 +245,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     []
   );
 
-
   // Card sizing/positioning used to be hand-computed in JS (a manually
   // row-virtualized grid with pixel heights precomputed from
   // scrollContainerRef.current.clientWidth) so it could stay in sync with
@@ -332,19 +257,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // correct at any size with zero JS involved. With the like list capped at
   // LIKERS_PAGE_SIZE (500) and images lazy-loaded, rendering all cards at
   // once here is not a real performance concern.
-
-  const calculateAge = useCallback((dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  }, []);
 
   const ageByLikerId = useMemo(() => {
     const map: Record<string, number> = {};
@@ -863,57 +775,13 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     return getPreviewHighlights(selectedProfile as unknown as PotentialMatch, currentSlide);
   }, [selectedProfile, currentSlide]);
 
-  // Up to 2 of this profile's photos that have a caption set (ImageManagement.tsx),
-  // picked once via a seeded shuffle so the same 1-2 photos surface consistently
-  // for this profile rather than a different random pick every render.
-  const captionedPhotos = useMemo(() => {
-    if (!selectedProfile) return [];
-    const entries = Object.entries(imageCaptions)
-      .filter(([url, v]) => v?.caption && (userImages[selectedProfile.id] || []).includes(url))
-      .map(([url, v]) => ({ url, caption: v!.caption as string, label: v!.label || null }));
-    if (entries.length === 0) return [];
-    const seed = seedFromString(`${selectedProfile.id || ''}_photocaption`);
-    const rand = mulberry32(seed);
-    const shuffled = [...entries];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, 2);
-  }, [selectedProfile, imageCaptions, userImages]);
-
-  // Both captioned photos show in the expanded panel, but scattered rather
-  // than back-to-back: the first sits right after About, and the second
-  // lands after a randomly chosen later section (seeded per profile, so it's
-  // consistent rather than jumping around on every re-render).
-  const secondPhotoAnchor = useMemo(() => {
-    if (captionedPhotos.length < 2 || !selectedProfile) return null;
-    const seed = seedFromString(`${selectedProfile.id || ''}_photo2anchor`);
-    const rand = mulberry32(seed);
-    return PHOTO_ANCHORS[Math.floor(rand() * PHOTO_ANCHORS.length)];
-  }, [captionedPhotos.length, selectedProfile]);
-
-  // useCallback (stable reference, no closures over changing state - purely a
-  // function of its argument) so it can safely sit in other memos' dependency
-  // arrays without forcing them to recompute every render.
-  const renderPhotoCaptionCard = useCallback((photo: { url: string; caption: string; label?: string | null }) => (
-    <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
-      <img
-        src={getDetailImageUrl(photo.url)}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-      <div
-        className="absolute inset-x-0 bottom-0 px-3 pt-8 pb-2.5"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))' }}
-      >
-        {photo.label && (
-          <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wide truncate">{photo.label}</p>
-        )}
-        <p className="text-white text-sm leading-snug break-words">{truncateCaption(photo.caption)}</p>
-      </div>
-    </div>
-  ), []);
+  // Up to 2 captioned photos (seeded pick, shared with every other profile view),
+  // limited to photos this viewer can actually see for that profile.
+  const { captionedPhotos, secondPhotoAnchor } = useCaptionedPhotos(
+    imageCaptions,
+    selectedProfile?.id ?? '',
+    userImages[selectedProfile?.id ?? ''] ?? NO_IMAGES
+  );
 
   // The collapsed card's "body" rotates through chips and a bio excerpt as
   // the viewer taps through photos, mirroring Discover's MatchCard -
@@ -962,6 +830,28 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     () => parseFavorites(selectedProfile?.favorites),
     [selectedProfile]
   );
+
+  // The selected profile as the shared details panel reads it (favorites already parsed).
+  const detailsProfile = useMemo(
+    () => (selectedProfile ? { ...selectedProfile, favorites: selectedProfileFavorites } : {}),
+    [selectedProfile, selectedProfileFavorites]
+  );
+
+  // Whether there is anything at all to show in the expanded details panel.
+  const hasProfileDetails = useMemo(() => {
+    const p = selectedProfile;
+    if (!p) return false;
+    return !!(
+      p.bio ||
+      (typeof p.height_cm === 'number' && p.height_cm > 0) ||
+      [p.smoking, p.drinking, p.exercise_level, p.sleeping_schedule].some(Boolean) ||
+      p.family_plans || p.occupation || p.education_level || p.industry ||
+      typeof p.introvert_extrovert === 'number' || typeof p.spontaneous_planner === 'number' || typeof p.messy_organized === 'number' ||
+      p.communication_style?.length || p.love_style?.length || p.interests?.length ||
+      selectedProfileFavorites.length > 0 || p.pets?.length || p.languages?.length ||
+      p.social_media || p.preferred_language || p.relationship_intent
+    );
+  }, [selectedProfile, selectedProfileFavorites]);
 
   const musicHighlight = useMemo(
     () => findFavoriteWithLink(selectedProfileFavorites),
@@ -1019,31 +909,6 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     }
   }, [selectedProfile, slides.length]);
 
-  // Only fire the one-time rating funnel for a user's actual first-ever match,
-  // and only after the match banner itself has been dismissed - same sequencing
-  // Discover uses (see DiscoverPage's maybeTriggerRatingFunnel).
-  const maybeTriggerRatingFunnel = useCallback(() => {
-    if (!pendingMatchForRatingRef.current) return;
-    pendingMatchForRatingRef.current = false;
-    if (!isRatingFunnelEligible()) return;
-    setTimeout(() => {
-      markRatingFunnelShown();
-      setShowRatingFunnel(true);
-    }, 3000);
-  }, []);
-
-  const handleStartChatFromMatch = useCallback((userId: string) => {
-    setShowMatchAnimation(false);
-    maybeTriggerRatingFunnel();
-    onNavigateToChat?.(userId);
-  }, [maybeTriggerRatingFunnel, onNavigateToChat]);
-
-  const handleCloseMatchAnimation = useCallback(() => {
-    setShowMatchAnimation(false);
-    setMatchedProfile(null);
-    maybeTriggerRatingFunnel();
-  }, [maybeTriggerRatingFunnel]);
-
   const handleLikeBack = useCallback(async (profileId: string) => {
     // Optimistic update - remove profile immediately
     const profileToRemove = likers.find(liker => liker.id === profileId);
@@ -1095,10 +960,14 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       // one-time rating funnel fire after the banner is dismissed.
       const madeMatch = !!data && typeof data === 'object' && Boolean((data as Record<string, unknown>).match);
       if (madeMatch) {
-        pendingMatchForRatingRef.current = true;
         if (profileToRemove) {
-          setMatchedProfile(profileToRemove);
-          setShowMatchAnimation(true);
+          // Liking back here can become a mutual match without ever visiting Discover: same
+          // "It's a match!" popup. It tells the rating engine a happy moment ended when it closes.
+          requestPopup('match', {
+            matchedUserId: profileToRemove.id,
+            matchedUserName: `${profileToRemove.first_name} ${profileToRemove.last_name}`,
+            matchedUserImage: userImagesRef.current[profileToRemove.id]?.[0],
+          });
         }
 
         // Liking back from this page is the same mutual-like outcome as
@@ -1386,160 +1255,30 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // Closing early while a block is still in its undo window (see
   // handleBlockUser) finalizes it right away instead of leaving a timer
   // running after the modal's already gone.
-  const closeReportModal = useCallback(() => {
-    if (blockCommitTimerRef.current) {
-      clearTimeout(blockCommitTimerRef.current);
-      blockCommitTimerRef.current = null;
-      if (isBlockSuccess && selectedProfile) {
-        const blockedId = selectedProfile.id;
-        setLikers(prev => prev.filter(liker => liker.id !== blockedId));
-        setSelectedProfile(null);
-      }
-    }
-    setShowReportModal(false);
-    setSelectedReportReason('');
-    setReportError('');
-    setBlockReason('');
-    setIsBlockSuccess(false);
-    setLastBlockedUserId(null);
-  }, [isBlockSuccess, selectedProfile]);
+  // Android back from a profile returns to the grid, same as the on-screen back arrow.
+  useBackClose(!!selectedProfile, () => {
+    setSelectedProfile(null);
+    setCurrentSlide(0);
+  });
 
-  // Reports whichever photo is currently on screen - same semantics as Discover's
-  // swipe card, which is why the trigger only shows up while viewing a photo slide.
-  const handleReportImage = useCallback(async () => {
-    if (!selectedProfile) return;
-    if (!selectedReportReason) {
-      setReportError(t('reportModal.selectReason'));
-      return;
-    }
-
-    setReporting(true);
-    setReportError('');
-    try {
-      const currentSlideData = slides[currentSlide];
-      const imageUrl = currentSlideData?.type === 'image' ? currentSlideData.content : undefined;
-      if (!imageUrl) throw new Error('Missing image');
-
-      const { error } = await supabase.from('reported_images').insert({
-        reporter_id: currentUser.id,
-        reported_user_id: selectedProfile.id,
-        image_url: imageUrl,
-        status: 'pending',
-        reason: selectedReportReason,
-      });
-      if (error) throw error;
-
-      setReportSuccess(true);
-      setTimeout(() => {
-        setShowReportModal(false);
-        setReportSuccess(false);
-        setSelectedReportReason('');
-      }, 1500);
-    } catch (error) {
-      setReportError(getSupabaseErrorMessage(error) || t('reportModal.error'));
-    } finally {
-      setReporting(false);
-    }
-  }, [selectedProfile, slides, currentSlide, currentUser?.id, selectedReportReason, t]);
-
-  // Requires a reason picked above or a note typed here (also enforced by
-  // the Block button's disabled state; checked again as defense in depth).
-  // The block itself is written immediately - real and enforced right away
-  // - but removing this liker from the list is deferred a few seconds so
-  // "Undo" below can delete the row again first if this was a mistake.
-  const handleBlockUser = useCallback(async () => {
-    if (!selectedProfile || !currentUser?.id) return;
-    if (!selectedReportReason && !blockReason.trim()) {
-      setReportError(t('reportModal.selectReason'));
-      return;
-    }
-
-    setIsBlocking(true);
-    try {
-      // Plain insert, no .select() chained after it - blocker_id+blocked_id
-      // is already unique, so Undo can delete by that pair directly without
-      // needing the row's own id back from the insert.
-      const { error } = await supabase
-        .from('blocks')
-        .insert({
-          blocker_id: currentUser.id,
-          blocked_id: selectedProfile.id,
-          reason: blockReason.trim() || selectedReportReason || null,
-        });
-
-      // A duplicate-key conflict (23505) means this person is already
-      // blocked from an earlier attempt - the end state the user wants is
-      // already true, so treat it as success instead of surfacing a raw DB
-      // constraint error for something that isn't actually a failure.
-      const isAlreadyBlocked = (error as { code?: string } | null)?.code === '23505';
-      if (error && !isAlreadyBlocked) throw error;
-
-      setLastBlockedUserId(selectedProfile.id);
-      setIsBlockSuccess(true);
-      const blockedId = selectedProfile.id;
-      blockCommitTimerRef.current = setTimeout(() => {
-        blockCommitTimerRef.current = null;
-        setShowReportModal(false);
-        setReportSuccess(false);
-        setIsBlockSuccess(false);
-        setSelectedReportReason('');
-        setBlockReason('');
-        setLastBlockedUserId(null);
-        setLikers(prev => prev.filter(liker => liker.id !== blockedId));
-        setSelectedProfile(null);
-      }, 5000); // Undo window - give real time to notice and react
-    } catch (error) {
-      setReportError(getSupabaseErrorMessage(error) || 'Failed to block user');
-    } finally {
-      setIsBlocking(false);
-    }
-  }, [selectedProfile, currentUser?.id, blockReason, selectedReportReason, t]);
-
-  // Reverse a block made by mistake, while still inside the undo window.
-  const handleUndoBlock = useCallback(async () => {
-    if (blockCommitTimerRef.current) {
-      clearTimeout(blockCommitTimerRef.current);
-      blockCommitTimerRef.current = null;
-    }
-    setIsUndoingBlock(true);
-    try {
-      if (currentUser?.id && lastBlockedUserId) {
-        const { error } = await supabase
-          .from('blocks')
-          .delete()
-          .eq('blocker_id', currentUser.id)
-          .eq('blocked_id', lastBlockedUserId);
-        if (error) throw error;
-      }
-      setShowReportModal(false);
-      setIsBlockSuccess(false);
-      setSelectedReportReason('');
-      setBlockReason('');
-      setLastBlockedUserId(null);
-      // Deliberately no list filtering here - the liker stays exactly as
-      // they were, as if the block had never happened.
-    } catch (error) {
-      setReportError(getSupabaseErrorMessage(error) || 'Failed to undo block');
-    } finally {
-      setIsUndoingBlock(false);
-    }
-  }, [lastBlockedUserId, currentUser?.id]);
-
-  // Clear any pending block-commit timer on unmount so it can't fire once
-  // this page is gone.
-  useEffect(() => {
-    return () => {
-      if (blockCommitTimerRef.current) {
-        clearTimeout(blockCommitTimerRef.current);
-        blockCommitTimerRef.current = null;
-      }
-    };
-  }, []);
+  // Report / block (with undo) - one flow shared with Discover and the preview.
+  // Blocking removes the liker from this list once the undo window has passed.
+  const report = useProfileReport({
+    reportedUserId: selectedProfile?.id,
+    getImageUrl: () => {
+      const slide = slides[currentSlide];
+      return slide?.type === 'image' ? slide.content : undefined;
+    },
+    onBlocked: (blockedId) => {
+      setLikers((prev) => prev.filter((liker) => liker.id !== blockedId));
+      setSelectedProfile(null);
+    },
+  });
 
   const handleProfileClick = (liker: LikerProfile, index: number) => {
     // For free users, only allow clicking if they're premium
     if (!isPremium) {
-      setShowPremiumUpgrade(true);
+      openPremiumUpgrade();
       return;
     }
 
@@ -1633,126 +1372,28 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               </div>
             )}
 
-            {/* Name/age caption - pinned to the bottom of the photo with a feathered
-                gradient, same pattern as Discover's MatchCard caption and
-                ProfilePreviewModal (an ordinary overlay clipped by the photo's own
-                overflow-hidden, no transform/negative-margin tricks). Living inside
-                the swipeable unit above (not a separate static sibling) is what
-                makes it move together with the photo on drag, just like Discover. */}
-            <div
-              className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
-              style={{
-                background: 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
-              }}
-            >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 leading-tight">
-                    <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
-                      {selectedProfile.first_name} {selectedProfile.last_name}
-                    </h2>
-                    {showVerifiedBadge && (
-                      <img
-                        loading="lazy"
-                        decoding="async"
-                        src="/images/verified.svg"
-                        alt="Verified profile"
-                        title="Verified profile"
-                        className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
-                        aria-hidden="false"
-                      />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-[clamp(12px,3.4vw,14px)] text-gray-300 mt-1">
-                    <div className="flex items-center">
-                      <Calendar className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                      <span>{ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)} {t('matches.yearsOld')}</span>
-                    </div>
-                    {/* Location and "looking for" alternate by photo, one at a time, matching
-                        Discover's MatchCard - falls back to whichever exists if only one is set. */}
-                    {(() => {
-                      const hasLocation = !!selectedProfile.city;
-                      const hasIntent = !!selectedProfile.relationship_intent;
-                      const showLocation = hasLocation && (!hasIntent || currentSlide % 2 === 0);
-                      // Never alongside About - a bio excerpt already speaks for the
-                      // person, so pairing it with "looking for" felt redundant.
-                      const showIntent = !showAbout && hasIntent && (!hasLocation || currentSlide % 2 === 1);
-
-                      if (showLocation) {
-                        return (
-                          <div className="flex items-center">
-                            <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                            <span>
-                              {selectedProfile.city}, {selectedProfile.country}
-                              {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
-                                <span className="ml-2">• {formatHeightLabel(selectedProfile.height_cm)}</span>
-                              )}
-                            </span>
-                          </div>
-                        );
-                      }
-                      if (showIntent) {
-                        return (
-                          <div className="flex items-center">
-                            <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                            <span>{selectedProfile.relationship_intent}</span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-
-                  {!showMoreInfo && showAbout ? (
-                    <p className="mt-2 pr-8 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
-                      {selectedProfile.bio}
-                    </p>
-                  ) : (
-                    !showMoreInfo && (previewHighlights.length > 0 || signHighlights.length > 0 || musicHighlight) && (
-                      <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
-                        {previewHighlights.map((highlight, index) => (
-                          <span
-                            key={index}
-                            className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
-                          >
-                            {truncateChipLabel(highlight)}
-                          </span>
-                        ))}
-                        {signHighlights.map((sign) => (
-                          <UserAdinkraDisplay key={sign} adinkraSymbols={[sign]} showLabel />
-                        ))}
-                        {musicHighlight?.link && (
-                          <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
-                        )}
-                      </div>
-                    )
-                  )}
-                </div>
-
-                {/* Expand/collapse control - identical pink-gradient glass circle used
-                    on Discover's own swipe card. */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowMoreInfo(!showMoreInfo); }}
-                  aria-label={showMoreInfo ? t('matches.showLess') : t('matches.showMore')}
-                  className="flex items-center justify-center text-white rounded-full transition-colors duration-200 shrink-0 backdrop-blur-md -mt-1.5"
-                  style={{
-                    width: 30,
-                    height: 30,
-                    minWidth: 30,
-                    minHeight: 30,
-                    padding: 0,
-                    background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-                    boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-                  }}
-                >
-                  {showMoreInfo ? (
-                    <ArrowUp size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
-                  ) : (
-                    <ArrowDown size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
-                  )}
-                </button>
-              </div>
-            </div>
+                        {/* Name / location / highlights caption + expand control (shared with Discover
+                and the preview so every screen shows the same header). It lives inside the
+                swipeable unit, so it moves together with the photo on drag. */}
+            <ProfileCaption
+              name={`${toTitleCase(selectedProfile.first_name)} ${toTitleCase(selectedProfile.last_name)}`.trim()}
+              age={ageByLikerId[selectedProfile.id] ?? calculateAge(selectedProfile.date_of_birth)}
+              online={isRecentlyOnline(selectedProfile.last_login_at, SWIPE_ONLINE_WINDOW_MS)}
+              verified={showVerifiedBadge}
+              city={selectedProfile.city}
+              country={selectedProfile.country}
+              heightCm={typeof selectedProfile.height_cm === 'number' ? selectedProfile.height_cm : null}
+              relationshipIntent={selectedProfile.relationship_intent}
+              bio={selectedProfile.bio}
+              highlights={previewHighlights}
+              signHighlights={signHighlights}
+              musicHighlight={musicHighlight}
+              currentSlide={currentSlide}
+              showAbout={showAbout}
+              expanded={showMoreInfo}
+              onToggle={() => setShowMoreInfo((v) => !v)}
+              action={icebreakerPillFor(selectedProfile, slides, { viewerId: currentUser?.id, photoUrl: userImages[selectedProfile.id]?.[0], currentSlide })}
+            />
           </div>
 
           {/* Slide indicators */}
@@ -1761,7 +1402,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             style={{
               // env(safe-area-inset-top) is now reliable on Android too (see
               // @capacitor-community/safe-area setup in src/main.tsx).
-              top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
+              top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 84px)'
             }}
           >
             {Array.from({ length: totalSlides }).map((_, idx) => (
@@ -1783,11 +1424,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               setCurrentSlide(0);
             }}
             aria-label={t('matches.back')}
-            className="absolute left-4 z-10 flex items-center justify-center w-7 h-7 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
+            className="dl-hit absolute left-4 z-10 flex items-center justify-center w-7 h-7 rounded-full text-white backdrop-blur-md transition-transform active:scale-95"
             style={{
               background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
               boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
+              top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 84px)'
             }}
           >
             <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
@@ -1799,9 +1440,9 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               reports whichever photo is currently on screen. */}
           {isImageSlide && (
             <button
-              onClick={() => setShowReportModal(true)}
+              onClick={report.open}
               aria-label={t('reportModal.title')}
-              className="absolute right-4 z-10 flex items-center justify-center rounded-full text-white backdrop-blur-md transition-transform active:scale-95 shrink-0"
+              className="dl-hit absolute right-4 z-10 flex items-center justify-center rounded-full text-white backdrop-blur-md transition-transform active:scale-95 shrink-0"
               style={{
                 width: 24,
                 height: 24,
@@ -1810,7 +1451,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                 padding: 0,
                 background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
                 boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-                top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 40px)'
+                top: 'clamp(8px, calc(env(safe-area-inset-top, 8px) + 12px), 84px)'
               }}
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1833,302 +1474,18 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          <div className="px-6 pt-4" style={{ paddingBottom: '24px' }}>
-            <div className="space-y-3">
-              {selectedProfile.bio && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-1">{t('matches.about')}</h4>
-                  <p className="text-gray-200 text-sm leading-relaxed">{selectedProfile.bio}</p>
-                </div>
-              )}
-
-              {/* First captioned photo (ImageManagement.tsx) - no section heading, just
-                  the photo, its preset label (what it's about), and the full caption
-                  (capped at 50 chars) pinned to the image's own bottom edge. */}
-              {captionedPhotos[0] && renderPhotoCaptionCard(captionedPhotos[0])}
-
-              {typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Height</h4>
-                  <div className="flex items-center text-sm">
-                    <Ruler className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-gray-200">{formatHeightLabel(selectedProfile.height_cm)}</span>
-                  </div>
-                </div>
-              )}
-
-              {[selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Lifestyle</h4>
-                  <div className="space-y-2">
-                    {selectedProfile.smoking && (
-                      <div className="flex items-center text-sm">
-                        <span className="mr-2 flex-shrink-0" aria-hidden="true">🚬</span>
-                        <span className="font-semibold mr-2 text-white">Smoking:</span>
-                        <span className="text-gray-200">{selectedProfile.smoking}</span>
-                      </div>
-                    )}
-                    {selectedProfile.drinking && (
-                      <div className="flex items-center text-sm">
-                        <span className="mr-2 flex-shrink-0" aria-hidden="true">🍸</span>
-                        <span className="font-semibold mr-2 text-white">Drinking:</span>
-                        <span className="text-gray-200">{selectedProfile.drinking}</span>
-                      </div>
-                    )}
-                    {selectedProfile.exercise_level && (
-                      <div className="flex items-center text-sm">
-                        <span className="mr-2 flex-shrink-0" aria-hidden="true">🏋️</span>
-                        <span className="font-semibold mr-2 text-white">Exercise:</span>
-                        <span className="text-gray-200">{selectedProfile.exercise_level}</span>
-                      </div>
-                    )}
-                    {selectedProfile.sleeping_schedule && (
-                      <div className="flex items-center text-sm">
-                        <span className="mr-2 flex-shrink-0" aria-hidden="true">😴</span>
-                        <span className="font-semibold mr-2 text-white">Sleep:</span>
-                        <span className="text-gray-200">{selectedProfile.sleeping_schedule}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {secondPhotoAnchor === 'lifestyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-              {selectedProfile.family_plans && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Family Plans</h4>
-                  <div className="flex items-center text-sm">
-                    <Baby className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-gray-200">{traitLabel(FAMILY_PLANS_OPTIONS, selectedProfile.family_plans)}</span>
-                  </div>
-                </div>
-              )}
-
-              {(selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry) && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Work & Education</h4>
-                  <div className="space-y-2">
-                    {selectedProfile.occupation && (
-                      <div className="flex items-center text-sm">
-                        <Briefcase className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                        <span className="text-gray-200">{selectedProfile.occupation}</span>
-                      </div>
-                    )}
-                    {selectedProfile.education_level && (
-                      <div className="flex items-center text-sm">
-                        <GraduationCap className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                        <span className="text-gray-200">{selectedProfile.education_level}</span>
-                      </div>
-                    )}
-                    {selectedProfile.industry && (
-                      <div className="flex items-center text-sm">
-                        <Briefcase className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                        <span className="text-gray-200">{selectedProfile.industry}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {secondPhotoAnchor === 'workEducation' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-              {(typeof selectedProfile.introvert_extrovert === 'number' || typeof selectedProfile.spontaneous_planner === 'number' || typeof selectedProfile.messy_organized === 'number') && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-3">Personality</h4>
-                  <div className="space-y-4">
-                    {typeof selectedProfile.introvert_extrovert === 'number' && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-400">Introvert</span>
-                        <div className="flex-1 bg-white/10 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${selectedProfile.introvert_extrovert}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm text-gray-400">Extrovert</span>
-                      </div>
-                    )}
-                    {typeof selectedProfile.spontaneous_planner === 'number' && (
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-400">Spontaneous</span>
-                          <div className="flex-1 bg-white/10 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${selectedProfile.spontaneous_planner}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-gray-400">Planner</span>
-                        </div>
-                      </div>
-                    )}
-                    {typeof selectedProfile.messy_organized === 'number' && (
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-400">Messy</span>
-                          <div className="flex-1 bg-white/10 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${selectedProfile.messy_organized}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-gray-400">Organized</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {secondPhotoAnchor === 'personality' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-              {selectedProfile.communication_style && selectedProfile.communication_style.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
-                    <MessageCircle className="w-3.5 h-3.5 text-pink-500" />
-                    Communication Style
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedProfile.communication_style.map((value, index) => (
-                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                        {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {secondPhotoAnchor === 'communicationStyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-              {selectedProfile.love_style && selectedProfile.love_style.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
-                    <Gift className="w-3.5 h-3.5 text-pink-500" />
-                    Love Style
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedProfile.love_style.map((value, index) => (
-                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                        {traitLabel(LOVE_STYLE_OPTIONS, value)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedProfile.interests && selectedProfile.interests.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">{t('matches.interests')}</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedProfile.interests.map((interest: string, index: number) => (
-                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedProfileFavorites.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">{t('matches.favorites')}</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedProfileFavorites.map((favorite, index) => (
-                      <span key={index} className="inline-flex items-center gap-1 h-6 leading-none px-2 py-0 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs">
-                        <span className="text-[11px] leading-none">{favoriteEmoji(favorite.category)}</span>
-                        <span className="leading-none">{formatFavoriteLabel(favorite)}</span>
-                        {favorite.link && (
-                          <MusicLinkBadge link={favorite.link} label={formatFavoriteLabel(favorite)} variant="inline" />
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedProfile.pets && selectedProfile.pets.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
-                    <PawPrint className="w-3.5 h-3.5 text-pink-500" />
-                    Pets
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedProfile.pets.map((value, index) => (
-                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                        {traitLabel(PETS_OPTIONS, value)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedProfile.languages && selectedProfile.languages.length > 0 && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Languages</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedProfile.languages.map((lang, index) => (
-                      <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedProfile.social_media && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Social Media</h4>
-                  <div className="flex items-center text-sm">
-                    <Share2 className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-gray-200">{traitLabel(SOCIAL_MEDIA_OPTIONS, selectedProfile.social_media)}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedProfile.preferred_language && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Language</h4>
-                  <div className="flex items-center text-sm">
-                    <Languages className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
-                    <span className="text-gray-200">{selectedProfile.preferred_language}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedProfile.relationship_intent && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-                  <h4 className="font-semibold text-pink-400 mb-2">Looking For</h4>
-                  <div className="flex items-center text-sm">
-                    <Heart className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
-                    <span className="text-gray-200">{selectedProfile.relationship_intent}</span>
-                  </div>
-                </div>
-              )}
-
-              {!(
-                selectedProfile.bio ||
-                (typeof selectedProfile.height_cm === 'number' && selectedProfile.height_cm > 0) ||
-                [selectedProfile.smoking, selectedProfile.drinking, selectedProfile.exercise_level, selectedProfile.sleeping_schedule].some(Boolean) ||
-                selectedProfile.family_plans ||
-                selectedProfile.occupation || selectedProfile.education_level || selectedProfile.industry ||
-                (typeof selectedProfile.introvert_extrovert === 'number' || typeof selectedProfile.spontaneous_planner === 'number' || typeof selectedProfile.messy_organized === 'number') ||
-                (selectedProfile.communication_style && selectedProfile.communication_style.length > 0) ||
-                (selectedProfile.love_style && selectedProfile.love_style.length > 0) ||
-                (selectedProfile.interests && selectedProfile.interests.length > 0) ||
-                selectedProfileFavorites.length > 0 ||
-                (selectedProfile.pets && selectedProfile.pets.length > 0) ||
-                (selectedProfile.languages && selectedProfile.languages.length > 0) ||
-                selectedProfile.social_media ||
-                selectedProfile.preferred_language ||
-                selectedProfile.relationship_intent
-              ) && (
-                <div className="bg-black border border-pink-500/20 rounded-lg p-6 text-center">
-                  <p className="text-gray-400 text-sm">No additional details shared yet.</p>
-                </div>
-              )}
+          <ProfileDetailsPanel
+            profile={detailsProfile}
+            captionedPhotos={captionedPhotos}
+            secondPhotoAnchor={secondPhotoAnchor}
+            preferredLanguageName={selectedProfile.preferred_language || undefined}
+            className="pb-24"
+          />
+          {!hasProfileDetails && (
+            <div className="mx-4 rounded-2xl border border-brand/20 bg-white/[0.03] p-6 text-center">
+              <p className="text-sm text-white/60">{t('matches.noDetailsYet', 'No additional details shared yet.')}</p>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Action buttons removed - pass/like-back is the swipe gesture on the
@@ -2136,153 +1493,16 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             swipe card, with the red/green hint overlay standing in for what
             these buttons used to make explicit. */}
 
-        {/* Report/Block modal - same content and flow as Discover's swipe card. */}
-        {showReportModal && (
-          <div
-            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={closeReportModal}
-          >
-            <div
-              className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-              style={{ maxHeight: '85vh' }}
-            >
-              <div className="relative px-3 pt-3 pb-2 border-b border-pink-500/20 bg-black shrink-0">
-                <button
-                  onClick={closeReportModal}
-                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
-                  disabled={reporting}
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-                <div className="pr-8">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
-                  <h3 className="text-base font-bold text-white mt-0.5">{t('reportModal.title')}</h3>
-                  <p className="text-[11px] text-gray-300 mt-0.5">{t('reportModal.instruction')}</p>
-                </div>
-              </div>
-
-              <div className="px-3 pb-3 pt-2 overflow-y-auto flex-1 min-h-0">
-                {isBlockSuccess ? (
-                  <div className="text-center py-6">
-                    <div className="text-green-400 font-semibold">
-                      <div className="mb-2 text-3xl">🚫</div>
-                      <div className="text-lg mb-2">{t('reportModal.blockSuccess.title')}</div>
-                      <div className="text-sm text-gray-300">{t('reportModal.blockSuccess.message')}</div>
-                    </div>
-                    <button
-                      className="mt-4 h-9 px-5 bg-white/10 hover:bg-white/20 text-white font-semibold text-sm rounded-lg border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                      onClick={handleUndoBlock}
-                      disabled={isUndoingBlock}
-                    >
-                      {isUndoingBlock ? t('reportModal.blockSuccess.undoing') : t('reportModal.blockSuccess.undo')}
-                    </button>
-                  </div>
-                ) : reportSuccess ? (
-                  <div className="text-green-400 font-semibold text-center py-8">
-                    <div className="mb-2 text-2xl">✓</div>
-                    <div>{t('reportModal.success')}</div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-1.5 mb-3">
-                      {[
-                        t('reportModal.reasons.inappropriate'),
-                        t('reportModal.reasons.fake'),
-                        t('reportModal.reasons.spam'),
-                        t('reportModal.reasons.offensive'),
-                        t('reportModal.reasons.harassment'),
-                        t('reportModal.reasons.other'),
-                      ].map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => setSelectedReportReason(reason)}
-                          disabled={reporting || isBlocking}
-                          className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-lg border-2 transition-all duration-200 ${
-                            selectedReportReason === reason
-                              ? 'border-rose-500 bg-rose-950/50 text-rose-300 ring-1 ring-rose-500/30'
-                              : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
-                          } ${(reporting || isBlocking) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                        >
-                          <span className="text-xs sm:text-sm font-semibold leading-tight">{reason}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Block section - just the optional note now; the actual
-                        action moved down to sit next to Report (below) so
-                        there's one clear pair of outcomes instead of three
-                        competing buttons. */}
-                    <div className="mb-3 p-2.5 bg-black/60 rounded-lg border border-pink-500/20">
-                      <p className="text-gray-200 mb-1.5 text-xs font-semibold uppercase tracking-wide">{t('reportModal.blockSection.title')}</p>
-                      <textarea
-                        placeholder={t('reportModal.blockSection.placeholder')}
-                        value={blockReason}
-                        onChange={(e) => setBlockReason(e.target.value)}
-                        disabled={reporting || isBlocking}
-                        className="w-full p-2 bg-black/40 border border-pink-500/30 text-white placeholder:text-gray-500 rounded-lg text-xs resize-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500/50 disabled:opacity-50"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-full shadow-sm disabled:opacity-50 transition-all duration-200"
-                        onClick={handleReportImage}
-                        disabled={reporting || !selectedReportReason || isBlocking}
-                      >
-                        {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
-                      </button>
-                      <button
-                        className="w-full h-9 bg-pink-600 hover:bg-pink-700 text-white font-semibold text-sm rounded-full disabled:opacity-50 transition-colors duration-200"
-                        onClick={handleBlockUser}
-                        disabled={isBlocking || reporting || (!selectedReportReason && !blockReason.trim())}
-                      >
-                        {isBlocking ? t('reportModal.blockSection.blocking') : t('reportModal.blockSection.blockButton')}
-                      </button>
-                    </div>
-
-                    {reportError && (
-                      <div className="text-red-300 text-xs mt-2 text-center bg-red-950/50 p-2 rounded-lg border border-red-500/30">
-                        {reportError}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        
       </div>
     );
-  }, [selectedProfile, slides, previewHighlights, signHighlights, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, showReportModal, reporting, reportSuccess, reportError, selectedReportReason, isBlocking, blockReason, isBlockSuccess, isUndoingBlock, closeReportModal, handleReportImage, handleBlockUser, handleUndoBlock, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeHintDir, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, handleSwipePointerCancel, captionedPhotos, secondPhotoAnchor, renderPhotoCaptionCard, showAbout, showVerifiedBadge]);
+  }, [selectedProfile, slides, previewHighlights, signHighlights, selectedProfileFavorites, musicHighlight, slideBackgroundColors, currentSlide, showMoreInfo, report.open, detailsProfile, hasProfileDetails, calculateAge, t, ageByLikerId, getSafeImageSrc, swipeHintDir, isSwipeDragging, swipeExitDirection, handleSwipePointerDown, handleSwipePointerMove, handleSwipePointerUp, handleSwipePointerCancel, captionedPhotos, secondPhotoAnchor, showAbout, showVerifiedBadge]);
 
   // ⭐ All early returns MUST be after all hooks
-  if (showMatchAnimation && matchedProfile) {
-    return (
-      <MatchAnimation
-        currentUserName={(currentUser as unknown as { first_name?: string })?.first_name || 'You'}
-        matchedUserName={`${matchedProfile.first_name} ${matchedProfile.last_name}`}
-        matchedUserImage={userImages[matchedProfile.id]?.[0]}
-        matchedUserId={matchedProfile.id}
-        onClose={handleCloseMatchAnimation}
-        onStartChat={handleStartChatFromMatch}
-      />
-    );
-  }
-
-  if (showPremiumUpgrade) {
-    return (
-      <div className="h-full w-full overflow-y-auto">
-        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
-      </div>
-    );
-  }
-
   if (loading) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-black">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      <div className="h-full w-full bg-black overflow-hidden">
+        <CardGridSkeleton />
       </div>
     );
   }
@@ -2291,15 +1511,20 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
   // Guard must run after all hooks have been declared
   if (!currentUser || !currentUser.id) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-black">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      <div className="h-full w-full bg-black overflow-hidden">
+        <CardGridSkeleton />
       </div>
     );
   }
 
   // ⭐ FIX #7: Return memoized card to prevent re-render storms
   if (selectedProfile) {
-    return selectedProfileCard;
+    return (
+      <>
+        {selectedProfileCard}
+        <ProfileReportModal report={report} />
+      </>
+    );
   }
 
   return (
@@ -2333,10 +1558,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
             <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">{t('matches.peopleWhoLikedYou')}</h1>
           </div>
           {!isPremium && (
-            <Button
-              onClick={() => setShowPremiumUpgrade(true)}
-              style={{ height: 28, minHeight: 28, padding: '0 12px' }}
-              className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-semibold text-xs leading-none shadow-sm"
+            <Button variant="premium" size="sm"
+              onClick={() => openPremiumUpgrade()}
+             
+             
             >
               <Crown className="w-3.5 h-3.5 mr-1" />
               {t('matches.upgrade')}
@@ -2385,7 +1610,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                           loading={isFirstThree ? "eager" : "lazy"}
                           decoding="async"
                           src={getSafeImageSrc(profileImages[0], true)}
-                          alt={`${liker.first_name}'s photo`}
+                          alt={isLocked ? '' : `${liker.first_name}'s photo`}
                           className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
                           style={{
                             height: '100%',
@@ -2402,7 +1627,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                       ) : (
                         <div className={`w-full h-full bg-gradient-to-br from-pink-950 to-purple-950 flex items-center justify-center ${isLocked ? 'blur-md' : ''}`}>
                           <span className="text-2xl font-bold text-pink-200">
-                            {liker.first_name?.[0]}{liker.last_name?.[0]}
+                            {isLocked ? '•' : `${liker.first_name?.[0] ?? ''}${liker.last_name?.[0] ?? ''}`}
                           </span>
                         </div>
                       );
@@ -2417,7 +1642,11 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                   </div>
                   <CardContent className="p-3 flex-1 bg-black">
                     <h3 className={`flex items-center gap-1.5 font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
-                      <span className="truncate">{liker.first_name}, {ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}</span>
+                      <span className="truncate">
+                        {isLocked
+                          ? `${liker.first_name?.[0] ?? ''}••••`
+                          : `${liker.first_name}, ${ageByLikerId[liker.id] ?? calculateAge(liker.date_of_birth)}`}
+                      </span>
                       {isRecentlyOnline(liker.last_login_at, SWIPE_ONLINE_WINDOW_MS) && (
                         <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" aria-label="Active now" />
                       )}
@@ -2434,32 +1663,21 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
         {hasMoreLikers && likers.length > 0 && (
           <div className="flex justify-center pt-4">
-            <Button
+            <Button variant="line" size="sm" className="text-white"
               onClick={loadMoreLikers}
               disabled={loadingMoreLikers}
-              variant="outline"
-              className="rounded-full text-xs px-4 h-8 border-pink-500/40 text-pink-300 hover:bg-pink-500/10"
             >
               {loadingMoreLikers ? 'Loading...' : 'Load More'}
             </Button>
           </div>
         )}
       </div>
-
-      <RatingFunnel
-        open={showRatingFunnel}
-        onClose={() => setShowRatingFunnel(false)}
-        userId={currentUser?.id}
-      />
     </div>
   );
 };
 
 export default React.memo(LikedMePage, (prevProps, nextProps) => {
-  // Must also compare isActiveTab - otherwise switching tabs never re-renders
-  // this component (currentUser.id/isPremium don't change), so its internal
-  // "tab went inactive, reset showPremiumUpgrade" effect never even runs and
-  // coming back to this tab lands right back on the stale premium screen.
+  // isActiveTab is compared so the tab re-renders when it becomes (in)active.
   return prevProps.currentUser?.id === nextProps.currentUser?.id &&
          prevProps.isPremium === nextProps.isPremium &&
          prevProps.isActiveTab === nextProps.isActiveTab;

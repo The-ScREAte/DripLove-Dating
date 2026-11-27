@@ -1,0 +1,130 @@
+/* Sign-in sheet: slides up from the bottom on phones, eases in as a centred
+   card on wider screens. opacity/transform only (cheap on weak GPUs); the
+   durations come from the shared motion tokens, so the "lite" and
+   reduced-motion tiers apply automatically. */
+
+.dl-auth-overlay {
+  background: rgba(8, 2, 6, 0.6);
+  animation: dl-fade var(--dl-dur) var(--dl-ease-out) backwards;
+}
+.dl-auth-overlay[data-state='closed'] {
+  animation: dl-fade-out var(--dl-dur-fast) var(--dl-ease-out) forwards;
+}
+
+.dl-auth-panel {
+  position: fixed;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  /* The native keyboard doesn't resize the WebView (Capacitor Keyboard resize:
+     'none'); the Keyboard plugin publishes its height as --keyboard-height on
+     <html>, so lift the sheet above it and shrink its max height to fit. */
+  bottom: var(--keyboard-height, 0px);
+  max-height: calc(92vh - var(--keyboard-height, 0px));
+  max-height: calc(92dvh - var(--keyboard-height, 0px));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
+  animation: dl-auth-sheet-in var(--dl-dur-slow) var(--dl-ease-out) backwards;
+}
+.dl-auth-panel[data-state='closed'] {
+  animation: dl-auth-sheet-out var(--dl-dur-fast) var(--dl-ease-out) forwards;
+}
+
+@media (min-width: 640px) {
+  .dl-auth-panel {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: calc(50% - (var(--keyboard-height, 0px) / 2));
+    width: 100%;
+    max-width: 420px;
+    transform: translate3d(-50%, -50%, 0);
+    animation: dl-auth-card-in var(--dl-dur-slow) var(--dl-ease-out) backwards;
+  }
+  .dl-auth-panel[data-state='closed'] {
+    animation: dl-auth-card-out var(--dl-dur-fast) var(--dl-ease-out) forwards;
+  }
+}
+
+/* With the keyboard up it already covers the home indicator. */
+body.keyboard-open .dl-auth-panel {
+  padding-bottom: 20px;
+}
+
+/* Short phones (iPhone SE class, small Androids) with the keyboard up: drop the
+   title and tighten spacing so the fields AND the primary button stay reachable. */
+@media (max-height: 700px) {
+  body.keyboard-open .dl-auth-heading { display: none; }
+  body.keyboard-open .dl-auth-top { height: 28px; }
+  body.keyboard-open .dl-auth-form { margin-top: 0; }
+  body.keyboard-open .dl-auth-form > * + * { margin-top: 10px !important; }
+  body.keyboard-open .dl-auth-forgot { min-height: 28px !important; }
+}
+
+/* Terms screen: vertically centred content, vh fallback before dvh. */
+.dl-terms-min {
+  min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 44px);
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 44px);
+}
+
+@keyframes dl-fade-out {
+  to { opacity: 0; }
+}
+@keyframes dl-auth-sheet-in {
+  from { opacity: 0; transform: translate3d(0, 32px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes dl-auth-sheet-out {
+  to { opacity: 0; transform: translate3d(0, 24px, 0); }
+}
+@keyframes dl-auth-card-in {
+  from { opacity: 0; transform: translate3d(-50%, calc(-50% + 14px), 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(-50%, -50%, 0) scale(1); }
+}
+@keyframes dl-auth-card-out {
+  to { opacity: 0; transform: translate3d(-50%, calc(-50% + 8px), 0) scale(0.99); }
+}
+
+/* Inline error / notice that appears without shifting the buttons below it
+   by more than its own height, fading in rather than popping. */
+.dl-auth-notice {
+  animation: dl-fade var(--dl-dur) var(--dl-ease-out) backwards;
+}
+
+/* The full-screen "Signing you in" / failure state used by the OAuth
+   callback pages. */
+.dl-auth-status {
+  animation: dl-fade var(--dl-dur-slow) var(--dl-ease-out) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-auth-overlay,
+  .dl-auth-panel,
+  .dl-auth-notice,
+  .dl-auth-status {
+    animation: none !important;
+  }
+}
+
+/* Google's branding guideline requires a pure #FFFFFF button; the app-wide theme
+   remaps .bg-white to a tinted white, so this wins on specificity. */
+.dl-google-btn.dl-google-btn {
+  background-color: #ffffff !important;
+}
+.dl-google-btn.dl-google-btn:hover {
+  background-color: #f8f8f8 !important;
+}
+
+/* Inline links inside a sentence must not inherit the global 44px button
+   min-height (it blows up the line height). The tap area stays generous via
+   the line's own height + underline. */
+.dl-inline-link {
+  display: inline;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  line-height: inherit;
+  vertical-align: baseline;
+}

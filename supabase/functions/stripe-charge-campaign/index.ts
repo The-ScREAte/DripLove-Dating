@@ -32,6 +32,13 @@ serve(async (req: Request) => {
     const { budgetPerDay, durationDays } = await req.json();
     if (!budgetPerDay || budgetPerDay <= 0) throw new Error('budgetPerDay must be greater than 0');
     if (!durationDays || durationDays <= 0) throw new Error('durationDays must be greater than 0');
+    // Bound the inputs: they come straight from the client and become a card charge.
+    if (!Number.isFinite(Number(budgetPerDay)) || !Number.isFinite(Number(durationDays))) {
+      throw new Error('Invalid campaign budget');
+    }
+    if (Number(budgetPerDay) * Number(durationDays) > 10000 || Number(durationDays) > 365) {
+      throw new Error('Campaign budget is too large. Please contact support for large campaigns.');
+    }
 
     const { data: advertiser, error: advertiserError } = await supabase
       .from('advertiser_profiles')

@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Search, Check, Loader2, CheckCircle2, Lock, X, Globe, LocateFixed, Navigation } from 'lucide-react';
+import { MapPin, Search, Check, Loader2, CheckCircle2, Lock, LocateFixed, Navigation } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
   getCountriesList, 
@@ -14,9 +14,11 @@ import {
   type CityData 
 } from '@/constants/locationData';
 import { getEnabledCountries } from '@/utils/enabledCountries';
-import { autoDetectCountry, checkIfUserIsOutsideCountry, getCountryName as getCountryNameFromCode } from '@/utils/countryDetection';
+import { autoDetectCountry, checkIfUserIsOutsideCountry } from '@/utils/countryDetection';
 import { searchCitiesForCountry } from '@/utils/citySearch';
 import { getCurrentLocation, describeLocationError, CurrentLocationFailure } from '@/utils/currentLocation';
+import { canOpenAppSettings, openAppSettings } from '@/utils/openAppSettings';
+import { useTranslation } from 'react-i18next';
 import { formLabel, formRequired, formError, formInput, formSelectTrigger, formSelectContent } from '@/components/forms/formTheme';
 
 interface LocationInputProps {
@@ -126,12 +128,16 @@ const LocationInput = ({
   const [detectionMethod, setDetectionMethod] = useState<'gps' | 'ip' | null>(null);
   const [isChangingCountry, setIsChangingCountry] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   // "Use my current location" - offered as a small pop-up the first time the
   // city field is tapped, and as a link next to the City label after that.
   const [locationPrompt, setLocationPrompt] = useState<'closed' | 'open' | 'locating'>('closed');
   const [locationPromptAnswered, setLocationPromptAnswered] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  // true only when the last attempt failed because location permission is denied
+  // (then iOS users get a one-tap jump to Settings next to the message)
+  const [locationDenied, setLocationDenied] = useState(false);
   // Exact device coordinates while the city came from "current location".
   // Those coordinates (not the city centre) are what distances to other
   // people are measured from. Cleared as soon as the user picks or types a
@@ -566,6 +572,7 @@ const LocationInput = ({
     setLocationPromptAnswered(true);
     setShowCitySuggestions(false);
     setLocationError(null);
+    setLocationDenied(false);
     setLocationPrompt('locating');
     try {
       const here = await getCurrentLocation();
@@ -627,6 +634,7 @@ const LocationInput = ({
     } catch (error) {
       const reason = error instanceof CurrentLocationFailure ? error.reason : 'unavailable';
       setLocationError(describeLocationError(reason));
+      setLocationDenied(reason === 'denied');
       setLocationPrompt('open');
     }
   };
@@ -888,7 +896,18 @@ const LocationInput = ({
                       </div>
                     </div>
                     {locationError && (
-                      <p className={`mb-3 text-xs leading-relaxed ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{locationError}</p>
+                      <div className="mb-3">
+                        <p className={`text-xs leading-relaxed ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{locationError}</p>
+                        {locationDenied && canOpenAppSettings() && (
+                          <button
+                            type="button"
+                            onClick={() => void openAppSettings()}
+                            className={`mt-1 min-h-[44px] text-xs font-semibold underline underline-offset-2 ${isDark ? 'text-pink-300' : 'text-pink-700'}`}
+                          >
+                            {t('permissions.openSettings')}
+                          </button>
+                        )}
+                      </div>
                     )}
                     <div className="space-y-2">
                       <Button type="button" onClick={handleUseCurrentLocation} className={ui.promptPrimary}>
@@ -1016,7 +1035,18 @@ const LocationInput = ({
 
       {/* City status shown below the row to keep City/ZIP aligned */}
       {locationPrompt === 'closed' && locationError && (
-        <p className={`mt-1 text-xs ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{locationError}</p>
+        <div className="mt-1">
+          <p className={`text-xs ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{locationError}</p>
+          {locationDenied && canOpenAppSettings() && (
+            <button
+              type="button"
+              onClick={() => void openAppSettings()}
+              className={`min-h-[44px] text-xs font-semibold underline underline-offset-2 ${isDark ? 'text-pink-300' : 'text-pink-700'}`}
+            >
+              {t('permissions.openSettings')}
+            </button>
+          )}
+        </div>
       )}
       {selectedCountryCode && cityInput && (
         <div className="mt-1 flex items-center gap-2 text-xs">

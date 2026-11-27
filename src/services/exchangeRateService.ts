@@ -85,7 +85,7 @@ async function fetchExchangeRates(baseCurrency: string = 'USD'): Promise<Record<
  * @param toCurrency - Target currency code (e.g., 'GHS')
  * @returns Exchange rate or null if unavailable
  */
-export async function getExchangeRate(
+async function getExchangeRate(
   fromCurrency: string,
   toCurrency: string
 ): Promise<number | null> {
@@ -180,17 +180,6 @@ export async function convertToGHS(
     
     // Ultimate fallback: use USD rate
     return Math.round(amount * 16);
-  }
-}
-
-/**
- * Clear the exchange rate cache (useful for testing or manual refresh)
- */
-export function clearExchangeRateCache(): void {
-  try {
-    localStorage.removeItem(CACHE_KEY);
-  } catch {
-    // Ignore cache clear errors
   }
 }
 

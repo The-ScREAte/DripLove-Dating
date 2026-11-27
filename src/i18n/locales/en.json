@@ -88,7 +88,30 @@
     "authenticationError": "Authentication Error",
     "failedToOpenGoogleSignIn": "Failed to open Google Sign-In popup",
     "noConnection": "No Internet Connection",
-    "checkConnection": "Please check your internet connection and try again."
+    "checkConnection": "Please check your internet connection and try again.",
+    "invalidCredentials": "That email and password don't match.",
+    "emailNotConfirmed": "Please confirm your email first - check your inbox.",
+    "resendConfirmation": "Resend email",
+    "confirmationSent": "Confirmation email sent. Check your inbox and spam folder.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "resetSentTitle": "Check your email",
+    "resetSentBody": "If an account exists for {{email}}, we've sent a link to reset your password.",
+    "usesGoogle": "This account uses Google. Please continue with Google instead.",
+    "usesApple": "This account uses Apple. Please continue with Apple instead.",
+    "signingIn": "Signing you in…",
+    "signInFailedTitle": "We couldn't sign you in",
+    "signInFailedBody": "Something went wrong. Please try again.",
+    "signInCancelled": "Sign-in was cancelled.",
+    "tryAgain": "Try again",
+    "newPassword": "New password",
+    "updatePassword": "Update password",
+    "updatingPassword": "Updating…",
+    "resetLinkExpired": "This reset link has expired. Please request a new one.",
+    "passwordUpdated": "Password updated. You can now sign in.",
+    "passwordHint": "At least 6 characters",
+    "setNewPasswordTitle": "Set a new password",
+    "signInTakingLong": "Sign-in is taking longer than expected. Please try again."
   },
   "profile": {
     "title": "Profile",
@@ -279,7 +302,14 @@
     "approximateLocationDescription": "Your city isn't in our database. You'll still get matches based on country/region.",
     "locationRequired": "Location Required",
     "locationRequiredDescription": "Please add your city to enable location-based matching.",
-    "freeTonight": "Free Tonight"
+    "freeTonight": "Free Tonight",
+    "height": "Height",
+    "selectHeight": "Select your height",
+    "vibe": {
+      "values": "What matters most to you",
+      "genres": "Music you love",
+      "empty": "Tap Edit to add - it helps us find better matches."
+    }
   },
   "discover": {
     "title": "DripCheck",
@@ -360,8 +390,37 @@
       "messyVsOrganized": "Messy vs Organized: {{percentage}}%",
       "interests": "Interests",
       "favorites": "Favorites",
-      "language": "Language"
-    }
+      "language": "Language",
+      "atAGlance": "At a glance",
+      "communicationStyle": "Communication Style",
+      "loveStyle": "Love Style",
+      "pets": "Pets",
+      "languagesSpoken": "Languages",
+      "socialMedia": "Social Media",
+      "readMore": "Read more",
+      "showLess": "Show less",
+      "lookingForSerious": "Looking for something serious",
+      "openToAnything": "Open to anything",
+      "lookingFor": "Looking for {{what}}",
+      "showDetails": "Show details",
+      "hideDetails": "Hide details",
+      "verifiedProfile": "Verified profile",
+      "funQuestions": "Fun questions",
+      "funFact": "Fun fact",
+      "perfectDate": "Perfect first date",
+      "lastGoogled": "Last thing I googled"
+    },
+    "modeForYou": "For You",
+    "modeSignMatch": "Sign Match",
+    "signMatchHint": "People whose signs fit yours",
+    "filtersAria": "Discover filters",
+    "emptySignMatchTitle": "No sign matches right now",
+    "emptySignMatchDesc": "Check back soon, or switch to For You.",
+    "refreshFailedTitle": "Couldn't refresh",
+    "refreshFailedDesc": "Check your connection and try again.",
+    "adjustFilters": "Adjust filters",
+    "playGames": "Play games",
+    "tryPremiumFree": "Try Premium free"
   },
   "matches": {
     "matches": "Matches",
@@ -394,7 +453,8 @@
     "releaseToRefresh": "Release to refresh",
     "refreshing": "Refreshing...",
     "error": "Error",
-    "failedToRefresh": "Failed to refresh people who liked you"
+    "failedToRefresh": "Failed to refresh people who liked you",
+    "noDetailsYet": "No additional details shared yet."
   },
   "chat": {
     "title": "Chat",
@@ -474,7 +534,37 @@
     "thankYouYes": "Great!",
     "thankYouNo": "Understood",
     "keepTheConversationGoing": "Keep the conversation going and see where it leads!",
-    "weWillCleanThingsUp": "No worries! We'll help you find better connections."
+    "weWillCleanThingsUp": "No worries! We'll help you find better connections.",
+    "search": "Search conversations",
+    "noResults": "No conversations found",
+    "yesterday": "Yesterday",
+    "you": "You",
+    "earlierConversations": "Earlier conversations ({{count}})",
+    "newMatchBadge": "New",
+    "findYourMatch": "Find your match",
+    "noMatchesTitle": "Your love story starts here",
+    "matchedWith": "You matched with {{name}}",
+    "matchedAgo": "Say hello and make it count",
+    "icebreakersTitle": "Break the ice",
+    "icebreaker1": "Hey {{name}}! What's the best part of your week so far?",
+    "icebreaker2": "Hi {{name}} 👋 What are you really into right now?",
+    "icebreaker3": "Your profile made me smile. What does a perfect weekend look like for you?",
+    "staySafeTitle": "Stay safe",
+    "staySafeBody": "Keep chatting on DripLove until you trust someone. Never share money, passwords or financial details.",
+    "dismiss": "Dismiss",
+    "jumpToLatest": "Jump to latest message",
+    "newMessagesCount": "{{count}} new",
+    "viewProfile": "View profile",
+    "replyingTo": "Replying to {{name}}",
+    "cancelReply": "Cancel reply",
+    "verified": "Verified",
+    "unreadCount": "{{count}} unread",
+    "openConversation": "Open conversation with {{name}}",
+    "newMatchesAria": "New matches",
+    "typingAria": "{{name}} is typing",
+    "today": "Today",
+    "copy": "Copy",
+    "copied": "Message copied"
   },
   "premium": {
     "goPremium": "Go Premium",
@@ -578,6 +668,19 @@
         "button": "🎯 One-Time Payment",
         "subtitle": "No auto-renewal"
       }
+    },
+    "legal": {
+      "renewalStore": "Renews every month at {{price}} until you cancel. Cancel anytime in your {{store}} settings.",
+      "renewalWeb": "Renews every 30 days at {{price}} until you cancel. Cancel anytime from your profile.",
+      "terms": "Terms of Use",
+      "privacy": "Privacy Policy"
+    },
+    "paymentIssue": {
+      "title": "Payment issue",
+      "body": "We couldn't renew your Premium. Update your payment method in {{store}} to keep your benefits.",
+      "until": "Your Premium stays active until {{date}}.",
+      "update": "Update payment method",
+      "later": "Not now"
     }
   },
   "notifications": {
@@ -609,8 +712,6 @@
     "faq": "FAQ",
     "feedback": "Send Feedback",
     "rateApp": "Rate App",
-    "enjoyingDripLove": "⭐ Enjoying DripLove?",
-    "rateExperience": "Rate your experience and help us grow!",
     "needHelp": "Need Help?",
     "contactSupport": "Contact our support team for any questions or assistance:",
     "termsOfService": "Terms of Service",
@@ -638,7 +739,10 @@
     "sessionExpired": "Session expired. Please sign in again",
     "uploadFailed": "Upload failed",
     "deleteFailed": "Delete failed",
-    "updateFailed": "Update failed"
+    "updateFailed": "Update failed",
+    "tabErrorTitle": "Couldn't load this tab",
+    "tabErrorBody": "This part hit a problem. Your other tabs are fine.",
+    "tabErrorRetry": "Try again"
   },
   "validation": {
     "required": "This field is required",
@@ -786,7 +890,9 @@
     "joinThousands": "Join thousands finding love across continents",
     "aboutLink": "About DripLove",
     "termsLink": "Terms of Service",
-    "privacyLink": "Privacy Policy"
+    "privacyLink": "Privacy Policy",
+    "legal": "By continuing, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
+    "connectLink": "Connect"
   },
   "registration": {
     "title": "Create Your Profile",
@@ -811,7 +917,10 @@
       "dobRequired": "Date of birth is required",
       "mustBe18": "You must be at least 18 years old",
       "genderRequired": "Please select your gender",
-      "preferenceRequired": "Please select your preference"
+      "preferenceRequired": "Please select your preference",
+      "photosRequired": "Photos required",
+      "someImagesRejected": "Some photos were rejected",
+      "photosNeedReupload": "Please add your photos again"
     },
     "createAccount": "Create Account",
     "tellUsMore": "Tell Us More About You",
@@ -1095,5 +1204,452 @@
     "priorityHint": "Keep your streak going to get prioritized for quality matches.",
     "continue": "Continue",
     "levelComplete": "🎉 Level {{level}} complete!"
+  },
+  "onboarding": {
+    "progress": "Sign-up progress",
+    "optional": "Optional",
+    "back": "Back",
+    "continue": "Continue",
+    "checkingPhotos": "Checking your photos…",
+    "addMorePhotos": "Add {{count}} more photo(s) to continue",
+    "select": "Select",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "pw": {
+      "tooShort": "Too short - use at least 6 characters",
+      "okay": "Okay",
+      "good": "Good",
+      "strong": "Strong"
+    },
+    "steps": {
+      "account": {
+        "title": "Create your account",
+        "hint": "Use an email you check."
+      },
+      "location": {
+        "title": "Where are you based?",
+        "hint": "So we can show you people nearby."
+      },
+      "work": {
+        "title": "Work & education",
+        "hintRequired": "Tell us what you do.",
+        "hintOptional": "Share what feels right."
+      },
+      "signs": {
+        "title": "Pick your cultural signs",
+        "hint": "Choose at least {{min}}.",
+        "hintOptional": "Choose any that feel like you."
+      },
+      "face": {
+        "title": "Verify it's you",
+        "hint": "A quick selfie keeps DripLove real. It's never shown."
+      },
+      "photos": {
+        "title": "Add your best photos",
+        "hint": "Add at least 2 clear photos of you."
+      },
+      "bio": {
+        "title": "Tell your story",
+        "hint": "A few honest words go a long way."
+      },
+      "details": {
+        "title": "A little more about you",
+        "hint": "Helps people connect with you."
+      },
+      "lifestyle": {
+        "title": "Your everyday life",
+        "hint": "Pick what feels right."
+      },
+      "interests": {
+        "title": "What lights you up?",
+        "hint": "Pick what you love - it helps us match you better."
+      },
+      "love": {
+        "title": "How do you love?",
+        "hint": "What a good relationship looks like to you."
+      },
+      "you": {
+        "title": "Let's start with you",
+        "hint": "Your name, birthday and who you are."
+      },
+      "looking": {
+        "title": "Who are you looking for?",
+        "hint": "Tell us who you'd like to meet."
+      },
+      "celebrate": {
+        "title": "You're in!",
+        "hint": "Want to make your profile shine?"
+      },
+      "values": {
+        "title": "What matters most to you?",
+        "hint": "Pick up to 5 - they shape who we show you."
+      },
+      "music": {
+        "title": "What do you listen to?",
+        "hint": "Pick your sound - we match on taste too."
+      }
+    },
+    "face": {
+      "done": "Face verified"
+    },
+    "photos": {
+      "tipsLink": "Photo tips",
+      "add": "Add photos",
+      "alt": "Your photo {{n}}",
+      "crop": "Crop photo",
+      "remove": "Remove photo",
+      "main": "Main",
+      "approved": "Approved"
+    },
+    "promo": {
+      "toggle": "Have a promo code?"
+    },
+    "tips": {
+      "title": "Best profile photo tips",
+      "subtitle": "Clear, genuine photos get far more matches. Add up to {{max}}.",
+      "doHeading": "Do",
+      "avoidHeading": "Please avoid",
+      "smile": "Genuine smile",
+      "light": "Natural light",
+      "life": "Show your life",
+      "sunglasses": "Sunglasses",
+      "dark": "Poor lighting",
+      "group": "Group shots",
+      "mirror": "Mirror selfies",
+      "cta": "Select photos"
+    },
+    "skip": "Skip",
+    "showMore": "Show more",
+    "showFewer": "Show fewer",
+    "bio": {
+      "placeholder": "Write a few lines about you…",
+      "starter1": "I'm happiest when…",
+      "starter2": "A perfect weekend for me is…",
+      "starter3": "Ask me about…",
+      "starter4": "I'm looking for someone who…"
+    },
+    "details": {
+      "languages": "Languages you speak (up to {{max}})"
+    },
+    "lifestyle": {
+      "pets": "Pets",
+      "social": "Social media vibe"
+    },
+    "interests": {
+      "counter": "{{count}} of {{max}} picked"
+    },
+    "love": {
+      "loveStyle": "How you show love",
+      "communication": "How you like to communicate",
+      "family": "Family plans"
+    },
+    "celebrate": {
+      "add": "Add more (optional)",
+      "skip": "Skip for now - take me to DripLove"
+    },
+    "bonus": "Make it shine",
+    "welcomeBack": "Welcome, {{name}} - just a few details to finish.",
+    "cheer": {
+      "start": "Great start",
+      "great": "You're doing great",
+      "almost": "Almost there!",
+      "last": "Last step!"
+    },
+    "vibe": {
+      "selected": "selected"
+    },
+    "music": {
+      "artists": "Favorite artists",
+      "artistN": "Artist {{n}}",
+      "artistPlaceholder": "e.g. Burna Boy",
+      "link": "Share a song or playlist",
+      "linkHelp": "It plays right on your profile.",
+      "linkInvalid": "Paste a Spotify, Apple Music, YouTube or SoundCloud link."
+    }
+  },
+  "circleUp": {
+    "permTitle": "Camera and microphone are off",
+    "permBody": "Turn them on for DripLove in your device settings to go live.",
+    "permBodyIos": "Allow camera and microphone for DripLove in Settings to go live.",
+    "openSettings": "Open Settings",
+    "tryAgain": "Try again",
+    "endCallTitle": "End this call?",
+    "endCallBody": "You will leave the call and your match will be told.",
+    "endCall": "End call",
+    "stay": "Stay",
+    "tapToPlay": "Tap to start video",
+    "finding": "We're finding you someone",
+    "searchNear": "Starting with people near you",
+    "searchCountry": "Widening to your whole country",
+    "searchAbroad": "Then looking abroad",
+    "reconnecting": "Reconnecting…",
+    "connecting": "Connecting…",
+    "flipCamera": "Switch camera",
+    "callEnded": "Call ended",
+    "callEndedBody": "Thanks for connecting.",
+    "findNew": "Find someone new",
+    "backToCircle": "Back to Circle"
+  },
+  "rating": {
+    "title": "Love DripLove?",
+    "body": "A quick rating helps more people find real love.",
+    "rateCta": "Rate DripLove",
+    "rateFailed": "Couldn't open the store. Search for DripLove in your app store to leave a rating.",
+    "feedbackCta": "Tell us what to improve",
+    "feedbackTitle": "Help us improve",
+    "feedbackSubtitle": "Your message goes straight to our team.",
+    "feedbackPlaceholder": "What could be better?",
+    "feedbackSend": "Send feedback",
+    "feedbackThanks": "Thank you - we read every message.",
+    "feedbackError": "Couldn't send. Please try again.",
+    "cat_matches": "Matches",
+    "cat_chat": "Chat",
+    "cat_photos": "Photos & verification",
+    "cat_payments": "Payments",
+    "cat_bug": "Bugs & speed",
+    "cat_other": "Other"
+  },
+  "permissions": {
+    "title": {
+      "camera": "Camera access is off",
+      "microphone": "Microphone access is off",
+      "cameraMicrophone": "Camera and microphone access is off",
+      "location": "Location access is off",
+      "photos": "Photo access is off",
+      "notifications": "Notifications are off"
+    },
+    "bodyIos": "Turn it on in Settings, then come back to DripLove.",
+    "bodyAndroid": "Open Settings → Apps → DripLove → Permissions and switch it on.",
+    "bodyWeb": "Allow access when your browser asks, or switch it on in your browser's site settings.",
+    "openSettings": "Open Settings",
+    "tryAgain": "Try again"
+  },
+  "legal": {
+    "contents": "Contents",
+    "related": "Related policies",
+    "links": {
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "community": "Community Guidelines",
+      "childSafety": "Child Safety",
+      "safetyTips": "Safety Tips"
+    }
+  },
+  "vibe": {
+    "sharedTitle": "You both like",
+    "more": "+{{count}}",
+    "musicMatch": "Music match - you have taste in common",
+    "valuesTitle": "What matters most",
+    "musicTitle": "Music taste",
+    "values": {
+      "honesty": "Honesty",
+      "loyalty": "Loyalty",
+      "humor": "Humor",
+      "kindness": "Kindness",
+      "respect": "Respect",
+      "communication": "Communication",
+      "family": "Family",
+      "faith": "Faith",
+      "ambition": "Ambition",
+      "growth": "Growth",
+      "adventure": "Adventure",
+      "affection": "Affection",
+      "stability": "Stability",
+      "independence": "Independence",
+      "culture": "Culture & roots",
+      "fun": "Fun",
+      "generosity": "Generosity",
+      "intimacy": "Intimacy"
+    },
+    "genres": {
+      "afrobeats": "Afrobeats",
+      "amapiano": "Amapiano",
+      "highlife": "Highlife",
+      "hiphop": "Hip-Hop",
+      "rnb": "R&B",
+      "gospel": "Gospel",
+      "reggae": "Reggae & Dancehall",
+      "pop": "Pop",
+      "rock": "Rock",
+      "jazz": "Jazz",
+      "soul": "Soul",
+      "house": "House",
+      "latin": "Latin",
+      "country": "Country",
+      "classical": "Classical",
+      "alternative": "Alternative"
+    }
+  },
+  "handoff": {
+    "welcomeName": "Welcome, {{name}}",
+    "welcome": "Welcome to DripLove",
+    "line": "Finding people near you…"
+  },
+  "termsAccept": {
+    "hint": "Tick the box to continue",
+    "saving": "Saving…",
+    "failed": "We couldn't save that. Check your connection and try again."
+  },
+  "cards": {
+    "heroMeet": "Meet {{name}}",
+    "sharedHeadline": "You and {{name}} have things in common",
+    "basicsTitle": "At a glance",
+    "basics": {
+      "work": "Work",
+      "education": "Education",
+      "height": "Height",
+      "lives": "Lives in",
+      "distance": "Distance",
+      "languages": "Speaks",
+      "away": "{{distance}} away"
+    },
+    "lookingTitle": "Looking for",
+    "looking": {
+      "family": "Family plans",
+      "loveStyle": "Love style",
+      "communication": "Communication"
+    },
+    "interestsTitle": "What {{name}} is into",
+    "interestsEyebrow": "Interests",
+    "valuesEyebrow": "Values",
+    "music": {
+      "artists": "On repeat",
+      "play": "Play their song"
+    },
+    "lifestyleTitle": "Lifestyle",
+    "lifestyle": {
+      "exercise": "Exercise",
+      "drinking": "Drinks",
+      "smoking": "Smokes",
+      "sleep": "Sleep",
+      "pets": "Pets"
+    },
+    "signTitle": "Cultural sign",
+    "sign": {
+      "shared": "You share this sign ✨",
+      "compatible": "A great match for your sign ✨"
+    },
+    "trustTitle": "Good to know",
+    "trust": {
+      "verified": "Verified profile",
+      "activeNow": "Active now",
+      "activeToday": "Active today",
+      "activeWeek": "Active this week",
+      "profile": "Profile",
+      "lastSeen": "Last seen",
+      "headlineVerified": "{{name}} is a real, verified person",
+      "headlineActive": "{{name}} was around recently"
+    },
+    "starterTitle": "Break the ice",
+    "starter": {
+      "interest": "What got you into {{thing}}?",
+      "value": "What does {{thing}} look like for you?",
+      "music": "What song is on repeat for you lately?",
+      "city": "What's your favourite spot in {{city}}?",
+      "generic": "Hi {{name}} 👋 how is your week going?",
+      "hint": "An easy first message - tap the chat when you match.",
+      "headline": "Say hi to {{name}}"
+    },
+    "welcomeTitle": "New here",
+    "welcomeBody": "{{name}} is just getting started - be the first to say hi.",
+    "promptFunFact": "Fun fact",
+    "promptFirstDate": "Perfect first date",
+    "promptGoogled": "Last googled",
+    "heroHint": "Tap the right side of the card to see more"
+  },
+  "circle": {
+    "title": "Circle Up",
+    "subtitle": "Find people who share your world.",
+    "verifiedNearYou": "{{count}} verified members near you",
+    "premiumTag": "Premium",
+    "unlockTitle": "members in {{circle}}",
+    "unlockTitleMany": "Join lots of members in {{circle}}",
+    "unlockBody": "Unlock this circle to meet the members who match exactly what you're looking for.",
+    "unlockCta": "Unlock with Premium",
+    "unlockCtaTrial": "Start free trial",
+    "maybeLater": "Maybe later",
+    "lockedCardTitle": "Unlock to see",
+    "endTitle": "You've seen everyone here",
+    "endBody": "You've seen everyone in \"{{circle}}\" for now. Check back soon, or explore another circle.",
+    "endCta": "Explore other circles",
+    "many": "Many",
+    "members": "members",
+    "worldwideHint": "Showing app-wide totals",
+    "pickCountries": "Choose your countries"
+  },
+  "icebreaker": {
+    "row": {
+      "aria": "Open icebreakers, {{count}} waiting",
+      "sub": "{{count}} waiting for you"
+    },
+    "inbox": {
+      "title": "Icebreakers",
+      "requestTitle": "Break the ice",
+      "reportBlock": "Report or block",
+      "said": "{{name}} says",
+      "showLess": "Show less",
+      "readMore": "Read more",
+      "acceptNote": "Accepting matches you with {{name}} and opens your chat. If you're not interested, nothing is sent back.",
+      "error": "Couldn't do that right now. Please try again.",
+      "accept": "Accept & start chatting",
+      "decline": "Not now",
+      "matched": "It's a match!",
+      "matchedBody": "You and {{name}} can chat now.",
+      "intro": "Accepting creates a match and opens your chat.",
+      "empty": "No icebreakers right now",
+      "emptySub": "When someone sends you a first message, it'll show up here."
+    },
+    "someone": "Someone",
+    "toast": {
+      "title": "{{name}} broke the ice",
+      "body": "Open to read their message",
+      "view": "View"
+    },
+    "sentLabel": "Icebreaker sent",
+    "sayHi": "Say hi",
+    "title": "Break the ice",
+    "quotaEmpty": "No free icebreakers left",
+    "quota": "{{remaining}} of {{limit}} free left",
+    "errors": {
+      "rateLimited": "You're sending a lot of icebreakers - try again in a little while.",
+      "dailyLimit": "You've reached today's icebreaker limit. Try again tomorrow.",
+      "invalid": "Please write a short message (up to {{max}} characters).",
+      "unavailable": "This person can't receive icebreakers right now.",
+      "generic": "Couldn't send that - please try again."
+    },
+    "sheet": {
+      "hint": "They'll see it first. If they accept, you match and can keep chatting.",
+      "to": "To {{name}}",
+      "ideas": "Need an idea?",
+      "placeholder": "Write a friendly first message…",
+      "sending": "Sending…",
+      "send": "Send icebreaker",
+      "safety": "They choose whether to accept. Be kind - you can always report or block.",
+      "sentTitle": "Sent!",
+      "sentBody": "We'll let you know if {{name}} replies.",
+      "done": "Done",
+      "title": "Send your first message to {{name}}"
+    },
+    "upsell": {
+      "title": "You've used your {{limit}} free icebreakers",
+      "body": "Go Premium to break the ice with as many people as you like.",
+      "cta": "Go Premium",
+      "later": "Not now"
+    },
+    "matched": {
+      "title": "You're already matched",
+      "body": "Say hi in your chat.",
+      "cta": "Open chat"
+    },
+    "useOpener": "Use this opener: {{text}}",
+    "copyOpener": "Copy: {{text}}",
+    "copied": "Copied",
+    "chances": {
+      "left_one": "{{count}} chance left",
+      "left_other": "{{count}} chances left",
+      "of": "{{remaining}} of {{limit}} free chances left",
+      "none": "No chances left - go Premium",
+      "unlimited": "Unlimited chances"
+    }
   }
 }

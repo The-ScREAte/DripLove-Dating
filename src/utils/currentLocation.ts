@@ -1,4 +1,5 @@
 import { reverseGeocode, countryCodeMap } from '@/utils/countryDetection';
+import { getSettingsPlatform } from '@/utils/openAppSettings';
 
 export interface CurrentLocation {
   latitude: number;
@@ -72,8 +73,13 @@ export async function getCurrentLocation(): Promise<CurrentLocation> {
 
 export function describeLocationError(reason: CurrentLocationError): string {
   switch (reason) {
-    case 'denied':
-      return 'Location access is turned off for DripLove. You can allow it in your phone settings, or choose your city below.';
+    case 'denied': {
+      // Say exactly how to fix it on THIS platform (see openAppSettings.ts).
+      const platform = getSettingsPlatform();
+      if (platform === 'ios') return 'Location access is turned off for DripLove. Open Settings to allow it, or choose your city below.';
+      if (platform === 'android') return 'Location access is turned off for DripLove. Turn it on in Settings → Apps → DripLove → Permissions, or choose your city below.';
+      return "Location access is blocked. Allow it in your browser's site settings, or choose your city below.";
+    }
     case 'timeout':
       return "We couldn't get your location in time. Try again, or choose your city below.";
     case 'unsupported':

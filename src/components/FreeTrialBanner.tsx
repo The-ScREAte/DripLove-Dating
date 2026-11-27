@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Capacitor } from '@capacitor/core';
 import { Sparkles, Globe, MessageCircle, Heart, MapPin, Compass, X, Loader2 } from 'lucide-react';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
@@ -93,11 +94,11 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
           ))}
         </div>
 
-        <button
+        <Button variant="primary" size="lg" className="mt-4 w-full"
           type="button"
           onClick={handleTap}
           disabled={starting || !canStart}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-pink-900/40 transition active:scale-[0.98] disabled:opacity-60"
+         
         >
           {(starting || !canStart) ? (
             <>
@@ -107,7 +108,7 @@ const FreeTrialBanner = ({ userId, onDismiss, dismissible, className = '' }: Fre
           ) : (
             'Start Free Trial →'
           )}
-        </button>
+        </Button>
 
         <p className="mt-2.5 text-center text-[11px] text-white/45">
           {offerInfo.trialPeriodLabel ? `No charge for ${offerInfo.trialPeriodLabel}.` : 'No charge during your trial.'} Cancel anytime.

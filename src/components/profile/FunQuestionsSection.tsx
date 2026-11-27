@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FUN_QUESTIONS, QuestionType } from '@/constants/funQuestions';
 import { Shuffle } from 'lucide-react';
 
@@ -58,14 +57,14 @@ const FunQuestionsSection = ({ editedProfile, isEditing, onInputChange }: FunQue
         )}
       </div>
 
-      <Input
+      <Input tone="dark"
         type="text"
         id={questionType}
         name={questionType}
         value={editedProfile[questionType] || ''}
         onChange={onInputChange}
         disabled={!isEditing}
-        className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/40"
+        className="w-full disabled:text-white/40"
         placeholder={placeholder}
       />
 

@@ -10,6 +10,584 @@
     "levelComplete": "🎉 ¡Nivel {{level}} completado!"
   },
   "profile": {
-    "freeTonight": "Libre esta noche"
+    "freeTonight": "Libre esta noche",
+    "height": "Estatura",
+    "selectHeight": "Selecciona tu estatura",
+    "vibe": {
+      "values": "Lo que más te importa",
+      "genres": "Música que te encanta",
+      "empty": "Toca Editar para añadir: nos ayuda a encontrar mejores matches."
+    }
+  },
+  "onboarding": {
+    "progress": "Progreso del registro",
+    "optional": "Opcional",
+    "back": "Atrás",
+    "continue": "Continuar",
+    "checkingPhotos": "Revisando tus fotos…",
+    "addMorePhotos": "Añade {{count}} foto(s) más para continuar",
+    "select": "Seleccionar",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
+    "pw": {
+      "tooShort": "Muy corta - usa al menos 6 caracteres",
+      "okay": "Aceptable",
+      "good": "Buena",
+      "strong": "Fuerte"
+    },
+    "steps": {
+      "account": {
+        "title": "Crea tu cuenta",
+        "hint": "Usa un correo que revises."
+      },
+      "location": {
+        "title": "¿Dónde vives?",
+        "hint": "Para mostrarte personas cercanas."
+      },
+      "work": {
+        "title": "Trabajo y estudios",
+        "hintRequired": "Cuéntanos a qué te dedicas.",
+        "hintOptional": "Comparte lo que te parezca bien."
+      },
+      "signs": {
+        "title": "Elige tus signos culturales",
+        "hint": "Elige al menos {{min}}.",
+        "hintOptional": "Elige los que te representen."
+      },
+      "face": {
+        "title": "Verifica que eres tú",
+        "hint": "Una selfie rápida mantiene DripLove real. Nunca se muestra."
+      },
+      "photos": {
+        "title": "Añade tus mejores fotos",
+        "hint": "Añade al menos 2 fotos claras tuyas."
+      },
+      "bio": {
+        "title": "Cuenta tu historia",
+        "hint": "Unas pocas palabras sinceras bastan."
+      },
+      "details": {
+        "title": "Un poco más sobre ti",
+        "hint": "Ayuda a que te conozcan."
+      },
+      "lifestyle": {
+        "title": "Tu día a día",
+        "hint": "Elige lo que sientas tuyo."
+      },
+      "interests": {
+        "title": "¿Qué te apasiona?",
+        "hint": "Elige lo que te encanta: mejora tus matches."
+      },
+      "love": {
+        "title": "¿Cómo amas?",
+        "hint": "Cómo es para ti una buena relación."
+      },
+      "you": {
+        "title": "Empecemos por ti",
+        "hint": "Tu nombre, tu cumpleaños y quién eres."
+      },
+      "looking": {
+        "title": "¿A quién buscas?",
+        "hint": "Dinos a quién te gustaría conocer."
+      },
+      "celebrate": {
+        "title": "¡Ya estás dentro!",
+        "hint": "¿Quieres que tu perfil brille?"
+      },
+      "values": {
+        "title": "¿Qué es lo que más te importa?",
+        "hint": "Elige hasta 5: influyen en los perfiles que te mostramos."
+      },
+      "music": {
+        "title": "¿Qué escuchas?",
+        "hint": "Elige tu sonido: también emparejamos por gustos musicales."
+      }
+    },
+    "face": {
+      "done": "Rostro verificado"
+    },
+    "photos": {
+      "tipsLink": "Consejos de fotos",
+      "add": "Añadir fotos",
+      "alt": "Tu foto {{n}}",
+      "crop": "Recortar foto",
+      "remove": "Eliminar foto",
+      "main": "Principal",
+      "approved": "Aprobada"
+    },
+    "promo": {
+      "toggle": "¿Tienes un código promocional?"
+    },
+    "tips": {
+      "title": "Mejores consejos para tu foto de perfil",
+      "subtitle": "Las fotos claras y naturales consiguen muchos más matches. Añade hasta {{max}}.",
+      "doHeading": "Haz",
+      "avoidHeading": "Evita",
+      "smile": "Sonrisa sincera",
+      "light": "Luz natural",
+      "life": "Muestra tu vida",
+      "sunglasses": "Gafas de sol",
+      "dark": "Mala iluminación",
+      "group": "Fotos de grupo",
+      "mirror": "Selfies en el espejo",
+      "cta": "Seleccionar fotos"
+    },
+    "skip": "Omitir",
+    "showMore": "Ver más",
+    "showFewer": "Ver menos",
+    "bio": {
+      "placeholder": "Escribe unas líneas sobre ti…",
+      "starter1": "Soy más feliz cuando…",
+      "starter2": "Mi fin de semana perfecto es…",
+      "starter3": "Pregúntame sobre…",
+      "starter4": "Busco a alguien que…"
+    },
+    "details": {
+      "languages": "Idiomas que hablas (hasta {{max}})"
+    },
+    "lifestyle": {
+      "pets": "Mascotas",
+      "social": "Estilo en redes sociales"
+    },
+    "interests": {
+      "counter": "{{count}} de {{max}} elegidos"
+    },
+    "love": {
+      "loveStyle": "Cómo demuestras amor",
+      "communication": "Cómo te gusta comunicarte",
+      "family": "Planes de familia"
+    },
+    "celebrate": {
+      "add": "Añadir más (opcional)",
+      "skip": "Omitir - llévame a DripLove"
+    },
+    "bonus": "Haz que brille",
+    "welcomeBack": "Bienvenido, {{name}} - solo unos detalles más.",
+    "cheer": {
+      "start": "¡Buen comienzo!",
+      "great": "¡Lo haces genial!",
+      "almost": "¡Casi listo!",
+      "last": "¡Último paso!"
+    },
+    "vibe": {
+      "selected": "seleccionados"
+    },
+    "music": {
+      "artists": "Artistas favoritos",
+      "artistN": "Artista {{n}}",
+      "artistPlaceholder": "p. ej. Burna Boy",
+      "link": "Comparte una canción o lista",
+      "linkHelp": "Se reproduce en tu perfil.",
+      "linkInvalid": "Pega un enlace de Spotify, Apple Music, YouTube o SoundCloud."
+    }
+  },
+  "registration": {
+    "errors": {
+      "photosRequired": "Fotos obligatorias",
+      "someImagesRejected": "Algunas fotos fueron rechazadas",
+      "photosNeedReupload": "Por favor, vuelve a añadir tus fotos"
+    }
+  },
+  "discover": {
+    "matchCard": {
+      "atAGlance": "De un vistazo",
+      "communicationStyle": "Estilo de comunicación",
+      "loveStyle": "Estilo de amor",
+      "pets": "Mascotas",
+      "languagesSpoken": "Idiomas",
+      "socialMedia": "Redes sociales",
+      "readMore": "Leer más",
+      "showLess": "Ver menos",
+      "lookingForSerious": "Busca algo serio",
+      "openToAnything": "Abierto a todo",
+      "lookingFor": "Busca {{what}}",
+      "showDetails": "Ver detalles",
+      "hideDetails": "Ocultar detalles",
+      "verifiedProfile": "Perfil verificado",
+      "funQuestions": "Preguntas divertidas",
+      "funFact": "Dato curioso",
+      "perfectDate": "Primera cita perfecta",
+      "lastGoogled": "Lo último que busqué en Google"
+    },
+    "modeForYou": "Para ti",
+    "modeSignMatch": "Sign Match",
+    "signMatchHint": "Personas cuyos signos encajan con los tuyos",
+    "filtersAria": "Filtros de Discover",
+    "emptySignMatchTitle": "Sin coincidencias de signo por ahora",
+    "emptySignMatchDesc": "Vuelve pronto o cambia a Para ti.",
+    "refreshFailedTitle": "No se pudo actualizar",
+    "refreshFailedDesc": "Revisa tu conexión e inténtalo de nuevo.",
+    "adjustFilters": "Ajustar filtros",
+    "playGames": "Jugar",
+    "tryPremiumFree": "Prueba Premium gratis"
+  },
+  "matches": {
+    "noDetailsYet": "Aún no se han compartido más detalles."
+  },
+  "chat": {
+    "search": "Buscar conversaciones",
+    "noResults": "No se encontraron conversaciones",
+    "yesterday": "Ayer",
+    "you": "Tú",
+    "earlierConversations": "Conversaciones anteriores ({{count}})",
+    "newMatchBadge": "Nuevo",
+    "findYourMatch": "Encuentra tu match",
+    "noMatchesTitle": "Tu historia de amor empieza aquí",
+    "matchedWith": "Hiciste match con {{name}}",
+    "matchedAgo": "Saluda y haz que cuente",
+    "icebreakersTitle": "Rompe el hielo",
+    "icebreaker1": "¡Hola {{name}}! ¿Qué es lo mejor de tu semana hasta ahora?",
+    "icebreaker2": "Hola {{name}} 👋 ¿Qué es lo que más te apasiona ahora mismo?",
+    "icebreaker3": "Tu perfil me hizo sonreír. ¿Cómo es tu fin de semana perfecto?",
+    "staySafeTitle": "Cuídate",
+    "staySafeBody": "Sigue chateando en DripLove hasta que confíes en alguien. Nunca compartas dinero, contraseñas ni datos financieros.",
+    "dismiss": "Cerrar",
+    "jumpToLatest": "Ir al último mensaje",
+    "newMessagesCount": "{{count}} nuevos",
+    "viewProfile": "Ver perfil",
+    "replyingTo": "Respondiendo a {{name}}",
+    "cancelReply": "Cancelar respuesta",
+    "verified": "Verificado",
+    "unreadCount": "{{count}} sin leer",
+    "openConversation": "Abrir conversación con {{name}}",
+    "newMatchesAria": "Nuevos matches",
+    "typingAria": "{{name}} está escribiendo",
+    "today": "Hoy",
+    "copy": "Copiar",
+    "copied": "Mensaje copiado"
+  },
+  "auth": {
+    "invalidCredentials": "El correo y la contraseña no coinciden.",
+    "emailNotConfirmed": "Primero confirma tu correo: revisa tu bandeja de entrada.",
+    "resendConfirmation": "Reenviar correo",
+    "confirmationSent": "Correo de confirmación enviado. Revisa tu bandeja de entrada y el spam.",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
+    "resetSentTitle": "Revisa tu correo",
+    "resetSentBody": "Si existe una cuenta para {{email}}, te hemos enviado un enlace para restablecer tu contraseña.",
+    "usesGoogle": "Esta cuenta usa Google. Continúa con Google.",
+    "usesApple": "Esta cuenta usa Apple. Continúa con Apple.",
+    "signingIn": "Iniciando sesión…",
+    "signInFailedTitle": "No pudimos iniciar tu sesión",
+    "signInFailedBody": "Algo salió mal. Inténtalo de nuevo.",
+    "signInCancelled": "Se canceló el inicio de sesión.",
+    "tryAgain": "Intentar de nuevo",
+    "newPassword": "Nueva contraseña",
+    "updatePassword": "Actualizar contraseña",
+    "updatingPassword": "Actualizando…",
+    "resetLinkExpired": "Este enlace ha caducado. Solicita uno nuevo.",
+    "passwordUpdated": "Contraseña actualizada. Ya puedes iniciar sesión.",
+    "passwordHint": "Al menos 6 caracteres",
+    "setNewPasswordTitle": "Crea una nueva contraseña",
+    "signInTakingLong": "El inicio de sesión está tardando más de lo esperado. Inténtalo de nuevo."
+  },
+  "welcome": {
+    "legal": "Al continuar, aceptas nuestros <terms>Términos de servicio</terms> y nuestra <privacy>Política de privacidad</privacy>.",
+    "connectLink": "Conecta"
+  },
+  "circleUp": {
+    "permTitle": "Cámara y micrófono desactivados",
+    "permBody": "Actívalos para DripLove en los ajustes de tu dispositivo para entrar en directo.",
+    "permBodyIos": "Permite cámara y micrófono para DripLove en Ajustes para entrar en directo.",
+    "openSettings": "Abrir Ajustes",
+    "tryAgain": "Reintentar",
+    "endCallTitle": "¿Terminar la llamada?",
+    "endCallBody": "Saldrás de la llamada y se avisará a tu match.",
+    "endCall": "Terminar",
+    "stay": "Quedarme",
+    "tapToPlay": "Toca para iniciar el vídeo",
+    "finding": "Estamos buscando a alguien para ti",
+    "searchNear": "Empezamos por gente cerca de ti",
+    "searchCountry": "Ampliando a todo tu país",
+    "searchAbroad": "Después, en el extranjero",
+    "reconnecting": "Reconectando…",
+    "connecting": "Conectando…",
+    "flipCamera": "Cambiar cámara",
+    "callEnded": "Llamada terminada",
+    "callEndedBody": "Gracias por conectar.",
+    "findNew": "Buscar a alguien nuevo",
+    "backToCircle": "Volver a Circle"
+  },
+  "rating": {
+    "title": "¿Te encanta DripLove?",
+    "body": "Una valoración rápida ayuda a más personas a encontrar el amor verdadero.",
+    "rateCta": "Valorar DripLove",
+    "rateFailed": "No se pudo abrir la tienda. Busca DripLove en tu tienda de aplicaciones para valorar.",
+    "feedbackCta": "Cuéntanos qué mejorar",
+    "feedbackTitle": "Ayúdanos a mejorar",
+    "feedbackSubtitle": "Tu mensaje llega directamente a nuestro equipo.",
+    "feedbackPlaceholder": "¿Qué podría ser mejor?",
+    "feedbackSend": "Enviar comentarios",
+    "feedbackThanks": "Gracias: leemos cada mensaje.",
+    "feedbackError": "No se pudo enviar. Inténtalo de nuevo.",
+    "cat_matches": "Matches",
+    "cat_chat": "Chat",
+    "cat_photos": "Fotos y verificación",
+    "cat_payments": "Pagos",
+    "cat_bug": "Errores y velocidad",
+    "cat_other": "Otro"
+  },
+  "premium": {
+    "legal": {
+      "renewalStore": "Se renueva cada mes a {{price}} hasta que lo canceles. Cancela cuando quieras en los ajustes de {{store}}.",
+      "renewalWeb": "Se renueva cada 30 días a {{price}} hasta que lo canceles. Cancela cuando quieras desde tu perfil.",
+      "terms": "Términos de uso",
+      "privacy": "Política de privacidad"
+    },
+    "paymentIssue": {
+      "title": "Problema de pago",
+      "body": "No pudimos renovar tu Premium. Actualiza tu método de pago en {{store}} para conservar tus beneficios.",
+      "until": "Tu Premium sigue activo hasta el {{date}}.",
+      "update": "Actualizar método de pago",
+      "later": "Ahora no"
+    }
+  },
+  "permissions": {
+    "title": {
+      "camera": "El acceso a la cámara está desactivado",
+      "microphone": "El acceso al micrófono está desactivado",
+      "cameraMicrophone": "El acceso a la cámara y al micrófono está desactivado",
+      "location": "El acceso a la ubicación está desactivado",
+      "photos": "El acceso a las fotos está desactivado",
+      "notifications": "Las notificaciones están desactivadas"
+    },
+    "bodyIos": "Actívalo en Ajustes y vuelve a DripLove.",
+    "bodyAndroid": "Abre Ajustes → Aplicaciones → DripLove → Permisos y actívalo.",
+    "bodyWeb": "Permite el acceso cuando tu navegador lo pida, o actívalo en los ajustes del sitio de tu navegador.",
+    "openSettings": "Abrir Ajustes",
+    "tryAgain": "Reintentar"
+  },
+  "legal": {
+    "contents": "Contenido",
+    "related": "Documentos relacionados",
+    "links": {
+      "terms": "Términos del servicio",
+      "privacy": "Política de privacidad",
+      "community": "Normas de la comunidad",
+      "childSafety": "Seguridad infantil",
+      "safetyTips": "Consejos de seguridad"
+    }
+  },
+  "errors": {
+    "tabErrorTitle": "No se pudo cargar esta pestaña",
+    "tabErrorBody": "Esta sección tuvo un problema. Tus otras pestañas funcionan bien.",
+    "tabErrorRetry": "Reintentar"
+  },
+  "vibe": {
+    "sharedTitle": "Os gusta a los dos",
+    "more": "+{{count}}",
+    "musicMatch": "Match musical: tenéis gustos en común",
+    "valuesTitle": "Lo que más importa",
+    "musicTitle": "Gustos musicales",
+    "values": {
+      "honesty": "Honestidad",
+      "loyalty": "Lealtad",
+      "humor": "Humor",
+      "kindness": "Bondad",
+      "respect": "Respeto",
+      "communication": "Comunicación",
+      "family": "Familia",
+      "faith": "Fe",
+      "ambition": "Ambición",
+      "growth": "Crecimiento",
+      "adventure": "Aventura",
+      "affection": "Cariño",
+      "stability": "Estabilidad",
+      "independence": "Independencia",
+      "culture": "Cultura y raíces",
+      "fun": "Diversión",
+      "generosity": "Generosidad",
+      "intimacy": "Intimidad"
+    },
+    "genres": {
+      "afrobeats": "Afrobeats",
+      "amapiano": "Amapiano",
+      "highlife": "Highlife",
+      "hiphop": "Hip-Hop",
+      "rnb": "R&B",
+      "gospel": "Gospel",
+      "reggae": "Reggae y Dancehall",
+      "pop": "Pop",
+      "rock": "Rock",
+      "jazz": "Jazz",
+      "soul": "Soul",
+      "house": "House",
+      "latin": "Latina",
+      "country": "Country",
+      "classical": "Clásica",
+      "alternative": "Alternativa"
+    }
+  },
+  "handoff": {
+    "welcomeName": "Te damos la bienvenida, {{name}}",
+    "welcome": "Te damos la bienvenida a DripLove",
+    "line": "Buscando personas cerca de ti…"
+  },
+  "termsAccept": {
+    "hint": "Marca la casilla para continuar",
+    "saving": "Guardando…",
+    "failed": "No pudimos guardarlo. Revisa tu conexión e inténtalo de nuevo."
+  },
+  "cards": {
+    "heroMeet": "Conoce a {{name}}",
+    "sharedHeadline": "{{name}} y tú tienen cosas en común",
+    "basicsTitle": "De un vistazo",
+    "basics": {
+      "work": "Trabajo",
+      "education": "Estudios",
+      "height": "Estatura",
+      "lives": "Vive en",
+      "distance": "Distancia",
+      "languages": "Habla",
+      "away": "A {{distance}}"
+    },
+    "lookingTitle": "Busca",
+    "looking": {
+      "family": "Planes de familia",
+      "loveStyle": "Estilo de amor",
+      "communication": "Comunicación"
+    },
+    "interestsTitle": "Lo que le gusta a {{name}}",
+    "interestsEyebrow": "Intereses",
+    "valuesEyebrow": "Valores",
+    "music": {
+      "artists": "En repetición",
+      "play": "Escucha su canción"
+    },
+    "lifestyleTitle": "Estilo de vida",
+    "lifestyle": {
+      "exercise": "Ejercicio",
+      "drinking": "Bebe",
+      "smoking": "Fuma",
+      "sleep": "Sueño",
+      "pets": "Mascotas"
+    },
+    "signTitle": "Signo cultural",
+    "sign": {
+      "shared": "Comparten este signo ✨",
+      "compatible": "Muy compatible con tu signo ✨"
+    },
+    "trustTitle": "Bueno saber",
+    "trust": {
+      "verified": "Perfil verificado",
+      "activeNow": "Activo ahora",
+      "activeToday": "Activo hoy",
+      "activeWeek": "Activo esta semana",
+      "profile": "Perfil",
+      "lastSeen": "Última conexión",
+      "headlineVerified": "{{name}} es una persona real y verificada",
+      "headlineActive": "{{name}} estuvo por aquí hace poco"
+    },
+    "starterTitle": "Rompe el hielo",
+    "starter": {
+      "interest": "¿Qué te acercó a {{thing}}?",
+      "value": "¿Cómo ves {{thing}} para ti?",
+      "music": "¿Qué canción tienes en repetición últimamente?",
+      "city": "¿Cuál es tu lugar favorito en {{city}}?",
+      "generic": "Hola {{name}} 👋 ¿cómo va tu semana?",
+      "hint": "Un primer mensaje fácil: toca el chat cuando hagan match.",
+      "headline": "Saluda a {{name}}"
+    },
+    "welcomeTitle": "Nuevo por aquí",
+    "welcomeBody": "{{name}} apenas está empezando: sé el primero en saludar.",
+    "promptFunFact": "Dato curioso",
+    "promptFirstDate": "Primera cita perfecta",
+    "promptGoogled": "Lo último que buscó",
+    "heroHint": "Toca el lado derecho de la tarjeta para ver más"
+  },
+  "circle": {
+    "title": "Circle Up",
+    "subtitle": "Encuentra personas que comparten tu mundo.",
+    "verifiedNearYou": "{{count}} miembros verificados cerca de ti",
+    "premiumTag": "Premium",
+    "unlockTitle": "miembros en {{circle}}",
+    "unlockTitleMany": "Únete a muchos miembros en {{circle}}",
+    "unlockBody": "Desbloquea este círculo para conocer a los miembros que encajan justo con lo que buscas.",
+    "unlockCta": "Desbloquear con Premium",
+    "unlockCtaTrial": "Empezar prueba gratis",
+    "maybeLater": "Quizás más tarde",
+    "lockedCardTitle": "Desbloquea para ver",
+    "endTitle": "Ya viste a todos aquí",
+    "endBody": "Por ahora ya viste a todos en \"{{circle}}\". Vuelve pronto o explora otro círculo.",
+    "endCta": "Explorar otros círculos",
+    "many": "Muchos",
+    "members": "miembros",
+    "worldwideHint": "Mostrando totales de toda la app",
+    "pickCountries": "Elige tus países"
+  },
+  "icebreaker": {
+    "errors": {
+      "dailyLimit": "Has alcanzado el límite de rompehielos de hoy. Inténtalo mañana.",
+      "generic": "No se pudo enviar. Inténtalo de nuevo.",
+      "invalid": "Escribe un mensaje corto (hasta {{max}} caracteres).",
+      "rateLimited": "Estás enviando muchos rompehielos. Inténtalo de nuevo en un rato.",
+      "unavailable": "Esta persona no puede recibir rompehielos ahora mismo."
+    },
+    "inbox": {
+      "accept": "Aceptar y empezar a chatear",
+      "acceptNote": "Al aceptar, haces match con {{name}} y se abre tu chat. Si no te interesa, no se envía nada de vuelta.",
+      "decline": "Ahora no",
+      "empty": "No hay rompehielos por ahora",
+      "emptySub": "Cuando alguien te envíe un primer mensaje, aparecerá aquí.",
+      "error": "No se pudo hacer ahora. Inténtalo de nuevo.",
+      "intro": "Aceptar crea un match y abre tu chat.",
+      "matched": "¡Es un match!",
+      "matchedBody": "Tú y {{name}} ya podéis chatear.",
+      "readMore": "Leer más",
+      "reportBlock": "Denunciar o bloquear",
+      "requestTitle": "Rompehielos",
+      "said": "{{name}} dice",
+      "showLess": "Mostrar menos",
+      "title": "Rompehielos"
+    },
+    "matched": {
+      "body": "Saluda en tu chat.",
+      "cta": "Abrir chat",
+      "title": "Ya hicisteis match"
+    },
+    "quota": "Te quedan {{remaining}} de {{limit}} gratis",
+    "quotaEmpty": "No te quedan rompehielos gratis",
+    "row": {
+      "aria": "Abrir rompehielos, {{count}} esperando",
+      "sub": "{{count}} te esperan"
+    },
+    "sayHi": "Saludar",
+    "sentLabel": "Rompehielos enviado",
+    "sheet": {
+      "done": "Listo",
+      "hint": "Lo verá primero. Si acepta, hacen match y pueden seguir conversando.",
+      "ideas": "¿Necesitas una idea?",
+      "placeholder": "Escribe un primer mensaje amable…",
+      "safety": "Ellos deciden si aceptan. Sé amable: siempre puedes denunciar o bloquear.",
+      "send": "Enviar rompehielos",
+      "sending": "Enviando…",
+      "sentBody": "Te avisaremos si {{name}} responde.",
+      "sentTitle": "¡Enviado!",
+      "to": "Para {{name}}",
+      "title": "Envía tu primer mensaje a {{name}}"
+    },
+    "someone": "Alguien",
+    "title": "Rompe el hielo",
+    "toast": {
+      "body": "Ábrelo para leer su mensaje",
+      "title": "{{name}} rompió el hielo",
+      "view": "Ver"
+    },
+    "upsell": {
+      "body": "Hazte Premium para romper el hielo con todas las personas que quieras.",
+      "cta": "Hazte Premium",
+      "later": "Ahora no",
+      "title": "Has usado tus {{limit}} rompehielos gratis"
+    },
+    "useOpener": "Usar este mensaje: {{text}}",
+    "copyOpener": "Copiar: {{text}}",
+    "copied": "Copiado",
+    "chances": {
+      "left_one": "Te queda {{count}} oportunidad",
+      "left_other": "Te quedan {{count}} oportunidades",
+      "of": "{{remaining}} de {{limit}} oportunidades gratis",
+      "none": "Sin oportunidades - hazte Premium",
+      "unlimited": "Oportunidades ilimitadas"
+    }
   }
 }

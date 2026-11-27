@@ -7,8 +7,10 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getAuthedCaller, isServiceRoleRequest } from '../_shared/caller-auth.ts'
+import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY')
+let PAYSTACK_SECRET_KEY: string | null = null
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -49,8 +51,21 @@ serve(async (req) => {
 
   try {
     const { user_id } = await req.json()
-    if (!user_id) return json(400, { error: 'Missing user_id' })
+    if (!user_id || typeof user_id !== 'string') return json(400, { error: 'Missing user_id' })
 
+    // This permanently disables a user's saved cards and auto-renew, so it must
+    // only be callable by that user themselves, an admin, or an internal
+    // (service-role) caller. It used to accept anyone with a user id.
+    if (!isServiceRoleRequest(req)) {
+      const caller = await getAuthedCaller(req)
+      if (!caller) return json(401, { error: 'Unauthorized' })
+      if (caller.id !== user_id && !caller.isAdmin) return json(403, { error: 'Forbidden' })
+    }
+
+    // Same test/live key selection every other Paystack function uses (this one
+    // used to read a bare PAYSTACK_SECRET_KEY env var instead, so if that secret
+    // is not set the cards were only disabled locally, never at Paystack).
+    try { PAYSTACK_SECRET_KEY = await getPaystackSecretKey() } catch { PAYSTACK_SECRET_KEY = null }
     if (!PAYSTACK_SECRET_KEY) {
       console.warn('[DEACTIVATE-PAYMENTS] PAYSTACK_SECRET_KEY not set, skipping Paystack calls')
     }

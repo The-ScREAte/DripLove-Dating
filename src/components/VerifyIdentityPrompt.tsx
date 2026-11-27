@@ -32,16 +32,13 @@ const VerifyIdentityPrompt = ({ open, onClose, onVerifyNow }: VerifyIdentityProm
         </DialogHeader>
 
         <div className="flex flex-col gap-2 mt-2">
-          <Button
+          <Button variant="primary" size="md" className="w-full"
             onClick={handleVerifyNow}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
           >
             Verify Now
           </Button>
-          <Button
-            variant="ghost"
+          <Button variant="quiet" size="md" className="w-full"
             onClick={onClose}
-            className="w-full text-gray-400 hover:text-white hover:bg-neutral-800"
           >
             Maybe Later
           </Button>

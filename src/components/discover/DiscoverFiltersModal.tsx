@@ -162,11 +162,9 @@ const DiscoverFiltersModal: React.FC<DiscoverFiltersModalProps> = ({
           }}
         />
 
-        <Button
+        <Button variant="primary" size="sm" className="w-full mt-4 mb-1"
           onClick={handleSave}
           disabled={isSaving}
-          size="sm"
-          className="w-full h-9 min-h-0 mt-4 mb-1 bg-pink-500 hover:bg-pink-600 text-white"
         >
           {isSaving ? 'Saving...' : 'Save Preferences'}
         </Button>

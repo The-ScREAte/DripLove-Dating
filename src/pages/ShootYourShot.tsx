@@ -909,14 +909,14 @@ const ShootYourShot = () => {
   if (!selectedLevel) {
     return (
       <div className="h-screen bg-black flex flex-col">
-        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10 hover:text-white">
+                <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate(-1)} title="Home">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
+                <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/games')} title="Back to Games">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
@@ -924,11 +924,8 @@ const ShootYourShot = () => {
                   <p className="text-xs text-gray-300">Shoot Your Shot 🎯</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
+              <Button variant="line" size="sm" className="text-white"
                 onClick={handleClearResults}
-                className="bg-black border-pink-500/40 text-gray-200 hover:bg-white/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -938,16 +935,14 @@ const ShootYourShot = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
           <div className="max-w-2xl mx-auto px-4 pt-2 pb-6 space-y-4">
-          <Card className="bg-neutral-900 border-pink-500/30">
+          <Card variant="surface">
             <CardContent className="pt-6 space-y-3">
               {Object.entries(levelConfig).map(([levelStr, cfg]) => {
                 const level = Number(levelStr);
                 return (
-                  <Button
+                  <Button variant="line" size="md" className="text-white w-full h-auto p-4 items-start justify-between text-left"
                     key={level}
                     onClick={() => startLevel(level)}
-                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all bg-black/60 border-pink-500/30 text-white hover:bg-white/5"
-                    variant="outline"
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -968,7 +963,7 @@ const ShootYourShot = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card className="bg-neutral-900 border-pink-500/30">
+            <Card variant="surface">
               <CardContent className="pt-6 space-y-2">
                 <div className="font-semibold text-white">Your best 3 (this device)</div>
                 {best3.map((r, idx) => (
@@ -990,13 +985,13 @@ const ShootYourShot = () => {
     const copy = getLevelSummaryCopy(levelComplete.percentage);
     return (
       <div className="h-screen bg-black flex flex-col">
-        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
+            <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/')} title="Home">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
+              <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -1009,7 +1004,7 @@ const ShootYourShot = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32">
           <div className="max-w-2xl mx-auto px-4 pt-2 pb-6 space-y-4">
-          <Card className="bg-neutral-900 border-pink-500/30">
+          <Card variant="surface">
             <CardContent className="pt-6">
               <div className="text-center space-y-2">
                 <Trophy className="w-10 h-10 text-purple-400 mx-auto" />
@@ -1041,13 +1036,12 @@ const ShootYourShot = () => {
               </div>
 
               <div className="mt-6 flex gap-2">
-                <Button
+                <Button variant="primary" size="md" className="flex-1"
                   onClick={() => startLevel(levelComplete.level)}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-bold"
                 >
                   Replay Level {levelComplete.level}
                 </Button>
-                <Button onClick={backToLevelSelect} variant="outline" className="flex-1 bg-black/60 border-pink-500/40 text-white hover:bg-white/10 hover:text-white">
+                <Button variant="line" size="md" className="text-white flex-1" onClick={backToLevelSelect}>
                   Choose Another Level
                 </Button>
               </div>
@@ -1055,7 +1049,7 @@ const ShootYourShot = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card className="bg-neutral-900 border-pink-500/30">
+            <Card variant="surface">
               <CardContent className="pt-6 space-y-2">
                 <div className="font-semibold text-white">Your best 3 (this device)</div>
                 {best3.map((r, idx) => (
@@ -1076,14 +1070,14 @@ const ShootYourShot = () => {
   return (
     <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+      <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
+              <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/')} title="Home">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
+              <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -1125,7 +1119,7 @@ const ShootYourShot = () => {
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
         <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
         {!result ? (
-          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
+          <Card variant="surface" className="mb-6">
             <CardContent className="pt-6">
               {/* Profile Preview */}
               <div className="flex items-start gap-4 mb-6 pb-6 border-b border-pink-500/20">
@@ -1150,9 +1144,8 @@ const ShootYourShot = () => {
                       No edits. No second chances. Make it count!
                     </p>
                   </div>
-                  <Button
+                  <Button variant="primary" size="lg" className="w-full"
                     onClick={startTimer}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-bold text-lg py-6"
                   >
                     Start Timer
                   </Button>
@@ -1175,10 +1168,9 @@ const ShootYourShot = () => {
                       {message.length}/200
                     </div>
                   </div>
-                  <Button
+                  <Button variant="primary" size="md" className="w-full"
                     onClick={handleSubmit}
                     disabled={!isActive || !message.trim()}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 text-white font-bold disabled:opacity-50"
                   >
                     Send Message
                   </Button>
@@ -1206,14 +1198,10 @@ const ShootYourShot = () => {
                 </div>
               )}
 
-              <Button
+              <Button variant={resultInfo?.color === 'green' ? 'success' : resultInfo?.color === 'orange' ? 'primary' : 'danger'} size="lg" className="w-full"
                 onClick={handleNext}
                 disabled={savingResult}
-                className={`w-full font-bold ${
-                  resultInfo?.color === 'green' ? 'bg-green-600 hover:bg-green-700' :
-                  resultInfo?.color === 'orange' ? 'bg-orange-600 hover:bg-orange-700' :
-                  'bg-red-600 hover:bg-red-700'
-                }`}
+               
               >
                 {savingResult ? 'Saving…' : currentChallenge < levelChallenges.length - 1 ? 'Next Challenge' : 'See Results'}
               </Button>

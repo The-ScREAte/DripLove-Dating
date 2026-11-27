@@ -11,23 +11,13 @@ import { Loader2, Copy, Check, Mail, Users, Globe, Filter, Download } from 'luci
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchAllRows, applyDebugFilter } from '@/hooks/useBatchFetch';
+import { getCountryName } from '@/constants/locationData';
 
 interface Country {
   code: string;
   name: string;
   userCount: number;
 }
-
-const getCountryName = (code: string): string => {
-  const countryNames: Record<string, string> = {
-    'GH': 'Ghana', 'NG': 'Nigeria', 'US': 'United States', 'GB': 'United Kingdom',
-    'CA': 'Canada', 'KE': 'Kenya', 'ZA': 'South Africa', 'UG': 'Uganda',
-    'TZ': 'Tanzania', 'RW': 'Rwanda', 'CI': "Côte d'Ivoire", 'SN': 'Senegal',
-    'CM': 'Cameroon', 'ET': 'Ethiopia', 'EG': 'Egypt', 'MA': 'Morocco',
-    'DZ': 'Algeria', 'TN': 'Tunisia', 'BW': 'Botswana', 'ZW': 'Zimbabwe',
-  };
-  return countryNames[code] || code;
-};
 
 export default function EmailExport() {
   const [countries, setCountries] = useState<Country[]>([]);

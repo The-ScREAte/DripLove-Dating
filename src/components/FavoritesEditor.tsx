@@ -13,7 +13,9 @@ import {
   CATEGORY_SUB_QUESTION,
   favoriteEmoji,
   formatFavoriteLabel,
+  displayFavorites,
 } from '@/constants/favorites';
+import { VIBE_CATEGORY } from '@/constants/vibe';
 
 interface FavoritesEditorProps {
   favorites: FavoriteEntry[];
@@ -23,9 +25,12 @@ interface FavoritesEditorProps {
 
 // Compact pill button style shared by every pick-list in this editor -
 // small text, tight padding, so a long list of options doesn't feel bloated.
-const pillClass = 'text-xs h-6 px-2 py-0 bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white';
-
-const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: FavoritesEditorProps) => {
+const FavoritesEditor = ({ favorites: allFavorites, onFavoritesChange: emitAll, disabled = false }: FavoritesEditorProps) => {
+  // The reserved Vibe entry (values + music genres, edited in its own section)
+  // is invisible here and always carried through unchanged on every edit.
+  const hiddenVibe = allFavorites.filter((f) => f.category === VIBE_CATEGORY);
+  const favorites = displayFavorites(allFavorites);
+  const onFavoritesChange = (next: FavoriteEntry[]) => emitAll([...next, ...hiddenVibe]);
   // Which category is mid-way through its own detail sub-form right now
   // (a sub-option pick-list, or Music's free-text artist/album + link).
   // Null means "showing the plain category picker".
@@ -150,18 +155,18 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
           </h4>
           <div className="flex flex-wrap gap-1.5 mb-1.5">
             {CATEGORY_SUB_OPTIONS[pendingCategory].map((option) => (
-              <Button
+              <Button variant="line" size="sm" className="text-white"
                 key={option}
-                variant="outline"
-                size="sm"
+               
+               
                 onClick={() => confirmSubOption(pendingCategory, option)}
-                className={pillClass}
+               
               >
                 {option}
               </Button>
             ))}
           </div>
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-white/60 hover:text-white" onClick={() => setPendingCategory(null)}>
+          <Button variant="quiet" size="sm" onClick={() => setPendingCategory(null)}>
             Cancel
           </Button>
         </div>
@@ -173,19 +178,16 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
           <div className="space-y-1.5">
             {musicTopArtists.map((artist, index) => (
               <div key={index} className="flex gap-1.5">
-                <Input
+                <Input tone="dark"
                   placeholder={index === 0 ? 'e.g. Kendrick Lamar' : 'Another artist'}
                   value={artist}
                   onChange={(e) => updateTopArtist(index, e.target.value)}
-                  className="h-8 text-sm bg-neutral-900 border-pink-500/30 text-white placeholder:text-white/40 flex-1"
+                  className="flex-1"
                 />
                 {index === 0 ? (
                   musicTopArtists.length < MUSIC_TOP_ARTISTS_MAX && (
-                    <Button
+                    <Button variant="line" size="iconSm" className="text-white shrink-0"
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 shrink-0 bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
                       onClick={addTopArtistField}
                       aria-label="Add another top artist"
                     >
@@ -193,11 +195,8 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
                     </Button>
                   )
                 ) : (
-                  <Button
+                  <Button variant="line" size="iconSm" className="text-white shrink-0"
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 shrink-0 bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
                     onClick={() => removeTopArtistField(index)}
                     aria-label="Remove this top artist"
                   >
@@ -208,26 +207,23 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
             ))}
           </div>
           <h4 className="text-xs font-medium mb-1.5 text-white">🎵 Favorite artist or album</h4>
-          <Input
+          <Input tone="dark"
             placeholder="e.g. Drake, or Scorpion (album)"
             value={musicDetail}
             onChange={(e) => setMusicDetail(e.target.value)}
-            className="h-8 text-sm bg-neutral-900 border-pink-500/30 text-white placeholder:text-white/40"
+           
           />
-          <Input
+          <Input tone="dark"
             placeholder="Share a link (optional) - Spotify, Apple Music, YouTube..."
             value={musicLink}
             onChange={(e) => setMusicLink(e.target.value)}
-            className="h-8 text-sm bg-neutral-900 border-pink-500/30 text-white placeholder:text-white/40"
+           
           />
           <div className="flex gap-1.5">
-            <Button onClick={confirmMusic} size="sm" className="h-7 text-xs" disabled={!musicDetail.trim()}>
+            <Button variant="primary" size="sm" onClick={confirmMusic} disabled={!musicDetail.trim()}>
               Add
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
+            <Button variant="line" size="sm" className="text-white"
               onClick={() => setPendingCategory(null)}
             >
               Cancel
@@ -242,12 +238,12 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
           <h4 className="text-xs font-medium mb-1.5 text-white">Pick up to {FAVORITES_MAX} favorites:</h4>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {availableCategories.map((category) => (
-              <Button
+              <Button variant="line" size="sm" className="text-white"
                 key={category}
-                variant="outline"
-                size="sm"
+               
+               
                 onClick={() => pickCategory(category)}
-                className={pillClass}
+               
               >
                 {favoriteEmoji(category)} {category}
               </Button>
@@ -257,31 +253,25 @@ const FavoritesEditor = ({ favorites, onFavoritesChange, disabled = false }: Fav
           {/* Add Custom Favorite */}
           <div className="space-y-1.5">
             {!showAddCustom ? (
-              <Button
-                variant="outline"
-                size="sm"
+              <Button variant="line" size="sm" className="text-white"
                 onClick={() => setShowAddCustom(true)}
-                className="h-6 text-xs px-2 flex items-center gap-1 bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Custom Favorite
               </Button>
             ) : (
               <div className="flex gap-1.5">
-                <Input
+                <Input tone="dark"
                   placeholder="Enter a favorite..."
                   value={newCustom}
                   onChange={(e) => setNewCustom(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addCustomFavorite()}
-                  className="flex-1 h-8 text-sm bg-neutral-900 border-pink-500/30 text-white placeholder:text-white/40"
+                  className="flex-1"
                 />
-                <Button onClick={addCustomFavorite} size="sm" className="h-7 text-xs">
+                <Button variant="primary" size="sm" onClick={addCustomFavorite}>
                   Add
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs bg-transparent border-pink-500/40 text-white hover:bg-neutral-800 hover:text-white"
+                <Button variant="line" size="sm" className="text-white"
                   onClick={() => {
                     setShowAddCustom(false);
                     setNewCustom('');

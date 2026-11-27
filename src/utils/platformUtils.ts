@@ -32,7 +32,7 @@ const detectPlatformFromRuntime = (): string => {
   return 'web';
 };
 
-export const getPlatformSafe = async (): Promise<string> => {
+const getPlatformSafe = async (): Promise<string> => {
   if (cachedPlatform) return cachedPlatform;
   try {
     if (!capacitorModule) {
@@ -58,8 +58,6 @@ export const getPlatformSync = (): string => {
 getPlatformSafe();
 
 export const isAndroidPlatform = (): boolean => getPlatformSync() === 'android';
-export const isIOSPlatform = (): boolean => getPlatformSync() === 'ios';
-
 /**
  * Check if the app is running in a mobile Capacitor environment
  */
@@ -92,23 +90,6 @@ export const isLocalhost = () => {
   
   return result;
 };
-
-/**
- * Check if the app is running in a web browser
- */
-export const isWebBrowser = () => {
-  return !isMobileApp();
-};
-
-/**
- * Get the current platform type
- */
-export const getPlatformType = (): 'mobile' | 'web' | 'localhost' => {
-  if (isMobileApp()) return 'mobile';
-  if (isLocalhost()) return 'localhost';
-  return 'web';
-};
-
 /**
  * Log platform information for debugging
  */

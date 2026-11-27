@@ -19,11 +19,11 @@ const BUCKET = 'user-photos';
 const PUBLIC_MARKER = `/storage/v1/object/public/${BUCKET}/`;
 const THUMB_DIR = 'thumbs';
 /** Longest side in pixels: sharp at ~160 CSS px on a 3x phone screen. */
-export const THUMBNAIL_MAX_DIMENSION = 400;
+const THUMBNAIL_MAX_DIMENSION = 400;
 const THUMBNAIL_QUALITY = 0.78;
 
 /** `<userId>/<name>` -> `<userId>/thumbs/<name>` (null for anything else). */
-export function thumbnailPathFor(filePath: string): string | null {
+function thumbnailPathFor(filePath: string): string | null {
   const clean = filePath.split('?')[0];
   const slash = clean.lastIndexOf('/');
   if (slash <= 0) return null;
@@ -91,13 +91,6 @@ export async function uploadPhotoThumbnail(filePath: string, source: Blob): Prom
   } catch (error) {
     console.warn('Thumbnail creation failed (full photo will be used):', error);
   }
-}
-
-/** Storage path inside the bucket for a public photo URL ('' if not one). */
-export function photoPathFromUrl(photoUrl: string): string {
-  const raw = photoUrl.split('?')[0];
-  const at = raw.indexOf(PUBLIC_MARKER);
-  return at === -1 ? '' : decodeURIComponent(raw.slice(at + PUBLIC_MARKER.length));
 }
 
 // ---- Remembering photos that have no thumbnail (older uploads) ----------

@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { X, Heart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useBackClose } from '@/utils/backStack';
+import { useTranslation } from 'react-i18next';
+import './circleUp.css';
 import HoppingLogo from '@/components/HoppingLogo';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
-import { calculateAge } from '@/utils/discoverCache';
+import { calculateAge } from '@/utils/dateUtils';
 import { formatDistance } from '@/utils/distanceUnits';
 import MatchPreviewCard, { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 import CircleUpHeader from './CircleUpHeader';
 import { readCircleUpLayoutPref, readCircleUpFilterPref } from './CircleUpPrepare';
 import { fetchApprovedImages } from './circleUpProfileExtras';
 
+import { uniqueTopic } from '@/utils/realtime';
 type Phase = 'launching' | 'searching' | 'deciding' | 'waiting_other';
 type CandidateFilter = 'matched' | 'not_matched' | 'everyone';
 // How far out the search had to reach to find this person. The pool widens
@@ -71,6 +76,14 @@ const CircleUpMatching = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [decideCountdown, setDecideCountdown] = useState(DECIDE_COUNTDOWN_SECONDS);
   const [pollAttempts, setPollAttempts] = useState(0);
+  const { t } = useTranslation();
+  // Calm rotating sub-line while searching (cross-fades via key, no layout shift).
+  const [searchLine, setSearchLine] = useState(0);
+  useEffect(() => {
+    if (phase !== 'searching') return;
+    const id = window.setInterval(() => setSearchLine((i) => (i + 1) % 3), 3600);
+    return () => window.clearInterval(id);
+  }, [phase]);
 
   // Who's actually browsable right now, replacing the old blind auto-pairing -
   // this is the live "who's available" grid.
@@ -301,7 +314,7 @@ const CircleUpMatching = () => {
   useEffect(() => {
     if (!sessionId || !userId) return;
     const channel = supabase
-      .channel(`circle-up-session:${sessionId}`)
+      .channel(uniqueTopic(`circle-up-session:${sessionId}`))
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'circle_up_sessions', filter: `id=eq.${sessionId}` },
@@ -331,10 +344,11 @@ const CircleUpMatching = () => {
     if (!sessionId || !userId) return;
     clearWaitingTimeout();
     const { data: row } = await supabase.from('circle_up_sessions').select('user_a').eq('id', sessionId).single();
-    const myField = row?.user_a === userId ? 'user_a_decision' : 'user_b_decision';
+    const isUserA = row?.user_a === userId;
+    const ended = { status: 'declined', ended_at: new Date().toISOString(), ended_reason: 'passed' };
     await supabase
       .from('circle_up_sessions')
-      .update({ [myField]: 'pass', status: 'declined', ended_at: new Date().toISOString(), ended_reason: 'passed' })
+      .update(isUserA ? { user_a_decision: 'pass', ...ended } : { user_b_decision: 'pass', ...ended })
       .eq('id', sessionId);
     resetOwnQueueAndSearch(userId);
   };
@@ -349,10 +363,9 @@ const CircleUpMatching = () => {
       .single();
     if (!row) return;
     const iAmUserA = row.user_a === userId;
-    const myField = iAmUserA ? 'user_a_decision' : 'user_b_decision';
     const otherDecision = iAmUserA ? row.user_b_decision : row.user_a_decision;
 
-    await supabase.from('circle_up_sessions').update({ [myField]: 'accept' }).eq('id', sessionId);
+    await supabase.from('circle_up_sessions').update(iAmUserA ? { user_a_decision: 'accept' } : { user_b_decision: 'accept' }).eq('id', sessionId);
 
     if (otherDecision === 'accept') {
       await supabase
@@ -390,6 +403,9 @@ const CircleUpMatching = () => {
     navigate('/circle-up');
   };
 
+  // Android back cancels the search (same as the Cancel button) instead of leaving the app.
+  useBackClose(true, () => { void handleCancel(); }, { escape: false });
+
   const distanceKm =
     candidate && myLat != null && myLon != null && candidate.latitude != null && candidate.longitude != null
       ? Math.round(calculateDistance(myLat, myLon, candidate.latitude, candidate.longitude))
@@ -415,10 +431,10 @@ const CircleUpMatching = () => {
 
 
   return (
-    <div className="h-[100dvh] w-full bg-black flex flex-col">
+    <div className="h-screen w-full bg-black flex flex-col">
       <CircleUpHeader onBack={handleCancel} backLabel="Cancel" />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 py-4">
+      <div className="dl-rise flex-1 flex flex-col items-center justify-center px-6 min-h-0 py-4">
         {phase === 'launching' && (
           <div className="flex flex-col items-center gap-3">
             <span key={launchCount} className="text-6xl font-bold text-white animate-in zoom-in-50 duration-300">
@@ -432,9 +448,18 @@ const CircleUpMatching = () => {
           <div className="flex flex-col items-center gap-4 w-full max-w-sm">
             {!featured ? (
               <>
-                <div className="relative w-24 h-24 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border-2 border-pink-500/25 border-t-pink-500 animate-spin" />
-                  <HoppingLogo size={44} />
+                {/* Radar: three expanding rings around a softly beating logo, with a few
+                    gently floating accents. Opacity/transform only, off for reduced motion. */}
+                <div className="relative mb-8 flex h-44 w-44 items-center justify-center" aria-hidden="true">
+                  <span className="cu-ring" />
+                  <span className="cu-ring" />
+                  <span className="cu-ring" />
+                  <span className="cu-float absolute -left-1 top-6 h-3 w-3 rounded-full bg-brand-gradient opacity-80" />
+                  <span className="cu-float absolute -right-2 top-14 h-2.5 w-2.5 rounded-full bg-brand-gradient opacity-60" />
+                  <span className="cu-float absolute bottom-4 left-3 h-2 w-2 rounded-full bg-brand-gradient opacity-70" />
+                  <div className="cu-beat relative flex h-20 w-20 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
+                    <HoppingLogo size={44} />
+                  </div>
                 </div>
                 {pollAttempts >= NO_MATCH_HINT_AFTER_ATTEMPTS ? (
                   <>
@@ -445,9 +470,9 @@ const CircleUpMatching = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-white font-semibold text-center">We're finding you someone</p>
-                    <p className="text-white/40 text-sm text-center">
-                      We start with people near you and keep widening the search — across your country, then abroad.
+                    <p className="relative z-10 text-white font-semibold text-center">{t('circleUp.finding')}</p>
+                    <p key={searchLine} className="dl-rise min-h-5 text-white/50 text-sm text-center" role="status">
+                      {t(['circleUp.searchNear', 'circleUp.searchCountry', 'circleUp.searchAbroad'][searchLine])}
                     </p>
                   </>
                 )}
@@ -457,7 +482,8 @@ const CircleUpMatching = () => {
                 {/* The person themselves fills the circle now, instead of a
                     logo spinning over an empty ring - you see who you're
                     about to meet before you accept. */}
-                <div className="relative w-40 h-40">
+                <div key={featured.id} className="dl-pop relative w-40 h-40">
+                  <span className="cu-ring" aria-hidden="true" />
                   <div className="absolute -inset-1.5 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 opacity-70 blur-[2px]" />
                   <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-white/20 bg-neutral-800">
                     {featured.firstImage ? (
@@ -488,14 +514,14 @@ const CircleUpMatching = () => {
                   <p className="text-white/45 text-xs text-center">{featuredWhere}</p>
                 </div>
 
-                <button
+                <Button variant="primary" size="lg" className="w-full"
                   type="button"
                   onClick={() => handleSelectCandidate(featured)}
                   disabled={!!selectingId}
-                  className="w-full py-3.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50"
+                 
                 >
                   Accept
-                </button>
+                </Button>
 
                 {candidates.length > 1 && (
                   <button
@@ -524,7 +550,7 @@ const CircleUpMatching = () => {
                           }`}
                         >
                           {c.firstImage ? (
-                            <img src={getDetailImageUrl(c.firstImage)} alt={c.first_name} className="w-full h-full object-cover" />
+                            <img src={getDetailImageUrl(c.firstImage)} alt={c.first_name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-pink-500/30 to-purple-600/30" />
                           )}

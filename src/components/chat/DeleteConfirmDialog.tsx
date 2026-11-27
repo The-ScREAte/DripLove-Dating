@@ -1,6 +1,8 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 
+import { useBackClose } from '@/utils/backStack';
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -15,6 +17,8 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
   deleteType
 }) => {
   const { t } = useTranslation();
+  // Android hardware back closes the dialog (hook must run before the early return below).
+  useBackClose(isOpen, onClose);
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -30,18 +34,18 @@ const DeleteConfirmDialog: React.FC<DeleteConfirmDialogProps> = ({
         </p>
 
         <div className="flex gap-2">
-          <button
+          <Button variant="line" size="md" className="flex-1 text-white"
             onClick={onClose}
-            className="flex-1 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition-colors"
+           
           >
             {t('deleteMessage.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button variant="danger" size="md" className="flex-1"
             onClick={handleConfirm}
-            className="flex-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full text-sm font-medium transition-colors"
+           
           >
             {t('deleteMessage.delete')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

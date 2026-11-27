@@ -1,8 +1,10 @@
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import PaystackPaymentModal from './PaystackPaymentModal';
+import PaywallLegal from './premium/PaywallLegal';
+import { usePopupBusy } from '@/popups/hooks';
 import { isIOS, isNativeApp } from '@/utils/iap';
-import { buyMonthly, debugIAPState, restorePurchases } from '../iap';
+import { buyMonthly, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -103,6 +105,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     googleCanBuyRef.current = canBuyGoogle;
   }, [canBuyGoogle]);
   
+  // While any payment step is in flight no other popup may appear on top of it
+  // (the coordinator in src/popups decides WHEN; we only report that we're busy).
+  usePopupBusy('payment', loading || iapLoading || googleIapLoading || restoreLoading || showPaymentModal || showPaymentOptions);
+
   // Enhanced subscription status monitoring
   const { subscriptionStatus, isPremium, loading: subscriptionLoading, refetch: refetchSubscription } = useEnhancedSubscription();
   // Read inside the long-lived IAP store listener below via a ref, same pattern
@@ -372,7 +378,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     return `$${defaultInternationalPrice}/month • ${t('premium.paymentOptions.monthly.subtitle')}`;
   })();
   
-  const [paymentMethods, setPaymentMethods] = useState<Array<{ type: 'iap' | 'card' | 'momo' }>>([{ type: 'card' }]);
+  const [paymentMethods, setPaymentMethods] = useState<Array<{ type: 'card' | 'momo' }>>([{ type: 'card' }]);
 
   const handleUpgrade = () => {
     // Don't allow upgrade if price is still loading
@@ -621,7 +627,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
         className="h-full w-full flex items-center justify-center overflow-y-auto px-4"
         style={{
           background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(20,10,20,0.92))',
-          paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
+          paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 72px)',
           minHeight: '100%',
         }}
       >
@@ -637,9 +643,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                 })
               : t('premium.alreadyPremium.subtitle', 'Your plan is active - enjoy all the premium features.')}
           </p>
-          <Button
+          <Button variant="premium" size="md"
             onClick={() => (onClose ? onClose() : window.history.back())}
-            className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold px-8"
           >
             {t('premium.back', 'Back')}
           </Button>
@@ -652,10 +657,14 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
   <div
     className="h-full w-full overflow-y-auto"
     style={{
+      // The floating bottom nav (z-[99999]) sits above this full-screen page, so
+      // leave room for it (+ the home-indicator inset) or the last section and
+      // the Restore/legal links end up hidden underneath it.
+      paddingBottom: 'calc(6.5rem + env(safe-area-inset-bottom, 0px))',
       background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(20,10,20,0.92))',
       // Use clamp to respect the device safe-area inset while keeping
       // a reasonable minimum and maximum top padding for notched devices.
-      paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 28px)',
+      paddingTop: 'clamp(16px, env(safe-area-inset-top, 0px), 72px)',
       marginTop: '4px',
       // Keep the responsive horizontal padding via remaining classes on inner container
       paddingLeft: 'env(safe-area-inset-left, 0px)',
@@ -771,9 +780,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
                 {/* CTA Button */}
                 <div className="pt-2 md:pt-4 text-center">
-                  <Button
+                  <Button variant="premium" size="lg" className="w-full"
                     onClick={handleUpgrade}
-                    className="w-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-400 hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-500 text-black font-bold py-2 md:py-3 px-3 md:px-6 rounded-full text-sm md:text-base shadow-lg transition-all duration-200"
                   >
                     <Crown className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" />
                     {pageTrialEligible ? 'Start Free Trial' : t('premium.upgradeButton')}
@@ -796,7 +804,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
 
           {/* Free Plan */}
           <div className="order-2 md:order-2 w-full">
-            <Card className="border-2 border-white/15 shadow-md bg-neutral-900 relative transition-all duration-300 w-full">
+            <Card variant="surface" className="border-2 relative transition-all duration-300 w-full">
               <CardHeader className="text-center pb-3 md:pb-5 px-2 md:px-4">
                 <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-200 responsive-text">{t('premium.freePlan')}</CardTitle>
                 <div className="mt-2 md:mt-3">
@@ -862,10 +870,10 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {/* Apple IAP - show on iOS native when available */}
               {isIosNative && canBuy && (
                 <>
-                  <button
+                  <Button variant="socialDark" size="lg" className="w-full h-auto min-h-12 flex-col gap-0 py-2.5 whitespace-normal text-center"
                     onClick={() => handlePaymentTypeSelection('iap')}
                     disabled={iapLoading}
-                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-full border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
+                   
                   >
                     <div className="flex items-center justify-center gap-2 text-sm sm:text-base">
                       {iapLoading ? (
@@ -891,7 +899,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         ? `Free for ${pageTrialOfferInfo.trialPeriodLabel || 'a limited time'}, then ${pageTrialOfferInfo.priceAfterTrial || (pricingConfig.loading ? '...' : displayPrice)}/month`
                         : t('premium.paymentOptions.iap.subtitle')}
                     </div>
-                  </button>
+                  </Button>
 
                   {/* Auto-renewal disclosure */}
                   <div className="text-[10px] text-gray-400 text-center px-2 -mt-2">
@@ -919,22 +927,22 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
               {/* Paystack/Card Payment Options - web only for now (temporarily
                   disabled on the Android app, see showPaystackOption above) */}
               {showPaystackOption && (
-                <button
+                <Button variant="primary" size="lg" className="w-full h-auto min-h-12 flex-col gap-0 py-2.5 whitespace-normal text-center"
                   onClick={() => handlePaymentTypeSelection('subscription')}
-                  className="w-full p-3.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full border-2 border-emerald-300/40 hover:border-emerald-300/70 shadow-lg shadow-emerald-900/30 hover:shadow-xl hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 font-semibold"
+                 
                 >
                   <div className="text-sm sm:text-base">💳 Pay with Paystack</div>
                   <div className="text-xs opacity-90 mt-0.5">{paystackButtonSubtitle}</div>
-                </button>
+                </Button>
               )}
 
               {/* Google IAP - show on Android native */}
               {isAndroidNative && (
                 <>
-                  <button
+                  <Button variant="socialDark" size="lg" className="w-full h-auto min-h-12 flex-col gap-0 py-2.5 whitespace-normal text-center"
                     onClick={() => handlePaymentTypeSelection('google_iap')}
                     disabled={googleIapLoading || !canBuyGoogle}
-                    className="w-full p-3.5 bg-gradient-to-r from-gray-800 to-black text-white rounded-full border-2 border-white/20 hover:border-white/40 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all duration-200 font-semibold disabled:opacity-50 disabled:active:scale-100"
+                   
                   >
                     <div className="text-sm sm:text-base flex items-center justify-center gap-2">
                       {googleIapLoading ? (
@@ -972,13 +980,8 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                         ? `Free for ${pageTrialOfferInfo.trialPeriodLabel || 'a limited time'}, then ${pageTrialOfferInfo.priceAfterTrial || googlePrice || `${currencySymbol}${monthlyPrice}`}/month`
                         : `${googlePrice || `${currencySymbol}${monthlyPrice}`}/month • Google Play`}
                     </div>
-                  </button>
+                  </Button>
                   
-                  {/* Auto-renewal disclosure */}
-                  <div className="text-[10px] text-gray-400 text-center px-2 -mt-2">
-                    Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.
-                  </div>
-
                   {/* Show status message if Google IAP not available */}
                   {!canBuyGoogle && googleIapLoadingTimeout && (
                     <div className="text-center text-xs text-gray-400 -mt-1">
@@ -1009,6 +1012,13 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
                   </button>
                 </div>
               )}
+
+              {/* Disclosure + legal links - required on every purchase screen */}
+              <PaywallLegal
+                platform={isIosNative ? 'ios' : isAndroidNative ? 'android' : 'web'}
+                price={isAndroidNative ? (googlePrice || displayPrice) : displayPrice}
+                showRenewal={!isIosNative}
+              />
             </div>
           </div>
         </div>

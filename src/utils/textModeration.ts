@@ -10,13 +10,3 @@ export function containsBadWords(text: string): boolean {
   const lower = text.toLowerCase();
   return BAD_WORDS.some(word => lower.includes(word));
 }
-
-export function filterBadWords(text: string): string {
-  if (!text) return '';
-  let filtered = text;
-  BAD_WORDS.forEach(word => {
-    const re = new RegExp(word, 'gi');
-    filtered = filtered.replace(re, '*'.repeat(word.length));
-  });
-  return filtered;
-}

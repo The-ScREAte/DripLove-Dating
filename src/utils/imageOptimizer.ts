@@ -105,8 +105,3 @@ export function getDetailImageUrl(url: string | null | undefined): string {
   const raw = getRawStorageUrl(url);
   return raw || url;
 }
-
-/** @deprecated use getDetailImageUrl - kept only so old imports don't break. */
-export function getCardImageUrl(url: string | null | undefined): string {
-  return getDetailImageUrl(url);
-}

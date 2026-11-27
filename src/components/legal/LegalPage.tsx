@@ -21,6 +21,14 @@ interface LegalPageProps {
 
 type ContentsItem = { id: string; label: string };
 
+const LEGAL_LINKS = [
+  { to: '/terms-of-service', key: 'legal.links.terms', fallback: 'Terms of Service' },
+  { to: '/privacy-policy', key: 'legal.links.privacy', fallback: 'Privacy Policy' },
+  { to: '/community-guidelines', key: 'legal.links.community', fallback: 'Community Guidelines' },
+  { to: '/child-safety', key: 'legal.links.childSafety', fallback: 'Child Safety' },
+  { to: '/safety-tips', key: 'legal.links.safetyTips', fallback: 'Safety Tips' },
+];
+
 // Headings sit below the sticky back bar when jumped to.
 const ANCHOR_OFFSET = 'calc(env(safe-area-inset-top, 0px) + 72px)';
 
@@ -43,6 +51,14 @@ export const LegalPage = ({ title, updated, intro, onBack, contents = false, chi
     return () => window.clearTimeout(timer);
   }, [contents]);
 
+  // Smooth jump to a heading, instant when the user (or low-end tier) prefers reduced motion.
+  const jumpTo = (id: string) => {
+    const reduced =
+      document.documentElement.dataset.motion === 'reduced' ||
+      (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    document.getElementById(id)?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  };
+
   // Give each page its own browser tab / search result title.
   useEffect(() => {
     const previous = document.title;
@@ -62,7 +78,7 @@ export const LegalPage = ({ title, updated, intro, onBack, contents = false, chi
       }}
     >
       <header
-        className="sticky top-0 z-10 border-b border-white/10 bg-black/85 backdrop-blur-md"
+        className="sticky top-0 z-10 border-b border-white/10 bg-black/95"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-1 px-3">
@@ -70,7 +86,7 @@ export const LegalPage = ({ title, updated, intro, onBack, contents = false, chi
             type="button"
             onClick={onBack}
             aria-label={t('common.back')}
-            className="rounded-full p-2 text-white transition-colors hover:bg-white/10"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 active:bg-white/15"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -84,29 +100,44 @@ export const LegalPage = ({ title, updated, intro, onBack, contents = false, chi
         {intro && <div className="mt-6 space-y-3 text-[15px] leading-relaxed">{intro}</div>}
 
         {toc.length > 0 && (
-          <nav aria-label="Contents" className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">Contents</p>
-            <ol className="mt-3 space-y-1.5">
-              {toc.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                    className="text-left text-[14px] text-neutral-300 transition-colors hover:text-pink-400"
-                  >
-                    {item.label}
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </nav>
+          <details
+            className="group mt-8 rounded-xl border border-white/10 bg-white/[0.03]"
+            open={toc.length <= 8}
+          >
+            <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400 [&::-webkit-details-marker]:hidden">
+              {t('legal.contents', 'Contents')}
+              <span aria-hidden className="text-base leading-none text-neutral-500 transition-transform group-open:rotate-180">⌄</span>
+            </summary>
+            <nav aria-label={t('legal.contents', 'Contents')} className="px-4 pb-4">
+              <ol className="space-y-0.5">
+                {toc.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(item.id)}
+                      className="min-h-[36px] w-full py-1.5 text-left text-[14px] leading-snug text-neutral-300 transition-colors hover:text-pink-400 active:text-pink-400"
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          </details>
         )}
 
-        <div ref={bodyRef} className="mt-10 space-y-10">
+        <div ref={bodyRef} className="mt-10 space-y-10 break-words">
           {children}
         </div>
 
         <footer className="mt-14 border-t border-white/10 pt-6 text-xs leading-relaxed text-neutral-500">
+          <nav aria-label={t('legal.related', 'Related policies')} className="mb-4 flex flex-wrap gap-x-4 gap-y-1">
+            {LEGAL_LINKS.map((l) => (
+              <Link key={l.to} to={l.to} className="inline-flex min-h-[32px] items-center text-pink-400 hover:underline">
+                {t(l.key, l.fallback)}
+              </Link>
+            ))}
+          </nav>
           © {new Date().getFullYear()} {COMPANY.name}. All rights reserved.
         </footer>
       </main>

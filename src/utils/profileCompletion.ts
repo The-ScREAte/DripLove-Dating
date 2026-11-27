@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Define completion criteria and weights for profile
-export interface CompletionCriteria {
+interface CompletionCriteria {
   photos: { weight: number; completed: boolean; description: string };
   basicInfo: { weight: number; completed: boolean; description: string };
   location: { weight: number; completed: boolean; description: string };

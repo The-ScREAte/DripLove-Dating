@@ -21,7 +21,7 @@ const CircleUpHeader = ({ onBack, backLabel = 'Back' }: CircleUpHeaderProps) => 
       <div
         className="relative flex justify-between items-center"
         style={{
-          paddingTop: 'clamp(16px, calc(env(safe-area-inset-top, 16px) + 8px), 48px)',
+          paddingTop: 'clamp(16px, calc(env(safe-area-inset-top, 16px) + 8px), 80px)',
           paddingLeft: 'clamp(10px, 4vw, 16px)',
           paddingRight: 'clamp(10px, 4vw, 16px)',
           paddingBottom: 'clamp(6px, 2vw, 8px)',

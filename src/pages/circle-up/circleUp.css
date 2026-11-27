@@ -1,0 +1,37 @@
+/* Circle Up: matching screen motion. opacity + transform only (compositor-friendly),
+   switched off for reduced motion / Data Saver (data-motion="reduced"). */
+@keyframes cu-ring {
+  0%   { transform: scale(0.55); opacity: 0.55; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+@keyframes cu-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, -10px, 0); }
+}
+@keyframes cu-beat {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+.cu-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid rgba(236, 72, 153, 0.55);
+  animation: cu-ring 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  will-change: transform, opacity;
+}
+.cu-ring:nth-child(2) { animation-delay: 1.07s; }
+.cu-ring:nth-child(3) { animation-delay: 2.14s; }
+.cu-float { animation: cu-float 4.5s ease-in-out infinite; }
+.cu-float:nth-child(2) { animation-duration: 5.4s; animation-delay: -1.2s; }
+.cu-float:nth-child(3) { animation-duration: 3.9s; animation-delay: -2.4s; }
+.cu-beat { animation: cu-beat 1.6s ease-in-out infinite; }
+
+html[data-motion="reduced"] .cu-ring,
+html[data-motion="reduced"] .cu-float,
+html[data-motion="reduced"] .cu-beat { animation: none; }
+html[data-motion="reduced"] .cu-ring:nth-child(n+2) { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .cu-ring, .cu-float, .cu-beat { animation: none; }
+  .cu-ring:nth-child(n+2) { display: none; }
+}

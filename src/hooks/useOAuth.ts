@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +20,18 @@ const PROFILE_COMPLETION_REQUIRED_FIELDS = [
   'education_level',
 ] as const;
 
+/** True when the user simply backed out of a provider sheet (not a real failure). */
+const isUserCancellation = (err: unknown): boolean => {
+  const e = err as { message?: unknown; code?: unknown; error?: unknown } | null;
+  const text = `${e?.message ?? ''} ${e?.code ?? ''} ${e?.error ?? ''}`.toLowerCase();
+  return /cancel|dismiss|popup_closed|user_cancel|12501|sign_in_cancelled|\b1001\b/.test(text);
+};
+
+/** How long a native sign-in may stay "loading" before the buttons are released (with a calm note). */
+const OAUTH_HARD_TIMEOUT_MS = 60_000;
+/** After the app comes back to the foreground, wait this long for a result before releasing the buttons. */
+const OAUTH_RESUME_GRACE_MS = 8_000;
+
 /**
  * Centralized OAuth hook - THE SINGLE SOURCE OF TRUTH for OAuth initiation
  * Used by both AuthForm and WelcomeScreen to avoid duplication
@@ -30,10 +43,58 @@ const PROFILE_COMPLETION_REQUIRED_FIELDS = [
 export const useOAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
 
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
+
+  // Safety nets so the sign-in buttons can NEVER stay disabled (native only; the
+  // web popup flow has its own 5-minute fallback and focus recovery):
+  //  - coming back from the Google/Apple sheet (Android back, iOS cancel, app
+  //    switcher) releases them shortly after, even if the plugin never answered;
+  //  - a hard 60s stop releases them with a calm note.
+  useEffect(() => {
+    if (!oauthLoading || !isNative) return undefined;
+
+    const hardStop = window.setTimeout(() => {
+      setOauthLoading(null);
+      toast({ title: t('auth.signInTakingLong') });
+    }, OAUTH_HARD_TIMEOUT_MS);
+
+    let resumeTimer: number | undefined;
+    const onResume = () => {
+      if (resumeTimer) window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => setOauthLoading(null), OAUTH_RESUME_GRACE_MS);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') onResume();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    let cancelled = false;
+    let removeAppListener: (() => void) | undefined;
+    (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        const handle = await App.addListener('appStateChange', (state: { isActive: boolean }) => {
+          if (state.isActive) onResume();
+        });
+        if (cancelled) handle.remove();
+        else removeAppListener = () => handle.remove();
+      } catch {
+        // No app plugin (web) - visibilitychange above still covers it.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(hardStop);
+      if (resumeTimer) window.clearTimeout(resumeTimer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      removeAppListener?.();
+    };
+  }, [oauthLoading, isNative, toast, t]);
 
   /**
    * Start OAuth flow for any provider
@@ -87,6 +148,10 @@ export const useOAuth = () => {
 
         } catch (err: any) {
           console.error('[useOAuth iOS Google] ❌ Error:', err);
+          if (isUserCancellation(err)) {
+            setOauthLoading(null);
+            return;
+          }
           toast({
             title: 'Authentication Error',
             description: err?.message || 'Failed to open Google Sign-In',
@@ -123,6 +188,10 @@ export const useOAuth = () => {
           }
         } catch (err: any) {
           console.error('[useOAuth Android Google] ❌ Error:', err);
+          if (isUserCancellation(err)) {
+            setOauthLoading(null);
+            return;
+          }
           toast({
             title: 'Authentication Error',
             description: err?.message || 'Failed to sign in with Google',
@@ -332,6 +401,10 @@ export const useOAuth = () => {
           }
         } catch (err: any) {
           console.error('[useOAuth Apple] ❌ Error:', err);
+          if (isUserCancellation(err)) {
+            setOauthLoading(null);
+            return;
+          }
           toast({
             title: 'Authentication Error',
             description: err?.message || 'Failed to sign in with Apple',

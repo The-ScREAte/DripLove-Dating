@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 
+import { useBackClose } from '@/utils/backStack';
 interface BlockDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,6 +26,8 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
   const [reason, setReason] = useState('');
   const [isBlocking, setIsBlocking] = useState(false);
   const { toast } = useToast();
+  // Android hardware back closes the dialog (Radix already handles Escape).
+  useBackClose(isOpen, onClose, { escape: false });
 
   const handleBlock = async () => {
     if (!userToBlock) return;
@@ -89,24 +92,23 @@ const BlockDialog = ({ isOpen, onClose, userToBlock, currentUserId, onBlockSucce
         <div className="space-y-4">
           <div>
             <Label htmlFor="reason" className="text-gray-300">{t('block.reasonOptional')}</Label>
-            <Textarea
+            <Textarea tone="dark"
               id="reason"
               placeholder={t('block.placeholder')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="mt-1 bg-neutral-900 border-pink-500/40 text-white placeholder:text-gray-500"
+              className="mt-1"
             />
           </div>
         </div>
 
         <DialogFooter className="flex-row justify-end gap-2 space-x-0">
-          <Button variant="outline" onClick={onClose} disabled={isBlocking} className="flex-1 bg-black border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">
+          <Button variant="line" size="md" className="text-white flex-1" onClick={onClose} disabled={isBlocking}>
             {t('common.cancel')}
           </Button>
-          <Button
+          <Button variant="danger" size="md" className="flex-1"
             onClick={handleBlock}
             disabled={isBlocking}
-            className="flex-1 bg-red-500 hover:bg-red-600 text-white"
           >
             {isBlocking ? t('block.blocking') : t('block.blockUser')}
           </Button>

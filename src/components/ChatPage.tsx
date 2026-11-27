@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
+import { ListSkeleton } from '@/components/ui/LoadingStates';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { MessageCircle } from 'lucide-react';
+import { ArrowDown } from 'lucide-react';
 import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheAvatar, getCachedAvatar } from '@/cache/chatCache';
@@ -19,14 +20,20 @@ import DeleteChatDialog from './chat/DeleteChatDialog';
 import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
-import ChatUserAvatar from './ChatUserAvatar';
-import MatchExpirationAvatar from './chat/MatchExpirationAvatar';
+import ChatList from './chat/ChatList';
+import ChatEmptyConversation from './chat/ChatEmptyConversation';
+import SafetyTip from './chat/SafetyTip';
+import { getGroupFlags, startsNewDay } from './chat/chatFormat';
+import { useBackClose } from '@/utils/backStack';
+import { recordRatingMoment, recordRatingNegative } from '@/rating/ratingMoments';
 import { CurrentUser, ChatMatch, ChatMessage } from '@/types';
 import { useTranslation } from 'react-i18next';
 import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
-import HoppingLogo from './HoppingLogo';
 import { isRecentlyOnline, CHAT_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
+import { withTimeout } from '@/utils/withTimeout';
 
+import { uniqueTopic, acquireSharedChannel } from '@/utils/realtime';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 type WindowWithChatCaches = Window & {
   chatMatchesCache?: typeof chatMatchesCache;
   chatMessagesCache?: typeof chatMessagesCache;
@@ -44,6 +51,8 @@ interface ChatPageProps {
   // Bumped when a notification should show the Chat list (a new match):
   // closes whatever conversation is open.
   showListSignal?: number;
+  // Takes the user to Discover from the empty Chat list.
+  onNavigateToDiscover?: () => void;
 }
 
 // Dormant conversations constants
@@ -58,16 +67,16 @@ const CHAT_BACK_ANIMATION_MS = 280;
 // "Today"/"Yesterday" for the last 2 days, weekday name within the last
 // week, and a full date beyond that - the same convention used everywhere
 // else (WhatsApp/iMessage) so it needs no explanation in the UI itself.
-const formatDateSeparator = (date: Date): string => {
+const formatDateSeparator = (date: Date, labels: { today: string; yesterday: string }, locale?: string): string => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diffDays = Math.round((today.getTime() - target.getTime()) / MS_PER_DAY);
 
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays > 1 && diffDays < 7) return date.toLocaleDateString([], { weekday: 'long' });
-  return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+  if (diffDays === 0) return labels.today;
+  if (diffDays === 1) return labels.yesterday;
+  if (diffDays > 1 && diffDays < 7) return date.toLocaleDateString(locale, { weekday: 'long' });
+  return date.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
 };
 
 const isDormantChat = (match: ChatMatch) => {
@@ -166,8 +175,8 @@ const markExpirationWarningSent = (matchId: string): void => {
   }
 };
 
-const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMatchId, onDeepLinkConsumed, showListSignal = 0 }: ChatPageProps) => {
-  const { t } = useTranslation();
+const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMatchId, onDeepLinkConsumed, showListSignal = 0, onNavigateToDiscover }: ChatPageProps) => {
+  const { t, i18n } = useTranslation();
   const [topCompensation, setTopCompensation] = useState(0);
   
   // ⭐ INSTANT LOAD: Initialize with cached data (0ms render, like Instagram/Telegram)
@@ -177,9 +186,21 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     return isCacheValidForUser(currentUser.id) ? (chatCache.chats as ChatMatch[]) : [];
   });
    
+  // False until the first matches fetch has settled (or a valid cache was used), so an empty
+  // list shows a skeleton instead of flashing the "No Matches Yet" empty state while loading.
+  const [matchesLoaded, setMatchesLoaded] = useState<boolean>(
+    () => !!currentUser?.id && isCacheValidForUser(currentUser.id)
+  );
+
   const matchesRef = useRef<ChatMatch[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<ChatMatch | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Icebreaker chosen on the empty conversation - placed in the composer, never sent automatically.
+  const [composerPrefill, setComposerPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  // "Jump to latest" button + how many partner messages arrived while scrolled up.
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [unseenBelow, setUnseenBelow] = useState(0);
+  const unseenTrackRef = useRef<{ matchId: string | null; count: number }>({ matchId: null, count: 0 });
   const [isSending, setIsSending] = useState(false);
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -253,18 +274,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   useEffect(() => {
     if (!selectedMatch?.id || !currentUser?.id) return;
     setPartnerTyping(false);
-    const channel = supabase
-      .channel(`typing:${selectedMatch.id}`)
-      .on('broadcast', { event: 'typing' }, (payload) => {
+    // The topic is shared with the other device (broadcast), so it can't be made unique; instead
+    // wait for any previous channel with this topic to be fully gone (see utils/realtime.ts).
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
+    void (async () => {
+      const ch = await acquireSharedChannel(`typing:${selectedMatch.id}`);
+      if (cancelled) {
+        void supabase.removeChannel(ch);
+        return;
+      }
+      ch.on('broadcast', { event: 'typing' }, (payload) => {
         if (payload.payload?.userId === currentUser.id) return;
         setPartnerTyping(true);
         if (partnerTypingTimeoutRef.current) window.clearTimeout(partnerTypingTimeoutRef.current);
         partnerTypingTimeoutRef.current = window.setTimeout(() => setPartnerTyping(false), 3000);
-      })
-      .subscribe();
-    typingChannelRef.current = channel;
+      }).subscribe();
+      channel = ch;
+      typingChannelRef.current = ch;
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
       typingChannelRef.current = null;
       if (partnerTypingTimeoutRef.current) window.clearTimeout(partnerTypingTimeoutRef.current);
       setPartnerTyping(false);
@@ -303,10 +334,18 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     }
 
     const timeouts = new Map<string, number>();
-    const channels = matchIdsWithConversation.map((matchId) =>
-      supabase
-        .channel(`typing:${matchId}`)
-        .on('broadcast', { event: 'typing' }, (payload) => {
+    const channels: RealtimeChannel[] = [];
+    let cancelled = false;
+    // Shared (cross-device) topics: wait for any previous channel with the same topic to be fully
+    // gone before creating it again (see utils/realtime.ts).
+    void (async () => {
+      for (const matchId of matchIdsWithConversation) {
+        const ch = await acquireSharedChannel(`typing:${matchId}`);
+        if (cancelled) {
+          void supabase.removeChannel(ch);
+          return;
+        }
+        ch.on('broadcast', { event: 'typing' }, (payload) => {
           if (payload.payload?.userId === currentUser.id) return;
           setListTypingMatchIds(prev => {
             if (prev.has(matchId)) return prev;
@@ -324,11 +363,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
               return next;
             });
           }, 3000));
-        })
-        .subscribe()
-    );
+        }).subscribe();
+        channels.push(ch);
+      }
+    })();
 
     return () => {
+      cancelled = true;
       channels.forEach(ch => supabase.removeChannel(ch));
       timeouts.forEach(id => window.clearTimeout(id));
       setListTypingMatchIds(new Set());
@@ -433,6 +474,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     // ⭐ Check if we have valid cached data first (instant render)
     if (isCacheValidForUser(currentUser.id)) {
       setMatches(chatCache.chats as ChatMatch[]);
+      setMatchesLoaded(true);
       // Still fetch in background to get latest data
       fetchMatchesInBackground();
     } else {
@@ -459,7 +501,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     // filtering client-side broadcasts every message any user sends to
     // every connected client, which doesn't scale.
     const channel = supabase
-      .channel(`unread-chats:${currentUser.id}`)
+      .channel(uniqueTopic(`unread-chats:${currentUser.id}`))
       .on(
         'postgres_changes',
         {
@@ -584,7 +626,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
 
     // Supabase realtime filters only support a single condition, so subscribe twice.
     const channelUser1 = supabase
-      .channel(`chat-matches-user1:${currentUser.id}`)
+      .channel(uniqueTopic(`chat-matches-user1:${currentUser.id}`))
       .on(
         'postgres_changes',
         {
@@ -598,7 +640,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       .subscribe();
 
     const channelUser2 = supabase
-      .channel(`chat-matches-user2:${currentUser.id}`)
+      .channel(uniqueTopic(`chat-matches-user2:${currentUser.id}`))
       .on(
         'postgres_changes',
         {
@@ -835,6 +877,54 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     }
   }, [messages]);
 
+  // Count partner messages that arrive while the user is reading history, and
+  // reset per conversation (icebreaker/jump state must not leak between chats).
+  useEffect(() => {
+    const matchId = selectedMatch?.id ?? null;
+    const track = unseenTrackRef.current;
+    if (track.matchId !== matchId) {
+      unseenTrackRef.current = { matchId, count: messages.length };
+      setUnseenBelow(0);
+      setShowJumpToLatest(false);
+      setComposerPrefill(null);
+      return;
+    }
+    if (messages.length > track.count && !isAtBottomRef.current) {
+      const arrived = messages.slice(track.count).filter((m) => m.sender_id !== currentUser?.id).length;
+      if (arrived > 0) setUnseenBelow((c) => c + arrived);
+    }
+    unseenTrackRef.current = { matchId, count: messages.length };
+  }, [messages, selectedMatch?.id, currentUser?.id]);
+
+  // A real two-way conversation is the best "happy moment" for the store-review prompt: once BOTH people have
+  // sent 3+ messages in this match, tell the rating engine (once per match per session). It shows no UI itself -
+  // RatingHost decides if/when to prompt, and never while the user is typing.
+  const milestoneRecordedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const matchId = selectedMatch?.id;
+    const me = currentUser?.id;
+    if (!matchId || !me || milestoneRecordedRef.current.has(matchId)) return;
+    let mine = 0;
+    let theirs = 0;
+    for (const m of messages) {
+      if (m.sender_id === '00000000-0000-0000-0000-000000000000') continue; // system messages don't count
+      if (m.sender_id === me) mine += 1;
+      else theirs += 1;
+      if (mine >= 3 && theirs >= 3) break;
+    }
+    if (mine >= 3 && theirs >= 3) {
+      milestoneRecordedRef.current.add(matchId);
+      recordRatingMoment('conversation_milestone');
+    }
+  }, [messages, selectedMatch?.id, currentUser?.id]);
+
+  const scrollToLatest = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    setUnseenBelow(0);
+  }, []);
+
   // Single scroll listener: bottom tracking (all platforms) + keyboard dismiss (mobile)
   useEffect(() => {
     const container = messagesContainerRef.current; 
@@ -849,6 +939,9 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       const currentScrollTop = container.scrollTop;
       const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
       isAtBottomRef.current = distanceFromBottom <= threshold;
+      const awayFromBottom = distanceFromBottom > 240;
+      setShowJumpToLatest((prev) => (prev === awayFromBottom ? prev : awayFromBottom));
+      if (isAtBottomRef.current) setUnseenBelow((prev) => (prev === 0 ? prev : 0));
 
       // Only dismiss keyboard when scrolling up (like iMessages)
       if (isMobile && currentScrollTop < lastScrollTop) {
@@ -877,7 +970,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     if (!currentUser || !currentUser.id) return;
     if (selectedMatch) {
       const channel = supabase
-        .channel(`chats:${selectedMatch.id}`)
+        .channel(uniqueTopic(`chats:${selectedMatch.id}`))
         .on(
           'postgres_changes',
           {
@@ -1003,6 +1096,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     last_name?: string;
     is_admin?: boolean;
     last_login_at?: string | null;
+    is_verified?: boolean | null;
+    date_of_birth?: string | null;
   };
 
   type MatchRowChat = {
@@ -1068,6 +1163,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           first_name: firstName,
           last_name: lastName,
           last_login_at: partner?.last_login_at ?? null,
+          is_verified: partner?.is_verified === true,
+          date_of_birth: partner?.date_of_birth ?? null,
           last_message_obj: lastMessage,
           unread_messages: unreadCount,
           last_message: lastMessage?.message || '',
@@ -1134,8 +1231,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         .from('matches')
         .select(`
           id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, last_login_at),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, last_login_at),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, last_login_at, is_verified, date_of_birth),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, last_login_at, is_verified, date_of_birth),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
@@ -1202,6 +1299,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       // Silently handle background fetch errors
     } finally {
       backgroundFetchingRef.current = false;
+      setMatchesLoaded(true);
     }
   };
 
@@ -1217,8 +1315,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         .from('matches')
         .select(`
           id, created_at, user1_id, user2_id, user1_unread_count, user2_unread_count,
-          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, last_login_at),
-          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, last_login_at),
+          user1:profiles!matches_user1_id_fkey(id, first_name, last_name, is_admin, last_login_at, is_verified, date_of_birth),
+          user2:profiles!matches_user2_id_fkey(id, first_name, last_name, is_admin, last_login_at, is_verified, date_of_birth),
           chats(id, message, created_at, sender_id)
         `)
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
@@ -1290,6 +1388,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       });
     }
     finally {
+      setMatchesLoaded(true);
       if (showLoading) {
         const remainingHold = MIN_REFRESH_VISIBLE_MS - (Date.now() - refreshStartedAt);
         if (remainingHold > 0) {
@@ -1387,77 +1486,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       }
     }
   };
-
-  const fetchMessages = async () => {
-    if (!selectedMatch) {
-      return;
-    }
-
-
-    // Check cache first
-    const cached = chatMessagesCache.get(selectedMatch.id);
-    if (cached && Date.now() - cached.timestamp < MESSAGE_CACHE_DURATION) {
-      // Filter out messages deleted for current user
-      const visibleMessages = cached.messages.filter(msg => {
-        const isDeletedForMe = msg.deleted_for && msg.deleted_for.includes(currentUser.id);
-        return !isDeletedForMe;
-      });
-      setMessages(visibleMessages);
-      // Still fetch in background for updates
-      fetchMessagesInBackground(selectedMatch.id);
-      return;
-    }
-
-
-    try {
-      // Bounded to the most recent messages (same cap the in-memory cache
-      // already trims to via trimCachedMessages/MAX_CACHED_MESSAGES) - a
-      // cold chat open used to pull a conversation's ENTIRE history with no
-      // limit, which for a long-running match becomes a large, slow fetch
-      // on every fresh open. Fetching most-recent-first then reversing
-      // preserves the expected ascending render order.
-      const { data, error } = await supabase
-        .from('chats')
-        .select(`
-          *,
-          sender:profiles!chats_sender_id_fkey(first_name, last_name)
-        `)
-        .eq('match_id', selectedMatch.id)
-        .order('created_at', { ascending: false })
-        .limit(MAX_CACHED_MESSAGES);
-
-      if (error) {
-        throw error;
-      }
-
-      data?.reverse();
-
-      const mappedMessages = data?.map(msg => ({
-        ...msg,
-        sent_at: msg.created_at,
-        receiver_id: msg.sender_id === currentUser.id 
-          ? (selectedMatch.user1_id === currentUser.id ? selectedMatch.user2_id : selectedMatch.user1_id)
-          : currentUser.id
-      })) || [];
-
-      const processedMessages = mappedMessages as unknown as ChatMessage[];
-      
-      // Don't filter out deleted messages - mark them instead
-      const visibleMessages = processedMessages;
-      
-      
-      // Update cache with all messages (bounded)
-      chatMessagesCache.set(selectedMatch.id, {
-        messages: trimCachedMessages(processedMessages),
-        timestamp: Date.now()
-      });
-
-      setMessages(visibleMessages);
-    } catch (error) {
-      // ignore fetch errors
-    }
-  };
-
   const fetchMessagesInBackground = async (matchId: string) => {
     try {
       // Get the latest message ID from cache to only fetch newer messages
@@ -1494,7 +1522,11 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           : currentUser.id
       })) || [];
 
-      const newMessages = mappedMessages as unknown as ChatMessage[];
+      const fetchedMessages = mappedMessages as unknown as ChatMessage[];
+      // A realtime insert can race this background fetch, so never append a
+      // message the cache already holds (de-dupe by id).
+      const cachedIds = new Set((cached?.messages ?? []).map((m) => m.id));
+      const newMessages = fetchedMessages.filter((m) => !cachedIds.has(m.id));
       
       // Merge new messages with cached messages
       const allMessages = trimCachedMessages(
@@ -1629,16 +1661,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     }
   };
 
-  const withTimeout = async <T,>(promise: Promise<T>, ms = 12000): Promise<T> => {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        window.setTimeout(() => reject(new Error('timeout')),
-        ms);
-      }),
-    ]);
-  };
-
   const sendMessage = async (rawText: string) => {
     const messageText = rawText.trim();
     if (!messageText || !selectedMatch || isSending) return;
@@ -1736,7 +1758,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           .then(resolve);
       });
       
-      const { data, error } = await withTimeout(queryPromise, 12000);
+      const { data, error } = await withTimeout(queryPromise, 12000, 'sendMessage');
       
       // Clear reply state after sending
       setReplyingTo(null);
@@ -1848,30 +1870,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       setIsSending(false);
     }
   };
-
-  const deleteMessage = async (messageId: string) => {
-    if (!selectedMatch) return;
-
-    try {
-      // Delete from database permanently (only for sender's own messages)
-      const { error: deleteError } = await supabase
-        .from('chats')
-        .delete()
-        .eq('id', messageId)
-        .eq('sender_id', currentUser.id); // Only allow deleting own messages
-
-      if (deleteError) throw deleteError;
-
-      // Clear cache to force fresh fetch next time
-      chatMessagesCache.delete(selectedMatch.id);
-
-      // Remove from UI immediately
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
-    } catch (error) {
-      // ignore delete errors
-    }
-  };
-
   const deleteMessageForMe = async (messageId: string) => {
     if (!selectedMatch) return;
 
@@ -2021,11 +2019,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
 
     try {
       const isUser1 = selectedMatch.user1_id === currentUser.id;
-      const updateField = isUser1 ? 'user1_heading_somewhere' : 'user2_heading_somewhere';
       
       const { error } = await supabase
         .from('matches')
-        .update({ [updateField]: response })
+        .update(isUser1 ? { user1_heading_somewhere: response } : { user2_heading_somewhere: response })
         .eq('id', selectedMatch.id);
 
       if (error) throw error;
@@ -2098,13 +2095,6 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       });
     }
   };
-
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  };
-
   // Pull to refresh handlers for the matches list.
   // Pull to refresh the conversation list (only from the top of the list).
   const pullToRefresh = usePullToRefresh({
@@ -2209,16 +2199,26 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
     if (swipeBackTimerRef.current !== null) window.clearTimeout(swipeBackTimerRef.current);
   }, []);
 
+  // Android hardware back from an open conversation returns to the chat list (same steps as the
+  // in-app back arrow). Overlays opened inside the conversation register later, so they close first.
+  useBackClose(
+    !!selectedMatch,
+    () => {
+      scheduleMarkMessagesAsRead(0);
+      if (currentUser?.id) chatMatchesCache.delete(currentUser.id);
+      void fetchMatchesInBackground();
+      setSelectedMatch(null);
+    },
+    { escape: false }
+  );
+
   // If there's no authenticated user yet, render a light loading state to avoid
   // dereferencing `currentUser.id` in JSX/handlers. Hooks above must remain
   // unconditionally called (so don't early-return before them).
   if (!currentUser || !currentUser.id) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-4" />
-          <p className="text-gray-300">Loading chats...</p>
-        </div>
+      <div className="h-full min-h-screen bg-black overflow-hidden">
+        <ListSkeleton rows={7} />
       </div>
     );
   }
@@ -2231,6 +2231,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   };
 
   const handleBlockSuccess = () => {
+    recordRatingNegative('report_or_block'); // a bad moment: keeps the review prompt away for a while
     setMatches(prev => prev.filter(match => match.id !== selectedMatch?.id));
     setSelectedMatch(null);
     toast({
@@ -2278,260 +2279,22 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   };
 
   if (!selectedMatch) {
-    // Dedupe new matches by partner ID to prevent duplicate profiles
-    const seenPartnerIds = new Set<string>();
-    const newMatchList = matches.filter(m => {
-      if (m.last_message) return false; // Only show matches without messages
-      const partnerId = m.partner?.id || (m.user1_id === currentUser.id ? m.user2_id : m.user1_id);
-      if (seenPartnerIds.has(partnerId)) return false; // Skip duplicates
-      seenPartnerIds.add(partnerId);
-      return true;
-    });
-    
-    // NOTE: Dormancy applies only to active (non-archived) users.
-    // Archived users are filtered earlier in processMatchesData.
-    const activeConversations = matches.filter(
-      m => m.last_message && !isDormantChat(m)
-    );
-    const dormantConversations = matches.filter(
-      m => m.last_message && isDormantChat(m)
-    );
-    
     return (
-  <div className="h-full min-h-0 flex flex-col bg-black" style={{ paddingTop: `${topCompensation}px` }}>
-        {/* Header */}
-        <div
-          className="shrink-0 z-30 text-white shadow-sm border-b border-pink-500/30"
-          style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}
-        >
-          <div
-            className="px-4"
-            style={{ paddingTop: '12px', paddingBottom: '12px' }}
-          >
-            <h2 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
-              💧 DripChat
-            </h2>
-          </div>
-        </div>
-
-        {/* New Matches Section */}
-        {newMatchList.length > 0 && (
-          <div
-            className="px-4 py-3 border-b border-pink-500/30 bg-black/60"
-            style={{ marginTop: '0px' }}
-          >
-            <h3 className="text-sm font-semibold text-white mb-3">{t('chat.newMatches')}</h3>
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {newMatchList.map((match) => {
-                const partnerId = match.partner?.id || 
-                                 (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
-                const hasMessages = !!match.last_message;
-                
-                return (
-                  <div
-                    key={match.id}
-                    className="flex flex-col items-center min-w-[70px] cursor-pointer"
-                    onClick={() => setSelectedMatch(match)}
-                  >
-                    <div className="relative mb-2">
-                      <MatchExpirationAvatar
-                        userId={partnerId}
-                        matchId={match.id}
-                        matchCreatedAt={match.created_at}
-                        hasMessages={hasMessages}
-                        firstName={match.first_name}
-                        lastName={match.last_name}
-                        size="md"
-                        onClick={() => handleUserProfileClick(partnerId)}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-200 text-center truncate w-full">
-                      {match.first_name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-  {/* Scrollable Chat List (only this area scrolls) */}
-  <div
-    ref={conversationListRef}
-    className="flex-1 min-h-0 overflow-y-auto pb-44 sm:pb-35 scrollbar-hide"
-    style={{
-      WebkitOverflowScrolling: 'touch',
-      // The pull indicator handles the top edge; the list's own bounce there
-      // would move the content twice as far as the finger.
-      overscrollBehaviorY: 'contain',
-      paddingTop: '0px'
-    }}
-    {...pullToRefresh.handlers}
-  >
-    {pullToRefresh.indicator}
-          {activeConversations.length === 0 && dormantConversations.length === 0 && newMatchList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center mt-20">
-              <div className="mb-6">
-                <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
-                  <MessageCircle className="w-10 h-10 text-pink-400" />
-                </div>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                {t('chat.noMatchesYet')}
-              </h3>
-              <p className="text-gray-300 mb-2 max-w-sm">
-                {t('chat.swipeRightInDripCheck')}
-              </p>
-              <p className="text-sm text-gray-400 mb-6">
-                {t('chat.moreYouSwipe')}
-              </p>
-              <div className="flex items-center gap-2 text-pink-400 font-medium">
-                <span>💧</span>
-                <span>{t('chat.startSwipingInDripCheck')}</span>
-              </div>
-            </div>
-          ) : activeConversations.length === 0 && dormantConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center mt-12">
-              <div className="mb-6">
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
-                  <span className="text-4xl">✨</span>
-                </div>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">
-                {t('chat.newMatchesWaiting')}
-              </h3>
-              <p className="text-gray-300 max-w-sm">
-                {t('chat.tapMatchToMessage')}
-              </p>
-            </div>
-          ) : (
-            <>
-            {activeConversations.map((match, index) => {
-              // Determine the correct partner ID for avatar
-              const partnerId = match.partner?.id || 
-                               (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
-              
-              return (
-                <div
-                  key={match.id}
-                  className={`p-4 border-b border-pink-500/30 cursor-pointer hover:bg-pink-500/10 transition-colors ${
-                    selectedMatch?.id === match.id ? 'bg-pink-500/15 border-pink-500/40' : 'bg-black'
-                  } ${match.unread_messages > 0 ? 'font-bold bg-pink-500/10' : ''}`}
-                  style={{
-                    marginTop: index === 0 && newMatchList.length === 0 && getPlatformSync() === 'ios' 
-                      ? '0px'
-                      : undefined
-                  }}
-                  onClick={() => setSelectedMatch(match)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <ChatUserAvatar
-                        userId={partnerId}
-                        firstName={match.first_name}
-                        lastName={match.last_name}
-                        onClick={() => handleUserProfileClick(partnerId)}
-                        size="md"
-                      />
-                      {match.unread_messages > 0 && (
-                        <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                          {match.unread_messages > 9 ? '9+' : match.unread_messages}
-                        </div>
-                      )}
-                      {isRecentlyOnline(match.last_login_at, CHAT_ONLINE_WINDOW_MS) && (
-                        <span
-                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-black"
-                          aria-label={t('chat.activeNow')}
-                        />
-                      )}
-                    </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <h3 className={`font-semibold truncate ${match.unread_messages > 0 ? 'text-pink-400' : 'text-white'}`}
-                        >
-                        {match.first_name} {match.last_name}
-                      </h3>
-                      {match.last_message_time && (
-                        <span className="text-xs text-gray-400 ml-2">
-                          {new Date(match.last_message_time).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      )}
-                    </div>
-                    {listTypingMatchIds.has(match.id) ? (
-                      <p className="text-sm text-pink-400 font-medium italic truncate mt-1">
-                        {t('chat.typing')}
-                      </p>
-                    ) : match.last_message && (
-                      <p className="text-sm text-gray-300 truncate mt-1">
-                        {match.last_message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-              );
-            })}
-            
-            {/* Dormant Conversations Section */}
-            {dormantConversations.length > 0 && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setShowDormant(v => !v)}
-                  className="w-full text-sm text-gray-400 px-4 py-2 flex justify-between items-center hover:bg-pink-500/10 transition-colors"
-                >
-                  <span>Earlier conversations ({dormantConversations.length})</span>
-                  <span>{showDormant ? '▲' : '▼'}</span>
-                </button>
-
-                {showDormant && (
-                  <div className="opacity-70">
-                    {dormantConversations.map(match => {
-                      const partnerId = match.partner?.id ||
-                                       (match.user1_id === currentUser.id ? match.user2_id : match.user1_id);
-
-                      return (
-                        <div
-                          key={match.id}
-                          className="p-4 border-b border-pink-500/20 cursor-pointer hover:bg-pink-500/10 transition-colors bg-black"
-                          onClick={() => setSelectedMatch(match)}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <ChatUserAvatar
-                              userId={partnerId}
-                              firstName={match.first_name}
-                              lastName={match.last_name}
-                              onClick={() => handleUserProfileClick(partnerId)}
-                              size="md"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start">
-                                <h3 className="font-medium text-gray-200 truncate">
-                                  {match.first_name} {match.last_name}
-                                </h3>
-                                {match.last_message_time && (
-                                  <span className="text-xs text-gray-500 ml-2">
-                                    {new Date(match.last_message_time).toLocaleDateString()}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-400 truncate mt-1">
-                                {match.last_message}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            </>
-          )}
-        </div>
+      <div className="flex h-full min-h-0 flex-col">
+        <ChatList
+          currentUserId={currentUser.id}
+          matches={matches}
+          matchesLoaded={matchesLoaded}
+          typingMatchIds={listTypingMatchIds}
+          isDormant={isDormantChat}
+          isOnline={(m) => isRecentlyOnline(m.last_login_at, CHAT_ONLINE_WINDOW_MS)}
+          onSelectMatch={setSelectedMatch}
+          onFindMatch={onNavigateToDiscover}
+          topCompensation={topCompensation}
+          listRef={conversationListRef}
+          pullHandlers={pullToRefresh.handlers}
+          pullIndicator={pullToRefresh.indicator}
+        />
 
         <UserProfileModal
           isOpen={isUserProfileOpen}
@@ -2564,12 +2327,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   return (
   <div
     ref={conversationViewRef}
-    className="h-full min-h-0 flex flex-col bg-black shadow-2xl"
-    style={{ paddingTop: `${topCompensation}px`, transform: 'translate3d(0, 0, 0)' }}
+    className="mx-auto h-full min-h-0 w-full max-w-3xl flex flex-col bg-black shadow-2xl dl-route md:border-x md:border-white/10"
+    style={{ paddingTop: `${topCompensation}px`, paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', transform: 'translate3d(0, 0, 0)' }}
   >
       {/* Chat Header (below global header) */}
   <div
-    className="shrink-0 border-b border-pink-500/30 shadow-sm z-20 m-0 p-0"
+    className="shrink-0 border-b border-white/10 shadow-sm z-20 m-0 p-0"
     style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))' }}
   >
         <ChatHeader
@@ -2588,6 +2351,8 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           isPartnerTyping={partnerTyping}
         />
       </div>
+
+      <SafetyTip matchId={selectedMatch.id} />
 
       {/* Scrollable Messages Area (only this area scrolls). The faint dot
           pattern on bg-black gives the background a little depth instead of
@@ -2614,22 +2379,15 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         onTouchCancel={handleSwipeCancel}
       >
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full pt-20">
-            <div className="mb-6">
-              <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-pink-950/60 to-purple-950/60 border border-pink-500/40 flex items-center justify-center">
-                <span className="text-4xl">👋</span>
-              </div>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">
-              {t('chat.startConversation')}
-            </h3>
-            <p className="text-gray-300 text-center px-6 max-w-sm mb-4">
-              {t('chat.sayHelloTo', { name: selectedMatch?.first_name })}
-            </p>
-            <div className="text-sm text-gray-400 text-center px-6">
-              {t('chat.conversationTip')}
-            </div>
-          </div>
+          <ChatEmptyConversation
+            currentUserId={currentUser.id}
+            currentFirstName={currentUser.first_name}
+            currentLastName={currentUser.last_name}
+            partnerId={selectedMatch.partner?.id || (selectedMatch.user1_id === currentUser.id ? selectedMatch.user2_id : selectedMatch.user1_id)}
+            partnerFirstName={selectedMatch.first_name}
+            partnerLastName={selectedMatch.last_name}
+            onPickIcebreaker={(text) => setComposerPrefill({ text, nonce: Date.now() })}
+          />
         ) : (
           <>
             {/* ⭐ VIRTUAL SCROLLING: Only render visible messages */}
@@ -2637,30 +2395,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                 const message = messages[virtualRow.index];
                 const prevMessage = messages[virtualRow.index - 1];
-                const nextMessage = messages[virtualRow.index + 1];
 
-                const isConsecutive =
-                  !!prevMessage &&
-                  prevMessage.sender_id === message.sender_id &&
-                  new Date(message.created_at || message.sent_at || '').getTime() -
-                    new Date(prevMessage.created_at || prevMessage.sent_at || '').getTime() <
-                    300000;
-
-                // Mirrors isConsecutive but looking forward - the last bubble
-                // of a run is the one whose NEXT message breaks the group
-                // (different sender, or too much time passed), or which has
-                // no next message at all.
-                const isLastInGroup =
-                  !nextMessage ||
-                  nextMessage.sender_id !== message.sender_id ||
-                  new Date(nextMessage.created_at || nextMessage.sent_at || '').getTime() -
-                    new Date(message.created_at || message.sent_at || '').getTime() >=
-                    300000;
-
+                const { isConsecutive, isLastInGroup } = getGroupFlags(messages, virtualRow.index);
                 const messageDate = new Date(message.created_at || message.sent_at || '');
-                const prevDate = prevMessage ? new Date(prevMessage.created_at || prevMessage.sent_at || '') : null;
-                const showDateSeparator = !prevDate || messageDate.toDateString() !== prevDate.toDateString();
-                const dateSeparatorLabel = showDateSeparator ? formatDateSeparator(messageDate) : null;
+                const dateSeparatorLabel = startsNewDay(prevMessage, message)
+                  ? formatDateSeparator(messageDate, { today: t('chat.today'), yesterday: t('chat.yesterday') }, i18n.language)
+                  : null;
 
                 const repliedMessage = message.reply_to
                   ? messages.find((m) => m.id === message.reply_to) ?? null
@@ -2682,7 +2422,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
                   >
                     {dateSeparatorLabel && (
                       <div className="flex items-center justify-center my-3">
-                        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-medium text-gray-400">
+                        <span className="px-3 py-1 rounded-full bg-white/[0.06] text-[11px] font-medium text-white/50">
                           {dateSeparatorLabel}
                         </span>
                       </div>
@@ -2721,8 +2461,28 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
           onTyping={broadcastTyping}
+          prefill={composerPrefill}
         />
       </div>
+
+      {/* Jump to latest. Fixed (not inside the virtualized scroller) and lifted by the same CSS
+          variables the composer uses, so it always sits just above the input bar and the keyboard. */}
+      {showJumpToLatest && messages.length > 0 && (
+        <button
+          type="button"
+          onClick={scrollToLatest}
+          aria-label={t('chat.jumpToLatest')}
+          className="dl-pop dl-press fixed z-[9990] flex h-11 items-center gap-1.5 rounded-full border border-white/15 bg-neutral-900/95 px-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+          style={{ bottom: 'calc(var(--input-bar-height, 60px) + var(--keyboard-height, 0px) + 14px)', right: 'max(1rem, calc(50% - 24rem + 1rem))' }}
+        >
+          <ArrowDown className="h-4 w-4 text-brand-ink" aria-hidden="true" />
+          {unseenBelow > 0 && (
+            <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-brand-gradient px-1.5 text-[11px] font-bold leading-none">
+              {unseenBelow > 99 ? '99+' : unseenBelow}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Modals */}
       <UserProfileModal
@@ -2750,7 +2510,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         }
         messageId={reportMessageId}
         onReportSuccess={() => {
-          // optional: any post-report actions
+          recordRatingNegative('report_or_block');
         }}
       />
 

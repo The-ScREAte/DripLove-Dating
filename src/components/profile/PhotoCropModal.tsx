@@ -13,7 +13,7 @@ import { uploadPhotoThumbnail, withThumbnailPaths } from '@/utils/photoThumbnail
 // varies slightly by device, but this is representative of all three:
 // Discover, Liked Me, and the profile preview all crop with object-cover
 // against a box noticeably taller than it is wide).
-export const PROFILE_PHOTO_ASPECT = 3 / 4;
+const PROFILE_PHOTO_ASPECT = 3 / 4;
 
 interface PhotoCropModalProps {
   imageUrl: string;
@@ -157,18 +157,15 @@ const PhotoCropModal: React.FC<PhotoCropModalProps> = ({ imageUrl, userId, onClo
         </div>
 
         <div className="flex flex-row items-center justify-end gap-2 mt-4">
-          <Button
-            variant="outline"
+          <Button variant="line" size="sm" className="text-black"
             onClick={onClose}
             disabled={isSaving}
-            className="w-auto h-9 px-4 bg-white border-pink-500/30 text-black hover:bg-neutral-200"
           >
             Cancel
           </Button>
-          <Button
+          <Button variant="primary" size="sm"
             onClick={handleSave}
             disabled={isSaving || !croppedAreaPixels}
-            className="w-auto h-9 px-4 bg-pink-600 hover:bg-pink-700 text-white"
           >
             {isSaving ? (onApply ? 'Applying...' : 'Saving...') : (onApply ? 'OK' : 'Save')}
           </Button>

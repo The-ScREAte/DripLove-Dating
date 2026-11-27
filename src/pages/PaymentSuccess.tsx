@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import HoppingLogo from '@/components/HoppingLogo';
+import { isEntitledToPremium } from '@/utils/subscriptionEntitlement';
 
 // Kept in sync with the real feature list on PremiumUpgrade.tsx (premium.features.*
 // in the locale files) - this screen used to promise a shorter, slightly different
@@ -23,13 +24,8 @@ const premiumFeatures = [
   { name: 'All future premium features included!', icon: Check },
 ];
 
-function isPremiumActive(row: { plan_name?: string; status?: string; expires_at?: string | null } | null) {
-  if (!row) return false;
-  const entitledByStatus = row.status === 'active' || row.status === 'cancelled';
-  if (row.plan_name !== 'premium' || !entitledByStatus) return false;
-  if (!row.expires_at) return true;
-  return new Date(row.expires_at) > new Date();
-}
+// Single source of truth for entitlement (grace period, cancelled-until-expiry, payment_pending).
+const isPremiumActive = isEntitledToPremium;
 
 // Clear any IAP redirect flags to prevent loops
 function clearIapRedirectFlags() {
@@ -360,8 +356,7 @@ const PaymentSuccess: React.FC = () => {
           <div className="mb-6 text-gray-700 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
             {error || 'Please log in to view and confirm your payment status.'}
           </div>
-          <Button
-            className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-3 px-8 rounded-full text-lg shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200"
+          <Button variant="premium" size="lg" className="w-full"
             onClick={() => navigate('/')}
           >
             Go to Home
@@ -389,15 +384,13 @@ const PaymentSuccess: React.FC = () => {
             )}
           </div>
           <div className="space-y-3">
-            <Button
-              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transition-all duration-200"
+            <Button variant="primary" size="lg" className="w-full"
               onClick={() => navigate('/')}
             >
               <ArrowLeft className="w-5 h-5 mr-2" />
               Try Payment Again
             </Button>
-            <Button
-              variant="outline"
+            <Button variant="line" size="md"
               onClick={() => navigate('/')}
             >
               Go to Home
@@ -446,8 +439,7 @@ const PaymentSuccess: React.FC = () => {
           ))}
         </ul>
         {error && <div className="mb-2 text-xs text-red-600 font-semibold animate-shake">{error}</div>}
-        <Button
-          className="w-full bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-extrabold py-2 px-4 rounded-full text-sm shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-200 mt-1"
+        <Button variant="premium" size="md" className="w-full mt-1"
           onClick={() => {
             clearPaymentCompletedFlag();
             navigate('/?premium=activated');

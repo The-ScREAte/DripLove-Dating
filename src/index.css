@@ -38,11 +38,40 @@
   grid-template-rows: minmax(0, 1fr) minmax(0, 0fr);
   transition: grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Expanded: the info area gets the larger share (it carries the actual
+   details); the photo keeps enough height for the name/age header it hosts. */
 .profile-info-layout.is-expanded {
-  grid-template-rows: minmax(180px, 58fr) minmax(0, 42fr);
+  grid-template-rows: minmax(176px, 36fr) minmax(0, 64fr);
 }
 .profile-info-photo {
   min-height: 0;
+}
+
+/* Short landscape screens: stacked photo-over-panel leaves the details no room,
+   so the expanded card goes side by side (photo left, details right). */
+@media (max-height: 480px) and (orientation: landscape) {
+  .profile-info-layout.is-expanded {
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  }
+  /* keep the first heading clear of the fixed top bar floating over the card */
+  .profile-info-layout.is-expanded .profile-info-panel {
+    padding-top: 44px;
+  }
+}
+
+/* Invisible 44px touch area for compact controls: grows the tap target of a
+   small button/pill WITHOUT changing how it looks or lays out. Only extends
+   along an axis where the control is smaller than 44px. */
+/* Needs a positioned box for the ::after; never override one that already is. */
+.dl-hit:not(.absolute):not(.fixed):not(.sticky):not(.relative) { position: relative; }
+.dl-hit::after {
+  content: "";
+  position: absolute;
+  top: min(0px, calc((100% - 44px) / 2));
+  bottom: min(0px, calc((100% - 44px) / 2));
+  left: min(0px, calc((100% - 44px) / 2));
+  right: min(0px, calc((100% - 44px) / 2));
 }
 .profile-info-panel {
   min-height: 0;
@@ -242,7 +271,20 @@ body.keyboard-open .chat-messages-container {
 /* Ensure chat area height accounts for keyboard and input bar */
 .chat-messages-container {
   height: calc(100vh - var(--keyboard-height, 0px) - var(--input-bar-height, 60px));
+  height: calc(100dvh - var(--keyboard-height, 0px) - var(--input-bar-height, 60px));
   overflow-y: auto;
+}
+
+/* Wide screens: the conversation is a centered column (max-w-3xl = 48rem), so the
+   fixed composer has to line up with it instead of spanning the whole window. */
+@media (min-width: 768px) {
+  .chat-input-container {
+    left: 50% !important;
+    right: auto !important;
+    width: min(100%, 48rem) !important;
+    transform: translate3d(-50%, calc(-1 * var(--keyboard-height, 0px)), 0);
+    -webkit-transform: translate3d(-50%, calc(-1 * var(--keyboard-height, 0px)), 0);
+  }
 }
 
 /* Subtle depth on the flat-black chat background - a faint dot grid, not
@@ -799,10 +841,13 @@ body.keyboard-open .chat-messages-container {
   [data-sonner-toaster],
   .toast-viewport-safe,
   .Toastify__toast-container,
-  [class*="toast"],
-  [class*="notification"],
-  [class*="alert"],
-  [class*="flash"] {
+  /* :not(svg) - lucide icons carry classes like "lucide-circle-alert" and
+     "lucide-triangle-alert"; without the exclusion every alert icon in the
+     app was yanked out of its layout and pinned to the top-left corner. */
+  [class*="toast"]:not(svg),
+  [class*="notification"]:not(svg),
+  [class*="alert"]:not(svg),
+  [class*="flash"]:not(svg) {
     top: var(--toast-safe-top) !important;
     position: fixed !important;
     /* MainApp's bottom nav bar is z-[99999] - matching that value here was
@@ -979,4 +1024,22 @@ body.keyboard-open .chat-messages-container {
 .dl-form input:autofill {
   -webkit-text-fill-color: #ffffff;
   box-shadow: 0 0 0 1000px #1a1a1f inset;
+}
+
+/* === DripLove viewport units (dvh-safe) === */
+/* 100vh includes the area under the mobile browser toolbar, so full-height pages
+   and capped dialogs were taller than the visible screen. Each rule keeps the vh
+   value as a fallback for browsers without dvh. */
+.h-screen { height: 100vh; height: 100dvh; }
+.min-h-screen { min-height: 100vh; min-height: 100dvh; }
+.max-h-\[80vh\] { max-height: 80vh; max-height: 80dvh; }
+.max-h-\[85vh\] { max-height: 85vh; max-height: 85dvh; }
+.max-h-\[90vh\] { max-height: 90vh; max-height: 90dvh; }
+.h-\[80vh\] { height: 80vh; height: 80dvh; }
+
+/* === Tap behaviour on all interactive controls === */
+/* The viewport meta no longer locks zoom (pinch-zoom is an accessibility feature), so remove the
+   double-tap-to-zoom delay/gesture on controls explicitly. Pinch zoom stays available. */
+button, a, summary, label, select, [role="button"], [role="tab"], [role="switch"], [role="menuitem"] {
+  touch-action: manipulation;
 }

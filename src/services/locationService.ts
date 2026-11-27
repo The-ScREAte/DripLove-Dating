@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import { calculateDistance, getCityCoordinates, getCountryByCode } from '@/constants/locationData';
+import { calculateDistance, getCityCoordinates } from '@/constants/locationData';
 
-export interface LocationMatch {
+interface LocationMatch {
   profile_id: string;
   distance_km: number;
   city: string;
@@ -10,7 +10,7 @@ export interface LocationMatch {
   age?: number;
 }
 
-export interface UserLocation {
+interface UserLocation {
   country: string;
   countryCode: string;
   city: string;

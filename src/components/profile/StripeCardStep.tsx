@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
+// '/pure' = no script injection on import: Stripe.js (270KB) only loads when a card form actually opens,
+// instead of on every page load (Welcome, Discover...).
+import { loadStripe } from '@stripe/stripe-js/pure';
+import type { Stripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck } from 'lucide-react';
@@ -99,10 +102,10 @@ const CardForm: React.FC<StripeCardStepProps> = ({ clientSecret, submitting, can
         Card details are encrypted and handled directly by Stripe.
       </p>
       <div className="flex gap-2">
-        <Button type="button" variant="outline" onClick={onBack} disabled={busy} className="flex-1 bg-black border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">
+        <Button variant="line" size="md" className="text-white flex-1" type="button" onClick={onBack} disabled={busy}>
           Back
         </Button>
-        <Button type="submit" disabled={!stripe || busy} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white">
+        <Button variant="primary" size="md" className="flex-1" type="submit" disabled={!stripe || busy}>
           {busy ? 'Saving...' : 'Save Card & Submit'}
         </Button>
       </div>

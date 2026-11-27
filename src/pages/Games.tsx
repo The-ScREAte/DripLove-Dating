@@ -54,15 +54,12 @@ const Games = () => {
   return (
     <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="bg-black/90 backdrop-blur-sm border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+      <div className="bg-black/90 backdrop-blur-sm border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
+              <Button variant="quiet" size="sm" className="text-white"
                 onClick={() => navigate('/')}
-                className="hover:bg-white/10 hover:text-white text-white"
                 title="Home"
               >
                 <Home className="w-5 h-5" />
@@ -83,18 +80,19 @@ const Games = () => {
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-8">
         <div className="max-w-6xl mx-auto px-4 pb-32 pb-safe-offset-32">
-          <div className="mb-5">
+          <div className="mb-5 pt-4">
             <h2 className="text-lg sm:text-xl font-semibold text-white">Pick Your Vibe</h2>
             <p className="text-sm text-gray-300">Quick, fun drills to boost your dating game.</p>
           </div>
 
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-          {games.map((game) => {
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 dl-stagger">
+          {games.map((game, index) => {
             const IconComponent = game.icon;
             return (
-              <Card
+              <Card variant="surface"
                 key={game.id}
-                className="group overflow-hidden border-pink-500/40 bg-neutral-900/95 backdrop-blur-sm hover:border-pink-500/70 hover:shadow-xl hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-250 cursor-pointer h-full"
+                style={{ '--i': index } as React.CSSProperties}
+                className="group flex flex-col active:scale-[0.98] overflow-hidden backdrop-blur-sm hover:border-pink-500/70 hover:shadow-xl hover:shadow-pink-500/10 hover:-translate-y-0.5 transition-all duration-250 cursor-pointer h-full"
                 onClick={() => navigate(game.path)}
               >
                 <div className="relative">
@@ -122,10 +120,10 @@ const Games = () => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 flex flex-col h-full">
+                <CardContent className="p-3 pt-0 flex flex-col flex-1">
                   <p className="text-xs text-gray-400 mb-3">{game.description}</p>
-                  <Button
-                    className={`mt-auto w-full bg-gradient-to-r ${game.gradient} hover:opacity-90 text-white font-medium h-9 text-sm`}
+                  <Button variant="primary" size="md" className="mt-auto w-full"
+                   
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(game.path);

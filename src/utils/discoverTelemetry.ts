@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 // non-blocking and swallows its own errors - telemetry must never be able to
 // slow down or break the actual swipe experience it's trying to measure.
 
-export type DiscoverFeedMechanism = 'A' | 'B';
+type DiscoverFeedMechanism = 'A' | 'B';
 
 interface ShownEventParams {
   viewerId: string;

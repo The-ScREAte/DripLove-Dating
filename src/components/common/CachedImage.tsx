@@ -79,7 +79,8 @@ const CachedImage = React.forwardRef<HTMLImageElement, CachedImageProps>(
       [onError, onLoadError, src, triedCache, fallbackSrc, onFallback, effectiveSrc]
     );
 
-    return <img ref={ref} src={effectiveSrc} onLoad={handleLoad} onError={handleError} {...rest} />;
+    // lazy/async are defaults only - callers (hero/current-card images) can still pass loading="eager".
+    return <img ref={ref} loading="lazy" decoding="async" src={effectiveSrc} onLoad={handleLoad} onError={handleError} {...rest} />;
   }
 );
 CachedImage.displayName = 'CachedImage';

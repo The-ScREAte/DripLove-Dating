@@ -1,0 +1,9 @@
+/*
+ * While a full popup (match, upgrade, streak, dialogs...) is open, the floating controls that live
+ * ABOVE page content with very high z-indexes (Discover's top bar, report button, undo button, slide
+ * dots) must not paint over it. PopupHost sets data-popup-blocking on <html>; give such controls
+ * the .dl-under-popup class instead of fighting z-index values.
+ */
+html[data-popup-blocking] .dl-under-popup {
+  visibility: hidden;
+}

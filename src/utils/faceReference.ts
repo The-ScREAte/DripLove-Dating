@@ -35,3 +35,41 @@ export function getFaceReferenceCode(input?: FaceReferenceInput | null): string 
 
   return `FACE-${token}`;
 }
+
+// ---------------------------------------------------------------------------
+// Duplicate-face responses (face-verify edge function). Shared by the
+// registration, profile-completion and face-verification flows.
+// ---------------------------------------------------------------------------
+
+export type DuplicateFaceDetails = {
+  similarity?: number | null;
+  faceId?: string | null;
+  imageId?: string | null;
+  externalImageId?: string | null;
+  associatedUserId?: string | null;
+  associatedEmail?: string | null;
+  associatedName?: string | null;
+};
+
+/** Normalises the edge function's duplicate-face payload into one shape. */
+export function extractDuplicateFaceDetails(
+  data: (DuplicateFaceDetails & { duplicateFace?: DuplicateFaceDetails | null }) | null | undefined
+): DuplicateFaceDetails {
+  if (data?.duplicateFace && typeof data.duplicateFace === 'object') {
+    return data.duplicateFace;
+  }
+
+  return {
+    similarity: data?.similarity ?? null,
+    faceId: data?.faceId ?? null,
+    imageId: data?.imageId ?? null,
+    externalImageId: data?.externalImageId ?? null,
+    associatedUserId: data?.associatedUserId ?? null,
+    associatedEmail: data?.associatedEmail ?? null,
+    associatedName: data?.associatedName ?? null,
+  };
+}
+
+export function formatDuplicateFaceMessage(details?: DuplicateFaceDetails | null): string {
+  return `User already exists. Reference code: ${getFaceReferenceCode(details)}.`;
+}

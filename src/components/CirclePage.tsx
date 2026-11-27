@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch, CurrentUser } from '@/types';
-import { calculateAge } from '@/utils/discoverCache';
+import { calculateAge } from '@/utils/dateUtils';
+import { useBackClose } from '@/utils/backStack';
 import { normalizeCountryCode } from '@/utils/countryCode';
-import { matchesReciprocalPreference } from './discover/discoverFeedUtils';
-import { parseFavorites } from '@/constants/favorites';
+import { parseFavorites, displayFavorites } from '@/constants/favorites';
 import {
   fetchCirclePool,
   CircleProfile,
@@ -24,9 +24,10 @@ import {
   writeCircleRowsCache,
 } from '@/utils/circlePoolFetch';
 import { calculateDistance } from '@/constants/locationData';
-import PremiumUpgrade from './PremiumUpgrade';
+import { openPremiumUpgrade } from '@/popups';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
 import { getCircleDailyLikeLimit, getCircleLikesUsedToday, recordCircleLike } from '@/utils/circleSwipeLimit';
+import { buildCircleCountScope, dobBoundsForAgeRange, EXACT_RADIUS_REFINE_MAX, formatCountCompact, hueFromString, prefetchWindow, removeFromDeck, rollbackInsertIndex, teaserDisplay, teaserHues } from '@/utils/circleCounts';
 import { publishSwipeDecision } from '@/utils/swipeSync';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
@@ -94,6 +95,10 @@ const CATEGORY_COUNTS_CACHE_TTL_MS = 2 * 60 * 1000;
 let categoryCountsCache: { key: string; categories: CategoryTile[]; timestamp: number } | null = null;
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
+import { TeaserAvatars } from './circle/TeaserAvatars';
+import { applyCircleCountFilters, fetchCircleTotals, fetchViewerExclusions, type CategoryFilter } from '@/utils/circleCountQuery';
+import { fetchCircleTeaserPhotos } from '@/utils/circleTeaserPhotos';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
   Plane,
@@ -128,6 +133,9 @@ import {
   Crown,
   Heart,
   Video,
+  ChevronLeft,
+  Globe,
+  Users,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -135,6 +143,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import ThumbnailImage from '@/components/common/ThumbnailImage';
+import { getGenderFilter } from '@/utils/genderPreference';
 
 // One icon per interest tag (see src/constants/formData.ts) - shown as the
 // shared-thing badge on a card instead of spelling the interest out as text.
@@ -220,8 +229,8 @@ const getCompatibility = (me: ProfileTraits, other: ProfileTraits): Compatibilit
   if (me.social_media && me.social_media === other.social_media) matchedCategories += 1;
 
   // 4. Favorites (matched by category - Sports, Music, etc. - not the exact pick)
-  const myFavoriteCategories = new Set((me.favorites || []).map((f) => f.category));
-  if ((other.favorites || []).some((f) => myFavoriteCategories.has(f.category))) matchedCategories += 1;
+  const myFavoriteCategories = new Set(displayFavorites(me.favorites).map((f) => f.category));
+  if (displayFavorites(other.favorites).some((f) => myFavoriteCategories.has(f.category))) matchedCategories += 1;
 
   // 5. Cultural (adinkra) signs
   const mySigns = new Set(me.adinkra_symbols || []);
@@ -278,6 +287,8 @@ interface CirclePageProps {
   // already running - opens that person's profile inside Circle.
   deepLinkProfileId?: string | null;
   onDeepLinkConsumed?: () => void;
+  // Opens a Profile section (e.g. 'location', where the country picker lives).
+  onNavigateToProfileSection?: (section: string) => void;
 }
 
 // CircleProfile + the pool fetch itself now live in '@/utils/circlePoolFetch'
@@ -288,16 +299,6 @@ interface CirclePageProps {
 // get_circle_category_profiles' own optional params 1:1 (exactly one of
 // these is ever set per tile). Omitted entirely for the Games tile, which
 // doesn't filter/browse people at all.
-interface CategoryFilter {
-  relationshipIntent?: string;
-  familyPlans?: string[];
-  isVerified?: boolean;
-  interest?: string;
-  hasMusic?: boolean;
-  hasSocialMedia?: boolean;
-  hasPets?: boolean;
-}
-
 interface CategoryTile {
   key: string;
   label: string;
@@ -333,12 +334,27 @@ const CATEGORY_DEFS: Array<{ key: string; label: string; icon: CategoryTile['ico
 // premium upsell instead of the filtered deck. Kept as its own set rather
 // than a field on CATEGORY_DEFS so the free/premium gating is one visible
 // list, not scattered across each tile's definition.
+// People per deck page; the deck progress label reads "n/60+" while more can still load.
+const CIRCLE_PAGE_SIZE = 60;
+
 const PREMIUM_ONLY_CATEGORY_KEYS = new Set(['serious', 'casual', 'open', 'verified', 'music', 'social', 'travel']);
 
-const getGenderFilter = (userPreference: string) => {
-  if (userPreference === 'male') return ['male'];
-  if (userPreference === 'female') return ['female'];
-  return ['male', 'female', 'other'];
+// Each tile gets its own pair of hues (a tint family, deep and dark so white text stays at
+// >= 7:1 contrast) so the grid reads as a colourful, curated set instead of 13 identical boxes.
+const CATEGORY_THEME: Record<string, [number, number]> = {
+  games: [330, 275],
+  serious: [345, 300],
+  casual: [18, 340],
+  open: [270, 225],
+  verified: [205, 180],
+  wants_kids: [38, 12],
+  child_free: [190, 230],
+  travel: [195, 160],
+  sporty: [150, 175],
+  creative: [290, 330],
+  music: [260, 310],
+  social: [320, 20],
+  pet: [28, 55],
 };
 
 // Turns a CircleProfile into the shape ProfilePreviewModal/buildSlides expect.
@@ -359,6 +375,9 @@ const toPotentialMatch = (p: CircleProfile): PotentialMatch => ({
   interests: p.interests || [],
   images: [],
   is_verified: p.is_verified,
+  // Archived members (inactive 30+ days) are the deck's top-up after the active ones; flagged the
+  // same way Discover flags its own archived mix-ins.
+  is_archived: p.__isArchivedMixin || undefined,
   gender: p.gender,
   preference: p.preference,
   relationship_intent: p.relationship_intent,
@@ -410,6 +429,44 @@ const CircularCountdown = ({ remainingMs, totalMs }: { remainingMs: number; tota
     </div>
   );
 };
+
+// Shown the instant a category tile is tapped (and in the rare moment a deck runs out of loaded
+// people) - same chrome as the real deck card (rounded border, back chevron, category pill, name
+// bars) so there is no layout jump when the first card arrives. Opacity/transform-only shimmer.
+const CircleDeckSkeleton = ({ label, onBack }: { label?: string | null; onBack: () => void }) => (
+  <div className="h-full w-full bg-black" role="status" aria-busy="true" aria-live="polite">
+    <div
+      className="relative overflow-hidden rounded-[28px] border border-pink-500/30 bg-neutral-950"
+      style={{ height: 'calc(100% - 8px)', animation: 'dl-fade var(--dl-dur) var(--dl-ease-out) backwards' }}
+    >
+      <div className="dl-skeleton absolute inset-0" />
+      <div className="absolute left-1/2 top-[34%] h-32 w-32 -translate-x-1/2 rounded-full bg-white/[0.05]" aria-hidden="true" />
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Back"
+        className="dl-hit absolute left-2 top-4 z-10 flex items-center justify-center text-white active:opacity-60"
+        style={{ background: 'none', border: 'none', padding: 0 }}
+      >
+        <ChevronLeft className="w-8 h-8" strokeWidth={3} />
+      </button>
+      {label && (
+        <div className="absolute left-1/2 top-3 z-10 max-w-[55%] -translate-x-1/2 truncate rounded-full border border-white/20 bg-black/60 px-3 py-1 text-[11px] font-semibold text-white">
+          {label}
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 space-y-2.5 bg-gradient-to-t from-black via-black/70 to-transparent p-5 pt-16">
+        <div className="h-6 w-48 rounded-md bg-white/15" />
+        <div className="h-4 w-32 rounded-md bg-white/10" />
+        <div className="flex gap-2 pt-1">
+          <div className="h-7 w-16 rounded-full bg-white/10" />
+          <div className="h-7 w-20 rounded-full bg-white/10" />
+          <div className="h-7 w-14 rounded-full bg-white/10" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 // A blurred, camouflaged placeholder card - same footprint as a real card so
 // it sits naturally in the scroll row. Shown at the end of a premium row
@@ -550,8 +607,20 @@ const PeopleRow = ({
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="relative w-40 h-48 bg-white/5">
-              {p.firstImage && (
-                <ThumbnailImage src={p.firstImage} alt={p.first_name} className={`w-full h-full object-cover ${locked ? 'blur-md' : ''}`} loading="lazy" decoding="async" draggable={false} />
+              {locked ? (
+                // Locked = a generic blurred silhouette. The real photo URL and name never enter the
+                // DOM for locked content (a CSS blur alone still ships the full-size image).
+                <div
+                  className="ci-locked-photo absolute inset-0"
+                  style={{ ['--h' as string]: hueFromString(p.id), ['--h2' as string]: (hueFromString(p.id) + 40) % 360 }}
+                  aria-hidden="true"
+                >
+                  <span className="ci-av" style={{ ['--h' as string]: hueFromString(p.id), ['--h2' as string]: (hueFromString(p.id) + 40) % 360 }} />
+                </div>
+              ) : (
+                p.firstImage && (
+                  <ThumbnailImage src={p.firstImage} alt={p.first_name} className="w-full h-full object-cover" loading="lazy" decoding="async" draggable={false} />
+                )
               )}
               {locked && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -578,7 +647,7 @@ const PeopleRow = ({
             </div>
             <div className="px-3 py-2.5">
               <p className="flex items-center gap-1.5 text-white text-sm font-medium truncate">
-                <span className="truncate">{p.first_name}, {calculateAge(p.date_of_birth)}</span>
+                <span className="truncate">{locked ? `••••, ${calculateAge(p.date_of_birth)}` : `${p.first_name}, ${calculateAge(p.date_of_birth)}`}</span>
                 {isRecentlyOnline(p.last_login_at, SWIPE_ONLINE_WINDOW_MS) && (
                   <span
                     className="w-2 h-2 rounded-full bg-green-500 shrink-0"
@@ -600,8 +669,9 @@ const PeopleRow = ({
   );
 };
 
-const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsumed }: CirclePageProps) => {
+const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsumed, onNavigateToProfileSection }: CirclePageProps) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { sendMatchNotification, sendMultipleLikesNotification } = usePushNotifications(currentUser?.id);
   const navigate = useNavigate();
   // Same eligibility signal PremiumUpgrade.tsx's own "Start Free Trial"
@@ -643,10 +713,21 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     inFlight: Promise<CircleProfile[]> | null;
   } | null>(null);
   const categoryBrowseRef = useRef<{ label: string; profiles: CircleProfile[] } | null>(null);
+  // Ids this Circle session itself just swiped (set right before the decision is published) so the
+  // 'profileDecided' listener can tell its own swipes from ones made in Discover / Liked Me.
+  const ownSwipedIdsRef = useRef<Set<string>>(new Set());
+  const categoryBrowseIndexRef = useRef(0);
   useEffect(() => {
     categoryBrowseRef.current = categoryBrowse;
   }, [categoryBrowse]);
   const [loadingCategoryKey, setLoadingCategoryKey] = useState<string | null>(null);
+  // The tapped tile's label while its deck is still loading: shows the deck skeleton INSTANTLY
+  // (so a tap always feels answered) instead of leaving the grid sitting there for the whole
+  // multi-query load. openTokenRef lets Back cancel a load that is still in flight.
+  const [openingCategory, setOpeningCategory] = useState<string | null>(null);
+  // Why the empty screen is showing: nobody matches this circle at all, vs the deck was swiped through.
+  const [emptyCategoryKind, setEmptyCategoryKind] = useState<'none' | 'seen'>('none');
+  const openTokenRef = useRef(0);
 
   // Recommended/Similar row state: null batch = not computed yet (still
   // waiting on the pool or cooldown status), [] = computed but empty (pool
@@ -676,7 +757,6 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // Which row a currently-open profile preview came from, so a like/pass
   // removes it from the right batch instead of just the general pool.
   const [activeRowKey, setActiveRowKey] = useState<CircleRowKey | null>(null);
-  const [showCirclePremiumUpgrade, setShowCirclePremiumUpgrade] = useState(false);
   // Set to a locked category tile's label the moment it's tapped - shows the
   // lightweight upsell overlay (not the full PremiumUpgrade page yet) with
   // that label worked into the copy; null hides it. Subscribing there is
@@ -748,7 +828,22 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       };
       shrinkRow('recommended', setRecommendedBatch);
       shrinkRow('similar', setSimilarBatch);
-      setCategoryBrowse((prev) => prev ? { ...prev, profiles: prev.profiles.filter((profile) => profile.id !== profileId) } : prev);
+      // The deck's own swipes already advanced past this person (see performSwipeAction), so
+      // removing them here as well shifted the list left while the index had moved right: every
+      // swipe silently SKIPPED the next profile. Only decisions made ELSEWHERE (Discover, Liked
+      // Me) remove from the deck, and they keep the index pointing at the same person.
+      const ownSwipe = ownSwipedIdsRef.current.delete(profileId);
+      const deck = categoryBrowseRef.current;
+      if (!ownSwipe && deck) {
+        const removal = removeFromDeck(deck.profiles.map((profile) => profile.id), categoryBrowseIndexRef.current, profileId);
+        if (removal.removed) {
+          if (removal.index !== categoryBrowseIndexRef.current) {
+            categoryBrowseIndexRef.current = removal.index;
+            setCategoryBrowseIndex(removal.index);
+          }
+          setCategoryBrowse((prev) => prev ? { ...prev, profiles: prev.profiles.filter((profile) => profile.id !== profileId) } : prev);
+        }
+      }
       if (selectedProfile?.id === profileId) {
         setSelectedProfile(null);
         setCategoryBrowse(null);
@@ -901,7 +996,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     if (!currentUser?.id) return;
     let cancelled = false;
 
-    const cacheKey = `${currentUser.id}:${currentUser.country_code || ''}:${currentUser.preference || ''}:${currentUser.gender || ''}:${isPremium ? '1' : '0'}`;
+    const cacheKey = `${currentUser.id}:${currentUser.country_code || ''}:${currentUser.preference || ''}:${currentUser.gender || ''}:${isPremium ? '1' : '0'}:${getCircleCountrySplit(currentUser, isPremium).unlockedCountryCodes.join(',')}`;
     if (
       categoryCountsCache &&
       categoryCountsCache.key === cacheKey &&
@@ -941,6 +1036,14 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         Promise.resolve(getCircleDistanceParams(currentUser, isPremium)),
       ]);
 
+      // Counts run in the DATABASE now: the age window becomes a date-of-birth range and the
+      // distance box stays a lat/lon box, and only a head count comes back. This used to download
+      // every matching profile row (id, coordinates, dob) x 12 categories x home/unlocked on every
+      // open of the page and filter in JS - megabytes of JSON parsed right as the user starts
+      // swiping. The exact circle (haversine) is only applied for small results, where the rows are
+      // cheap; for big ones the box count is scaled by pi/4 (circle/box area), which errs LOW so a
+      // number shown to the user is never an overstatement.
+      const dobBounds = dobBoundsForAgeRange(currentUser.min_age || 18, currentUser.max_age || 99);
       const countForCountries = async (
         codes: string[],
         applyRadius: boolean,
@@ -948,48 +1051,25 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       ): Promise<number> => {
         if (codes.length === 0) return 0;
         const useBox = applyRadius && hasCoords && radiusDegrees !== null;
-        let q = supabase
-          .from('profiles')
-          .select('id, latitude, longitude, date_of_birth')
-          .eq('account_status', 'active')
-          .eq('is_admin', false)
-          .eq('is_archived', false)
-          .in('country_code', codes)
-          .in('gender', allowedGenders);
-        if (excluded.size > 0) {
-          q = q.not('id', 'in', `(${Array.from(excluded).join(',')})`);
-        }
-        if (useBox) {
-          q = q
-            .gte('latitude', (userLat as number) - (radiusDegrees as number))
-            .lte('latitude', (userLat as number) + (radiusDegrees as number))
-            .gte('longitude', (userLon as number) - (radiusDegrees as number))
-            .lte('longitude', (userLon as number) + (radiusDegrees as number));
-        }
-        // Reciprocal: this profile has to actually be open to the viewer's
-        // own gender too, not just be a gender the viewer is into.
-        if (currentUser.gender) {
-          q = q.or(`preference.eq.${currentUser.gender},preference.eq.everyone`);
-        }
-        if (filter?.relationshipIntent) q = q.eq('relationship_intent', filter.relationshipIntent);
-        if (filter?.isVerified) q = q.eq('is_verified', true);
-        if (filter?.familyPlans) q = q.in('family_plans', filter.familyPlans);
-        if (filter?.interest) q = q.contains('interests', [filter.interest]);
-        // favorites is a jsonb column: the value must go over as JSON text.
-        // Passed as a JS array it was serialised as `{[object Object]}`, which
-        // Postgres rejected (400) - so the Music Lovers count never loaded.
-        if (filter?.hasMusic) q = q.contains('favorites', JSON.stringify([{ category: 'Music' }]));
-        if (filter?.hasSocialMedia) q = q.not('social_media', 'is', null).neq('social_media', '');
-        // pets is a text[] column: an empty JS array was sent as '' ("malformed
-        // array literal", 400). '{}' is Postgres' empty array.
-        if (filter?.hasPets) q = q.not('pets', 'is', null).filter('pets', 'neq', '{}');
-        const { data, error } = await q;
-        if (error || !data) return 0;
-        return data.filter((profile) => {
-          if (!profile.date_of_birth) return false;
-          const age = calculateAge(profile.date_of_birth);
-          if (age < (currentUser.min_age || 18) || age > (currentUser.max_age || 99)) return false;
-          if (!applyRadius || !hasCoords || typeof profile.latitude !== 'number' || typeof profile.longitude !== 'number') return true;
+        const withFilters = (q: unknown) => applyCircleCountFilters(q, {
+          codes,
+          allowedGenders,
+          dob: dobBounds,
+          excluded,
+          box: useBox ? { lat: userLat as number, lon: userLon as number, degrees: radiusDegrees as number } : null,
+          viewerGender: currentUser.gender || undefined,
+          filter,
+        });
+        const head = await withFilters(supabase.from('profiles').select('id', { count: 'exact', head: true }));
+        if (head.error || typeof head.count !== 'number') return 0;
+        const needsCircle = applyRadius && hasCoords;
+        if (!needsCircle) return head.count;
+        if (head.count === 0) return 0;
+        if (head.count > EXACT_RADIUS_REFINE_MAX) return Math.floor(head.count * (Math.PI / 4));
+        const { data, error } = await withFilters(supabase.from('profiles').select('id, latitude, longitude'));
+        if (error || !data) return Math.floor(head.count * (Math.PI / 4));
+        return (data as { latitude: number | null; longitude: number | null }[]).filter((profile) => {
+          if (typeof profile.latitude !== 'number' || typeof profile.longitude !== 'number') return true;
           return calculateDistance(userLat as number, userLon as number, profile.latitude, profile.longitude) <= maxDistanceKm;
         }).length;
       };
@@ -1013,6 +1093,52 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     void load();
     return () => { cancelled = true; };
   }, [currentUser?.id, currentUser?.country_code, currentUser?.preference, currentUser?.gender, currentUser?.unlocked_countries, isPremium]);
+
+  // Which pool the tile counts describe: the ENTIRE APP for a free viewer's locked tiles (and for a
+  // premium viewer who has not picked any countries yet, with a hint to pick some), or - once
+  // countries are picked - only where this premium viewer has access (what they will see in the
+  // deck). Recomputed whenever premium status or the selected countries change.
+  const countScope = useMemo(() => {
+    const split = getCircleCountrySplit(currentUser, isPremium);
+    return buildCircleCountScope({
+      isPremium,
+      homeCountry: split.baseCountryCode,
+      selectedCountries: split.unlockedCountryCodes,
+      prefs: { minAge: currentUser?.min_age, maxAge: currentUser?.max_age },
+    });
+  }, [currentUser, isPremium]);
+
+  // ENTIRE-APP total per circle (head counts, no country/gender/age/distance filter, cached per
+  // session). null = could not be fetched -> the tile says "Many" (never an invented number).
+  const [appTotals, setAppTotals] = useState<Record<string, number | null>>({});
+  useEffect(() => {
+    if (isPremium === undefined || !currentUser?.id || countScope.mode !== 'worldwide') return undefined;
+    let cancelled = false;
+    // free: only the locked circles need it; premium with no countries yet: every tile shows it
+    const defs = CATEGORY_DEFS
+      .filter((d) => !d.isGameLink && (isPremium ? true : PREMIUM_ONLY_CATEGORY_KEYS.has(d.key)))
+      .map((d) => ({ key: d.key, filter: d.filter }));
+    void fetchCircleTotals({ id: currentUser.id }, defs)
+      .then((totals) => { if (!cancelled) setAppTotals(totals); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isPremium, currentUser?.id, countScope.mode]);
+
+  // Real (moderated, blurred) member photos for the tiny avatar clusters on LOCKED tiles. Loaded
+  // after the totals, in the background: until they arrive (or if anything fails) the tiles keep
+  // their silhouettes, so this can never block or break the page.
+  const [teaserPhotos, setTeaserPhotos] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    if (isPremium !== false || !currentUser?.id || Object.keys(appTotals).length === 0) return undefined;
+    let cancelled = false;
+    const defs = CATEGORY_DEFS.filter((d) => PREMIUM_ONLY_CATEGORY_KEYS.has(d.key)).map((d) => ({ key: d.key, filter: d.filter }));
+    void (async () => {
+      const excluded = await fetchViewerExclusions(currentUser.id);
+      const photos = await fetchCircleTeaserPhotos(currentUser.id, defs, appTotals, excluded);
+      if (!cancelled) setTeaserPhotos(photos);
+    })();
+    return () => { cancelled = true; };
+  }, [isPremium, currentUser?.id, appTotals]);
 
   const me = useMemo(() => ({
     interests: currentUser?.interests,
@@ -1276,10 +1402,9 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   // The person shown at `index` and the next three: every photo of the
   // current and next person, the first photo of the two after.
   const prefetchUpcoming = useCallback((profiles: CircleProfile[], index: number) => {
-    void prefetchProfileImages(profiles[index], true);
-    void prefetchProfileImages(profiles[index + 1], true);
-    void prefetchProfileImages(profiles[index + 2]);
-    void prefetchProfileImages(profiles[index + 3]);
+    const { full, first } = prefetchWindow(index, profiles.length);
+    full.forEach((i) => { void prefetchProfileImages(profiles[i], true); });
+    first.forEach((i) => { void prefetchProfileImages(profiles[i]); });
   }, [prefetchProfileImages]);
 
   // Loads the open category's next page (people not already in the deck) and
@@ -1336,6 +1461,12 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     setSelectedImages([]);
     setActiveRowKey(null);
   }, []);
+
+  // Android hardware back closes the top overlay first (profile view, upgrade/out-of-likes
+  // sheets) instead of leaving the app.
+  useBackClose(!!selectedProfile || !!categoryBrowse, closeProfileView, { escape: false });
+  useBackClose(showCircleOutOfLikes, () => setShowCircleOutOfLikes(false), { escape: false });
+  useBackClose(!!emptyCategoryLabel, () => setEmptyCategoryLabel(null), { escape: false });
 
   // Opening from Recommended/Similar tags which row's batch this profile
   // came from, so a like/pass below shrinks the right snapshot. Category
@@ -1412,146 +1543,174 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, deepLinkProfileId, isPremium]);
 
-  // Guards against a double-fire from the swipe gesture's own exit-animation
-  // timeout landing while a second gesture is somehow already in flight.
-  const [isSwipeActionPending, setIsSwipeActionPending] = useState(false);
+  // Per-profile in-flight guard against a double-fire from the swipe gesture's own exit-animation
+  // timeout. This used to be ONE boolean held until the like/pass round trip AND the follow-up
+  // likes-count query + notification call had all finished, so any swipe made in that window was
+  // silently ignored (on a slow link that is most quick swipes) and the card flew off then came back.
+  const swipeInFlightRef = useRef<Set<string>>(new Set());
+  // Always-current copies for rollback (a background failure can land after the deck moved on).
+  useEffect(() => { categoryBrowseIndexRef.current = categoryBrowseIndex; }, [categoryBrowseIndex]);
+  // Set while the deck is out of preloaded people and waiting on the next page (rare: the next
+  // page is fetched when 5 are left). Shows the deck skeleton instead of the already-thrown card.
+  const [deckLoadingMore, setDeckLoadingMore] = useState(false);
 
-  // Same RPCs Discover/Liked Me use for a real like/pass - usage-limit
-  // enforcement and mutual-match detection happen server-side in these, not
-  // here, so swiping from Circle behaves identically to swiping anywhere
-  // else in the app rather than being a second, divergent code path. Shared
-  // between the single-profile preview (Recommended/Similar) and a category
-  // browse deck - the only difference is what happens to the view afterward:
-  // close back to the grid, or advance to the next card in the deck.
-  const performSwipeAction = useCallback(async (profile: CircleProfile, direction: 'like' | 'pass') => {
-    if (isSwipeActionPending || !currentUser?.id) return;
+  // Same RPCs Discover/Liked Me use for a real like/pass - usage-limit enforcement and
+  // mutual-match detection happen server-side in these, so swiping from Circle behaves
+  // identically to swiping anywhere else rather than being a second, divergent code path.
+  //
+  // OPTIMISTIC: the deck advances the moment the swipe commits (the fly-away has already played),
+  // and the like/pass is sent in the background. A server rejection (daily limit raced from
+  // another device, network error) rolls the person back into the deck as the next card and says
+  // so - it never blocks the next swipe. Shared by the single-profile preview (Recommended/
+  // Similar) and the category deck; the only difference is close-to-grid vs advance.
+  const performSwipeAction = useCallback((profile: CircleProfile, direction: 'like' | 'pass') => {
+    const userId = currentUser?.id;
+    if (!userId || swipeInFlightRef.current.has(profile.id)) return;
     if (direction === 'like' && circleLikesLoaded && circleLikesUsed >= circleDailyLimit) {
       setShowCircleOutOfLikes(true);
       return;
     }
-    setIsSwipeActionPending(true);
+    swipeInFlightRef.current.add(profile.id);
+    const wasLike = direction === 'like';
+    const rowKey = activeRowKey === 'recommended' || activeRowKey === 'similar' ? activeRowKey : null;
 
-    let madeMatch = false;
-    try {
-      if (direction === 'like') {
-        const result = await recordCircleLike(currentUser.id, profile.id, isPremium);
-        setCircleLikesUsed(result.currentUsage);
-        if (result.limitReached || !result.success) {
-          setShowCircleOutOfLikes(true);
-          return;
-        }
-        madeMatch = result.match;
-      } else {
-        const { error } = await supabase.rpc('pass_and_usage_batched', {
-          passer_id_param: currentUser.id,
-          passed_id_param: profile.id,
-          premium_param: !!isPremium,
-        });
-        if (error) throw error;
-      }
-    } catch (error) {
-      console.error(`Error ${direction === 'like' ? 'liking' : 'passing'} from Circle:`, error);
-      toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
-      setIsSwipeActionPending(false);
-      return;
-    }
-
+    // ---------- 1) optimistic local state (synchronous, no network) ----------
+    if (wasLike) setCircleLikesUsed((n) => n + 1);
     setPool((prev) => prev.filter((p) => p.id !== profile.id));
 
-    // Shrink the exact Recommended/Similar snapshot this profile came from
-    // (not just the general pool) - once it hits empty, that row goes on
-    // cooldown instead of quietly pulling in the next-best pool candidate.
-    // Free users can only ever reach this for index 0 (the one unlocked
-    // "lucky swipe" - the other 3 route to the upsell, never here), and
-    // that single swipe uses up the whole row, not just that one card, so
-    // the remaining locked teasers disappear along with it.
-    if (activeRowKey === 'recommended' || activeRowKey === 'similar') {
-      const setBatch = activeRowKey === 'recommended' ? setRecommendedBatch : setSimilarBatch;
+    // Shrink the exact Recommended/Similar snapshot this profile came from (not just the general
+    // pool) - once it hits empty, that row goes on cooldown instead of quietly pulling in the
+    // next-best pool candidate. Free users can only ever reach this for index 0 (the one
+    // unlocked "lucky swipe" - the other 3 route to the upsell, never here), and that single swipe
+    // uses up the whole row, so the remaining locked teasers disappear along with it.
+    let prevBatchSnapshot: CircleProfile[] | null = null;
+    if (rowKey) {
+      const setBatch = rowKey === 'recommended' ? setRecommendedBatch : setSimilarBatch;
       setBatch((prev) => {
+        prevBatchSnapshot = prev;
         const hadItems = !!prev && prev.length > 0;
         const next = isPremium ? (prev ?? []).filter((p) => p.id !== profile.id) : [];
-        if (hadItems && next.length === 0) {
-          void markRowExhausted(activeRowKey);
-        }
-        // Keep the persisted snapshot in sync immediately, rather than
-        // waiting for the next mount's reconciliation to notice this swipe.
-        if (currentUser?.id) void saveCircleBatch(currentUser.id, activeRowKey, next.map((p) => p.id));
+        if (hadItems && next.length === 0) void markRowExhausted(rowKey);
+        // Keep the persisted snapshot in sync immediately, rather than waiting for the next
+        // mount's reconciliation to notice this swipe.
+        void saveCircleBatch(userId, rowKey, next.map((p) => p.id));
         return next;
       });
     }
 
     if (categoryBrowse) {
       const nextIndex = categoryBrowseIndex + 1;
-      // Keep the deck loading: with 5 or fewer people left, quietly fetch the
-      // next page of this category so swiping never runs dry.
+      // Keep the deck loading: with 5 or fewer people left, quietly fetch the next page of this
+      // category so swiping never runs dry.
       if (categoryBrowse.profiles.length - nextIndex <= 5) void loadMoreCategory();
       if (nextIndex < categoryBrowse.profiles.length) {
-        const nextProfile = categoryBrowse.profiles[nextIndex];
         setCategoryBrowseIndex(nextIndex);
-        void applyProfileImages(nextProfile);
+        void applyProfileImages(categoryBrowse.profiles[nextIndex]);
         // Stay ahead so the deck never stalls on a photo fetch.
         prefetchUpcoming(categoryBrowse.profiles, nextIndex);
       } else {
-        // End of what's loaded: load more first - "That's everyone" only when
-        // a fresh load finds nobody new.
-        const more = await loadMoreCategory();
-        if (more.length > 0) {
-          setCategoryBrowseIndex(nextIndex);
-          void applyProfileImages(more[0]);
-          prefetchUpcoming(more, 0);
-        } else {
-          toast({ title: "That's everyone", description: `You've seen everyone in "${categoryBrowse.label}" for now.` });
-          closeProfileView();
-        }
+        // End of what's loaded: wait (behind a skeleton) for a fresh page - "That's everyone"
+        // only when it finds nobody new.
+        setDeckLoadingMore(true);
+        void loadMoreCategory().then((more) => {
+          setDeckLoadingMore(false);
+          if (more.length > 0) {
+            setCategoryBrowseIndex(nextIndex);
+            void applyProfileImages(more[0]);
+            prefetchUpcoming(more, 0);
+          } else {
+            setEmptyCategoryKind('seen');
+            setEmptyCategoryLabel(categoryBrowse.label);
+            closeProfileView();
+          }
+        });
       }
     } else {
       closeProfileView();
     }
 
-    try {
-      publishSwipeDecision(currentUser.id, profile.id, direction);
-      if (direction === 'like') {
-        if (madeMatch) {
-          toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
-          try {
-            await sendMatchNotification(
-              `${currentUser.first_name || ''}`.trim() || 'Someone',
-              profile.id
-            );
-          } catch {
-            // ignore notification errors
+    // Puts the person back (as the NEXT card in a deck, or back in their row) after a failed save.
+    const rollback = (opts: { keepUsage?: boolean } = {}) => {
+      if (wasLike && !opts.keepUsage) setCircleLikesUsed((n) => Math.max(0, n - 1));
+      setPool((prev) => (prev.some((p) => p.id === profile.id) ? prev : [profile, ...prev]));
+      if (rowKey) {
+        const setBatch = rowKey === 'recommended' ? setRecommendedBatch : setSimilarBatch;
+        setBatch((prev) => {
+          const restored = prevBatchSnapshot ?? [profile, ...(prev ?? [])];
+          void saveCircleBatch(userId, rowKey, restored.map((p) => p.id));
+          return restored;
+        });
+      } else if (categoryBrowseRef.current) {
+        setCategoryBrowse((prev) => {
+          if (!prev || prev.profiles.some((p) => p.id === profile.id)) return prev;
+          const profiles = [...prev.profiles];
+          profiles.splice(rollbackInsertIndex(categoryBrowseIndexRef.current, profiles.length), 0, profile);
+          return { ...prev, profiles };
+        });
+      }
+    };
+
+    // ---------- 2) the actual like/pass, in the background ----------
+    const persist = async () => {
+      let madeMatch = false;
+      try {
+        if (wasLike) {
+          const result = await recordCircleLike(userId, profile.id, isPremium);
+          setCircleLikesUsed(result.currentUsage);
+          if (result.limitReached || !result.success) {
+            rollback({ keepUsage: true });
+            setShowCircleOutOfLikes(true);
+            return;
           }
-          if (typeof window !== 'undefined') {
-            const win = window as Window & { chatMatchesCache?: Map<string, unknown> };
-            win.chatMatchesCache?.delete(currentUser.id);
-            window.dispatchEvent(new CustomEvent('newMatch', { detail: { userId: currentUser.id } }));
-          }
+          madeMatch = result.match;
         } else {
-          // A one-way Circle like belongs on Liked Me. Once it is mutual,
-          // send only the match notification so the recipient is not shown
-          // contradictory like and match alerts for the same action.
-          try {
-            const { count } = await supabase
-              .from('likes')
-              .select('id', { count: 'exact', head: true })
-              .eq('liked_id', profile.id);
-            await sendMultipleLikesNotification(profile.id, typeof count === 'number' ? count : 1, currentUser.id);
-          } catch {
-            // Notification failures never block a persisted swipe.
-          }
+          const { error } = await supabase.rpc('pass_and_usage_batched', {
+            passer_id_param: userId,
+            passed_id_param: profile.id,
+            premium_param: !!isPremium,
+          });
+          if (error) throw error;
+        }
+      } catch (error) {
+        console.error(`Error ${wasLike ? 'liking' : 'passing'} from Circle:`, error);
+        rollback();
+        toast({ title: "Couldn't save that", description: `Your ${wasLike ? 'like' : 'pass'} for ${profile.first_name} didn't go through, so they're back in your deck.`, variant: 'destructive' });
+        return;
+      }
+
+      ownSwipedIdsRef.current.add(profile.id);
+      publishSwipeDecision(userId, profile.id, direction);
+      if (!wasLike) return;
+      // Everything below is best-effort follow-up (a persisted like never fails because a
+      // notification did) and it never holds up the next swipe.
+      if (madeMatch) {
+        toast({ title: "It's a match! 🎉", description: `You and ${profile.first_name} liked each other.` });
+        try {
+          await sendMatchNotification(`${currentUser?.first_name || ''}`.trim() || 'Someone', profile.id);
+        } catch {
+          // ignore notification errors
+        }
+        if (typeof window !== 'undefined') {
+          const win = window as Window & { chatMatchesCache?: Map<string, unknown> };
+          win.chatMatchesCache?.delete(userId);
+          window.dispatchEvent(new CustomEvent('newMatch', { detail: { userId } }));
+        }
+      } else {
+        // A one-way Circle like belongs on Liked Me. Once it is mutual, send only the match
+        // notification so the recipient is not shown contradictory like and match alerts.
+        try {
+          const { count } = await supabase
+            .from('likes')
+            .select('id', { count: 'exact', head: true })
+            .eq('liked_id', profile.id);
+          await sendMultipleLikesNotification(profile.id, typeof count === 'number' ? count : 1, userId);
+        } catch {
+          // Notification failures never block a persisted swipe.
         }
       }
-    } catch (error) {
-      console.error(`Error ${direction === 'like' ? 'liking' : 'passing'} from Circle:`, error);
-      // Not restored to the pool/deck - the like/pass may well have gone
-      // through server-side (usage-limit RPCs can partially succeed), and
-      // mistakenly showing this person again isn't worth risking a
-      // duplicate action.
-      toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
-    } finally {
-      setIsSwipeActionPending(false);
-    }
-  }, [isSwipeActionPending, currentUser?.id, isPremium, toast, categoryBrowse, categoryBrowseIndex, applyProfileImages, prefetchUpcoming, loadMoreCategory, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
+    };
+    void persist().finally(() => { swipeInFlightRef.current.delete(profile.id); });
+  }, [currentUser?.id, currentUser?.first_name, isPremium, toast, categoryBrowse, categoryBrowseIndex, applyProfileImages, prefetchUpcoming, loadMoreCategory, closeProfileView, activeRowKey, markRowExhausted, circleLikesLoaded, circleLikesUsed, circleDailyLimit, sendMatchNotification, sendMultipleLikesNotification]);
 
   const handleCircleLike = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'like'), [performSwipeAction]);
   const handleCirclePass = useCallback((profile: CircleProfile) => performSwipeAction(profile, 'pass'), [performSwipeAction]);
@@ -1571,7 +1730,9 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       return;
     }
     if (!currentUser?.id || loadingCategoryKey) return;
+    const openToken = ++openTokenRef.current;
     setLoadingCategoryKey(tile.key);
+    setOpeningCategory(tile.label);
     try {
       const userId = currentUser.id;
       const baseCountryCode = normalizeCountryCode(currentUser.country_code || '');
@@ -1589,6 +1750,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         homeCountryCodes = Array.from(new Set((countryRows || []).map((r) => normalizeCountryCode(r.country_code || '')).filter(Boolean)));
       }
       if (homeCountryCodes.length === 0 && unlockedCountryCodes.length === 0) {
+        setEmptyCategoryKind('none');
         setEmptyCategoryLabel(tile.label);
         return;
       }
@@ -1598,19 +1760,13 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // like/pass/match/block/cooldown, never someone else's incoming like on
       // you (see circlePoolFetch.ts's comment - Discover shows those too;
       // Liked Me is what surfaces the other side of it).
-      const [likesRes, matchesRes, blocksRes, passesRes, cooldownsRes] = await Promise.all([
-        supabase.from('likes').select('liked_id').eq('liker_id', userId),
-        supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-        supabase.from('blocks').select('blocked_id,blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
-        supabase.from('passes').select('passed_id').eq('passer_id', userId).gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
-        supabase.from('match_cooldowns').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`).gt('expires_at', new Date().toISOString()),
+      // The shared exclusion set (the exact five queries this block used to repeat inline) plus the
+      // PERSISTED Recommended/Similar reservations, all in ONE round trip.
+      const [excluded, storedRecommended, storedSimilar] = await Promise.all([
+        fetchCircleExclusionIds(userId),
+        fetchStoredCircleBatch(userId, 'recommended'),
+        fetchStoredCircleBatch(userId, 'similar'),
       ]);
-      const excluded = new Set<string>([userId]);
-      (likesRes.data || []).forEach((l) => l.liked_id && excluded.add(l.liked_id));
-      (matchesRes.data || []).forEach((m) => excluded.add(m.user1_id === userId ? m.user2_id : m.user1_id));
-      (blocksRes.data || []).forEach((b) => { if (b.blocked_id) excluded.add(b.blocked_id); if (b.blocker_id) excluded.add(b.blocker_id); });
-      (passesRes.data || []).forEach((p) => p.passed_id && excluded.add(p.passed_id));
-      (cooldownsRes.data || []).forEach((c) => excluded.add(c.user1_id === userId ? c.user2_id : c.user1_id));
       // Anyone held by the Recommended/Similar rows belongs only to those
       // rows - never also in a category deck, where swiping them would
       // silently gut the row the user is still looking at.
@@ -1619,22 +1775,17 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       // Also honour the PERSISTED reservation, not just what's in memory -
       // a row that hasn't finished loading (or is on cooldown with a stored
       // batch) must still keep its people out of every category deck.
-      const [storedRecommended, storedSimilar] = await Promise.all([
-        fetchStoredCircleBatch(userId, 'recommended'),
-        fetchStoredCircleBatch(userId, 'similar'),
-      ]);
       (storedRecommended || []).forEach((id) => excluded.add(id));
       (storedSimilar || []).forEach((id) => excluded.add(id));
 
-      // Same distance/archived rules Discover and Circle's own
-      // Recommended/Similar rows already enforce - this RPC used to have
-      // neither, so category browsing could surface people hundreds of km
-      // away, or archived accounts, that Discover would never show.
+      // Same distance rule Discover and Circle's own Recommended/Similar rows enforce. Archived
+      // members (inactive 30+ days) ARE included, but only as a top-up after the active ones
+      // (see loadPage), exactly how Discover mixes them in.
       const { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees } = getCircleDistanceParams(currentUser, isPremium);
 
       type ProfileRow = Omit<CircleProfile, 'firstImage'>;
       const fetchCategoryRows = async (
-        codes: string[], applyRadius: boolean, limit: number, skip: Set<string>
+        codes: string[], applyRadius: boolean, limit: number, skip: Set<string>, archived = false
       ): Promise<ProfileRow[]> => {
         if (codes.length === 0 || limit <= 0) return [];
         const useBox = applyRadius && hasCoords;
@@ -1651,7 +1802,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           p_has_music: typeof tile.filter?.hasMusic === 'boolean' ? tile.filter.hasMusic : null,
           p_has_social_media: typeof tile.filter?.hasSocialMedia === 'boolean' ? tile.filter.hasSocialMedia : null,
           p_has_pets: typeof tile.filter?.hasPets === 'boolean' ? tile.filter.hasPets : null,
-          p_archived: false,
+          p_archived: archived,
           p_lat: useBox ? userLat : null,
           p_lon: useBox ? userLon : null,
           p_radius_degrees: applyRadius ? radiusDegrees : null,
@@ -1667,12 +1818,24 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       const loadPage = async (skipIds: string[]): Promise<CircleProfile[]> => {
       const skip = new Set(excluded);
       skipIds.forEach((id) => skip.add(id));
-      const homeLimit = unlockedCountryCodes.length > 0 ? 30 : 60;
-      const [homeRows, unlockedRows] = await Promise.all([
-        fetchCategoryRows(homeCountryCodes, true, homeLimit, skip),
-        fetchCategoryRows(unlockedCountryCodes, false, unlockedCountryCodes.length > 0 ? 60 - homeLimit : 0, skip),
-      ]);
-      const rows = [...homeRows, ...unlockedRows];
+      // Two phases, like Discover: ACTIVE members first; ARCHIVED members (inactive 30+ days) only
+      // top the page up when the active supply for this circle is short. Later pages repeat the
+      // same order, so the deck flows active -> archived with no visible seam (the prefetch window
+      // is just "the next cards in the list").
+      const fetchPhase = async (archived: boolean, want: number): Promise<ProfileRow[]> => {
+        const homeLimit = unlockedCountryCodes.length > 0 ? Math.ceil(want / 2) : want;
+        const [homeRows, unlockedRows] = await Promise.all([
+          fetchCategoryRows(homeCountryCodes, true, homeLimit, skip, archived),
+          fetchCategoryRows(unlockedCountryCodes, false, unlockedCountryCodes.length > 0 ? want - homeLimit : 0, skip, archived),
+        ]);
+        return [...homeRows, ...unlockedRows];
+      };
+      const activeRows = await fetchPhase(false, CIRCLE_PAGE_SIZE);
+      const archivedRows = activeRows.length < CIRCLE_PAGE_SIZE
+        ? (await fetchPhase(true, CIRCLE_PAGE_SIZE - activeRows.length)).map((r) => ({ ...r, __isArchivedMixin: true }))
+        : [];
+      const seenIds = new Set<string>();
+      const rows = [...activeRows, ...archivedRows].filter((r) => (seenIds.has(r.id) ? false : (seenIds.add(r.id), true)));
       if (rows.length === 0) return [];
 
       const eligible = rows
@@ -1695,7 +1858,15 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         ? await supabase.from('user_images').select('user_id, image_url, image_order').in('user_id', ids).eq('is_approved', true).neq('image_order', -1).order('image_order', { ascending: true })
         : { data: [] as { user_id: string; image_url: string }[] };
       const firstImageByUser: Record<string, string> = {};
-      (imageRows || []).forEach((row) => { if (!firstImageByUser[row.user_id]) firstImageByUser[row.user_id] = row.image_url; });
+      const allImagesByUser: Record<string, string[]> = {};
+      (imageRows || []).forEach((row) => {
+        if (!firstImageByUser[row.user_id]) firstImageByUser[row.user_id] = row.image_url;
+        (allImagesByUser[row.user_id] ||= []).push(row.image_url);
+      });
+      // Every person's FULL photo list came back in this one query, so seed the per-session
+      // cache with it: swiping no longer fires a user_images request per upcoming card (the
+      // prefetch window used to cost ~3 extra round trips on every single swipe).
+      Object.entries(allImagesByUser).forEach(([uid, urls]) => { imageUrlCacheRef.current.set(uid, urls); });
 
       return eligible
         .filter((p) => firstImageByUser[p.id])
@@ -1703,7 +1874,9 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       };
 
       const withPhotos = await loadPage([]);
+      if (openToken !== openTokenRef.current) return; // Back was pressed while loading
       if (withPhotos.length === 0) {
+        setEmptyCategoryKind('none');
         setEmptyCategoryLabel(tile.label);
         return;
       }
@@ -1715,9 +1888,12 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
       prefetchUpcoming(withPhotos, 0);
     } catch (err) {
       console.error('Error loading category browse:', err);
-      toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
+      if (openToken === openTokenRef.current) toast({ title: 'Error', description: 'Something went wrong. Please try again.', variant: 'destructive' });
     } finally {
-      setLoadingCategoryKey(null);
+      if (openToken === openTokenRef.current) {
+        setLoadingCategoryKey(null);
+        setOpeningCategory(null);
+      }
     }
   }, [currentUser, isPremium, toast, loadingCategoryKey, navigate, applyProfileImages, prefetchUpcoming, recommendedBatch, similarBatch]);
 
@@ -1822,6 +1998,22 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
 
   const activeProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex] : selectedProfile;
   const nextBrowseProfile = categoryBrowse ? categoryBrowse.profiles[categoryBrowseIndex + 1] : undefined;
+  // Stable props for the deck card: building these inline handed the preview a brand-new profile
+  // object (and a new images array) on every CirclePage render, i.e. on every state tick of the
+  // like counter, row batches, cooldown clock, etc.
+  const activeMatch = useMemo(() => (activeProfile ? toPotentialMatch(activeProfile) : null), [activeProfile]);
+  const activeImages = useMemo(
+    () => (selectedImages.length ? selectedImages : (activeProfile?.firstImage ? [activeProfile.firstImage] : [])),
+    [selectedImages, activeProfile?.firstImage]
+  );
+  const cancelOpening = useCallback(() => {
+    openTokenRef.current += 1;
+    setOpeningCategory(null);
+    setLoadingCategoryKey(null);
+    setDeckLoadingMore(false);
+    closeProfileView();
+  }, [closeProfileView]);
+  useBackClose(!!openingCategory && !activeProfile, cancelOpening, { escape: false });
 
   // Users who've used today's tier allowance. Same shape as
   // Discover's own out-of-swipes card, with the CTA wording following
@@ -1829,7 +2021,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   if (showCircleOutOfLikes) {
     return (
       <div className="h-full w-full flex items-center justify-center overflow-y-auto p-4">
-        <Card className="max-w-md w-full bg-black border border-pink-500/25 text-white shadow-2xl">
+        <Card variant="surface" className="max-w-md w-full">
           <CardContent className="p-6 text-center flex flex-col items-center">
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
             <h2 className="text-lg font-semibold mb-1.5 text-white">Out of swipes for today</h2>
@@ -1838,17 +2030,14 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
               {!isPremium ? ' — or upgrade for 100 Circle likes each day.' : '.'}
             </p>
             <div className="w-full flex flex-col items-center gap-3">
-              <Button
-                onClick={() => { setShowCircleOutOfLikes(false); setShowCirclePremiumUpgrade(true); }}
-                className="w-auto h-9 !rounded-full px-4 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+              <Button variant="premium" size="sm"
+                onClick={() => { setShowCircleOutOfLikes(false); openPremiumUpgrade(); }}
               >
                 <Crown className="w-3.5 h-3.5 mr-1.5" />
                 {eligibleForTrial ? 'Try now for free' : 'Upgrade to Premium'}
               </Button>
-              <Button
-                variant="outline"
+              <Button variant="line" size="sm" className="text-white"
                 onClick={() => setShowCircleOutOfLikes(false)}
-                className="w-auto h-8 !rounded-full px-3.5 text-xs border-pink-500/30 text-white hover:bg-pink-500/10 bg-transparent"
               >
                 Back to Circle
               </Button>
@@ -1868,33 +2057,34 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   if (emptyCategoryLabel) {
     return (
       <div className="h-full w-full flex items-center justify-center overflow-y-auto p-4">
-        <Card className="max-w-md w-full bg-black border border-pink-500/25 text-white shadow-2xl">
+        <Card variant="surface" className="max-w-md w-full">
           <CardContent className="p-6 text-center flex flex-col items-center">
             <Heart className="w-12 h-12 mb-3 text-pink-500/80" />
-            <h2 className="text-lg font-semibold mb-1.5 text-white">No one matches yet</h2>
+            <h2 className="text-lg font-semibold mb-1.5 text-white">
+              {emptyCategoryKind === 'seen' ? t('circle.endTitle', "You've seen everyone here") : 'No one matches yet'}
+            </h2>
             <p className="text-gray-400 text-sm mb-5 max-w-xs">
-              No one new matches &quot;{emptyCategoryLabel}&quot; right now. Check back soon, or adjust your preferences in Profile.
+              {emptyCategoryKind === 'seen'
+                ? t('circle.endBody', { circle: emptyCategoryLabel, defaultValue: 'You\'ve seen everyone in "{{circle}}" for now. Check back soon, or explore another circle.' })
+                : <>No one new matches &quot;{emptyCategoryLabel}&quot; right now. Check back soon, or adjust your preferences in Profile.</>}
             </p>
             {!isPremium && (
               <div className="mb-3">
                 <p className="text-yellow-400 text-sm mb-3 max-w-xs mx-auto">
                   Upgrade to Premium to unlock more countries and see more people.
                 </p>
-                <Button
-                  onClick={() => { setEmptyCategoryLabel(null); setShowCirclePremiumUpgrade(true); }}
-                  className="w-auto h-8 !rounded-full px-3.5 text-xs bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold"
+                <Button variant="premium" size="sm"
+                  onClick={() => { setEmptyCategoryLabel(null); openPremiumUpgrade(); }}
                 >
                   <Crown className="w-3.5 h-3.5 mr-1.5" />
                   {eligibleForTrial ? 'Try now for free' : 'Unlock More Countries'}
                 </Button>
               </div>
             )}
-            <Button
-              variant="outline"
+            <Button variant="line" size="sm" className="text-white"
               onClick={() => setEmptyCategoryLabel(null)}
-              className="w-auto h-8 !rounded-full px-3.5 text-xs border-pink-500/30 text-white hover:bg-pink-500/10"
             >
-              Back to Circle
+              {emptyCategoryKind === 'seen' ? t('circle.endCta', 'Explore other circles') : 'Back to Circle'}
             </Button>
           </CardContent>
         </Card>
@@ -1902,41 +2092,58 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     );
   }
 
-  if (showCirclePremiumUpgrade) {
-    return (
-      <div className="h-full w-full overflow-y-auto">
-        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowCirclePremiumUpgrade(false)} preselectedPlan="premium" />
-      </div>
-    );
+  // Landing-page derived values (plain reads of state, no hooks, so they are safe below the
+  // hooks block and above the early returns).
+  const verifiedNearYou = categories.find((c) => c.key === 'verified')?.count ?? 0;
+  const lockedTile = lockedTileLabel ? categories.find((c) => c.label === lockedTileLabel) ?? null : null;
+  const lockedTeaser = lockedTile ? teaserDisplay(appTotals[lockedTile.key] ?? null) : null;
+
+  if (deckLoadingMore || (openingCategory && !activeProfile)) {
+    return <CircleDeckSkeleton label={categoryBrowse?.label ?? openingCategory} onBack={cancelOpening} />;
   }
 
-  if (activeProfile) {
+  if (activeProfile && activeMatch) {
     return (
+      // Opacity-only fade (a transform here would trap the preview's fixed children). Keyed to
+      // the opened deck, NOT the person, so it plays once on open and never between swipes.
+      <div
+        key={categoryBrowse ? `browse:${categoryBrowse.label}` : 'single'}
+        className="h-full w-full"
+        style={{ animation: 'dl-fade var(--dl-dur) var(--dl-ease-out) backwards' }}
+      >
       <ProfilePreviewModal
         // Remount per person: the preview keeps its own slide index, expanded
         // state and swipe-exit transform, so reusing the instance left the
         // next card stuck mid-swipe with stale info until a full refresh.
         key={activeProfile.id}
-        profile={toPotentialMatch(activeProfile)}
-        images={selectedImages.length ? selectedImages : (activeProfile.firstImage ? [activeProfile.firstImage] : [])}
+        profile={activeMatch}
+        images={activeImages}
         onClose={closeProfileView}
         onBack={closeProfileView}
         simpleBackButton
         onLike={() => handleCircleLike(activeProfile)}
         onPass={() => handleCirclePass(activeProfile)}
-        topLabel={categoryBrowse ? categoryBrowse.label : undefined}
+        topLabel={categoryBrowse
+          ? `${categoryBrowse.label} · ${categoryBrowseIndex + 1}/${categoryBrowse.profiles.length}${categoryMoreRef.current && !categoryMoreRef.current.exhausted ? '+' : ''}`
+          : undefined}
         nextPreviewImageUrl={nextBrowseProfile?.firstImage || undefined}
         dailyLikeCounter={circleLikesLoaded ? { remaining: circleLikesLeft, limit: circleDailyLimit } : undefined}
         readOnly
       />
+      </div>
     );
   }
 
   return (
     <div className="h-full w-full bg-black overflow-y-auto scrollbar-hide">
-      <div className="sticky top-0 z-10 bg-black pt-2 pb-2">
+      <div className="sticky top-0 z-10 bg-black pt-1.5 pb-1.5">
         <div className="flex items-start justify-between px-6 gap-3 mb-1">
-          <h2 className="text-white font-semibold text-base">Circle Up</h2>
+          <div className="min-w-0">
+            <h2 className="ci-title">
+              <span className="ci-title-accent">{t('circle.title', 'Circle Up')}</span>
+            </h2>
+            <p className="ci-sub">{t('circle.subtitle', 'Find people who share your world.')}</p>
+          </div>
           {circleLikesLoaded && (
             <span
               className={`flex items-center gap-1 flex-shrink-0 text-[11px] font-medium rounded-full border px-2.5 py-1 ${
@@ -1951,7 +2158,6 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
             </span>
           )}
         </div>
-        <p className="text-white/40 text-xs px-6">Made easy to spot and find who's right for you.</p>
         {/* Hidden for now - flip SHOW_CIRCLE_UP_LIVE to bring the entry back. */}
         {SHOW_CIRCLE_UP_LIVE && (
           <button
@@ -1971,9 +2177,39 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         )}
       </div>
       <div>
+        {isPremium === true && countScope.showCountryHint && (
+          <div className="px-6 pt-1 pb-2">
+            <button
+              type="button"
+              className="ci-hint"
+              onClick={() => onNavigateToProfileSection?.('location')}
+            >
+              <Globe className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{t('circle.worldwideHint', 'Showing app-wide totals')}</span>
+              <span className="ci-hint-cta">{t('circle.pickCountries', 'Choose your countries')}</span>
+            </button>
+          </div>
+        )}
+        {verifiedNearYou > 0 && (
+          <div className="px-6 pt-1 pb-2">
+            <span className="ci-live" style={{ marginTop: 0 }}>
+              <span className="ci-live-dot" aria-hidden="true" />
+              {t('circle.verifiedNearYou', { count: formatCountCompact(verifiedNearYou), defaultValue: '{{count}} verified members near you' })}
+            </span>
+          </div>
+        )}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+          <div className="space-y-6 px-6 py-4" role="status" aria-busy="true">
+            {[0, 1].map((row) => (
+              <div key={row}>
+                <div className="dl-skeleton mb-3 h-5 w-40" />
+                <div className="flex gap-3 overflow-hidden">
+                  {[0, 1, 2].map((card) => (
+                    <div key={card} className="dl-skeleton h-[250px] w-40 shrink-0 rounded-2xl" />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : pool.length === 0 ? (
           <div className="px-6 pb-2">
@@ -1981,43 +2217,81 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
           </div>
         ) : (
           <>
-            {renderCircleRow('recommended', 'Recommended for you', recommendedItems, recommendedBatch, false)}
-            {renderCircleRow('similar', 'Similar interests', similarItems, similarBatch, true)}
+            <div className="dl-stagger">
+              <div style={{ '--i': 0 } as React.CSSProperties}>
+                {renderCircleRow('recommended', 'Recommended for you', recommendedItems, recommendedBatch, false)}
+              </div>
+              <div style={{ '--i': 1 } as React.CSSProperties}>
+                {renderCircleRow('similar', 'Similar interests', similarItems, similarBatch, true)}
+              </div>
+            </div>
           </>
         )}
 
-        <div className="grid grid-cols-2 gap-3 pb-4" style={{ paddingLeft: 24, paddingRight: 24 }}>
-          {categories.map((tile) => {
+        <div className="ci-grid dl-stagger pb-4" style={{ paddingLeft: 24, paddingRight: 24 }}>
+          {categories.map((tile, tileIndex) => {
             const { key, label, icon: Icon, count, isGameLink } = tile;
             const isLoadingThis = loadingCategoryKey === key;
             const isLockedForFree = !isPremium && PREMIUM_ONLY_CATEGORY_KEYS.has(key);
+            const [h1, h2] = CATEGORY_THEME[key] ?? [330, 280];
+            // Locked tiles advertise the circle instead of showing a bare number: blurred round
+            // avatars + an honest bucket of the REAL count rounded DOWN ("1k+"). When the count is
+            // not known we say "Many" rather than invent a figure.
+            const teaser = isLockedForFree ? teaserDisplay(appTotals[key] ?? null) : null;
+            // a premium viewer who has not picked countries yet sees the entire-app total on every
+            // tile (falling back to their local count if that total could not be fetched)
+            const appWide = !isLockedForFree && !isGameLink && isPremium === true && countScope.mode === 'worldwide'
+              ? teaserDisplay(appTotals[key] ?? null)
+              : null;
+            const unlockedPill = appWide?.label ?? (count !== null ? formatCountCompact(count) : null);
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => handleCategoryClick(tile)}
                 disabled={!isGameLink && !isLockedForFree && loadingCategoryKey !== null}
-                className={`relative text-left rounded-2xl border px-4 py-5 flex flex-col items-center gap-3 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                  isGameLink
-                    ? 'bg-gradient-to-br from-pink-600/20 to-purple-600/20 border-pink-500/30 active:from-pink-600/30 active:to-purple-600/30'
-                    : 'bg-white/[0.04] border-white/10 active:bg-white/[0.08]'
-                }`}
+                className="ci-tile"
+                data-locked={isLockedForFree ? 'true' : undefined}
+                data-games={isGameLink ? 'true' : undefined}
+                style={{ ['--h1' as string]: h1, ['--h2' as string]: h2, ['--i' as string]: tileIndex }}
               >
-                {isLockedForFree && (
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/80 border border-pink-500/40 flex items-center justify-center">
-                    <Lock className="w-3 h-3 text-pink-300" />
-                  </div>
-                )}
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isGameLink ? 'bg-pink-500/20 border border-pink-500/40' : 'bg-pink-500/10 border border-pink-500/25'}`}>
-                  {isLoadingThis ? (
-                    <div className="w-4 h-4 border-2 border-pink-400 border-t-transparent rounded-full animate-spin" />
+                <div className="ci-tile-top">
+                  {isLockedForFree ? (
+                    <>
+                      <TeaserAvatars hues={teaserHues(key, 3)} size={18} photos={teaserPhotos[key]} more={(appTotals[key] ?? 0) > 3} />
+                      <span className="ci-lock" aria-label={t('circle.premiumTag', 'Premium')}>
+                        <Lock className="w-3 h-3" />
+                      </span>
+                    </>
                   ) : (
-                    <Icon className="w-5 h-5 text-pink-500" />
+                    <>
+                      <span className="ci-tile-icon">
+                        {isLoadingThis ? (
+                          <span className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Icon className="w-4 h-4" />
+                        )}
+                      </span>
+                      {!isGameLink && unlockedPill !== null && (
+                        <span className="ci-pill" aria-label={`${unlockedPill} ${t('circle.members', 'members')}`}>
+                          <Users className="w-3 h-3" aria-hidden="true" />
+                          {unlockedPill}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-white text-sm font-medium leading-tight">{label}</span>
-                  {!isGameLink && count !== null && <span className="text-white/40 text-xs ml-2 flex-shrink-0">{count}</span>}
+                <div className="ci-tile-foot">
+                  <span className="ci-tile-label">{label}</span>
+                  {isLockedForFree && (teaser?.label || teaser?.vague) && (
+                    <span
+                      className="ci-pill ci-pill-hot"
+                      aria-label={teaser?.label ? `${teaser.label} ${t('circle.members', 'members')}` : t('circle.many', 'Many')}
+                    >
+                      <Users className="w-3 h-3" aria-hidden="true" />
+                      {teaser?.label ?? t('circle.many', 'Many')}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -2025,38 +2299,45 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         </div>
       </div>
 
-      {lockedTileLabel && (
+      {lockedTile && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+          className="fixed inset-0 z-[9999] bg-black/70 flex items-center justify-center p-6"
+          style={{ WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}
           onClick={() => setLockedTileLabel(null)}
+          role="dialog"
+          aria-modal="true"
         >
-          <div
-            className="w-full max-w-xs rounded-2xl border border-pink-500/30 bg-gradient-to-br from-pink-950 via-purple-950 to-black p-6 text-center shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-pink-500/15 border border-pink-500/40 flex items-center justify-center">
-              <Lock className="w-5 h-5 text-pink-300" />
+          <div className="ci-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center">
+              <TeaserAvatars hues={teaserHues(lockedTile.key, 3)} size={22} photos={teaserPhotos[lockedTile.key]} more={(appTotals[lockedTile.key] ?? 0) > 3} />
             </div>
-            <p className="text-white text-sm leading-relaxed mb-5">
-              You could see a lot of <span className="font-semibold text-pink-300">{lockedTileLabel}</span> matches waiting for you - but you'll need to upgrade to enjoy this.
+            {lockedTeaser?.label && <div className="ci-sheet-count">{lockedTeaser.label}</div>}
+            <h3 className="ci-sheet-title">
+              {lockedTeaser?.label
+                ? t('circle.unlockTitle', { circle: lockedTile.label, defaultValue: 'members in {{circle}}' })
+                : lockedTeaser?.vague
+                  ? t('circle.unlockTitleMany', { circle: lockedTile.label, defaultValue: 'Join lots of members in {{circle}}' })
+                  : lockedTile.label}
+            </h3>
+            <p className="ci-sheet-body">
+              {t('circle.unlockBody', "Unlock this circle to meet the members who match exactly what you're looking for.")}
             </p>
-            <button
+            <Button variant="premium" size="lg" className="w-full"
               type="button"
               onClick={() => {
                 setLockedTileLabel(null);
-                setShowCirclePremiumUpgrade(true);
+                openPremiumUpgrade();
               }}
-              className="w-full py-3 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black text-sm font-semibold shadow-md transition-colors flex items-center justify-center gap-2"
             >
               <Crown className="w-4 h-4" />
-              {eligibleForTrial ? 'Start Free Trial' : 'Upgrade'}
-            </button>
+              {eligibleForTrial ? t('circle.unlockCtaTrial', 'Start free trial') : t('circle.unlockCta', 'Unlock with Premium')}
+            </Button>
             <button
               type="button"
               onClick={() => setLockedTileLabel(null)}
-              className="mt-3 text-white/40 text-xs"
+              className="dl-hit mt-3 text-white/45 text-xs"
             >
-              Maybe later
+              {t('circle.maybeLater', 'Maybe later')}
             </button>
           </div>
         </div>

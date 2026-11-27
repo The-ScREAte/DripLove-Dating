@@ -1,6 +1,7 @@
 /**
  * Auto-detect user's country using GPS and IP geolocation
  */
+import { withTimeout } from '@/utils/withTimeout';
 
 async function isNativePlatform(): Promise<boolean> {
   try {
@@ -9,21 +10,6 @@ async function isNativePlatform(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutId = setTimeout(() => reject(new Error(`Timeout: ${label}`)), ms);
-    promise
-      .then((value) => {
-        clearTimeout(timeoutId);
-        resolve(value);
-      })
-      .catch((err) => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
-  });
 }
 
 interface GeolocationResult {
@@ -261,20 +247,6 @@ export async function autoDetectCountry(): Promise<GeolocationResult> {
     countryName: '',
     method: 'failed'
   };
-}
-
-/**
- * Get country name from country code
- */
-export function getCountryName(countryCode: string): string {
-  return countryCodeMap[countryCode.toUpperCase()] || '';
-}
-
-/**
- * Check if country detection is supported
- */
-export function isGeolocationSupported(): boolean {
-  return 'geolocation' in navigator;
 }
 
 /**

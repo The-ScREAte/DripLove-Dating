@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { recordRatingMoment } from '@/rating/ratingMoments';
 
 export interface DailyStreakResult {
   currentStreak: number;
@@ -31,6 +32,11 @@ export const useDailyStreak = (userId: string | undefined) => {
         if (error || !data || data.length === 0) return;
 
         const row = data[0];
+        // A 7 / 14 / 30 day streak is a proud moment - a good time (after the
+        // flash) for the store-review engine to consider asking.
+        if (row.is_new_day && [7, 14, 30].includes(row.current_streak)) {
+          recordRatingMoment('streak_milestone');
+        }
         setStreak({
           currentStreak: row.current_streak,
           longestStreak: row.longest_streak,

@@ -5,6 +5,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts'
 import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
+import { claimPaymentReference, isAcceptableGhsPayment } from '../_shared/payment-guards.ts'
+import { timingSafeEqual } from '../_shared/caller-auth.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -42,7 +44,7 @@ async function verifyPaystackSignature(body: string, signature: string, secretKe
       .map(b => b.toString(16).padStart(2, '0'))
       .join('')
     
-    return computedHex === signature
+    return timingSafeEqual(computedHex, signature)
   } catch (error) {
     console.error('Signature verification error:', error)
     return false
@@ -305,8 +307,17 @@ serve(async (req) => {
       return json(200, { message: 'Failure processed' })
     }
 
+    // Paystack plan subscriptions are not used by this app (paystack-init rejects
+    // plans; renewals are charged from saved authorizations by the cron). A
+    // subscription.create event therefore carries no payment and must never grant
+    // premium on its own.
+    if (eventType === 'subscription.create') {
+      console.log('[PAYSTACK-WEBHOOK] subscription.create ignored (plans unused, no payment attached)')
+      return json(200, { message: 'subscription.create ignored' })
+    }
+
     // Successful payment / renewal events
-    if (eventType === 'charge.success' || eventType === 'subscription.create') {
+    if (eventType === 'charge.success') {
       console.log('[PAYSTACK-WEBHOOK] Processing payment success/renewal event')
 
       const userIdFromMeta = extractUserIdFromMetadata(eventData)
@@ -325,11 +336,41 @@ serve(async (req) => {
 
       if (!userId) return json(400, { error: 'Unable to resolve user' })
 
-      // Extract and save authorization for future recurring charges
       const authorization = extractAuthorization(eventData)
       const amount = eventData?.amount || 0 // Already in smallest unit
       const currency = eventData?.currency || 'GHS'
+      const reference = typeof eventData?.reference === 'string' ? eventData.reference.trim() : ''
+      const amountMajor = Number(amount) / 100
 
+      // A charge only counts as a premium purchase when it carries a reference
+      // and the amount is plausibly the real price (the client picks the amount
+      // at init time, so it must never be trusted on its own).
+      if (!reference) {
+        console.warn('[PAYSTACK-WEBHOOK] charge.success without reference ignored')
+        return json(200, { message: 'charge.success without reference ignored' })
+      }
+      const amountCheck = await isAcceptableGhsPayment(supabase, amountMajor, currency)
+      if (!amountCheck.ok) {
+        console.warn(`[PAYSTACK-WEBHOOK] Payment not accepted as premium purchase: ${amountCheck.reason} (ref ${reference})`)
+        // 200 so Paystack does not retry; this will never become valid.
+        return json(200, { message: 'Payment amount not accepted as a premium purchase' })
+      }
+
+      // Idempotency: the first path to see this reference (webhook retry,
+      // paystack-verify, recurring-billing) extends premium; the rest skip.
+      const claim = await claimPaymentReference(supabase, {
+        user_id: userId,
+        amount: amountMajor,
+        currency: currency || 'GHS',
+        payment_method: 'paystack',
+        transaction_id: reference,
+      })
+      if (!claim.claimed) {
+        console.log(`[PAYSTACK-WEBHOOK] Reference ${reference} already processed, skipping duplicate`)
+        return json(200, { message: 'Duplicate reference already processed' })
+      }
+
+      // Extract and save authorization for future recurring charges
       if (authorization) {
         await saveAuthorization(supabase, userId, resolvedEmail || '', authorization, amount, currency)
       }
@@ -372,41 +413,20 @@ serve(async (req) => {
 
       if (upsertError) {
         console.error('[PAYSTACK-WEBHOOK] Error upserting subscription:', upsertError)
+        // Release the claim so Paystack's retry can activate this payment.
+        if (claim.paymentId) await supabase.from('subscription_payments').delete().eq('id', claim.paymentId)
         return json(500, { error: 'Failed to activate subscription' })
       }
 
-      // Record payment (best-effort)
-      let paymentRecordId: string | null = null
-      try {
-        const reference = eventData?.reference || subscriptionCode || ''
-        const { data: paymentRecord, error: paymentError } = await supabase
-          .from('subscription_payments')
-          .insert({
-            user_id: userId,
-            amount: Number(amount) / 100,
-            currency: currency || 'GHS',
-            payment_method: 'paystack',
-            transaction_id: reference,
-          })
-          .select('id')
-          .single()
-        
-        if (!paymentError && paymentRecord) {
-          paymentRecordId = paymentRecord.id
-        }
-      } catch (e) {
-        console.error('[PAYSTACK-WEBHOOK] Error recording payment:', e)
-      }
-
-      // Process referral commission if payment was recorded
-      if (paymentRecordId) {
+      // Process referral commission for the claimed payment
+      if (claim.paymentId) {
         try {
           const { data: commissionResult, error: commissionError } = await supabase.rpc('process_referral_commission', {
             p_user_id: userId,
-            p_payment_amount: Number(amount) / 100,
-            p_payment_id: paymentRecordId
+            p_payment_amount: amountMajor,
+            p_payment_id: claim.paymentId
           })
-          
+
           if (commissionError) {
             console.error('[PAYSTACK-WEBHOOK] Error processing commission:', commissionError)
           } else {

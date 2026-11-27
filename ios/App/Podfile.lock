@@ -5,7 +5,7 @@ PODS:
   - AppAuth/Core (1.7.6)
   - AppAuth/ExternalUserAgent (1.7.6):
     - AppAuth/Core
-  - Capacitor (7.4.3):
+  - Capacitor (7.6.11):
     - CapacitorCordova
   - CapacitorApp (7.0.1):
     - Capacitor
@@ -23,7 +23,7 @@ PODS:
     - Capacitor
   - CapacitorCommunitySafeArea (7.0.0):
     - Capacitor
-  - CapacitorCordova (7.4.3)
+  - CapacitorCordova (7.6.11)
   - CapacitorFirebaseMessaging (7.4.0):
     - Capacitor
     - FirebaseMessaging (~> 11.7.0)
@@ -37,7 +37,7 @@ PODS:
     - Capacitor
   - CapacitorVideoPlayer (6.0.2):
     - Capacitor
-  - CordovaPlugins (7.6.4):
+  - CordovaPlugins (7.6.11):
     - CapacitorCordova
   - FirebaseCore (11.7.0):
     - FirebaseCoreInternal (~> 11.7.0)
@@ -186,7 +186,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
-  Capacitor: b4741ca7affb32c1b70debd03df92cbf522d8a80
+  Capacitor: c9e5351be957c92c9419427dd64c3b16bc154e5b
   CapacitorApp: d63334c052278caf5d81585d80b21905c6f93f39
   CapacitorAppLauncher: a72c5bf90dccef44d3b7ff9fc01813afa38e455e
   CapacitorBrowser: 45c681e7abc3b4384e54eb52bafeef1347d98fa8
@@ -195,14 +195,14 @@ SPEC CHECKSUMS:
   CapacitorCommunityCameraPreview: e103f14483f5f0a5356aacee4605dc7e88260462
   CapacitorCommunityPrivacyScreen: cecddb5f4fb6427a6f9f822aba7970c361e5ecaf
   CapacitorCommunitySafeArea: cea909b52195cf57d08a6b6331288cb43d906196
-  CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
+  CapacitorCordova: 80bf3c6082e7a03b1dbbef63ffe2b33534a07581
   CapacitorFirebaseMessaging: 9cac5fc77994801e2b87a61f7b2a5f8efc0da33a
   CapacitorKeyboard: 3822c3a0c6b58168f96ca562f9534ed095d40860
   CapacitorPreferences: 83f13cc19660ca9649a4769ec255be93f8c2ff68
   CapacitorPushNotifications: 729ade0d2791ec1969feaf931a15e28d929a6d70
   CapacitorRateApp: 896df7ec6a237fea72d1955e0cb26394654b00db
   CapacitorVideoPlayer: e437e704dbc171ecab1a28e89671017643fab06b
-  CordovaPlugins: 799c0d0e2e65a22f43dd5e5785398b04b426e943
+  CordovaPlugins: 3611b3848e3db509151f1a883e619da489dc5fad
   FirebaseCore: 3227e35f4197a924206fbcdc0349325baf4f5de4
   FirebaseCoreInternal: d6c17dafc8dc33614733a8b52df78fcb4394c881
   FirebaseInstallations: 9347e719c3d52d8d7b9074b2c32407dd027305e9

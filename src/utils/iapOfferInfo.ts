@@ -79,7 +79,7 @@ interface ProductLike {
  * returns offers the account is eligible for, so there's nothing to strip
  * there. Owning the product already also rules out a trial.
  */
-export const isTrialEligible = (product: ProductLike | null | undefined): boolean => {
+const isTrialEligible = (product: ProductLike | null | undefined): boolean => {
   if (!product) return false;
   if (product.owned) return false;
   return product.raw?.introPriceEligible !== false;

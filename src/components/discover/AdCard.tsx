@@ -222,13 +222,12 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAna
         </div>
 
         {ad.link && (
-          <Button
+          <Button variant="primary" size="md" className="w-full h-auto"
             onClick={handleLinkClick}
             // No fixed h-* here - letting the smaller py-2 padding set the
             // height (instead of fighting the base Button's own h-10) is
             // what actually shrinks it; rounded-full makes it a proper pill
             // instead of the default rounded-md rectangle.
-            className="w-full h-auto py-2 rounded-full text-sm bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-bold"
           >
             <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
             {ad.link_as || 'Click here'}

@@ -1,66 +1,29 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  MapPin,
-  Heart,
-  Briefcase,
-  GraduationCap,
-  Languages,
-  ArrowDown,
-  ArrowUp,
-  ArrowLeft as ArrowLeftIcon,
-  ChevronLeft,
-  Ruler,
-  Baby,
-  MessageCircle,
-  Gift,
-  PawPrint,
-  Share2,
-  X as XIcon,
-} from 'lucide-react';
+import { Heart, ArrowLeft as ArrowLeftIcon, ChevronLeft, X as XIcon } from 'lucide-react';
 import { Pencil } from 'lucide-react';
 import { PotentialMatch } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
 import { getLanguageName } from '@/utils/languageNames';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
-import { buildSlides, getPreviewHighlights, getUserColorHash, HIGHLIGHT_CHIP_BORDER_COLORS, truncateChipLabel, seedFromString, mulberry32, seededShuffle } from '../discover/MatchCardHelpers';
-import { favoriteEmoji, formatFavoriteLabel, findFavoriteWithLink } from '@/constants/favorites';
-import {
-  FAMILY_PLANS_OPTIONS,
-  COMMUNICATION_STYLE_OPTIONS,
-  LOVE_STYLE_OPTIONS,
-  PETS_OPTIONS,
-  SOCIAL_MEDIA_OPTIONS,
-  traitLabel,
-} from '@/constants/profileTraits';
-import MusicLinkBadge from '../discover/MusicLinkBadge';
+import { buildSlides, getPreviewHighlights, getUserColorHash, seedFromString, mulberry32, seededShuffle } from '../discover/MatchCardHelpers';
+import { findFavoriteWithLink } from '@/constants/favorites';
+
+import { ProfileDetailsPanel } from '../profile-card/ProfileDetailsPanel';
+import { useCaptionedPhotos, toTitleCase } from '../profile-card/profileCardUtils';
+import { ProfileCaption } from '../profile-card/ProfileCaption';
+import { icebreakerPillFor } from '../icebreaker/target';
+import { ProfileReportModal } from '../profile-card/ProfileReportModal';
+import { useProfileReport } from '../profile-card/useProfileReport';
+import { useBackClose } from '@/utils/backStack';
+import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import { SlideRenderer } from '../discover/SlideRenderer';
-import UserAdinkraDisplay from '../discover/UserAdinkraDisplay';
 import SwipeButtons from '../discover/SwipeButtons';
+import { useCardSwipe, CARD_EXIT_MS, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from '../discover/useCardSwipe';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
-
-const formatHeightLabel = (cm: number) => {
-  const totalInches = Math.round(cm / 2.54);
-  const feet = Math.floor(totalInches / 12);
-  const inches = totalInches % 12;
-  return `${feet}'${inches}" (${cm} cm)`;
-};
-
-// Same reasoning as MatchCard.tsx's copy of this helper: a Supabase/Postgrest
-// error can be a plain object with a `message` field rather than an `Error`
-// instance, which `err instanceof Error` misses - masking the real reason
-// (RLS denial, constraint, etc.) right when it's most useful to see it.
-const getSupabaseErrorMessage = (err: unknown): string | undefined => {
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === 'object' && 'message' in err) {
-    const message = (err as { message?: unknown }).message;
-    if (typeof message === 'string' && message) return message;
-  }
-  return undefined;
-};
 
 interface ProfilePreviewModalProps {
   profile: PotentialMatch;
@@ -120,18 +83,6 @@ const BACKGROUND_COLORS = [
   'bg-gradient-to-br from-fuchsia-600 to-purple-900',
 ];
 
-// Where the second captioned photo call-out can land in the expanded details
-// panel - always above Personality. Module-level (not per-render) since it's
-// a fixed constant, not something that needs recreating on every render.
-const PHOTO_ANCHORS = ['lifestyle', 'workEducation', 'personality', 'communicationStyle'] as const;
-
-const formatRelationshipIntent = (intent?: string | null) => {
-  if (!intent) return '';
-  if (intent === 'serious') return 'Looking for something serious';
-  if (intent === 'open_to_anything') return 'Open to anything';
-  return `Looking for ${intent.replace(/_/g, ' ').toLowerCase()}`;
-};
-
 const getSafeImageSrc = (url?: string): string | undefined => {
   if (!url) return undefined;
   if (url.startsWith('blob:')) return url;
@@ -161,11 +112,6 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   // Report image - only reachable in readOnly mode (Circle), same as the
   // Crop button it sits opposite: nobody should be able to report their own
   // photo, and nobody but the profile's owner should be able to crop it.
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reporting, setReporting] = useState(false);
-  const [reportSuccess, setReportSuccess] = useState(false);
-  const [reportError, setReportError] = useState('');
-  const [selectedReportReason, setSelectedReportReason] = useState('');
   // Crop is applied locally first ("OK" in the crop modal) so the user sees it
   // exactly as it will look here, and only hits storage/db on an explicit Save.
   const [pendingCrop, setPendingCrop] = useState<{ blob: Blob; previewUrl: string; originalUrl: string } | null>(null);
@@ -237,58 +183,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
     const start = currentSlide % ordered.length;
     return [ordered[start], ordered[(start + 1) % ordered.length]];
   }, [profile.adinkra_symbols, profile.id, profile.first_name, currentSlide]);
-  // Up to 2 of this profile's photos that have a caption set (ImageManagement.tsx),
-  // picked once via a seeded shuffle so the same 1-2 photos surface consistently
-  // rather than a different random pick every render.
-  const captionedPhotos = useMemo(() => {
-    const entries = Object.entries(profile.imageCaptions || {})
-      .filter(([, v]) => v?.caption)
-      .map(([url, v]) => ({ url, caption: v!.caption as string, label: v!.label || null }));
-    if (entries.length === 0) return [];
-    const seed = seedFromString(`${profile.id || profile.first_name || ''}_photocaption`);
-    const rand = mulberry32(seed);
-    const shuffled = [...entries];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled.slice(0, 2);
-  }, [profile.imageCaptions, profile.id, profile.first_name]);
-
-  // Both captioned photos show in the expanded panel, but scattered rather
-  // than back-to-back: the first sits right after About, and the second
-  // lands after a randomly chosen later section (seeded per profile, so it's
-  // consistent rather than jumping around on every re-render).
-  const secondPhotoAnchor = useMemo(() => {
-    if (captionedPhotos.length < 2) return null;
-    const seed = seedFromString(`${profile.id || profile.first_name || ''}_photo2anchor`);
-    const rand = mulberry32(seed);
-    return PHOTO_ANCHORS[Math.floor(rand() * PHOTO_ANCHORS.length)];
-  }, [captionedPhotos.length, profile.id, profile.first_name]);
-
-  // Caption text is capped at 50 characters, matching the limit enforced when
-  // saving it in ImageManagement.tsx, so this should rarely ever truncate -
-  // it's just a safety net for older captions saved before that cap existed.
-  const truncateCaption = (text: string) => (text.length > 50 ? `${text.slice(0, 50).trimEnd()}…` : text);
-
-  const renderPhotoCaptionCard = (photo: { url: string; caption: string; label?: string | null }) => (
-    <div className="relative w-56 aspect-[3/4] rounded-lg overflow-hidden bg-black">
-      <img
-        src={getDetailImageUrl(photo.url)}
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-      <div
-        className="absolute inset-x-0 bottom-0 px-3 pt-8 pb-2.5"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92), rgba(0,0,0,0))' }}
-      >
-        {photo.label && (
-          <p className="text-white/70 text-[11px] font-semibold uppercase tracking-wide truncate">{photo.label}</p>
-        )}
-        <p className="text-white text-sm leading-snug break-words">{truncateCaption(photo.caption)}</p>
-      </div>
-    </div>
+  // Up to 2 captioned photos (seeded pick, shared with every other profile view).
+  const { captionedPhotos, secondPhotoAnchor } = useCaptionedPhotos(
+    profile.imageCaptions,
+    String(profile.id || profile.first_name || '')
   );
+
 
   // The collapsed card's "body" rotates through chips and a bio excerpt as
   // the viewer taps through photos, mirroring Discover's MatchCard -
@@ -320,59 +220,15 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
 
   const currentSlideData = slides[currentSlide] || slides[0];
 
-  const reportReasons = useMemo(() => [
-    t('reportModal.reasons.inappropriate'),
-    t('reportModal.reasons.fake'),
-    t('reportModal.reasons.spam'),
-    t('reportModal.reasons.offensive'),
-    t('reportModal.reasons.harassment'),
-    t('reportModal.reasons.other'),
-  ], [t]);
+  // Android back leaves the preview (Circle's back arrow when present, else close).
+  useBackClose(true, onBack ?? onClose);
 
-  const closeReportModal = useCallback(() => {
-    setShowReportModal(false);
-    setSelectedReportReason('');
-    setReportError('');
-    setReportSuccess(false);
-  }, []);
-
-  // Same reported_images insert MatchCard.tsx uses on Discover, so a report
-  // filed from Circle lands in exactly the same moderation queue.
-  const handleReportImage = useCallback(async () => {
-    if (!selectedReportReason) {
-      setReportError(t('reportModal.selectReason'));
-      return;
-    }
-    setReporting(true);
-    setReportError('');
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const imageUrl = currentSlideData?.content;
-      if (!imageUrl || !profile.id) throw new Error('Missing image or user');
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { error } = await supabase.from('reported_images').insert({
-        reporter_id: user.id,
-        reported_user_id: profile.id,
-        image_url: imageUrl,
-        status: 'pending',
-        reason: selectedReportReason,
-      });
-      if (error) throw error;
-      setReportSuccess(true);
-      setTimeout(() => {
-        setShowReportModal(false);
-        setReportSuccess(false);
-        setSelectedReportReason('');
-      }, 1500);
-    } catch (err: unknown) {
-      setReportError(getSupabaseErrorMessage(err) || t('reportModal.error'));
-    } finally {
-      setReporting(false);
-    }
-  }, [selectedReportReason, currentSlideData, profile.id, t]);
+  // Report (photo on screen) - same shared flow, and same moderation queue, as Discover.
+  // The preview can only report; blocking someone from Circle is handled elsewhere.
+  const report = useProfileReport({
+    reportedUserId: profile.id,
+    getImageUrl: () => currentSlideData?.content,
+  });
 
   const handleNavigationClick = useCallback((e: React.MouseEvent) => {
     const x = e.clientX;
@@ -397,22 +253,17 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   // of suppressing the synthetic "click" after a real drag, instead of a
   // hand-rolled dragging flag.
   const swipeEnabled = Boolean(onLike && onPass);
-  const [swipeDragX, setSwipeDragX] = useState(0);
-  const [swipeDragY, setSwipeDragY] = useState(0);
+  // Same gesture core as Discover (touch / mouse / keyboard share one path: thresholds,
+  // fly-away, snap-back and the heart / X stamps are identical). `holdAfterCommit` keeps the
+  // thrown card off-screen while Circle waits on the network before advancing, so the old
+  // card never flashes back; if the parent does NOT advance (daily limit, error) the card is
+  // restored below.
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
-  const [swipeExitDirection, setSwipeExitDirection] = useState<'left' | 'right' | null>(null);
+  const [swipeExitDirection, setSwipeExitDirection] = useState<SwipeDir | null>(null);
   const swipeCardElRef = useRef<HTMLDivElement>(null);
-  const swipeIsDraggingRef = useRef(false);
-  const swipeStartXRef = useRef(0);
-  const swipeStartYRef = useRef(0);
-  const swipeLatestDeltaXRef = useRef(0);
-  const swipeLatestDeltaYRef = useRef(0);
-  const swipeRafScheduledRef = useRef(false);
-  const swipeRafIdRef = useRef<number | null>(null);
-  // Discover's own threshold: whichever is smaller of 25% of the screen or a
-  // flat 120px, so a swipe commits at a normal, easy drag distance on wide
-  // screens/tablets instead of requiring a much longer drag.
-  const SWIPE_THRESHOLD = () => Math.min(window.innerWidth * 0.25, 120);
+  const likeStampRef = useRef<HTMLDivElement>(null);
+  const passStampRef = useRef<HTMLDivElement>(null);
+  const restoreTimerRef = useRef<number | null>(null);
   // Next-card backdrop reveal - fully hidden the entire drag (no matter how
   // far), only clearing once the swipe actually commits (swipeExitDirection
   // fires), same "hidden until it goes completely through" behavior as
@@ -421,130 +272,53 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
   const NEXT_CARD_MAX_DARK_OPACITY = 0.3;
   const nextCardRevealProgress = swipeExitDirection ? 1 : 0;
 
-  const swipeDragStart = useCallback((x: number, y: number) => {
-    if (!swipeEnabled || swipeExitDirection) return;
-    swipeStartXRef.current = x;
-    swipeStartYRef.current = y;
-    swipeIsDraggingRef.current = true;
-    setIsSwipeDragging(true);
-  }, [swipeEnabled, swipeExitDirection]);
-
-  const swipeDragMove = useCallback((x: number, y: number) => {
-    if (!swipeIsDraggingRef.current) return;
-    const deltaX = x - swipeStartXRef.current;
-    const deltaY = y - swipeStartYRef.current;
-    // The card follows the finger/cursor freely in both directions (a real
-    // grab-and-move feel, matching Discover) - only the horizontal component
-    // decides the like/pass direction and threshold.
-    swipeLatestDeltaXRef.current = deltaX;
-    swipeLatestDeltaYRef.current = deltaY;
-    if (!swipeRafScheduledRef.current) {
-      swipeRafScheduledRef.current = true;
-      swipeRafIdRef.current = requestAnimationFrame(() => {
-        swipeRafIdRef.current = null;
-        if (!swipeIsDraggingRef.current) {
-          swipeRafScheduledRef.current = false;
-          return;
-        }
-        const d = swipeLatestDeltaXRef.current;
-        const dy = swipeLatestDeltaYRef.current;
-        if (swipeCardElRef.current) {
-          swipeCardElRef.current.style.transform = `translate3d(${d}px, ${dy}px, 0) rotate(${d * 0.06}deg)`;
-        }
-        setSwipeDragX(d);
-        setSwipeDragY(dy);
-        swipeRafScheduledRef.current = false;
-      });
-    }
+  const cardSwipe = useCardSwipe({
+    cardRef: swipeCardElRef,
+    likeStampRef,
+    passStampRef,
+    isBlocked: () => !swipeEnabled,
+    holdAfterCommit: true,
+    onUiChange: (patch) => {
+      if (patch.isDragging !== undefined) setIsSwipeDragging(patch.isDragging);
+    },
+    onExitStart: (dir) => setSwipeExitDirection(dir),
+    onExitEnd: () => setSwipeExitDirection(null),
+    onCommit: (dir) => {
+      if (dir === 'right') onLike?.(); else onPass?.();
+      // The parent normally swaps in the next profile (this component is re-keyed per
+      // profile). If it is still here a moment later nothing advanced - restore the card.
+      if (restoreTimerRef.current !== null) window.clearTimeout(restoreTimerRef.current);
+      // Circle now advances synchronously (the like/pass is sent in the background), so a card that is
+      // still here shortly after commit means the parent refused it (daily limit): bring it back fast.
+      restoreTimerRef.current = window.setTimeout(() => {
+        restoreTimerRef.current = null;
+        cardSwipe.restore();
+      }, 450);
+    },
+  });
+  useEffect(() => () => {
+    if (restoreTimerRef.current !== null) window.clearTimeout(restoreTimerRef.current);
   }, []);
 
-  const swipeDragEnd = useCallback((endX: number) => {
-    if (!swipeIsDraggingRef.current) return;
-    swipeIsDraggingRef.current = false;
-    setIsSwipeDragging(false);
-    const deltaX = endX - swipeStartXRef.current;
-    swipeLatestDeltaXRef.current = 0;
-    swipeLatestDeltaYRef.current = 0;
-    if (swipeRafIdRef.current !== null) {
-      cancelAnimationFrame(swipeRafIdRef.current);
-      swipeRafIdRef.current = null;
-    }
-    swipeRafScheduledRef.current = false;
-
-    if (Math.abs(deltaX) > SWIPE_THRESHOLD()) {
-      const direction = deltaX > 0 ? 'right' : 'left';
-      // Drive the fly-away straight on the element, same as Discover - the
-      // card's live transform was written imperatively during the drag, so
-      // relying on React's own style update alone can land a frame late and
-      // spring back to center before vanishing instead of continuing off
-      // in the thrown direction.
-      if (swipeCardElRef.current) {
-        const exitX = direction === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
-        const exitY = window.innerHeight * 0.3;
-        const rotation = direction === 'right' ? 24 : -24;
-        swipeCardElRef.current.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
-        swipeCardElRef.current.style.transform = `translate3d(${exitX}px, ${exitY}px, 0) rotate(${rotation}deg)`;
-      }
-      setSwipeExitDirection(direction);
-      setSwipeDragX(0);
-      setSwipeDragY(0);
-      setTimeout(() => {
-        if (direction === 'right') {
-          onLike?.();
-        } else {
-          onPass?.();
-        }
-      }, 400);
-    } else {
-      // Below threshold: spring back to center from wherever it was let go.
-      if (swipeCardElRef.current) {
-        swipeCardElRef.current.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
-        swipeCardElRef.current.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
-      }
-      setSwipeDragX(0);
-      setSwipeDragY(0);
-    }
-  }, [onLike, onPass]);
-
-  const handleSwipeTouchStart = useCallback((e: React.TouchEvent) => {
+  // Keyboard parity (desktop / switch control): Left = pass, Right = like, same fly-away as a
+  // gesture. Ignored while typing, while a dialog is open, or while this card is hidden
+  // (Circle stays mounted behind other tabs).
+  useEffect(() => {
     if (!swipeEnabled) return;
-    const touch = e.touches[0];
-    swipeDragStart(touch.clientX, touch.clientY);
-  }, [swipeEnabled, swipeDragStart]);
-
-  const handleSwipeTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!swipeIsDraggingRef.current) return;
-    const touch = e.touches[0];
-    swipeDragMove(touch.clientX, touch.clientY);
-  }, [swipeDragMove]);
-
-  const handleSwipeTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!swipeIsDraggingRef.current) return;
-    const changedTouch = e.changedTouches && e.changedTouches[0];
-    swipeDragEnd(changedTouch ? changedTouch.clientX : swipeStartXRef.current + swipeLatestDeltaXRef.current);
-  }, [swipeDragEnd]);
-
-  // Desktop/testing support - mouse doesn't keep bubbling to this element
-  // once the cursor leaves it mid-drag, so move/up are attached to the
-  // window for the duration of the drag, same as Discover's own
-  // handleMouseDown.
-  const handleSwipeMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!swipeEnabled) return;
-    swipeDragStart(e.clientX, e.clientY);
-
-    const onWindowMouseMove = (ev: MouseEvent) => {
-      if (!swipeIsDraggingRef.current) return;
-      swipeDragMove(ev.clientX, ev.clientY);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      const el = swipeCardElRef.current;
+      if (!el || el.getClientRects().length === 0) return;
+      e.preventDefault();
+      cardSwipe.commitSwipe(e.key === 'ArrowRight' ? 'right' : 'left');
     };
-    const onWindowMouseUp = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', onWindowMouseMove);
-      window.removeEventListener('mouseup', onWindowMouseUp);
-      if (!swipeIsDraggingRef.current) return;
-      swipeDragEnd(ev.clientX);
-    };
-    window.addEventListener('mousemove', onWindowMouseMove);
-    window.addEventListener('mouseup', onWindowMouseUp);
-  }, [swipeEnabled, swipeDragStart, swipeDragMove, swipeDragEnd]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [swipeEnabled, cardSwipe]);
 
   const lifestyleFields = [profile.smoking, profile.drinking, profile.exercise_level, profile.sleeping_schedule];
   const hasLifestyle = lifestyleFields.some(val => val && val !== 'not_specified');
@@ -577,6 +351,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         >
           <img
             src={getDetailImageUrl(nextPreviewImageUrl)}
+            decoding="async"
             alt=""
             className="absolute inset-0 w-full h-full object-cover object-center"
             style={{
@@ -625,14 +400,12 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           // "grab and move" feel before (the card could only ever move
           // horizontally, since this style never read a Y value at all).
           transform: swipeExitDirection
-            ? `translate3d(${swipeExitDirection === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5}px, ${window.innerHeight * 0.3}px, 0) rotate(${swipeExitDirection === 'right' ? 24 : -24}deg)`
-            : swipeEnabled
-              ? `translate3d(${swipeDragX}px, ${swipeDragY}px, 0) rotate(${swipeDragX * 0.06}deg)`
-              : undefined,
+            ? exitTransform(swipeExitDirection, window.innerWidth, window.innerHeight)
+            : CARD_REST_TRANSFORM,
           transition: isSwipeDragging
             ? 'border-radius 0.2s ease'
             : swipeExitDirection
-              ? 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease'
+              ? `transform ${CARD_EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease`
               : 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease',
         }}
       >
@@ -661,10 +434,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             // vertical-pan handling for the same gesture.
             touchAction: swipeEnabled ? 'none' : undefined,
           }}
-          onTouchStart={handleSwipeTouchStart}
-          onTouchMove={handleSwipeTouchMove}
-          onTouchEnd={handleSwipeTouchEnd}
-          onMouseDown={handleSwipeMouseDown}
+          {...(swipeEnabled ? cardSwipe.handlers : {})}
           onClick={handleNavigationClick}
         >
           {currentSlideData && (
@@ -681,21 +451,22 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             />
           )}
 
-          {/* Swipe direction hint - same red/green X and heart Discover/Liked Me use,
-              fading in with drag distance. */}
-          {swipeEnabled && swipeDragX !== 0 && (
-            <div
-              className={`absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center w-16 h-16 rounded-full border-4 ${
-                swipeDragX > 0 ? 'right-6 border-green-400 bg-green-500/20' : 'left-6 border-red-400 bg-red-500/20'
-              }`}
-              style={{ opacity: Math.min(1, Math.abs(swipeDragX) / SWIPE_THRESHOLD()) }}
-            >
-              {swipeDragX > 0 ? (
-                <Heart className="w-8 h-8 text-green-400" />
-              ) : (
-                <XIcon className="w-8 h-8 text-red-400" />
-              )}
-            </div>
+          {/* Like (heart) / Pass (X) stamps - identical to Discover. Always mounted and driven
+              straight on the DOM by useCardSwipe, so they grow smoothly with the drag. */}
+          {swipeEnabled && (
+            <>
+              <div aria-hidden="true" className="absolute inset-0 z-20 flex items-start justify-start pl-10 pointer-events-none" style={{ paddingTop: '35%' }}>
+                <div ref={likeStampRef} className="relative" style={{ opacity: 0, willChange: 'transform, opacity', transition: 'none' }}>
+                  <Heart className="w-20 h-20 absolute -top-2 -left-2 opacity-50" style={{ color: '#ef4444', fill: '#ef4444', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.3))' }} />
+                  <Heart className="w-20 h-20 relative" style={{ color: '#dc2626', fill: '#dc2626', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))' }} />
+                </div>
+              </div>
+              <div aria-hidden="true" className="absolute inset-0 z-20 flex items-start justify-end pr-10 pointer-events-none" style={{ paddingTop: '35%' }}>
+                <div ref={passStampRef} style={{ opacity: 0, willChange: 'transform, opacity', transition: 'none' }}>
+                  <XIcon className="w-28 h-28" strokeWidth={3} style={{ color: '#ffffff', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.35))' }} />
+                </div>
+              </div>
+            </>
           )}
 
           {/* Back button - only when the caller wants one (Circle does; other
@@ -716,8 +487,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           <button
             onClick={(e) => { e.stopPropagation(); onBack(); }}
             aria-label="Back"
-            className="absolute left-4 z-10 flex items-center justify-center w-9 h-9 rounded-full text-white bg-black/50 backdrop-blur-md border border-white/20 transition-transform active:scale-95"
-            style={{ top: '4px' }}
+            className="dl-hit absolute left-4 z-10 flex items-center justify-center w-9 h-9 rounded-full text-white bg-black/50 backdrop-blur-md border border-white/20 transition-transform active:scale-95"
+            style={{ top: '4px', minHeight: 0 }}
           >
             <ArrowLeftIcon className="w-4 h-4" strokeWidth={2.5} />
           </button>
@@ -745,7 +516,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         )}
 
         {slides.length > 1 && (
-          <div className={`absolute ${onBack ? 'left-12' : 'left-4'} flex gap-1.5 z-10`} style={{ top: '14px' }}>
+          <div className={`absolute ${onBack ? 'left-[60px]' : 'left-4'} flex gap-1.5 z-10`} style={{ top: '14px' }}>
             {slides.map((_, idx) => (
               <div
                 key={idx}
@@ -787,9 +558,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             action button on the card. */}
         {readOnly && currentSlideData?.type === 'image' && currentSlideData.content && (
           <button
-            onClick={(e) => { e.stopPropagation(); setShowReportModal(true); }}
+            onClick={(e) => { e.stopPropagation(); report.open(); }}
             aria-label={t('reportModal.title')}
-            className="absolute right-4 z-10 flex items-center justify-center rounded-full text-white backdrop-blur-md transition-transform active:scale-95 shrink-0"
+            className="dl-hit absolute right-4 z-10 flex items-center justify-center rounded-full text-white backdrop-blur-md transition-transform active:scale-95 shrink-0"
             style={{
               top: '4px',
               width: 24,
@@ -807,82 +578,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           </button>
         )}
 
-        {readOnly && showReportModal && (
-          <div
-            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={closeReportModal}
-          >
-            <div
-              className="bg-black rounded-2xl shadow-2xl border border-pink-500/30 w-full max-w-sm mx-auto flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-              style={{ maxHeight: '85vh' }}
-            >
-              <div className="relative px-3 pt-3 pb-2 border-b border-pink-500/20 bg-black shrink-0">
-                <button
-                  onClick={closeReportModal}
-                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white transition-colors rounded-full bg-white/10 border border-pink-500/20 hover:bg-white/20"
-                  disabled={reporting}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-                <div className="pr-8">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-rose-400 font-semibold">Safety Center</p>
-                  <h3 className="text-base font-bold text-white mt-0.5">{t('reportModal.title')}</h3>
-                  <p className="text-[11px] text-gray-300 mt-0.5">{t('reportModal.instruction')}</p>
-                </div>
-              </div>
-
-              <div className="px-3 pb-3 pt-2 overflow-y-auto flex-1 min-h-0">
-                {reportSuccess ? (
-                  <div className="text-green-400 font-semibold text-center py-8">
-                    <div className="mb-2 text-2xl">✓</div>
-                    <div>{t('reportModal.success')}</div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-1.5 mb-3">
-                      {reportReasons.map((reason) => (
-                        <button
-                          key={reason}
-                          onClick={() => setSelectedReportReason(reason)}
-                          disabled={reporting}
-                          className={`w-full min-h-9 px-2.5 py-1.5 text-left rounded-full border-2 transition-all duration-200 flex items-center justify-between ${
-                            selectedReportReason === reason
-                              ? 'border-pink-500 bg-pink-500/20 text-white'
-                              : 'border-pink-500/20 bg-black/60 text-gray-200 hover:border-pink-500/40 hover:bg-white/5'
-                          } ${reporting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                        >
-                          <span className="text-xs sm:text-sm font-semibold leading-tight flex-1 pr-1">{reason}</span>
-                          {selectedReportReason === reason && (
-                            <svg className="w-4 h-4 text-current flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      className="w-full h-9 bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600 text-white font-semibold text-sm rounded-full shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                      onClick={handleReportImage}
-                      disabled={reporting || !selectedReportReason}
-                    >
-                      {reporting ? t('reportModal.reporting') : t('reportModal.reportButton')}
-                    </button>
-
-                    {reportError && (
-                      <div className="text-red-300 text-xs mt-2 text-center bg-red-950/50 p-2 rounded-lg border border-red-500/30">
-                        {reportError}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {readOnly && <ProfileReportModal report={report} allowBlock={false} />}
 
         {!readOnly && showCropModal && currentSlideData?.type === 'image' && currentSlideData.content && (
           <PhotoCropModal
@@ -904,20 +600,15 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-2 px-3 py-2 bg-black/70 backdrop-blur-md">
             <span className="text-xs text-white">Unsaved crop</span>
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
+              <Button variant="line" size="sm" className="text-black"
                 onClick={(e) => { e.stopPropagation(); setShowDiscardWarning(true); }}
                 disabled={savingCrop}
-                className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
               >
                 Cancel
               </Button>
-              <Button
-                size="sm"
+              <Button variant="primary" size="sm"
                 onClick={(e) => { e.stopPropagation(); handleSavePendingCrop(); }}
                 disabled={savingCrop}
-                className="h-8 px-3 text-xs bg-pink-600 hover:bg-pink-700 text-white"
               >
                 {savingCrop ? 'Saving...' : 'Save'}
               </Button>
@@ -934,18 +625,13 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               <p className="text-sm text-white mb-1 font-semibold">Discard your crop?</p>
               <p className="text-xs text-white/80 mb-4">Your cropped photo hasn't been saved yet.</p>
               <div className="flex items-center justify-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
+                <Button variant="line" size="sm" className="text-black"
                   onClick={() => setShowDiscardWarning(false)}
-                  className="h-8 px-3 text-xs bg-white border-pink-500/30 text-black hover:bg-neutral-200 hover:text-black"
                 >
                   Keep editing
                 </Button>
-                <Button
-                  size="sm"
+                <Button variant="primary" size="sm"
                   onClick={handleDiscardPendingCrop}
-                  className="h-8 px-3 text-xs bg-pink-600 hover:bg-pink-700 text-white"
                 >
                   Discard
                 </Button>
@@ -954,121 +640,27 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           </div>
         )}
 
-        {/* Name/age caption - pinned to the bottom of the photo with the same
-            feathered gradient curve as Discover's .detailsContainer (transparent
-            at the top, but crossing 85% opacity by just 10% down and settling
-            fully solid by 24%) so the blend into the photo reads the same way,
-            not the much lighter/slower fade this had before. Always in the same
-            spot (never "empty gap" below it) since it's clipped to the photo. */}
-        <div
-          className={`absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${showMoreInfo ? 'pb-2' : 'pb-5'}`}
-          style={{
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
-          }}
-        >
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1 leading-tight">
-                <h2 className="text-[clamp(15px,4.4vw,18px)] font-bold text-white">
-                  {profile.first_name} {profile.last_name}, {calculateAge(profile.date_of_birth)}
-                </h2>
-                {showVerifiedBadge && (
-                  <img
-                    loading="lazy"
-                    decoding="async"
-                    src="/images/verified.svg"
-                    alt="Verified profile"
-                    title="Verified profile"
-                    className="w-[clamp(18px,5vw,24px)] h-[clamp(18px,5vw,24px)]"
-                    aria-hidden="false"
-                  />
-                )}
-              </div>
-              {/* Location and "looking for" alternate by photo, one at a time, matching
-                  Discover's MatchCard - falls back to whichever exists if only one is set. */}
-              {!showMoreInfo && (() => {
-                const hasLocation = !!profile.city;
-                const hasIntent = !!profile.relationship_intent;
-                const showLocation = hasLocation && (!hasIntent || currentSlide % 2 === 0);
-                // Never alongside About - a bio excerpt already speaks for the
-                // person, so pairing it with "looking for" felt redundant.
-                const showIntent = !showAbout && hasIntent && (!hasLocation || currentSlide % 2 === 1);
-
-                return (
-                  <>
-                    {showLocation && (
-                      <div className="flex items-center text-[clamp(12px,3.4vw,14px)] text-white/80">
-                        <MapPin className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                        <span>
-                          {profile.city}, {profile.country}
-                          {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
-                            <span className="ml-2">• {formatHeightLabel(profile.height_cm)}</span>
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    {showIntent && (
-                      <div className="flex items-center text-[clamp(11px,3.2vw,13px)] font-medium text-white/80">
-                        <Heart className="w-[clamp(13px,3.6vw,16px)] h-[clamp(13px,3.6vw,16px)] mr-1 shrink-0" />
-                        <span>{formatRelationshipIntent(profile.relationship_intent)}</span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-
-              {!showMoreInfo && showAbout ? (
-                <p className="mt-2 pr-8 text-[clamp(11px,3.2vw,13px)] text-white/85 line-clamp-2">
-                  {profile.bio}
-                </p>
-              ) : (
-                !showMoreInfo && (previewHighlights.length > 0 || signHighlights.length > 0 || musicHighlight) && (
-                  <div className="flex items-center gap-1.5 flex-wrap mt-2 pr-8">
-                    {previewHighlights.map((highlight, index) => (
-                      <span
-                        key={index}
-                        className={`text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 bg-white/10 border ${HIGHLIGHT_CHIP_BORDER_COLORS[index % HIGHLIGHT_CHIP_BORDER_COLORS.length]} px-2 py-0.5 rounded-full truncate max-w-[100px] min-[400px]:max-w-[140px] shrink-0`}
-                      >
-                        {truncateChipLabel(highlight)}
-                      </span>
-                    ))}
-                    {signHighlights.map((sign) => (
-                      <UserAdinkraDisplay key={sign} adinkraSymbols={[sign]} showLabel />
-                    ))}
-                    {musicHighlight?.link && (
-                      <MusicLinkBadge link={musicHighlight.link} label={formatFavoriteLabel(musicHighlight)} />
-                    )}
-                  </div>
-                )
-              )}
-            </div>
-
-            {/* Expandable info button - same style/behavior as Discover's MatchCard toggle.
-                Stops propagation: the photo area now also has its own onClick for
-                tap-to-navigate-slides, and without this, tapping this button would
-                ALSO advance/rewind a slide underneath it. */}
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowMoreInfo(prev => !prev); }}
-              className="flex items-center justify-center text-white rounded-full transition-colors duration-200 shrink-0 backdrop-blur-md -mt-1.5"
-              style={{
-                width: 30,
-                height: 30,
-                minWidth: 30,
-                minHeight: 30,
-                padding: 0,
-                background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-                boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
-              }}
-              aria-label={showMoreInfo ? t('discover.matchCard.hideDetails', 'Hide details') : t('discover.matchCard.showDetails', 'Show details')}
-            >
-              {showMoreInfo ? (
-                <ArrowUp size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
-              ) : (
-                <ArrowDown size={15} style={{ width: 15, height: 15 }} strokeWidth={2.5} />
-              )}
-            </button>
-          </div>
-        </div>
+                {/* Name / location / highlights caption + expand control (shared with Discover
+            and Liked Me so every screen shows the same header). */}
+        <ProfileCaption
+          name={`${toTitleCase(profile.first_name)} ${toTitleCase(profile.last_name)}`.trim()}
+          age={calculateAge(profile.date_of_birth)}
+          online={isRecentlyOnline(profile.last_login_at, SWIPE_ONLINE_WINDOW_MS)}
+          verified={showVerifiedBadge}
+          city={profile.city}
+          country={profile.country}
+          heightCm={profile.height_cm}
+          relationshipIntent={profile.relationship_intent}
+          bio={profile.bio}
+          highlights={previewHighlights}
+          signHighlights={signHighlights}
+          musicHighlight={musicHighlight}
+          currentSlide={currentSlide}
+          showAbout={showAbout}
+          expanded={showMoreInfo}
+          onToggle={() => setShowMoreInfo((v) => !v)}
+          action={readOnly ? icebreakerPillFor(profile, slides, { photoUrl: images?.[0], currentSlide }) : null}
+        />
       </div>
 
       {/* Expanded details - directly beneath the name caption (the photo
@@ -1079,10 +671,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           block with a gap. */}
         <div
           ref={expandedDetailsRef}
-          className="profile-info-panel bg-black px-4 pt-1 space-y-3 overflow-y-auto scrollbar-hide"
+          className="profile-info-panel bg-black overflow-y-auto scrollbar-hide"
           aria-hidden={!showMoreInfo}
           style={{
-            paddingBottom: '10px',
             WebkitOverflowScrolling: 'touch',
             // Overlaps the photo box by a hair to paper over the subpixel seam
             // that shows up between the gradient's solid-black bottom edge and
@@ -1091,272 +682,13 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             marginTop: '-2px',
           }}
         >
-          {profile.relationship_intent && (
-            <div className="flex items-center text-xs text-white/80">
-              <Heart className="w-3 h-3 mr-1" />
-              <span>{formatRelationshipIntent(profile.relationship_intent)}</span>
-            </div>
-          )}
-          {profile.bio && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-1">{t('discover.matchCard.about')}</h4>
-              <p className="text-white text-sm leading-relaxed">{profile.bio}</p>
-            </div>
-          )}
-
-          {/* First captioned photo (ImageManagement.tsx) - no section heading, just
-              the photo, its preset label (what it's about), and the full caption
-              (capped at 50 chars) pinned to the image's own bottom edge. */}
-          {captionedPhotos[0] && renderPhotoCaptionCard(captionedPhotos[0])}
-
-          {typeof profile.height_cm === 'number' && profile.height_cm > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.height', 'Height')}</h4>
-              <div className="flex items-center text-sm">
-                <Ruler className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                <span className="text-white">{formatHeightLabel(profile.height_cm)}</span>
-              </div>
-            </div>
-          )}
-
-          {hasLifestyle && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.lifestyle')}</h4>
-              <div className="space-y-2">
-                {profile.smoking && profile.smoking !== 'not_specified' && (
-                  <div className="flex items-center text-sm">
-                    <span className="mr-2 flex-shrink-0" aria-hidden="true">🚬</span>
-                    <span className="font-semibold mr-2 text-white">{t('discover.matchCard.smoking')}:</span>
-                    <span className="text-white">{profile.smoking}</span>
-                  </div>
-                )}
-                {profile.drinking && profile.drinking !== 'not_specified' && (
-                  <div className="flex items-center text-sm">
-                    <span className="mr-2 flex-shrink-0" aria-hidden="true">🍸</span>
-                    <span className="font-semibold mr-2 text-white">{t('discover.matchCard.drinking')}:</span>
-                    <span className="text-white">{profile.drinking}</span>
-                  </div>
-                )}
-                {profile.exercise_level && profile.exercise_level !== 'not_specified' && (
-                  <div className="flex items-center text-sm">
-                    <span className="mr-2 flex-shrink-0" aria-hidden="true">🏋️</span>
-                    <span className="font-semibold mr-2 text-white">{t('discover.matchCard.exercise')}:</span>
-                    <span className="text-white">{profile.exercise_level}</span>
-                  </div>
-                )}
-                {profile.sleeping_schedule && profile.sleeping_schedule !== 'not_specified' && (
-                  <div className="flex items-center text-sm">
-                    <span className="mr-2 flex-shrink-0" aria-hidden="true">😴</span>
-                    <span className="font-semibold mr-2 text-white">{t('discover.matchCard.sleep')}:</span>
-                    <span className="text-white">{profile.sleeping_schedule}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {secondPhotoAnchor === 'lifestyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-          {profile.family_plans && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.familyPlans', 'Family Plans')}</h4>
-              <div className="flex items-center text-sm">
-                <Baby className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                <span className="text-white">{traitLabel(FAMILY_PLANS_OPTIONS, profile.family_plans)}</span>
-              </div>
-            </div>
-          )}
-
-          {(profile.occupation || profile.education_level) && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.workEducation')}</h4>
-              <div className="space-y-2">
-                {profile.occupation && (
-                  <div className="flex items-center text-sm">
-                    <Briefcase className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-white">{profile.occupation}</span>
-                  </div>
-                )}
-                {profile.education_level && (
-                  <div className="flex items-center text-sm">
-                    <GraduationCap className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                    <span className="text-white">{profile.education_level}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {secondPhotoAnchor === 'workEducation' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-          {(typeof profile.introvert_extrovert === 'number' || typeof profile.spontaneous_planner === 'number' || typeof profile.messy_organized === 'number') && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-3">{t('discover.matchCard.personality')}</h4>
-              <div className="space-y-4">
-                {typeof profile.introvert_extrovert === 'number' && (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-white/60">{t('discover.matchCard.introvert')}</span>
-                    <div className="flex-1 bg-white/10 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${profile.introvert_extrovert}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm text-white/60">{t('discover.matchCard.extrovert')}</span>
-                  </div>
-                )}
-                {typeof profile.spontaneous_planner === 'number' && (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-medium text-white/80">{t('discover.matchCard.spontaneousVsPlanner', { percentage: profile.spontaneous_planner })}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-white/60">{t('discover.matchCard.spontaneous')}</span>
-                      <div className="flex-1 bg-white/10 rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${profile.spontaneous_planner}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-white/60">{t('discover.matchCard.planner')}</span>
-                    </div>
-                  </div>
-                )}
-                {typeof profile.messy_organized === 'number' && (
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-medium text-white/80">{t('discover.matchCard.messyVsOrganized', { percentage: profile.messy_organized })}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-white/60">{t('discover.matchCard.messy')}</span>
-                      <div className="flex-1 bg-white/10 rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-purple-400 to-purple-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${profile.messy_organized}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-white/60">{t('discover.matchCard.organized')}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {secondPhotoAnchor === 'personality' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-          {profile.communication_style && profile.communication_style.length > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5 text-pink-500" />
-                {t('discover.matchCard.communicationStyle', 'Communication Style')}
-              </h4>
-              <div className="flex flex-wrap gap-1">
-                {profile.communication_style.map((value, index) => (
-                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                    {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {secondPhotoAnchor === 'communicationStyle' && captionedPhotos[1] && renderPhotoCaptionCard(captionedPhotos[1])}
-
-          {profile.love_style && profile.love_style.length > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
-                <Gift className="w-3.5 h-3.5 text-pink-500" />
-                {t('discover.matchCard.loveStyle', 'Love Style')}
-              </h4>
-              <div className="flex flex-wrap gap-1">
-                {profile.love_style.map((value, index) => (
-                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                    {traitLabel(LOVE_STYLE_OPTIONS, value)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {profile.interests && profile.interests.length > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.interests')}</h4>
-              <div className="flex flex-wrap gap-1">
-                {profile.interests.map((interest, index) => (
-                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                    {interest}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {profile.favorites && profile.favorites.length > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.favorites')}</h4>
-              <div className="flex flex-wrap gap-1.5">
-                {profile.favorites.map((favorite, index) => (
-                  <span key={index} className="inline-flex items-center gap-1 h-6 leading-none px-2 py-0 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-xs">
-                    <span className="text-[11px] leading-none">{favoriteEmoji(favorite.category)}</span>
-                    <span className="leading-none">{formatFavoriteLabel(favorite)}</span>
-                    {favorite.link && (
-                      <MusicLinkBadge link={favorite.link} label={formatFavoriteLabel(favorite)} variant="inline" />
-                    )}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {profile.pets && profile.pets.length > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2 flex items-center gap-1.5">
-                <PawPrint className="w-3.5 h-3.5 text-pink-500" />
-                {t('discover.matchCard.pets', 'Pets')}
-              </h4>
-              <div className="flex flex-wrap gap-1">
-                {profile.pets.map((value, index) => (
-                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                    {traitLabel(PETS_OPTIONS, value)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {profile.languages && profile.languages.length > 0 && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.languagesSpoken', 'Languages')}</h4>
-              <div className="flex flex-wrap gap-1">
-                {profile.languages.map((lang, index) => (
-                  <span key={index} className="px-2 py-1 bg-pink-500/15 text-pink-300 border border-pink-500/30 rounded-full text-sm">
-                    {lang}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {profile.social_media && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.socialMedia', 'Social Media')}</h4>
-              <div className="flex items-center text-sm">
-                <Share2 className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-pink-500" />
-                <span className="text-white">{traitLabel(SOCIAL_MEDIA_OPTIONS, profile.social_media)}</span>
-              </div>
-            </div>
-          )}
-
-          {preferredLanguageName && (
-            <div className="bg-black border border-pink-500/20 rounded-lg p-3">
-              <h4 className="font-semibold text-pink-400 mb-2">{t('discover.matchCard.language')}</h4>
-              <div className="flex items-center text-sm">
-                <Languages className="w-3.5 h-3.5 mr-2 text-pink-500 shrink-0" />
-                <span className="text-white">{preferredLanguageName}</span>
-              </div>
-            </div>
-          )}
+          <ProfileDetailsPanel
+            profile={profile}
+            captionedPhotos={captionedPhotos}
+            secondPhotoAnchor={secondPhotoAnchor}
+            preferredLanguageName={preferredLanguageName}
+            className="pb-24"
+          />
         </div>
       </div>
 

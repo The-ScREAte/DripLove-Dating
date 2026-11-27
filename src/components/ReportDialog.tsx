@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from 'react-i18next';
 
+import { useBackClose } from '@/utils/backStack';
 interface ReportDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,6 +33,8 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
   const [description, setDescription] = useState('');
   const [isReporting, setIsReporting] = useState(false);
   const { toast } = useToast();
+  // Android hardware back closes the dialog (Radix already handles Escape).
+  useBackClose(isOpen, onClose, { escape: false });
 
   const handleReport = async () => {
     if (!reason) return;
@@ -98,18 +101,18 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
 
           <div>
             <Label className="text-gray-300">{t('report.detailsOptional')}</Label>
-            <Textarea
+            <Textarea tone="dark"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder={t('report.addMoreInfo')}
-              className="mt-1 bg-neutral-900 border-pink-500/40 text-white placeholder:text-gray-500"
+              className="mt-1"
             />
           </div>
         </div>
 
         <DialogFooter className="flex-row justify-end gap-2 space-x-0">
-          <Button variant="outline" onClick={onClose} disabled={isReporting} className="flex-1 border-pink-500/40 text-gray-100 hover:bg-neutral-800 hover:text-white">{t('common.cancel')}</Button>
-          <Button onClick={handleReport} disabled={!reason || isReporting} className="flex-1 bg-red-500 hover:bg-red-600 text-white">
+          <Button variant="line" size="md" className="text-white flex-1" onClick={onClose} disabled={isReporting}>{t('common.cancel')}</Button>
+          <Button variant="danger" size="md" className="flex-1" onClick={handleReport} disabled={!reason || isReporting}>
             {isReporting ? t('report.reporting') : t('report.submitReport')}
           </Button>
         </DialogFooter>

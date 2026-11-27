@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { AFRICAN_SYMBOL_GROUPS, MAX_CULTURAL_SIGNS } from '@/constants/africanSymbols';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AdinkraSymbolSelectorProps {
   selectedSymbols: string[];

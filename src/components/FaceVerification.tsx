@@ -6,39 +6,15 @@ import { Camera as CapacitorCamera } from '@capacitor/camera';
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { getFaceReferenceCode } from "@/utils/faceReference";
+import PermissionDeniedPanel from "@/components/PermissionDeniedPanel";
+import { isPermissionDeniedError } from "@/utils/openAppSettings";
+import { getFaceReferenceCode, extractDuplicateFaceDetails, formatDuplicateFaceMessage, type DuplicateFaceDetails } from "@/utils/faceReference";
 import { Camera as CameraIcon, CheckCircle2, RefreshCw } from "lucide-react";
 
 type FaceVerificationProps = {
   onVerified?: (faceImageBase64: string) => void;
   disabled?: boolean;
 };
-
-type DuplicateFaceDetails = {
-  similarity?: number | null;
-  faceId?: string | null;
-  imageId?: string | null;
-  externalImageId?: string | null;
-  associatedUserId?: string | null;
-  associatedEmail?: string | null;
-  associatedName?: string | null;
-};
-
-function extractDuplicateFaceDetails(responseData: any): DuplicateFaceDetails {
-  if (responseData?.duplicateFace && typeof responseData.duplicateFace === 'object') {
-    return responseData.duplicateFace;
-  }
-
-  return {
-    similarity: responseData?.similarity ?? null,
-    faceId: responseData?.faceId ?? null,
-    imageId: responseData?.imageId ?? null,
-    externalImageId: responseData?.externalImageId ?? null,
-    associatedUserId: responseData?.associatedUserId ?? null,
-    associatedEmail: responseData?.associatedEmail ?? null,
-    associatedName: responseData?.associatedName ?? null,
-  };
-}
 
 const CAMERA_SIZE = 280;
 
@@ -48,17 +24,14 @@ type CaptureStep = 'front' | 'side';
 // type="button" - a bare <button> defaults to "submit", which made "Take
 // Photo" submit the surrounding form and pop the browser's "Please fill out
 // this field" bubble.
-const PRIMARY_BUTTON =
-  'w-full h-12 rounded-full font-semibold text-white bg-gradient-to-r from-[#9d0d52] to-[#e0187a] hover:opacity-95 shadow-[0_8px_24px_-10px_rgba(224,24,122,0.7)] disabled:opacity-50';
-const SECONDARY_BUTTON =
-  'h-12 rounded-full border border-white/20 bg-transparent text-white hover:bg-white/[0.06] hover:text-white';
-
 export default function FaceVerification({ onVerified, disabled }: FaceVerificationProps) {
   const [step, setStep] = useState(0); // 0=start, 1=camera-front, 2=camera-side, 3=review, 4=verifying, 5=done
   const [isLoading, setIsLoading] = useState(false);
   const [capturedImages, setCapturedImages] = useState<{ front: string | null; side: string | null }>({ front: null, side: null });
   const [verificationResult, setVerificationResult] = useState<'none' | 'success' | 'duplicate' | 'error'>('none');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Camera access refused: shows the shared panel (Open Settings on iOS, the exact Settings path on Android).
+  const [cameraDenied, setCameraDenied] = useState(false);
   const [currentCapture, setCurrentCapture] = useState<CaptureStep>('front');
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -79,11 +52,6 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
   // Native live preview
   const [nativeLiveFrame, setNativeLiveFrame] = useState<string | null>(null);
   const nativeFrameIntervalRef = useRef<number | null>(null);
-
-  function formatDuplicateFaceMessage(details?: DuplicateFaceDetails | null): string {
-    const code = getFaceReferenceCode(details);
-    return `User already exists. Reference code: ${code}.`;
-  }
 
   // Cleanup on unmount
   useEffect(() => {
@@ -134,6 +102,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
     try {
       setIsLoading(true);
       setErrorMessage(null);
+      setCameraDenied(false);
       setCurrentCapture(captureType);
       setStep(captureType === 'front' ? 1 : 2);
 
@@ -141,7 +110,7 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
         try {
           const perm = await CapacitorCamera.requestPermissions({ permissions: ['camera'] });
           if (perm.camera !== 'granted') {
-            setErrorMessage('Camera permission denied');
+            setCameraDenied(true);
             setStep(0);
             return;
           }
@@ -189,7 +158,11 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
       }
     } catch (error) {
       console.error('Camera error:', error);
-      setErrorMessage('Camera permission required');
+      if (isPermissionDeniedError(error)) {
+        setCameraDenied(true);
+      } else {
+        setErrorMessage('Camera permission required');
+      }
       setStep(0);
     } finally {
       setIsLoading(false);
@@ -535,7 +508,9 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             type="button"
             onClick={capturePhoto}
             disabled={isLoading}
-            className={PRIMARY_BUTTON}
+            variant="primary"
+            size="lg"
+            className="w-full"
           >
             <CameraIcon className="mr-2 h-5 w-5" />
             {isLoading ? "Capturing..." : "Take Photo"}
@@ -581,8 +556,9 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             <Button
               type="button"
               onClick={() => retakePhoto('all')}
-              variant="outline"
-              className={`flex-1 ${SECONDARY_BUTTON}`}
+              variant="line"
+              size="lg"
+              className="flex-1 text-white"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Retake
@@ -594,7 +570,9 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
                 type="button"
                 onClick={submitVerification}
                 disabled={isLoading}
-                className={`flex-1 ${PRIMARY_BUTTON}`}
+                variant="primary"
+                size="lg"
+                className="flex-1"
               >
                 {isLoading ? "Verifying..." : "Try again"}
               </Button>
@@ -632,13 +610,18 @@ export default function FaceVerification({ onVerified, disabled }: FaceVerificat
             type="button"
             onClick={() => startCamera('front')}
             disabled={isLoading || disabled}
-            className={PRIMARY_BUTTON}
+            variant="primary"
+            size="lg"
+            className="w-full"
           >
             <CameraIcon className="mr-2 h-5 w-5" />
             {isLoading ? "Opening Camera..." : "Start Verification"}
           </Button>
           {disabled && (
             <p className="text-xs text-amber-400 text-center">Enter your first and last name to enable verification</p>
+          )}
+          {cameraDenied && (
+            <PermissionDeniedPanel kind="camera" onRetry={() => startCamera(currentCapture)} />
           )}
           {errorMessage && (
             <p className="text-xs text-red-400 text-center">{errorMessage}</p>

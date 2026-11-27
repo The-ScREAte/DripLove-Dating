@@ -459,7 +459,3 @@ export function usePricingConfig(userId?: string): PricingConfig {
 }
 
 // Clear cache (useful for testing or when pricing changes)
-export function clearPricingCache(): void {
-  cachedConfig = null;
-  configPromise = null;
-}

@@ -1,18 +1,14 @@
 import React from 'react';
+import { displayFavorites } from '@/constants/favorites';
 import { Home, Ruler, Briefcase, GraduationCap, User, Heart, Compass, Wine, Plus, Languages, Baby, MessageCircle, Gift, PawPrint, Share2, Sparkles, Star, Lightbulb, FileText } from 'lucide-react';
-import { FAMILY_PLANS_OPTIONS, COMMUNICATION_STYLE_OPTIONS, LOVE_STYLE_OPTIONS, PETS_OPTIONS, SOCIAL_MEDIA_OPTIONS } from '@/constants/profileTraits';
+import { FAMILY_PLANS_OPTIONS, SOCIAL_MEDIA_OPTIONS } from '@/constants/profileTraits';
+import { formatHeightShort } from '@/utils/profileFormat';
+import { displayValue } from '../profile-card/profileCardUtils';
 
 interface ProfileBasicsChipsProps {
   editedProfile: any;
   onOpenSection: (section: string) => void;
 }
-
-const formatHeight = (cm: number) => {
-  const totalInches = Math.round(cm / 2.54);
-  const feet = Math.floor(totalInches / 12);
-  const inches = totalInches % 12;
-  return `${feet}'${inches}"`;
-};
 
 const labelFor = (options: { value: string; label: string }[], value: string) =>
   options.find((opt) => opt.value === value)?.label || value;
@@ -24,7 +20,7 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
   const loveStyle: string[] = Array.isArray(editedProfile.love_style) ? editedProfile.love_style : [];
   const pets: string[] = Array.isArray(editedProfile.pets) ? editedProfile.pets : [];
   const interests: string[] = Array.isArray(editedProfile.interests) ? editedProfile.interests : [];
-  const favorites: unknown[] = Array.isArray(editedProfile.favorites) ? editedProfile.favorites : [];
+  const favorites: unknown[] = displayFavorites(Array.isArray(editedProfile.favorites) ? editedProfile.favorites : []);
   const hasFunQuestion = !!(editedProfile.fun_fact || editedProfile.perfect_first_date || editedProfile.last_googled);
 
   // label is '' when nothing's set yet - the chip then renders icon + a bare "+"
@@ -50,7 +46,7 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
     {
       key: 'height',
       icon: <Ruler className="w-3.5 h-3.5" />,
-      label: editedProfile.height_cm ? formatHeight(editedProfile.height_cm) : '',
+      label: editedProfile.height_cm ? formatHeightShort(editedProfile.height_cm) : '',
       section: 'basicInfo',
       border: 'border-purple-500/50',
     },
@@ -85,7 +81,7 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
     {
       key: 'intent',
       icon: <Compass className="w-3.5 h-3.5" />,
-      label: editedProfile.relationship_intent || '',
+      label: editedProfile.relationship_intent ? displayValue(editedProfile.relationship_intent) : '',
       section: 'lifestyle',
       border: 'border-cyan-500/50',
     },

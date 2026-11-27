@@ -67,7 +67,7 @@ export const formatUuidInFilter = (ids: string[], maxLen = 3500) => {
   return low > 0 ? build(low) : '()';
 };
 
-export const hashStringToInt = (str: string): number => {
+const hashStringToInt = (str: string): number => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i);

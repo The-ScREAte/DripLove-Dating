@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { sanitizeName, sanitizeBio } from '@/utils/inputSanitization';
-import { containsBadWords } from '@/utils/textModeration';
+import { sanitizeBio } from '@/utils/inputSanitization';
+import { calculateAgeOrNull } from '@/utils/dateUtils';
 
 interface BasicInfoSectionProps {
   editedProfile: any;
@@ -23,53 +23,17 @@ const formatHeight = (cm: number) => {
   const inches = totalInches % 12;
   return `${feet}'${inches}" (${cm} cm)`;
 };
-
-const getSanitizedValue = (name: string, value: string) => {
-  let sanitizedValue = value;
-  if (name === 'first_name' || name === 'last_name') {
-    sanitizedValue = value
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<[^>]*>?/gm, '')
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '')
-      .trim()
-      .slice(0, 50);
-  } else if (name === 'bio') {
-    sanitizedValue = sanitizeBio(value);
-    // Only check for bad words when the user finishes typing (not on every keystroke)
-    // This prevents clearing the bio while they're still typing
-  }
-  return sanitizedValue;
-};
-
 const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfoSectionProps) => {
   const { t } = useTranslation();
   
-  // Calculate age from date of birth
-  const calculateAge = (dateOfBirth: string | null | undefined): number | null => {
-    if (!dateOfBirth) return null;
-    try {
-      const birthDate = new Date(dateOfBirth);
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      return age;
-    } catch {
-      return null;
-    }
-  };
-  
-  const age = calculateAge(editedProfile.date_of_birth);
+  const age = calculateAgeOrNull(editedProfile.date_of_birth);
   
   return (
         <div className="space-y-5 pt-1">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="first_name" className="text-white">{t('profile.firstName')}</Label>
-              <Input
+              <Input tone="dark"
                 type="text"
                 id="first_name"
                 name="first_name"
@@ -93,12 +57,12 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                   });
                 }}
                 disabled={!isEditing}
-                className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60"
+                className="w-full disabled:text-white/60"
               />
             </div>
             <div>
               <Label htmlFor="last_name" className="text-white">{t('profile.lastName')}</Label>
-              <Input
+              <Input tone="dark"
                 type="text"
                 id="last_name"
                 name="last_name"
@@ -122,7 +86,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                   });
                 }}
                 disabled={!isEditing}
-                className="w-full bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60"
+                className="w-full disabled:text-white/60"
               />
             </div>
           </div>
@@ -131,7 +95,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="date_of_birth" className="text-white">{t('profile.dateOfBirth', 'Date of Birth')}</Label>
-              <Input
+              <Input tone="dark"
                 type="date"
                 id="date_of_birth"
                 name="date_of_birth"
@@ -142,7 +106,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
             </div>
             <div>
               <Label htmlFor="age" className="text-white">{t('profile.age', 'Age')}</Label>
-              <Input
+              <Input tone="dark"
                 type="text"
                 id="age"
                 name="age"
@@ -162,7 +126,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
               } as any)}
               disabled={!isEditing}
             >
-              <SelectTrigger id="height" className="w-full bg-black/40 border-pink-500/30 text-white disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60">
+              <SelectTrigger tone="dark" id="height" className="w-full disabled:text-white/60">
                 <SelectValue placeholder={t('profile.selectHeight', 'Select your height')} />
               </SelectTrigger>
               <SelectContent className="bg-black border-pink-500/30 max-h-72">
@@ -177,22 +141,13 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
 
           <div>
             <Label htmlFor="bio" className="text-white">{t('profile.bio')}</Label>
-            <Textarea
+            <Textarea tone="dark"
               id="bio"
               name="bio"
               value={editedProfile.bio || ''}
               onChange={(e) => {
                 // Only sanitize for security (remove scripts/HTML) but preserve spaces
-                const basicSanitized = e.target.value
-                  .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                  .replace(/<[^>]*>?/gm, '')
-                  .replace(/javascript:/gi, '')
-                  .replace(/on\w+\s*=/gi, '')
-                  .replace(/data:/gi, '')
-                  .replace(/vbscript:/gi, '')
-                  .replace(/[<>]/g, '')
-                  .slice(0, 500);
-                
+                const basicSanitized = sanitizeBio(e.target.value);                
                 onInputChange({
                   ...e,
                   target: {
@@ -203,7 +158,7 @@ const BasicInfoSection = ({ editedProfile, isEditing, onInputChange }: BasicInfo
                 });
               }}
               disabled={!isEditing}
-              className="w-full min-h-[100px] resize-none bg-black/40 border-pink-500/30 text-white placeholder:text-white/40 disabled:bg-black/30 disabled:border-pink-500/10 disabled:text-white/60"
+              className="w-full min-h-[100px] resize-none disabled:text-white/60"
               placeholder={t('profile.bioPlaceholder')}
             />
             <p className="text-xs text-white/60 mt-1">

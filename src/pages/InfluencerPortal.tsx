@@ -497,7 +497,7 @@ const InfluencerPortal = () => {
                   onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                   placeholder="Enter your promo code"
                   disabled={loading}
-                  className="bg-white text-black placeholder:text-black"
+                 
                 />
               </div>
               <div>
@@ -510,7 +510,7 @@ const InfluencerPortal = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     disabled={loading}
-                    className="bg-white text-black placeholder:text-black"
+                   
                   />
                   <button
                     type="button"
@@ -521,9 +521,8 @@ const InfluencerPortal = () => {
                   </button>
                 </div>
               </div>
-              <Button 
-                type="submit" 
-                className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700"
+              <Button variant="primary" size="md" className="w-full" 
+                type="submit"
                 disabled={loading}
               >
                 {loading ? (
@@ -563,11 +562,8 @@ const InfluencerPortal = () => {
                   <p className="text-xs text-gray-600">{session.email}</p>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
+              <Button variant="line" size="sm" className="text-black"
                 onClick={handleLogout}
-                className="bg-white border-gray-400 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
               >
                 <LogOut className="w-4 h-4 mr-1.5" /> Log Out
               </Button>
@@ -575,21 +571,15 @@ const InfluencerPortal = () => {
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-300">
               <Badge className="font-mono text-xs bg-pink-100 text-pink-800 border border-pink-300 hover:bg-pink-100">{session.code}</Badge>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <Button variant="line" size="sm" className="text-black"
                   onClick={() => setShowTerms(true)}
-                  className="h-8 text-xs bg-white border-gray-400 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 >
                   <FileText className="w-3.5 h-3.5 mr-1.5" />
                   Terms
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <Button variant="line" size="sm" className="text-black"
                   onClick={refreshStats}
                   disabled={refreshing}
-                  className="h-8 text-xs bg-white border-gray-400 text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
                   {refreshing ? 'Refreshing…' : 'Refresh'}
@@ -703,12 +693,11 @@ const InfluencerPortal = () => {
                         min="1"
                         max={session.outstanding_usd}
                         step="0.01"
-                        className="bg-white text-black placeholder:text-black"
+                       
                       />
-                      <Button
+                      <Button variant="primary" size="md" className="shrink-0"
                         onClick={handleRequestPayout}
                         disabled={requestingPayout || !payoutAmount}
-                        className="bg-pink-600 hover:bg-pink-700 shrink-0"
                       >
                         {requestingPayout ? 'Submitting…' : 'Request Payout'}
                       </Button>
@@ -771,10 +760,10 @@ const InfluencerPortal = () => {
                   <span className="text-white/90">I have read and agree to the Terms &amp; Conditions above.</span>
                 </label>
                 <DialogFooter className="flex-row justify-end gap-2 space-x-0 sm:space-x-0">
-                  <Button
+                  <Button variant="social" size="md" className="w-full text-pink-700"
                     onClick={handleAcceptTerms}
                     disabled={!termsChecked || acceptingTerms}
-                    className="w-full bg-white text-pink-700 hover:bg-pink-100"
+                   
                   >
                     {acceptingTerms ? 'Saving…' : 'Agree & Continue'}
                   </Button>
@@ -785,7 +774,7 @@ const InfluencerPortal = () => {
                 <p className="text-xs text-pink-200">
                   Agreed on {session.terms_accepted_at ? new Date(session.terms_accepted_at).toLocaleDateString() : '—'}.
                 </p>
-                <Button variant="outline" className="bg-white text-pink-700" onClick={() => setShowTerms(false)}>Close</Button>
+                <Button variant="line" size="md" onClick={() => setShowTerms(false)}>Close</Button>
               </div>
             )}
           </div>

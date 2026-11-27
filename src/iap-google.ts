@@ -1,6 +1,37 @@
 import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
 import { selectPurchasableProduct } from '@/utils/iapOfferInfo';
+import { toast } from '@/hooks/use-toast';
+import { isTransientInvokeError, withTransientRetry } from '@/utils/iapRetry';
+import { isEntitledToPremium } from '@/utils/subscriptionEntitlement';
+
+// Tell the user what happened instead of failing silently, and decide whether the
+// purchase may be finished (acknowledged). A transient failure (network/5xx) means
+// the user WAS charged but our server was unreachable: keep the transaction pending
+// so the store redelivers it and premium activates by itself later.
+function reportGoogleValidationFailure(validationError: unknown, validation: { error?: string } | null | undefined): { finish: boolean } {
+  const transient = !!validationError && isTransientInvokeError(validationError);
+  if (transient) {
+    toast({
+      title: 'Your purchase is safe',
+      description: "We couldn't reach our server just now. Premium will activate automatically as soon as you're back online - or tap \"Restore Purchases\".",
+    });
+    return { finish: false };
+  }
+  const reason = typeof validation?.error === 'string' ? validation.error : '';
+  if (reason.toLowerCase().includes('already linked')) {
+    toast({
+      title: 'This subscription belongs to another account',
+      description: 'The Google account on this device already has an active DripLove subscription linked to a different account. Use a different Google account for this purchase, or contact support.',
+    });
+  } else {
+    toast({
+      title: 'We could not verify your purchase yet.',
+      description: 'If you were charged, please try "Restore Purchases" in a moment, or contact support.',
+    });
+  }
+  return { finish: true };
+}
 
 const noopLog = (..._args: unknown[]) => {};
 
@@ -290,6 +321,7 @@ export function initGoogleIAP() {
               return;
             }
             window.googleIapValidationInProgress = true;
+            let shouldFinish = true;
 
             // Don't rely on `t.verify()` / `.verified()` — they may not fire if the plugin
             // validator isn't configured, or if the WebView reloads while returning from
@@ -332,7 +364,7 @@ export function initGoogleIAP() {
                 }
 
                 noopLog('[Google IAP] Calling server validator (approved):', { productId });
-                const { data: validation, error: validationError } = await supabase.functions.invoke('google-iap-validator', {
+                const { data: validation, error: validationError } = await withTransientRetry(() => supabase.functions.invoke('google-iap-validator', {
                   body: {
                     receiptData,
                     productId,
@@ -340,11 +372,12 @@ export function initGoogleIAP() {
                     transactionId,
                     user_id: userId,
                   },
-                });
+                }));
 
                 if (validationError || !validation?.valid || !validation?.active) {
                   console.error('[Google IAP] Server validation failed (approved):', validationError || validation);
                   window.googleIapValidationInProgress = false;
+                  shouldFinish = reportGoogleValidationFailure(validationError, validation).finish;
                   return;
                 }
 
@@ -357,7 +390,7 @@ export function initGoogleIAP() {
                   .limit(1)
                   .maybeSingle();
 
-                const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && (subRow.status === 'active' || subRow.status === 'cancelled') && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+                const isPremiumNow = isEntitledToPremium(subRow);
                 if (!isPremiumNow) {
                   console.warn('[Google IAP] Validation ok but subscription not applied to current user; skipping redirect');
                   window.googleIapValidationInProgress = false;
@@ -376,14 +409,18 @@ export function initGoogleIAP() {
               } catch (err) {
                 console.error('[Google IAP] Error during approved validation:', err);
                 window.googleIapValidationInProgress = false;
+                shouldFinish = !isTransientInvokeError(err);
               } finally {
                 window.googleIapPurchaseInitiated = false;
                 window.googleIapFlow = undefined;
-                if (t?.finish && typeof t.finish === 'function') t.finish();
+                // Only acknowledge once the server has confirmed (or definitively
+                // rejected) the purchase; a pending one is redelivered on next launch.
+                if (shouldFinish && t?.finish && typeof t.finish === 'function') t.finish();
               }
             })();
           })
           .verified(async (r: any) => {
+            let shouldFinishVerified = true;
             noopLog('[Google IAP] Purchase verified:', r?.productId);
 
             const hasPending = (() => {
@@ -445,7 +482,7 @@ export function initGoogleIAP() {
                 return;
               }
 
-              const { data: validation, error: validationError } = await supabase.functions.invoke('google-iap-validator', {
+              const { data: validation, error: validationError } = await withTransientRetry(() => supabase.functions.invoke('google-iap-validator', {
                 body: {
                   receiptData,
                   productId,
@@ -453,11 +490,12 @@ export function initGoogleIAP() {
                   transactionId,
                   user_id: userId,
                 },
-              });
+              }));
 
               if (validationError || !validation?.valid || !validation?.active) {
                 console.error('[Google IAP] Server validation failed:', validationError || validation);
                 window.googleIapValidationInProgress = false;
+                shouldFinishVerified = reportGoogleValidationFailure(validationError, validation).finish;
                 return;
               }
 
@@ -470,7 +508,7 @@ export function initGoogleIAP() {
                 .limit(1)
                 .maybeSingle();
 
-              const isPremiumNow = !!subRow && subRow.plan_name === 'premium' && (subRow.status === 'active' || subRow.status === 'cancelled') && (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+              const isPremiumNow = isEntitledToPremium(subRow);
               if (!isPremiumNow) {
                 console.warn('[Google IAP] Validation ok but subscription not applied to current user; skipping redirect');
                 window.googleIapValidationInProgress = false;
@@ -488,9 +526,10 @@ export function initGoogleIAP() {
             } catch (error) {
               console.error('[Google IAP] Error during server validation:', error);
               window.googleIapValidationInProgress = false;
+              shouldFinishVerified = !isTransientInvokeError(error);
             } finally {
               window.googleIapFlow = undefined;
-              if (r?.finish && typeof r.finish === 'function') r.finish();
+              if (shouldFinishVerified && r?.finish && typeof r.finish === 'function') r.finish();
             }
           })
           .unverified((r: any, err: any) => {

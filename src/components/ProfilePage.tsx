@@ -25,6 +25,7 @@ import PersonalitySection from './profile/PersonalitySection';
 import FunQuestionsSection from './profile/FunQuestionsSection';
 import InterestsSection from './profile/InterestsSection';
 import FavoritesSection from './profile/FavoritesSection';
+import ProfileVibeSection from './profile/ProfileVibeSection';
 import AdinkraSection from './profile/AdinkraSection';
 import LanguagesSection from './profile/LanguagesSection';
 import PetsSection from './profile/PetsSection';
@@ -37,11 +38,12 @@ import ProfileSummaryCard from './ProfileSummaryCard';
 import ReportButton from './ReportButton';
 
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
-import PremiumUpgrade from './PremiumUpgrade';
+import { openPremiumUpgrade } from '@/popups';
 import CollapsibleSection from './ui/CollapsibleSection';
 import { getLanguageForCountry } from '@/i18n/config';
 import { occupationOptions, industryOptions, educationLevelOptions } from '@/constants/professionOptions';
 import { FavoriteEntry, parseFavorites } from '@/constants/favorites';
+import { uniqueTopic } from '@/utils/realtime';
 import {
   Dialog,
   DialogContent,
@@ -120,7 +122,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   useAllowScreenshots(isActiveTab);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showPremiumUpgrade, setShowPremiumUpgrade] = useState(false);
   const [hideProfileCompletion, setHideProfileCompletion] = useState(false);
   
   // State for collapsible sections - accordion style (only one open at a time)
@@ -206,6 +207,23 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
   const [isProfileMessagesOpen, setIsProfileMessagesOpen] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
+  // Preview <-> profile transition: the preview replaces the profile in place (inline, not an
+  // overlay), so without this both directions are an instant cut. Closing plays a short exit
+  // (dl-preview-out) before unmounting; the profile then fades back in (dl-preview-back).
+  const [previewClosing, setPreviewClosing] = useState(false);
+  const [returningFromPreview, setReturningFromPreview] = useState(false);
+  const previewTimersRef = useRef<number[]>([]);
+  useEffect(() => () => { previewTimersRef.current.forEach((id) => window.clearTimeout(id)); }, []);
+  const closePreviewAnimated = useCallback(() => {
+    if (previewClosing) return;
+    setPreviewClosing(true);
+    previewTimersRef.current.push(window.setTimeout(() => {
+      setShowProfilePreview(false);
+      setPreviewClosing(false);
+      setReturningFromPreview(true);
+      previewTimersRef.current.push(window.setTimeout(() => setReturningFromPreview(false), 400));
+    }, 170));
+  }, [previewClosing]);
   // Set by ProfilePreviewModal - it has an unsaved crop applied ("OK" but not
   // yet "Save"), which is about to be silently lost below since leaving
   // always unmounts it. There's no button here to intercept and block (the
@@ -227,7 +245,6 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       }
       hasPendingCropRef.current = false;
       setShowProfilePreview(false);
-      setShowPremiumUpgrade(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActiveTab]);
@@ -438,7 +455,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     if (!isOwnProfile || !currentUser?.id) return;
 
     const channel = supabase
-      .channel(`profile-broadcasts-${currentUser.id}`)
+      .channel(uniqueTopic(`profile-broadcasts-${currentUser.id}`))
       .on(
         'postgres_changes',
         {
@@ -1029,27 +1046,22 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
     };
   }, [profile, previewImages, previewImageCaptions]);
 
-  if (showPremiumUpgrade) {
-    return (
-      <div className="h-full w-full overflow-y-auto">
-        <PremiumUpgrade currentUser={currentUser} onClose={() => setShowPremiumUpgrade(false)} preselectedPlan="premium" />
-      </div>
-    );
-  }
-
   // Renders inline (same as the premium-upgrade screen above) rather than as a
   // full-screen overlay, so it stays inside MainApp's normal header/bottom-nav
   // shell and scrolls the same way every other tab does, instead of covering
   // the whole viewport in its own isolated modal.
   if (showProfilePreview && previewMatch) {
     return (
-      <ProfilePreviewModal
-        profile={previewMatch}
-        images={previewImages}
-        onClose={() => setShowProfilePreview(false)}
-        onPhotoUpdated={onProfileUpdate}
-        onPendingCropChange={(hasPending) => { hasPendingCropRef.current = hasPending; }}
-      />
+      <div className={`h-full w-full ${previewClosing ? 'dl-preview-out' : 'dl-preview-in'}`}>
+        <ProfilePreviewModal
+          profile={previewMatch}
+          images={previewImages}
+          onClose={closePreviewAnimated}
+          onBack={closePreviewAnimated}
+          onPhotoUpdated={onProfileUpdate}
+          onPendingCropChange={(hasPending) => { hasPendingCropRef.current = hasPending; }}
+        />
+      </div>
     );
   }
 
@@ -1066,7 +1078,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
   }
 
   return (
-      <div className="h-full w-full bg-black overflow-x-hidden"
+      <div className={`h-full w-full bg-black overflow-x-hidden${returningFromPreview ? ' dl-preview-back' : ''}`}
          style={{ 
            touchAction: 'pan-y', // allow horizontal gestures (e.g. slider drags) to be handled by child controls
            userSelect: 'none',
@@ -1136,7 +1148,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                       }
                     }}
                     style={{ height: 22, minHeight: 22, padding: '0 8px' }}
-                    className={`flex items-center gap-1 rounded-full bg-neutral-900 border border-pink-500/50 text-white text-[11px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer ${
+                    className={`dl-hit flex items-center gap-1 rounded-full bg-neutral-900 border border-pink-500/50 text-white text-[11px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer ${
                       previewMatch ? '' : 'opacity-50 pointer-events-none cursor-default'
                     }`}
                     aria-label="Preview my profile"
@@ -1153,10 +1165,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   false - `undefined` means "still resolving", and showing the
                   crown then made subscribers briefly think they weren't. */}
               {isPremium === false && (
-                <Button
-                  onClick={() => setShowPremiumUpgrade(true)}
-                  style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
-                  className="rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black shadow-sm"
+                <Button variant="premium" size="iconSm"
+                  onClick={() => openPremiumUpgrade()}
+                  style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0, boxShadow: 'none' }}
+                  className="rounded-full shadow-sm"
                   aria-label={t('Upgrade')}
                 >
                   <Crown className="w-4 h-4" />
@@ -1165,9 +1177,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {/* Message button (own profile only) */}
               {isOwnProfile && (
                 <div className="relative">
-                  <Button
+                  <Button variant="line" size="iconSm"
                     onClick={openProfileMessages}
-                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
+                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0, boxShadow: 'none' }}
                     className="rounded-full bg-neutral-900 border border-pink-500/30 text-white hover:bg-neutral-800"
                     aria-label="Open profile messages"
                   >
@@ -1183,9 +1195,9 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
               {/* Games button (own profile only) */}
               {isOwnProfile && (
-                <Button
+                <Button variant="line" size="iconSm"
                   onClick={() => navigate('/games')}
-                  style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0 }}
+                  style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0, boxShadow: 'none' }}
                   className="rounded-full bg-neutral-900 border border-pink-500/30 text-purple-300 hover:bg-neutral-800"
                   aria-label="Play games"
                 >
@@ -1215,7 +1227,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
               <div className="mt-4 bg-blue-950/40 border border-blue-700/50 rounded-lg px-4 py-3 relative">
                 <button
-                  className="absolute top-2 right-3 text-blue-300 hover:text-blue-100 text-lg font-bold focus:outline-none"
+                  className="dl-hit absolute top-2 right-3 text-blue-300 hover:text-blue-100 text-lg font-bold focus:outline-none"
                   aria-label="Dismiss profile completion"
                   onClick={() => setHideProfileCompletion(true)}
                 >
@@ -1363,10 +1375,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                                   {msg.message}
                                 </div>
                                 <div className="mt-4 flex justify-end">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 font-medium transition-colors"
+                                  <Button variant="dangerSoft" size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       deleteBroadcastMessage(msg.recipient_id);
@@ -1468,7 +1477,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                 setEditedProfile(prev => ({ ...prev, unlocked_countries: countries }));
                 onProfileUpdate();
               }}
-              onUpgradeClick={() => setShowPremiumUpgrade(true)}
+              onUpgradeClick={() => openPremiumUpgrade()}
             />
           </CollapsibleSection>
           <CollapsibleSection
@@ -1649,6 +1658,14 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               isEditing={isEditing}
               onFavoritesChange={handleFavoritesChange}
             />
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <ProfileVibeSection
+                editedProfile={editedProfile}
+                profile={profile}
+                isEditing={isEditing}
+                onFavoritesChange={handleFavoritesChange}
+              />
+            </div>
           </CollapsibleSection>
           <CollapsibleSection
             title={t('profile.adinkra')}

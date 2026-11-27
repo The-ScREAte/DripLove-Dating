@@ -16,7 +16,7 @@ export const DAY_WINDOW_SIZE = 30; // swipes per day eligible for that day's quo
 // (day 10 = day 1's quota again, etc).
 export const DAY_QUOTA_CYCLE: ReadonlyArray<number> = [2, 1, 1, 0, 1, 0, 0, 1, 2];
 
-export const MIN_GAP_BETWEEN_INJECTIONS = 3; // never two reveals back-to-back (measured in real swipes)
+const MIN_GAP_BETWEEN_INJECTIONS = 3; // never two reveals back-to-back (measured in real swipes)
 
 const todayStr = (): string => new Date().toISOString().split('T')[0];
 

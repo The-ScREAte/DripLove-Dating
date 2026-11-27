@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Mic, Video as VideoIcon, VideoOff, MicOff, Rows2, Columns2, PictureInPicture2, ChevronDown, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { fetchCircleProfilesByIds, CircleProfile } from '@/utils/circlePoolFetch';
-import { calculateAge } from '@/utils/discoverCache';
+import { calculateAge } from '@/utils/dateUtils';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CircleUpHeader from './CircleUpHeader';
 import ProfileInfoOverlay from './ProfileInfoOverlay';
 import SlimSwitch from './SlimSwitch';
+import PermissionDeniedPanel from './PermissionDeniedPanel';
 import { fetchApprovedImages } from './circleUpProfileExtras';
 import { CircleUpShareSettings, DEFAULT_SHARE_SETTINGS } from './MatchPreviewCard';
 
@@ -175,6 +177,19 @@ const CircleUpPrepare = () => {
     };
   }, [navigate]);
 
+  // Re-ask for camera + microphone (after the user changed the setting or dismissed the prompt).
+  const retryPermission = async () => {
+    setPermissionState('checking');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = stream;
+      setPermissionState('granted');
+    } catch {
+      setPermissionState('denied');
+    }
+  };
+
   // The <video> element only mounts once permissionState flips to
   // 'granted' (it's conditionally rendered below), so videoRef.current
   // was still null at the moment the effect above obtained the stream -
@@ -248,7 +263,7 @@ const CircleUpPrepare = () => {
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-black flex flex-col">
+    <div className="h-screen w-full bg-black flex flex-col">
       <CircleUpHeader onBack={() => navigate('/?tab=circle')} backLabel="Back to Circle" />
 
       <div className="flex-1 overflow-y-auto min-h-0">
@@ -263,10 +278,7 @@ const CircleUpPrepare = () => {
               </div>
             )}
             {permissionState === 'denied' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-                <VideoOff className="w-8 h-8 text-white/40" />
-                <p className="text-white/60 text-sm">Camera and microphone access is needed to go live. Enable it in your device settings.</p>
-              </div>
+              <PermissionDeniedPanel className="absolute inset-0" onRetry={retryPermission} />
             )}
             {(permissionState !== 'granted' || !camOn) && permissionState !== 'checking' && permissionState !== 'denied' && (
               <div className="absolute inset-0 flex items-center justify-center bg-neutral-900">
@@ -412,14 +424,14 @@ const CircleUpPrepare = () => {
       </div>
 
       <div className="flex-shrink-0 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 bg-black border-t border-white/5">
-        <button
+        <Button variant="primary" size="lg" className="w-full"
           type="button"
           onClick={handleReady}
           disabled={permissionState !== 'granted' || goingLive}
-          className="w-full h-11 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold text-sm disabled:opacity-40 transition-opacity"
+         
         >
           {goingLive ? 'Getting ready…' : 'Ready'}
-        </button>
+        </Button>
       </div>
     </div>
   );

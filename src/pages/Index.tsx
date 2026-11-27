@@ -5,29 +5,28 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import HoppingLogo from '@/components/HoppingLogo';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { transformFormDataForSubmission } from '@/utils/formValidation';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
 import { preloadExchangeRates } from '@/services/exchangeRateService';
 import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
 import { FORM_PAGE_BG } from '@/components/forms/formTheme';
 import OnboardingTransition from '@/components/forms/OnboardingTransition';
+import HandoffWelcome from '@/components/HandoffWelcome';
+import { HANDOFF_MAX_MS, handoffLeaveDelay } from '@/utils/handoff';
+import { useBackClose } from '@/utils/backStack';
+import { onAppContentReady, resetAppContentReady } from '@/utils/appContentReady';
 
 // Lazy load AdminPage (54KB) - only loads when admin features are accessed
 const LazyAdminPage = lazy(() => import('@/components/AdminPage'));
-// Only needed on the login/register/profile-completion screens, never on
-// the very first paint (WelcomeScreen) - was eagerly bundled before this.
-const VideoBackground = lazy(() => import('@/components/VideoBackground'));
 const ProfileCompletionPage = lazy(() => import('@/components/ProfileCompletionPage'));
 const TermsAcceptance = lazy(() => import('@/components/TermsAcceptance'));
 const MainApp = lazy(() => import('@/components/MainApp'));
 const TermsOfService = lazy(() => import('@/components/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('@/components/PrivacyPolicy'));
-// AuthForm/RegistrationForm/AboutUs (~2,250 lines combined) used to load
-// eagerly as part of the very first bundle, on every cold start, for every
-// user, even though none of them are needed until the user actually taps
-// past the welcome screen. Only WelcomeScreen (the one screen genuinely
-// needed instantly) and the tiny AuthDialog stay eager.
-const AuthForm = lazy(() => import('@/components/AuthForm'));
+// RegistrationForm/AboutUs used to load eagerly as part of the very first
+// bundle, on every cold start, for every user, even though none of them are
+// needed until the user actually taps past the welcome screen. Only
+// WelcomeScreen (the one screen genuinely needed instantly) and the tiny
+// AuthDialog shell stay eager (the email form itself is lazy inside it).
 const RegistrationForm = lazy(() => import('@/components/RegistrationForm'));
 const AboutUs = lazy(() => import('@/components/AboutUs'));
 
@@ -46,7 +45,7 @@ const Index = ({
   } & Record<string, unknown>) | null;
   isAuthenticated: boolean;
 }) => {
-  const [currentView, setCurrentView] = useState<'welcome' | 'login' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(
+  const [currentView, setCurrentView] = useState<'welcome' | 'register' | 'profile-completion' | 'terms-acceptance' | 'app' | 'admin' | 'about' | 'terms' | 'privacy'>(
     isAuthenticated ? 'app' : 'welcome'
   );
   // Starts true, matching currentView above, for an already-authenticated
@@ -61,7 +60,6 @@ const Index = ({
   // app in between.
   const [loading, setLoading] = useState(isAuthenticated);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
-  const [isLoginMode, setIsLoginMode] = useState(true);
   const { toast } = useToast();
   const didRouteRef = React.useRef(false);
   // Registration creates the auth account (via supabase.auth.signUp) BEFORE
@@ -263,25 +261,12 @@ const Index = ({
     const id = window.setTimeout(warm, 600);
     return () => window.clearTimeout(id);
   }, [currentView]);
-
-  const handleGetStarted = () => {
-    setCurrentView('login');
-  };
-
   const handleShowRegister = () => {
     setCurrentView('register');
   };
 
   const handleBackToLogin = () => {
     setCurrentView('welcome');
-  };
-
-  const handleAdminAccess = () => {
-    setCurrentView('login'); // Redirect to login instead of direct admin access
-  };
-
-  const handleShowLogin = () => {
-    setCurrentView('login');
   };
 
   const handleBackToWelcome = () => {
@@ -302,7 +287,6 @@ const Index = ({
 
   const handleManualLogin = () => {
     setShowAuthDialog(true);
-    setIsLoginMode(true);
   };
 
   const handleAuthDialogToggle = () => {
@@ -310,11 +294,6 @@ const Index = ({
     setShowAuthDialog(false);
     setCurrentView('register');
   };
-
-  const handleAuthDialogClose = () => {
-    setShowAuthDialog(false);
-  };
-
   // Shortest possible registration: essentials only
   const handleRegister = async (formData: unknown) => {
     // Registration passes user directly - use it immediately
@@ -328,18 +307,6 @@ const Index = ({
       setCurrentView('terms-acceptance');
     }
   };
-
-  const handleProfileComplete = () => {
-    // After profile completion, show terms acceptance
-    setCurrentView('terms-acceptance');
-  };
-
-  const handleProfileCancel = async () => {
-    // Sign out the user if they cancel profile completion
-    await supabase.auth.signOut();
-    setCurrentView('welcome');
-  };
-
   const handleLogout = async () => {
     // Remove push token before logging out
     if (user?.id) {
@@ -368,15 +335,70 @@ const Index = ({
     setCurrentView('welcome');
   };
 
-  // Set only when arriving from sign-up/terms, so that hand-off shows the
-  // branded "getting Discover ready" screen while the app mounts; a normal
-  // cold start keeps its existing (empty) fallback.
-  const [isOnboardingHandoff, setIsOnboardingHandoff] = useState(false);
+  // Android hardware Back from the state-based info views returns to Welcome
+  // instead of leaving the app (they aren't routes, so history can't do it).
+  useBackClose(
+    currentView === 'about' || currentView === 'terms' || currentView === 'privacy',
+    handleBackToWelcome,
+    { escape: false }
+  );
+  // Back on the sign-up screen goes to Welcome - unless the account is being
+  // created right now (photos uploading), when Back is swallowed rather than
+  // abandoning a half-finished registration. Steps inside the wizard register
+  // their own handler on top of this one.
+  useBackClose(
+    currentView === 'register',
+    () => {
+      if (suppressAutoRouteRef.current) return;
+      handleBackToLogin();
+    },
+    { escape: false }
+  );
 
-  const handleTermsAccept = () => {
-    setIsOnboardingHandoff(true);
+  // Hand-off from sign-up/terms into the app: keep the branded "Getting
+  // Discover ready" screen up until the first tab's content is actually ready
+  // (not just until the MainApp chunk has loaded), then fade it out. A normal
+  // cold start keeps its existing fallback. `max` is a failsafe so the screen
+  // can never get stuck.
+  const [handoffPhase, setHandoffPhase] = useState<'off' | 'on' | 'leaving'>('off');
+  // First name for the "Welcome, {name}" moment (from the terms screen / profile).
+  const [handoffName, setHandoffName] = useState<string | null>(null);
+  const [handoffContinued, setHandoffContinued] = useState(false);
+
+  // The welcome moment is held just long enough to register (HANDOFF_MIN_MS) and then only
+  // until Discover's first content is ready; HANDOFF_MAX_MS is the failsafe, after which the
+  // app shows its own card-shaped skeleton (never an empty screen) instead of waiting longer.
+  const handleTermsAccept = (info?: { firstName?: string | null; continued?: boolean }) => {
+    resetAppContentReady();
+    setHandoffName(info?.firstName?.trim() || null);
+    setHandoffContinued(info?.continued === true);
+    setHandoffPhase('on');
     setCurrentView('app');
   };
+
+  useEffect(() => {
+    if (handoffPhase !== 'on') return undefined;
+    const startedAt = Date.now();
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const leave = () => {
+      // Honour the minimum, plus one short beat so the first content frame has painted underneath.
+      const wait = handoffLeaveDelay(startedAt, Date.now());
+      settle = setTimeout(() => setHandoffPhase('leaving'), wait);
+    };
+    const unsubscribe = onAppContentReady(leave);
+    const max = setTimeout(() => setHandoffPhase('leaving'), HANDOFF_MAX_MS);
+    return () => {
+      unsubscribe();
+      clearTimeout(max);
+      if (settle) clearTimeout(settle);
+    };
+  }, [handoffPhase]);
+
+  useEffect(() => {
+    if (handoffPhase !== 'leaving') return undefined;
+    const id = setTimeout(() => setHandoffPhase('off'), 300);
+    return () => clearTimeout(id);
+  }, [handoffPhase]);
 
   if (loading) {
     return (
@@ -393,7 +415,6 @@ const Index = ({
         {currentView === 'welcome' && (
           <>
             <WelcomeScreen
-              onLogin={handleShowLogin}
               onAbout={handleShowAbout}
               onTerms={handleShowTerms}
               onPrivacy={handleShowPrivacy}
@@ -402,7 +423,6 @@ const Index = ({
             <AuthDialog
               open={showAuthDialog}
               onOpenChange={setShowAuthDialog}
-              isLogin={isLoginMode}
               onToggle={handleAuthDialogToggle}
             />
           </>
@@ -424,22 +444,6 @@ const Index = ({
           <Suspense fallback={<PageLoader />}>
             <PrivacyPolicy onBack={handleBackToWelcome} />
           </Suspense>
-        )}
-
-        {currentView === 'login' && (
-          <div className="h-fill bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e] flex items-start px-4 pt-3 overflow-y-auto relative" style={{ minHeight: '100vh' }}>
-            {/* Video Background */}
-            <Suspense fallback={null}>
-              <VideoBackground />
-            </Suspense>
-            <Suspense fallback={<PageLoader />}>
-              <AuthForm
-                isLogin={true}
-                onToggle={handleShowRegister}
-                onBack={handleBackToWelcome}
-              />
-            </Suspense>
-          </div>
         )}
 
         {currentView === 'register' && (
@@ -475,10 +479,26 @@ const Index = ({
 
         {currentView === 'app' && user && (
           <ErrorBoundary>
-            <Suspense fallback={isOnboardingHandoff ? <OnboardingTransition title="Getting Discover ready" subtitle="Finding people near you…" /> : <PageLoader />}>
+            <Suspense fallback={handoffPhase !== 'off' ? null : <PageLoader />}>
               <MainApp user={user} onLogout={handleLogout} />
             </Suspense>
           </ErrorBoundary>
+        )}
+
+        {currentView === 'app' && user && handoffPhase !== 'off' && (
+          // Above the app's own bottom nav (z-[99999]); fades out once Discover is ready.
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 100002,
+              opacity: handoffPhase === 'leaving' ? 0 : 1,
+              transition: 'opacity 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+              pointerEvents: handoffPhase === 'leaving' ? 'none' : 'auto',
+            }}
+          >
+            <HandoffWelcome firstName={handoffName} continued={handoffContinued} />
+          </div>
         )}
 
         {currentView === 'admin' && (

@@ -5,33 +5,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Heart, Briefcase, GraduationCap, User, Trash2, X, Settings, Save, Pencil, Ruler, Baby, MessageCircle, Gift, PawPrint, Share2, Languages, Activity } from 'lucide-react';
+import { Heart, MapPin, User, Trash2, X, Settings, Save, Pencil, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
+import { useBackClose } from '@/utils/backStack';
+import { ProfileDetailsPanel } from './profile-card/ProfileDetailsPanel';
+import { ProfileSection } from './profile-card/ProfileSection';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/hooks/use-toast';
 import { getCountriesList } from '@/constants/locationData';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
 import CachedImage from '@/components/common/CachedImage';
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
-import {
-  FAMILY_PLANS_OPTIONS,
-  COMMUNICATION_STYLE_OPTIONS,
-  LOVE_STYLE_OPTIONS,
-  PETS_OPTIONS,
-  SOCIAL_MEDIA_OPTIONS,
-  traitLabel,
-} from '@/constants/profileTraits';
-import { favoriteEmoji, formatFavoriteLabel, parseFavorites } from '@/constants/favorites';
+import { parseFavorites } from '@/constants/favorites';
 import { withThumbnailPaths } from '@/utils/photoThumbnails';
+import { calculateAge } from '@/utils/dateUtils';
+import { formatHeightLabel } from '@/utils/profileFormat';
 
-const formatHeightLabel = (cm: number) => {
-  const totalInches = Math.round(cm / 2.54);
-  const feet = Math.floor(totalInches / 12);
-  const inches = totalInches % 12;
-  return `${feet}'${inches}" (${cm} cm)`;
-};
 // Lazy, not a static import: PhotoCropModal needs its own isolated build
 // chunk (see vite.config.ts) to avoid a circular-chunk crash.
 const PhotoCropModal = React.lazy(() => import('@/components/profile/PhotoCropModal'));
@@ -78,6 +69,8 @@ interface UserProfileModalProps {
 const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProfileModalProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  // Android back closes the dialog (Radix already handles Escape on the web).
+  useBackClose(isOpen, () => onClose(), { escape: false });
   const [profile, setProfile] = useState<any>(null);
   const [wasEdited, setWasEdited] = useState(false);
   const [userImages, setUserImages] = useState<string[]>([]);
@@ -275,17 +268,6 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
     }
   };
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
   // Same "earned" verified badge shown everywhere else (>=85% profile
   // completion) - not a face-verification flag.
   const showVerifiedBadge = profile ? calculateProfileCompletion(profile, userImages).showVerifiedBadge : false;
@@ -306,7 +288,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
           <DialogHeader>
             <DialogTitle className="text-white">{t('userProfileModal.loading')}</DialogTitle>
           </DialogHeader>
@@ -322,7 +304,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   if (!profile && !loading) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
           <DialogHeader>
             <DialogTitle className="text-white">{t('userProfileModal.unavailable')}</DialogTitle>
           </DialogHeader>
@@ -341,7 +323,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
           {/* Absolutely positioned (not a normal grid row) so the close button
               doesn't reserve its own gap-4 row above the avatar - it just
               floats in the corner instead of pushing everything else down. */}
@@ -353,12 +335,9 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
             <DialogTitle className="sr-only">
               {profile?.first_name} {profile?.last_name}
             </DialogTitle>
-            <Button
-              variant="outline"
-              size="icon"
+            <Button variant="line" size="iconSm" className="text-white"
               onClick={handleClose}
               aria-label={t('common.close')}
-              className="h-8 w-8 bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -502,20 +481,15 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         User Preferences (Admin Edit)
                       </h3>
                       {!isEditingPreferences ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <Button variant="line" size="sm" className="text-white"
                           onClick={() => setIsEditingPreferences(true)}
-                          className="h-7 text-xs bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
                         >
                           <Pencil className="w-3 h-3 mr-1" />
                           Edit
                         </Button>
                       ) : (
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
+                          <Button variant="line" size="sm" className="text-white"
                             onClick={() => {
                               setIsEditingPreferences(false);
                               // Reset to original values
@@ -530,15 +504,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                               setEditedUnlockedCountries(profile?.unlocked_countries || []);
                               setEditedDateOfBirth(profile?.date_of_birth || '');
                             }}
-                            className="h-7 text-xs bg-black border-pink-500/40 text-white hover:bg-pink-900/30"
                           >
                             Cancel
                           </Button>
-                          <Button
-                            size="sm"
+                          <Button variant="primary" size="sm"
                             onClick={handleSavePreferences}
                             disabled={savingPreferences}
-                            className="h-7 text-xs bg-blue-600 hover:bg-blue-700"
                           >
                             <Save className="w-3 h-3 mr-1" />
                             {savingPreferences ? 'Saving...' : 'Save'}
@@ -553,7 +524,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">Gender</label>
                             <Select value={editedGender} onValueChange={setEditedGender}>
-                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
+                              <SelectTrigger tone="dark">
                                 <SelectValue placeholder="Select gender" />
                               </SelectTrigger>
                               <SelectContent className="bg-black border-pink-500/30 text-white">
@@ -566,7 +537,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">Looking For</label>
                             <Select value={editedPreference} onValueChange={setEditedPreference}>
-                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
+                              <SelectTrigger tone="dark">
                                 <SelectValue placeholder="Select preference" />
                               </SelectTrigger>
                               <SelectContent className="bg-black border-pink-500/30 text-white">
@@ -581,7 +552,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         <div>
                           <label className="text-xs font-medium text-gray-400 mb-1 block">Relationship Intent</label>
                           <Select value={editedRelationshipIntent} onValueChange={setEditedRelationshipIntent}>
-                            <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
+                            <SelectTrigger tone="dark">
                               <SelectValue placeholder="Select intent" />
                             </SelectTrigger>
                             <SelectContent className="bg-black border-pink-500/30 text-white">
@@ -597,11 +568,11 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         {/* Date of Birth */}
                         <div>
                           <label className="text-xs font-medium text-gray-400 mb-1 block">Date of Birth</label>
-                          <Input
+                          <Input tone="dark"
                             type="date"
                             value={editedDateOfBirth}
                             onChange={(e) => setEditedDateOfBirth(e.target.value)}
-                            className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
+                           
                           />
                           {editedDateOfBirth && (
                             <p className="text-[10px] text-gray-400 mt-1">
@@ -614,7 +585,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">Country</label>
                             <Select value={editedCountry} onValueChange={setEditedCountry}>
-                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
+                              <SelectTrigger tone="dark">
                                 <SelectValue placeholder="Select country" />
                               </SelectTrigger>
                               <SelectContent className="max-h-60 bg-black border-pink-500/30 text-white">
@@ -628,12 +599,12 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">City</label>
-                            <Input
+                            <Input tone="dark"
                               type="text"
                               value={editedCity}
                               onChange={(e) => setEditedCity(e.target.value)}
                               placeholder="Enter city"
-                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
+                             
                             />
                           </div>
                         </div>
@@ -641,35 +612,35 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         <div className="grid grid-cols-3 gap-3">
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">Min Age</label>
-                            <Input
+                            <Input tone="dark"
                               type="number"
                               value={editedMinAge}
                               onChange={(e) => setEditedMinAge(e.target.value)}
                               min="18"
                               max="99"
-                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
+                             
                             />
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">Max Age</label>
-                            <Input
+                            <Input tone="dark"
                               type="number"
                               value={editedMaxAge}
                               onChange={(e) => setEditedMaxAge(e.target.value)}
                               min="18"
                               max="99"
-                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
+                             
                             />
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-400 mb-1 block">Max Distance (km)</label>
-                            <Input
+                            <Input tone="dark"
                               type="number"
                               value={editedMaxDistance}
                               onChange={(e) => setEditedMaxDistance(e.target.value)}
                               min="1"
                               max="500"
-                              className="h-8 text-xs bg-black/40 border-pink-500/30 text-white"
+                             
                             />
                           </div>
                         </div>
@@ -705,7 +676,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                                 }
                               }}
                             >
-                              <SelectTrigger className="h-8 text-xs bg-black/40 border-pink-500/30 text-white">
+                              <SelectTrigger tone="dark">
                                 <SelectValue placeholder="Add country..." />
                               </SelectTrigger>
                               <SelectContent className="max-h-60 bg-black border-pink-500/30 text-white">
@@ -778,12 +749,10 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
               {/* Photo Gallery */}
               {userImages.length > 1 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold text-white mb-4 flex items-center">
-                      <User className="w-4 h-4 mr-2" />
-                      {t('userProfileModal.photos', { count: userImages.length })}
-                    </h3>
+                <ProfileSection
+                  title={t('userProfileModal.photos', { count: userImages.length })}
+                  icon={<User />}
+                >
                     <div className="grid grid-cols-3 gap-2">
                       {userImages.slice(0, 6).map((image, index) => (
                         <div key={index} className="relative group">
@@ -822,328 +791,22 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
+                </ProfileSection>
               )}
 
-              {/* Bio */}
-              {profile?.bio && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <p className="text-gray-200 text-center italic">"{profile.bio}"</p>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {/* Basic Info */}
-              <Card className="bg-black border-pink-500/20">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold mb-3 flex items-center text-white">
-                    <Heart className="w-4 h-4 mr-2 text-blue-400" />
-                    {t('userProfileModal.sections.lookingFor')}
-                  </h3>
-                  <div className="space-y-2">
-                    {profile?.preference && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">{t('userProfileModal.lookingFor.interestedIn')}</span>
-                        <Badge variant="secondary" className="capitalize bg-blue-950/40 text-blue-300 border-blue-700/40">{profile.preference}</Badge>
-                      </div>
-                    )}
-                    {profile?.relationship_intent && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">{t('userProfileModal.lookingFor.lookingFor')}</span>
-                        <Badge variant="secondary" className="capitalize bg-blue-950/40 text-blue-300 border-blue-700/40">{profile.relationship_intent}</Badge>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Lifestyle */}
-              {(profile?.smoking || profile?.drinking || profile?.exercise_level || profile?.sleeping_schedule) && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.lifestyle')}</h3>
-                    <div className="grid grid-cols-2 gap-y-2 gap-x-4">
-                      {profile?.smoking && (
-                        <div>
-                          <span className="text-gray-400">{t('userProfileModal.lifestyle.smoking')}</span>
-                          <span className="block font-medium text-white">{profile.smoking}</span>
-                        </div>
-                      )}
-                      {profile?.drinking && (
-                        <div>
-                          <span className="text-gray-400">{t('userProfileModal.lifestyle.drinking')}</span>
-                          <span className="block font-medium text-white">{profile.drinking}</span>
-                        </div>
-                      )}
-                      {profile?.exercise_level && (
-                        <div>
-                          <span className="text-gray-400">{t('userProfileModal.lifestyle.exercise')}</span>
-                          <span className="block font-medium text-white">{profile.exercise_level}</span>
-                        </div>
-                      )}
-                      {profile?.sleeping_schedule && (
-                        <div>
-                          <span className="text-gray-400">{t('userProfileModal.lifestyle.sleep')}</span>
-                          <span className="block font-medium text-white">{profile.sleeping_schedule}</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+              {/* Interested in - the one "looking for" fact the shared panel doesn't carry */}
+              {profile?.preference && (
+                <ProfileSection title={t('userProfileModal.lookingFor.interestedIn').replace(/\s*[:：]\s*$/, '')} icon={<Heart />}>
+                  <Badge variant="brand" className="px-3 py-1 text-sm capitalize">{profile.preference}</Badge>
+                </ProfileSection>
               )}
 
-              {/* Family Plans */}
-              {profile?.family_plans && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <Baby className="w-4 h-4 mr-2 text-blue-400" />
-                      Family Plans
-                    </h3>
-                    <p className="text-gray-200">{traitLabel(FAMILY_PLANS_OPTIONS, profile.family_plans)}</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Work & Education */}
-              {(profile?.occupation || profile?.industry || profile?.education_level) && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <Briefcase className="w-4 h-4 mr-2 text-blue-400" />
-                      {t('userProfileModal.sections.workEducation')}
-                    </h3>
-                    <div className="space-y-3">
-                      {profile?.occupation && (
-                        <div>
-                          <span className="text-gray-400">{t('userProfileModal.workEducation.occupation')}</span>
-                          <span className="block font-medium text-white">{profile.occupation}</span>
-                        </div>
-                      )}
-                      {profile?.industry && (
-                        <div>
-                          <span className="text-gray-400">{t('userProfileModal.workEducation.industry')}</span>
-                          <span className="block font-medium text-white">{profile.industry}</span>
-                        </div>
-                      )}
-                      {profile?.education_level && (
-                        <div>
-                          <span className="text-gray-400 flex items-center">
-                            <GraduationCap className="w-4 h-4 mr-1" /> {t('userProfileModal.workEducation.education')}
-                          </span>
-                          <span className="block font-medium text-white">{profile.education_level}</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Personality Traits */}
-              {(typeof profile?.introvert_extrovert === 'number' || typeof profile?.spontaneous_planner === 'number' || typeof profile?.messy_organized === 'number') && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.personality')}</h3>
-                    <div className="space-y-3">
-                      {typeof profile?.introvert_extrovert === 'number' && (
-                        <div>
-                          <div className="flex justify-between text-sm mb-1 text-gray-300">
-                            <span>{t('userProfileModal.personality.introvert')}</span>
-                            <span>{t('userProfileModal.personality.extrovert')}</span>
-                          </div>
-                          <div className="w-full bg-neutral-800 rounded-full h-2">
-                            <div 
-                              className="bg-blue-400 h-2 rounded-full" 
-                              style={{ width: `${profile.introvert_extrovert}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                      {typeof profile?.spontaneous_planner === 'number' && (
-                        <div>
-                          <div className="flex justify-between text-sm mb-1 text-gray-300">
-                            <span>{t('userProfileModal.personality.planner')}</span>
-                            <span>{t('userProfileModal.personality.spontaneous')}</span>
-                          </div>
-                          <div className="w-full bg-neutral-800 rounded-full h-2">
-                            <div 
-                              className="bg-blue-400 h-2 rounded-full" 
-                              style={{ width: `${profile.spontaneous_planner}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                      {typeof profile?.messy_organized === 'number' && (
-                        <div>
-                          <div className="flex justify-between text-sm mb-1 text-gray-300">
-                            <span>{t('userProfileModal.personality.organized')}</span>
-                            <span>{t('userProfileModal.personality.messy')}</span>
-                          </div>
-                          <div className="w-full bg-neutral-800 rounded-full h-2">
-                            <div 
-                              className="bg-blue-400 h-2 rounded-full" 
-                              style={{ width: `${profile.messy_organized}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Communication Style */}
-              {profile?.communication_style && profile.communication_style.length > 0 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <MessageCircle className="w-4 h-4 mr-2 text-blue-400" />
-                      Communication Style
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.communication_style.map((value: string) => (
-                        <Badge key={value} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
-                          {traitLabel(COMMUNICATION_STYLE_OPTIONS, value)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Love Style */}
-              {profile?.love_style && profile.love_style.length > 0 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <Gift className="w-4 h-4 mr-2 text-blue-400" />
-                      Love Style
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.love_style.map((value: string) => (
-                        <Badge key={value} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
-                          {traitLabel(LOVE_STYLE_OPTIONS, value)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Fun Questions */}
-              {(profile?.fun_fact || profile?.perfect_first_date || profile?.last_googled) && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.funFacts')}</h3>
-                    <div className="space-y-4">
-                      {profile?.fun_fact && (
-                        <div>
-                          <span className="text-gray-400 font-medium">{t('userProfileModal.funFacts.funFact')}</span>
-                          <p className="text-gray-200">{profile.fun_fact}</p>
-                        </div>
-                      )}
-                      {profile?.perfect_first_date && (
-                        <div>
-                          <span className="text-gray-400 font-medium">{t('userProfileModal.funFacts.perfectDate')}</span>
-                          <p className="text-gray-200">{profile.perfect_first_date}</p>
-                        </div>
-                      )}
-                      {profile?.last_googled && (
-                        <div>
-                          <span className="text-gray-400 font-medium">{t('userProfileModal.funFacts.lastGoogled')}</span>
-                          <p className="text-gray-200">{profile.last_googled}</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Interests */}
-              {profile?.interests && profile.interests.length > 0 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 text-white">{t('userProfileModal.sections.interests')}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.interests.map((interest: string) => (
-                        <Badge key={interest} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
-                          {interest}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Favorites */}
-              {favorites.length > 0 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 text-white">{t('matches.favorites', 'Favorites')}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {favorites.map((favorite, index) => (
-                        <Badge key={index} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40 gap-1">
-                          <span>{favoriteEmoji(favorite.category)}</span>
-                          <span>{formatFavoriteLabel(favorite)}</span>
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Pets */}
-              {profile?.pets && profile.pets.length > 0 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <PawPrint className="w-4 h-4 mr-2 text-blue-400" />
-                      Pets
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.pets.map((value: string) => (
-                        <Badge key={value} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
-                          {traitLabel(PETS_OPTIONS, value)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Languages spoken */}
-              {profile?.languages && profile.languages.length > 0 && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <Languages className="w-4 h-4 mr-2 text-blue-400" />
-                      Languages
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.languages.map((lang: string) => (
-                        <Badge key={lang} variant="outline" className="bg-blue-950/40 text-blue-300 border-blue-700/40">
-                          {lang}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Social Media */}
-              {profile?.social_media && (
-                <Card className="bg-black border-pink-500/20">
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3 flex items-center text-white">
-                      <Share2 className="w-4 h-4 mr-2 text-blue-400" />
-                      Social Media
-                    </h3>
-                    <p className="text-gray-200">{traitLabel(SOCIAL_MEDIA_OPTIONS, profile.social_media)}</p>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Details - the same panel Discover, Liked Me and the preview use */}
+              <ProfileDetailsPanel
+                profile={{ ...profile, favorites: parseFavorites(profile?.favorites) }}
+                showFunQuestions
+                className="px-0 pb-0 pt-0"
+              />
             </div>
         </DialogContent>
       </Dialog>

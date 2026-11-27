@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -308,14 +308,14 @@ const TestYourToast = () => {
   if (!selectedLevel) {
     return (
       <div className="h-screen bg-black flex flex-col">
-        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10 hover:text-white">
+                <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate(-1)} title="Home">
                   <Home className="w-5 h-5" />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
+                <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/games')} title="Back to Games">
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
@@ -323,11 +323,8 @@ const TestYourToast = () => {
                   <p className="text-xs text-gray-300">Test Your Toast 🥂</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
+              <Button variant="line" size="sm" className="text-white"
                 onClick={handleClearResults}
-                className="bg-black border-pink-500/40 text-gray-200 hover:bg-white/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -337,7 +334,7 @@ const TestYourToast = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
           <div className="max-w-2xl mx-auto px-4 pt-2 pb-6 space-y-4">
-          <Card className="bg-neutral-900 border-pink-500/30">
+          <Card variant="surface">
             <CardHeader>
               <CardTitle className="text-white">Select a level</CardTitle>
             </CardHeader>
@@ -346,14 +343,12 @@ const TestYourToast = () => {
                 const level = Number(levelStr);
                 const levelBest = bestByLevel[level];
                 return (
-                  <Button
+                  <Button variant="line" size="md" className="text-white w-full h-auto min-h-[44px] p-4 items-start justify-between text-left whitespace-normal"
                     key={level}
                     onClick={() => startLevel(level)}
-                    className="w-full h-auto p-4 flex items-start justify-between text-left hover:shadow-md transition-all active:scale-95 bg-black/60 border-pink-500/30 text-white hover:bg-white/5"
-                    variant="outline"
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
                         <span className="font-bold text-lg text-white">Level {level}</span>
                         <span className="text-sm text-gray-300">- {config.name}</span>
                         <div className="flex gap-0.5">
@@ -364,7 +359,7 @@ const TestYourToast = () => {
                       </div>
                       <p className="text-sm text-gray-300">{config.difficulty} • {config.questionCount} questions{level >= 4 ? ' • 💀 Sudden Death' : ''}</p>
                     </div>
-                    <div className="text-right text-sm font-semibold text-white min-w-[80px]">
+                    <div className="text-right text-sm font-semibold text-white shrink-0 min-w-[48px]">
                       {levelBest ? `${levelBest.percentage.toFixed(0)}%` : '—'}
                       <div className="text-[11px] text-gray-400">Best</div>
                     </div>
@@ -375,7 +370,7 @@ const TestYourToast = () => {
           </Card>
 
           {best3.length > 0 && (
-            <Card className="bg-neutral-900 border-pink-500/30">
+            <Card variant="surface">
               <CardHeader>
                 <CardTitle className="text-white">Your best 3 (this device)</CardTitle>
               </CardHeader>
@@ -403,13 +398,13 @@ const TestYourToast = () => {
     const isNewBest = bestPct === undefined || percentage >= bestPct;
     return (
       <div className="h-screen bg-black flex flex-col">
-        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+        <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
           <div className="max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')} title="Home" className="text-white hover:bg-white/10 hover:text-white">
+            <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/')} title="Home">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
+              <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -422,7 +417,7 @@ const TestYourToast = () => {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
           <div className="max-w-2xl mx-auto px-4 pt-2 pb-8">
-          <Card className="text-center bg-neutral-900 border-pink-500/30">
+          <Card variant="surface" className="text-center">
             <CardContent className="pt-8 pb-8">
               <Trophy className="w-20 h-20 mx-auto mb-6 text-yellow-400" />
               <h2 className="text-3xl font-bold mb-2 text-white">{rating.title}</h2>
@@ -437,16 +432,13 @@ const TestYourToast = () => {
               </div>
 
               <div className="flex gap-3">
-                <Button
+                <Button variant="premium" size="md" className="flex-1"
                   onClick={handleRestart}
-                  className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 hover:opacity-90 text-white font-semibold"
                 >
                   Try Another Set
                 </Button>
-                <Button
+                <Button variant="line" size="md" className="text-white flex-1"
                   onClick={() => navigate('/games')}
-                  variant="outline"
-                  className="flex-1 bg-black/60 border-pink-500/40 text-white hover:bg-white/10 hover:text-white"
                 >
                   Back to Games
                 </Button>
@@ -462,14 +454,14 @@ const TestYourToast = () => {
   return (
     <div className="h-screen bg-black flex flex-col">
       {/* Header */}
-      <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 40px)' }}>
+      <div className="bg-black border-b border-pink-500/30 shadow-sm sticky top-0 z-10" style={{ paddingTop: 'clamp(8px, env(safe-area-inset-top, 8px), 72px)' }}>
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} title="Home" className="text-white hover:bg-white/10 hover:text-white">
+              <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate(-1)} title="Home">
                 <Home className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/games')} title="Back to Games" className="text-white hover:bg-white/10 hover:text-white">
+              <Button variant="quiet" size="sm" className="text-white" onClick={() => navigate('/games')} title="Back to Games">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -511,7 +503,7 @@ const TestYourToast = () => {
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-safe-offset-32 pb-8">
         <div className="max-w-2xl mx-auto px-4 pt-2 pb-6">
         {loadingScenarios ? (
-          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
+          <Card variant="surface" className="mb-6">
             <CardContent className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
@@ -520,14 +512,14 @@ const TestYourToast = () => {
             </CardContent>
           </Card>
         ) : !currentScenario ? (
-          <Card className="mb-6 bg-neutral-900 border-pink-500/30">
+          <Card variant="surface" className="mb-6">
             <CardContent className="py-12 text-center text-gray-300">
               No scenarios available
             </CardContent>
           </Card>
         ) : (
           <>
-            <Card className="mb-6 bg-neutral-900 border-pink-500/30">
+            <Card variant="surface" className="mb-6">
               <CardHeader>
                 <div className="inline-block px-3 py-1 bg-orange-500/20 text-orange-300 rounded-full text-sm font-semibold mb-3">
                   {currentScenario.personality}
@@ -586,13 +578,9 @@ const TestYourToast = () => {
               <p className="text-lg leading-relaxed mb-4 text-gray-100">
                 {isCorrect ? currentScenario.feedback.correct : currentScenario.feedback.incorrect}
               </p>
-              <Button
+              <Button variant={isCorrect ? 'success' : 'primary'} size="lg" className="w-full"
                 onClick={handleNext}
-                className={`w-full font-semibold ${
-                  isCorrect 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-orange-600 hover:bg-orange-700'
-                }`}
+               
               >
                 {questionIndex < scenarios.length - 1 ? 'Next Question' : 'See Results'}
               </Button>

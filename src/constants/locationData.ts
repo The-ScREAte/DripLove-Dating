@@ -19,7 +19,7 @@ export interface CountryData {
 }
 
 // African countries with their major cities and coordinates
-export const locationData: Record<string, CountryData> = {
+const locationData: Record<string, CountryData> = {
   // West Africa
   nigeria: {
     name: 'Nigeria',
@@ -1695,7 +1695,21 @@ export function getCountriesList(): { name: string; code: string; continent: str
   })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function getCitiesByCountry(countryCode: string): CityData[] {
+let countryNameByCode: Map<string, string> | null = null;
+
+/**
+ * Display name for an ISO country code, from the full country list. Unknown
+ * codes show as the code itself; an empty/missing code shows `fallback`.
+ */
+export function getCountryName(code: string | null | undefined, fallback?: string): string {
+  if (!countryNameByCode) {
+    countryNameByCode = new Map(Object.values(locationData).map(c => [c.code, c.name]));
+  }
+  const key = (code ?? '').toString();
+  return countryNameByCode.get(key) ?? (key || fallback || '');
+}
+
+function getCitiesByCountry(countryCode: string): CityData[] {
   const countryKey = Object.keys(locationData).find(
     key => locationData[key].code === countryCode
   );
@@ -1715,29 +1729,9 @@ export function getCountryByCode(code: string): CountryData | undefined {
   return countryKey ? locationData[countryKey] : undefined;
 }
 
-export function getCityData(countryCode: string, cityName: string): CityData | undefined {
+function getCityData(countryCode: string, cityName: string): CityData | undefined {
   const cities = getCitiesByCountry(countryCode);
   return cities.find(city => city.name.toLowerCase() === cityName.toLowerCase());
-}
-
-export function getStatesByCountry(countryCode: string): string[] {
-  const cities = getCitiesByCountry(countryCode);
-  const states = new Set<string>();
-  
-  cities.forEach(city => {
-    if (city.state) {
-      states.add(city.state);
-    }
-  });
-  
-  return Array.from(states).sort();
-}
-
-export function getCitiesByState(countryCode: string, state: string): CityData[] {
-  const cities = getCitiesByCountry(countryCode);
-  return cities
-    .filter(city => city.state === state)
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Alias for backwards compatibility

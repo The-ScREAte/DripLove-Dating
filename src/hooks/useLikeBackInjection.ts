@@ -5,7 +5,9 @@ import { normalizeCountryCode } from '@/utils/countryCode';
 import { readLikeBackCycle, writeLikeBackCycle, type LikeBackCycleState } from '@/utils/likeBackCycleStorage';
 import { advanceLikeBackCycle } from '@/utils/likeBackSchedule';
 import { parseFavorites } from '@/constants/favorites';
+import { calculateDistance } from '@/constants/locationData';
 
+import { uniqueTopic } from '@/utils/realtime';
 /**
  * Like-Back Injection Hook
  *
@@ -94,19 +96,6 @@ interface LikerProfile {
 const MIN_PHOTOS_REQUIRED = 2; // Quality filter
 const INJECTION_POSITION_MIN = 3; // never in the first 3 positions (0-indexed, so index 3 is the first allowed)
 const INJECTION_POSITION_MAX = 5;
-
-// Helper to calculate distance between two coordinates (Haversine formula)
-const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 export function useLikeBackInjection({
   userId,
@@ -358,7 +347,7 @@ export function useLikeBackInjection({
     if (!userId) return;
 
     const channel = supabase
-      .channel(`likes-me-${userId}`)
+      .channel(uniqueTopic(`likes-me-${userId}`))
       .on(
         'postgres_changes',
         {
@@ -497,7 +486,7 @@ export function useLikeBackInjection({
           profile.latitude != null &&
           profile.longitude != null
         ) {
-          const distance = calculateDistanceKm(
+          const distance = calculateDistance(
             userLatitude,
             userLongitude,
             profile.latitude,

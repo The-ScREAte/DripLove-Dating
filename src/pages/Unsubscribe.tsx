@@ -215,12 +215,11 @@ const Unsubscribe: React.FC = () => {
               </div>
             )}
             
-            <Button
+            <Button variant="primary" size="md" className="w-full mt-4"
               onClick={() => {
                 setShowManageInstructions(false);
                 navigate('/');
               }}
-              className="w-full mt-4"
             >
               Done
             </Button>
@@ -235,17 +234,14 @@ const Unsubscribe: React.FC = () => {
               className="mb-2"
             />
             {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
-            <Button
+            <Button variant="danger" size="md" className="w-full mt-2"
               onClick={handleUnsubscribe}
               disabled={loading || confirmation.trim().toLowerCase() !== REQUIRED_PHRASE.toLowerCase()}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full mt-2"
             >
               {loading ? 'Processing...' : 'Unsubscribe'}
             </Button>
-            <Button
-              variant="outline"
+            <Button variant="line" size="md" className="w-full mt-2"
               onClick={() => navigate('/')}
-              className="w-full mt-2"
             >
               Cancel
             </Button>

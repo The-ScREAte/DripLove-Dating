@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MessageCircle, Send, X, Sparkles, Heart, Shield, Crown, HelpCircle, Star } from 'lucide-react';
+import { Send, X, Sparkles, Heart, Shield, Crown, HelpCircle, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Message {
@@ -362,17 +362,16 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
         {/* Input */}
         <div className="p-4 bg-black border-t border-pink-500/20 rounded-b-lg shrink-0">
           <div className="flex gap-2">
-            <Input
+            <Input tone="dark"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
-              className="flex-1 bg-neutral-900 border-pink-500/30 text-white placeholder:text-gray-500 focus:border-purple-400 focus:ring-purple-400"
+              className="flex-1"
             />
-            <Button
+            <Button variant="primary" size="md"
               onClick={() => handleSendMessage()}
               disabled={!inputValue.trim() || isTyping}
-              className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4"
             >
               <Send className="w-4 h-4" />
             </Button>

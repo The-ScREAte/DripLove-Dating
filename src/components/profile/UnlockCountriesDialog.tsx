@@ -154,11 +154,11 @@ const UnlockCountriesDialog = ({
           {/* Search */}
           <div className="relative mb-2">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-pink-400" />
-            <Input
+            <Input tone="dark"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('common.search', 'Search countries')}
-              className="pl-8 h-9 bg-black border-pink-500/30 text-white placeholder:text-white/50 text-sm"
+              className="pl-8"
             />
           </div>
 
@@ -207,18 +207,15 @@ const UnlockCountriesDialog = ({
         </div>
 
         <DialogFooter className="flex-row items-center justify-end gap-2 space-x-0">
-          <Button
-            variant="outline"
+          <Button variant="line" size="sm" className="text-black"
             onClick={onClose}
             disabled={isSaving}
-            className="w-auto h-9 px-4 bg-white border-pink-500/30 text-black hover:bg-neutral-200"
           >
             {t('common.cancel')}
           </Button>
-          <Button
+          <Button variant="primary" size="sm"
             onClick={handleSave}
             disabled={isSaving}
-            className="w-auto h-9 px-4 bg-pink-600 hover:bg-pink-700 text-white"
           >
             {isSaving ? t('common.saving') : t('common.save')}
           </Button>

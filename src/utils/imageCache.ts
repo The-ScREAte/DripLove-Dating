@@ -1,8 +1,8 @@
 import { isAndroidPlatform } from './platformUtils';
 
 // ⭐ GLOBAL IMAGE CACHE - Shared across all components for instant loading
-export const globalImageCache = new Map<string, string>(); // url => blobURL
-export const failedImages = new Set<string>(); // Track failed images to avoid retry loops
+const globalImageCache = new Map<string, string>(); // url => blobURL
+const failedImages = new Set<string>(); // Track failed images to avoid retry loops
 
 // ⭐ EFFICIENT IMAGE PRELOADER - Converts images to blob URLs for instant rendering
 // ⭐ ANDROID OPTIMIZATION: Shorter timeout and smaller blob cache for Android
@@ -84,17 +84,3 @@ export const dropBlobUrl = (url: string): void => {
 
 // Cleanup blob URLs when needed (optional, for memory management)
 // ⭐ ANDROID FIX: Lower threshold for Android to prevent memory pressure
-export const cleanupOldBlobUrls = () => {
-  const isAndroid = isAndroidPlatform();
-  const threshold = isAndroid ? 50 : 100; // Android: more aggressive cleanup
-  const removeCount = isAndroid ? 15 : 20;
-  
-  if (globalImageCache.size > threshold) {
-    const entries = Array.from(globalImageCache.entries());
-    const toRemove = entries.slice(0, removeCount);
-    toRemove.forEach(([url, blobUrl]) => {
-      URL.revokeObjectURL(blobUrl);
-      globalImageCache.delete(url);
-    });
-  }
-};

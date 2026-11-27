@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useTranslation } from 'react-i18next';
 
+import { useBackClose } from '@/utils/backStack';
 interface DeleteChatDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,6 +26,8 @@ const DeleteChatDialog: React.FC<DeleteChatDialogProps> = ({
   matchName
 }) => {
   const { t } = useTranslation();
+  // Android hardware back closes the dialog.
+  useBackClose(isOpen, onClose, { escape: false });
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
@@ -36,10 +39,10 @@ const DeleteChatDialog: React.FC<DeleteChatDialogProps> = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-row justify-end gap-2 space-x-0">
-          <AlertDialogCancel className="flex-1 mt-0 bg-black border border-pink-500/30 text-white hover:bg-pink-500/10 hover:text-white">{t('chat.cancel')}</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel className="flex-1 mt-0">{t('chat.cancel')}</AlertDialogCancel>
+          <AlertDialogAction variant="danger"
             onClick={onConfirm}
-            className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+            className="flex-1"
           >
             {t('chat.deleteChat')}
           </AlertDialogAction>

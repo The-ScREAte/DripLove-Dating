@@ -1,7 +1,8 @@
 // ⭐ ANDROID OPTIMIZATION: Memoized slide components to reduce re-render cost by 40-60%
 import React from 'react';
-import { User, Quote, Heart, Coffee, Search, Baby, MessageCircle, Gift, PawPrint, Share2, Ruler } from 'lucide-react';
+import { User } from 'lucide-react';
 import { SlideContent } from './MatchCardHelpers';
+import { InfoCardSlide } from './InfoCardSlide';
 import { useTranslation } from 'react-i18next';
 import styles from './MatchCard.module.css';
 import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
@@ -192,6 +193,7 @@ const ImageSlide = React.memo<{
     <div className="absolute inset-0 bg-black overflow-hidden">
       <img
         src={displaySrc}
+        decoding="async"
         aria-hidden="true"
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
@@ -211,10 +213,13 @@ const ImageSlide = React.memo<{
             <div
               key={side}
               className="absolute left-0 w-full h-full overflow-hidden"
-              style={side === 'top' ? { bottom: '100%' } : { top: '100%' }}
+              // 1px overlap under the photo so sub-pixel rounding can never
+              // leave a hairline seam between the photo and its reflection.
+              style={side === 'top' ? { bottom: 'calc(100% - 1px)' } : { top: 'calc(100% - 1px)' }}
             >
               <img
                 src={displaySrc}
+        decoding="async"
                 alt=""
                 className="w-full h-full object-fill"
                 style={{
@@ -229,21 +234,24 @@ const ImageSlide = React.memo<{
                   no visible line, then hands over to the softer copy below. */}
               <img
                 src={displaySrc}
+        decoding="async"
                 alt=""
                 className="absolute inset-0 w-full h-full object-fill"
                 style={{
                   transform: 'scaleY(-1)',
                   // Mask is applied before the flip, so the opaque end sits at
                   // the photo-adjacent edge after scaleY(-1).
-                  maskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, black 0%, transparent 25%)`,
-                  WebkitMaskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, black 0%, transparent 25%)`,
+                  // Eased (multi-stop) fade instead of a straight line so the
+                  // hand-off to the softer copy has no visible banding/edge.
+                  maskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.82) 6%, rgba(0,0,0,0.58) 12%, rgba(0,0,0,0.3) 18%, rgba(0,0,0,0.1) 23%, transparent 28%)`,
+                  WebkitMaskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.82) 6%, rgba(0,0,0,0.58) 12%, rgba(0,0,0,0.3) 18%, rgba(0,0,0,0.1) 23%, transparent 28%)`,
                 }}
                 draggable={false}
               />
               <div
                 className="absolute inset-0"
                 style={{
-                  background: `linear-gradient(to ${side}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.45) 35%, rgba(0,0,0,0.9) 100%)`,
+                  background: `linear-gradient(to ${side}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 12%, rgba(0,0,0,0.22) 24%, rgba(0,0,0,0.42) 38%, rgba(0,0,0,0.64) 54%, rgba(0,0,0,0.82) 72%, rgba(0,0,0,0.92) 100%)`,
                 }}
               />
             </div>
@@ -277,112 +285,6 @@ const ImageSlide = React.memo<{
 
 });
 ImageSlide.displayName = 'ImageSlide';
-
-// Bio Slide Component
-const BioSlide = React.memo<{
-  content: string;
-  userBackgroundColor: string;
-  matchFirstName: string;
-}>(({ content, userBackgroundColor, matchFirstName }) => {
-  const { t } = useTranslation();
-  return (
-    <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
-      <div className="max-w-sm mx-auto text-center">
-        <div className="flex items-center justify-center mb-6">
-          <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-            <Quote className="w-8 h-8 text-white" />
-          </div>
-        </div>
-        <h3 className="text-2xl font-bold text-white mb-6">
-          {t('discover.matchCard.aboutUser', { name: matchFirstName })}
-        </h3>
-        <p className="text-white text-lg leading-relaxed font-medium">{content}</p>
-      </div>
-    </div>
-  );
-});
-BioSlide.displayName = 'BioSlide';
-
-// Fun Fact Slide Component
-const FunFactSlide = React.memo<{
-  content: string;
-  userBackgroundColor: string;
-}>(({ content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
-    <div className="max-w-sm mx-auto text-center">
-      <div className="flex items-center justify-center mb-6">
-        <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-          <Heart className="w-8 h-8 text-white" />
-        </div>
-      </div>
-      <h3 className="text-2xl font-bold text-white mb-6">Fun Fact</h3>
-      <p className="text-white text-lg leading-relaxed font-medium">{content}</p>
-    </div>
-  </div>
-));
-FunFactSlide.displayName = 'FunFactSlide';
-
-// Perfect First Date Slide Component
-const PerfectFirstDateSlide = React.memo<{
-  content: string;
-  userBackgroundColor: string;
-}>(({ content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
-    <div className="max-w-sm mx-auto text-center">
-      <div className="flex items-center justify-center mb-6">
-        <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-          <Coffee className="w-8 h-8 text-white" />
-        </div>
-      </div>
-      <h3 className="text-2xl font-bold text-white mb-6">Perfect First Date</h3>
-      <p className="text-white text-lg leading-relaxed font-medium">{content}</p>
-    </div>
-  </div>
-));
-PerfectFirstDateSlide.displayName = 'PerfectFirstDateSlide';
-
-// Last Googled Slide Component
-const LastGoogledSlide = React.memo<{
-  content: string;
-  userBackgroundColor: string;
-}>(({ content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
-    <div className="max-w-sm mx-auto text-center">
-      <div className="flex items-center justify-center mb-6">
-        <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-          <Search className="w-8 h-8 text-white" />
-        </div>
-      </div>
-      <h3 className="text-2xl font-bold text-white mb-6">Last Googled</h3>
-      <p className="text-white text-lg leading-relaxed font-medium">{content}</p>
-    </div>
-  </div>
-));
-LastGoogledSlide.displayName = 'LastGoogledSlide';
-
-// Generic trait prompt slide (family plans / communication style / love
-// style / pets / social media) - same layout as the fun-fact-style slides
-// above, just parametrized by icon + title instead of five near-duplicate
-// components.
-const TraitPromptSlide = React.memo<{
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  content: string;
-  userBackgroundColor: string;
-}>(({ icon: Icon, title, content, userBackgroundColor }) => (
-  <div className={`w-full h-full ${userBackgroundColor} flex items-center justify-center px-8 pt-8 pb-[150px]`}>
-    <div className="max-w-sm mx-auto text-center">
-      <div className="flex items-center justify-center mb-6">
-        <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 shadow-lg">
-          <Icon className="w-8 h-8 text-white" />
-        </div>
-      </div>
-      <h3 className="text-2xl font-bold text-white mb-6">{title}</h3>
-      <p className="text-white text-lg leading-relaxed font-medium">{content}</p>
-    </div>
-  </div>
-));
-TraitPromptSlide.displayName = 'TraitPromptSlide';
 
 // Placeholder Slide Component
 const PlaceholderSlide = React.memo<{
@@ -443,32 +345,8 @@ export const SlideRenderer = React.memo<SlideRendererProps>(({
         />
       );
     }
-    case 'bio':
-      return (
-        <BioSlide
-          content={slide.content || ''}
-          userBackgroundColor={userBackgroundColor}
-          matchFirstName={matchFirstName}
-        />
-      );
-    case 'fun_fact':
-      return <FunFactSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'perfect_first_date':
-      return <PerfectFirstDateSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'last_googled':
-      return <LastGoogledSlide content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'height':
-      return <TraitPromptSlide icon={Ruler} title="Height" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'family_plans':
-      return <TraitPromptSlide icon={Baby} title="Family Plans" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'communication_style':
-      return <TraitPromptSlide icon={MessageCircle} title="Communication Style" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'love_style':
-      return <TraitPromptSlide icon={Gift} title="Love Style" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'pets':
-      return <TraitPromptSlide icon={PawPrint} title="Pets" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
-    case 'social_media':
-      return <TraitPromptSlide icon={Share2} title="Social Media" content={slide.content || ''} userBackgroundColor={userBackgroundColor} />;
+    case 'card':
+      return slide.card ? <InfoCardSlide card={slide.card} /> : <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
     case 'placeholder':
       return <PlaceholderSlide matchFirstName={matchFirstName || ''} matchLastName={matchLastName || ''} />;
     default:

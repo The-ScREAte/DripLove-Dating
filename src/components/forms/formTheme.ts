@@ -8,7 +8,6 @@
 export const FORM_PAGE_BG = '#0B0B0F';
 
 export const formSectionTitle = 'text-[15px] font-semibold tracking-tight text-white';
-export const formSectionHint = 'text-xs leading-relaxed text-white/55';
 export const formLabel = 'block text-[13px] font-medium text-white/85';
 export const formRequired = 'text-pink-400';
 export const formError = 'mt-1.5 text-xs font-medium text-red-400';

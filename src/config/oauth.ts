@@ -16,7 +16,7 @@
 
 import { isMobileApp, isLocalhost } from '@/utils/platformUtils';
 
-export const OAUTH_CONFIG = {
+const OAUTH_CONFIG = {
   // Custom URL scheme for your app
   customScheme: 'driplove',
   
@@ -94,11 +94,6 @@ export const getRedirectUri = (provider: 'google' | 'apple' = 'google') => {
   // Use provider-specific web redirect
   return OAUTH_CONFIG.webRedirectUris[provider] || OAUTH_CONFIG.webRedirectUri;
 };
-
-export const getAppleClientId = () => {
-  return OAUTH_CONFIG.servicesClientIds.apple;
-};
-
 /**
  * Get the appropriate password reset redirect URI based on platform
  */
@@ -137,25 +132,4 @@ export const getEmailConfirmRedirectUri = () => {
 
   // Default for web/production
   return `${window.location.origin}/auth/confirm`;
-};
-
-/**
- * Configure Supabase Auth with proper mobile redirects
- */
-export const getSupabaseAuthConfig = () => {
-  let redirectTo = OAUTH_CONFIG.webRedirectUri;
-  
-  if (isMobileApp()) {
-    redirectTo = OAUTH_CONFIG.supabaseRedirectUri;
-  } else if (isLocalhost()) {
-    redirectTo = OAUTH_CONFIG.localhostRedirectUri;
-  }
-  
-  return {
-    redirectTo,
-    queryParams: {
-      // Ensure proper mobile flow
-      prompt: 'select_account',
-    }
-  };
 };

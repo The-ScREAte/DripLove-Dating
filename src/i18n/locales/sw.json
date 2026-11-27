@@ -82,7 +82,30 @@
       "signUpFailed": "Kuunda akaunti kumeshindikana",
       "appleSignInFailed": "Kuingia kwa Apple kumeshindikana",
       "googleSignInFailed": "Kuingia kwa Google kumeshindikana"
-    }
+    },
+    "invalidCredentials": "Barua pepe na nenosiri havilingani.",
+    "emailNotConfirmed": "Tafadhali thibitisha barua pepe yako kwanza - angalia kikasha chako.",
+    "resendConfirmation": "Tuma tena barua pepe",
+    "confirmationSent": "Barua pepe ya uthibitisho imetumwa. Angalia kikasha na spam.",
+    "showPassword": "Onyesha nenosiri",
+    "hidePassword": "Ficha nenosiri",
+    "resetSentTitle": "Angalia barua pepe yako",
+    "resetSentBody": "Ikiwa akaunti ipo kwa {{email}}, tumetuma kiungo cha kuweka upya nenosiri lako.",
+    "usesGoogle": "Akaunti hii inatumia Google. Tafadhali endelea na Google.",
+    "usesApple": "Akaunti hii inatumia Apple. Tafadhali endelea na Apple.",
+    "signingIn": "Inakuingiza…",
+    "signInFailedTitle": "Hatukuweza kukuingiza",
+    "signInFailedBody": "Hitilafu imetokea. Tafadhali jaribu tena.",
+    "signInCancelled": "Kuingia kumeghairiwa.",
+    "tryAgain": "Jaribu tena",
+    "newPassword": "Nenosiri jipya",
+    "updatePassword": "Sasisha nenosiri",
+    "updatingPassword": "Inasasisha…",
+    "resetLinkExpired": "Kiungo hiki kimeisha muda. Tafadhali omba kipya.",
+    "passwordUpdated": "Nenosiri limesasishwa. Sasa unaweza kuingia.",
+    "passwordHint": "Angalau herufi 6",
+    "setNewPasswordTitle": "Weka nenosiri jipya",
+    "signInTakingLong": "Kuingia kunachukua muda mrefu kuliko ilivyotarajiwa. Tafadhali jaribu tena."
   },
   "profile": {
     "myProfile": "Wasifu Wangu",
@@ -250,7 +273,14 @@
       "funQuestions": "Jibu maswali ya kufurahisha",
       "interests": "Chagua angalau mapendekezo 3"
     },
-    "freeTonight": "Huru Usiku Huu"
+    "freeTonight": "Huru Usiku Huu",
+    "height": "Urefu",
+    "selectHeight": "Chagua urefu wako",
+    "vibe": {
+      "values": "Yanayokujali zaidi",
+      "genres": "Muziki unaoupenda",
+      "empty": "Gusa Hariri kuongeza - hutusaidia kupata mechi bora."
+    }
   },
   "discover": {
     "discover": "Gundua",
@@ -328,8 +358,37 @@
       "messyVsOrganized": "Uchafu vs Mpangilio: {{percentage}}%",
       "interests": "Mambo Yanayopendeza",
       "favorites": "Favorites",
-      "language": "Lugha"
-    }
+      "language": "Lugha",
+      "atAGlance": "Kwa muhtasari",
+      "communicationStyle": "Mtindo wa mawasiliano",
+      "loveStyle": "Mtindo wa mapenzi",
+      "pets": "Wanyama kipenzi",
+      "languagesSpoken": "Lugha",
+      "socialMedia": "Mitandao ya kijamii",
+      "readMore": "Soma zaidi",
+      "showLess": "Onyesha kidogo",
+      "lookingForSerious": "Anatafuta uhusiano wa dhati",
+      "openToAnything": "Yuko wazi kwa lolote",
+      "lookingFor": "Anatafuta {{what}}",
+      "showDetails": "Onyesha maelezo",
+      "hideDetails": "Ficha maelezo",
+      "verifiedProfile": "Wasifu uliothibitishwa",
+      "funQuestions": "Maswali ya kufurahisha",
+      "funFact": "Ukweli wa kuvutia",
+      "perfectDate": "Miadi kamili ya kwanza",
+      "lastGoogled": "Nilichotafuta mwisho kwenye Google"
+    },
+    "modeForYou": "Kwako",
+    "modeSignMatch": "Sign Match",
+    "signMatchHint": "Watu ambao ishara zao zinaendana na zako",
+    "filtersAria": "Vichujio vya Discover",
+    "emptySignMatchTitle": "Hakuna Sign Match kwa sasa",
+    "emptySignMatchDesc": "Rudi hivi karibuni, au badili kwenda Kwako.",
+    "refreshFailedTitle": "Imeshindwa kusasisha",
+    "refreshFailedDesc": "Angalia muunganisho wako kisha ujaribu tena.",
+    "adjustFilters": "Rekebisha vichujio",
+    "playGames": "Cheza michezo",
+    "tryPremiumFree": "Jaribu Premium bila malipo"
   },
   "matches": {
     "matches": "Mechi",
@@ -361,7 +420,8 @@
     "releaseToRefresh": "Achia ili kuonyesha upya",
     "refreshing": "Inaonyesha upya...",
     "error": "Hitilafu",
-    "failedToRefresh": "Imeshindwa kuonyesha upya watu waliokupenda"
+    "failedToRefresh": "Imeshindwa kuonyesha upya watu waliokupenda",
+    "noDetailsYet": "Hakuna maelezo zaidi bado."
   },
   "chat": {
     "messages": "Ujumbe",
@@ -425,7 +485,37 @@
     "matchExpiredDescription": "Mechi hii imeisha kwa sababu ya kutokuwa na shughuli. Anza mazungumzo ndani ya siku 10 ili kuweka mechi zako!",
     "matchExpiringTitle": "Mechi Inaisha Hivi Karibuni!",
     "matchExpiringBody": "Mechi yako na {{name}} inaisha kesho. Tuma ujumbe ili kuweka muunganisho! 💬",
-    "daysLeft": "Siku {{days}} zimebaki"
+    "daysLeft": "Siku {{days}} zimebaki",
+    "search": "Tafuta mazungumzo",
+    "noResults": "Hakuna mazungumzo yaliyopatikana",
+    "yesterday": "Jana",
+    "you": "Wewe",
+    "earlierConversations": "Mazungumzo ya awali ({{count}})",
+    "newMatchBadge": "Mpya",
+    "findYourMatch": "Pata mwenzi wako",
+    "noMatchesTitle": "Hadithi yako ya mapenzi inaanzia hapa",
+    "matchedWith": "Mmeoana na {{name}}",
+    "matchedAgo": "Sema habari na ufanye iwe na maana",
+    "icebreakersTitle": "Vunja ukimya",
+    "icebreaker1": "Habari {{name}}! Ni sehemu gani bora ya wiki yako hadi sasa?",
+    "icebreaker2": "Hujambo {{name}} 👋 Unapenda nini sana kwa sasa?",
+    "icebreaker3": "Wasifu wako ulinifanya nitabasamu. Wikendi yako bora inaonekanaje?",
+    "staySafeTitle": "Kaa salama",
+    "staySafeBody": "Endelea kuzungumza kwenye DripLove hadi umwamini mtu. Usishiriki pesa, nenosiri wala taarifa za kifedha.",
+    "dismiss": "Funga",
+    "jumpToLatest": "Nenda ujumbe wa mwisho",
+    "newMessagesCount": "{{count}} mpya",
+    "viewProfile": "Tazama wasifu",
+    "replyingTo": "Unajibu {{name}}",
+    "cancelReply": "Ghairi jibu",
+    "verified": "Amethibitishwa",
+    "unreadCount": "{{count}} hazijasomwa",
+    "openConversation": "Fungua mazungumzo na {{name}}",
+    "newMatchesAria": "Mechi mpya",
+    "typingAria": "{{name}} anaandika",
+    "today": "Leo",
+    "copy": "Nakili",
+    "copied": "Ujumbe umenakiliwa"
   },
   "premium": {
     "goPremium": "Pata Premium",
@@ -511,6 +601,19 @@
         "button": "🎯 Malipo ya Mara Moja",
         "subtitle": "Hakuna kujifanya tena kiotomatiki"
       }
+    },
+    "legal": {
+      "renewalStore": "Hujisasisha kila mwezi kwa {{price}} hadi utakapoghairi. Ghairi wakati wowote katika mipangilio ya {{store}}.",
+      "renewalWeb": "Hujisasisha kila siku 30 kwa {{price}} hadi utakapoghairi. Ghairi wakati wowote kutoka kwenye wasifu wako.",
+      "terms": "Masharti ya Matumizi",
+      "privacy": "Sera ya Faragha"
+    },
+    "paymentIssue": {
+      "title": "Tatizo la malipo",
+      "body": "Hatukuweza kuhuisha Premium yako. Sasisha njia ya malipo katika {{store}} ili kuendelea kupata faida zako.",
+      "until": "Premium yako inaendelea hadi {{date}}.",
+      "update": "Sasisha njia ya malipo",
+      "later": "Si sasa"
     }
   },
   "notifications": {
@@ -544,8 +647,6 @@
     "rateApp": "Kadiria App",
     "title": "Mipangilio",
     "accountActions": "Vitendo vya Akaunti",
-    "enjoyingDripLove": "⭐ Unafurahia DripLove?",
-    "rateExperience": "Tathmini uzoefu wako na tusaidie kukua!",
     "needHelp": "Unahitaji msaada?",
     "contactSupport": "Wasiliana na timu yetu ya usaidizi kwa maswali yoyote au msaada:",
     "termsOfService": "Masharti ya Huduma",
@@ -573,7 +674,10 @@
     "deleteFailed": "Ufutaji umeshindwa",
     "updateFailed": "Usasishaji umeshindwa",
     "noUserData": "Hakuna Data ya Mtumiaji",
-    "unableToLoadUser": "Haikuweza kupakia taarifa za mtumiaji. Tafadhali ingia tena."
+    "unableToLoadUser": "Haikuweza kupakia taarifa za mtumiaji. Tafadhali ingia tena.",
+    "tabErrorTitle": "Imeshindwa kupakia kichupo hiki",
+    "tabErrorBody": "Sehemu hii ilikumbana na tatizo. Vichupo vyako vingine viko sawa.",
+    "tabErrorRetry": "Jaribu tena"
   },
   "validation": {
     "required": "Uwanja huu unahitajika",
@@ -815,7 +919,10 @@
       "dobRequired": "Tarehe ya kuzaliwa inahitajika",
       "mustBe18": "Lazima uwe na umri wa miaka 18",
       "genderRequired": "Tafadhali chagua jinsia yako",
-      "preferenceRequired": "Tafadhali chagua mapendeleo yako"
+      "preferenceRequired": "Tafadhali chagua mapendeleo yako",
+      "photosRequired": "Picha zinahitajika",
+      "someImagesRejected": "Baadhi ya picha zimekataliwa",
+      "photosNeedReupload": "Tafadhali ongeza picha zako tena"
     },
     "createAccount": "Unda Akaunti",
     "tellUsMore": "Tuambie Zaidi",
@@ -985,7 +1092,9 @@
     "joinThousands": "Jiunge na maelfu wanaopata upendo kote ulimwenguni",
     "aboutLink": "Kuhusu DripLove",
     "termsLink": "Masharti ya Huduma",
-    "privacyLink": "Sera ya Faragha"
+    "privacyLink": "Sera ya Faragha",
+    "legal": "Kwa kuendelea, unakubali <terms>Masharti ya Huduma</terms> na <privacy>Sera ya Faragha</privacy> yetu.",
+    "connectLink": "Unganika"
   },
   "adinkraMeanings": {
     "Aya": "Ufunguo. Ishara ya uvumilivu na ustadi.",
@@ -1014,5 +1123,452 @@
     "priorityHint": "Endelea na mfululizo wako upewe kipaumbele kwa mechi bora.",
     "continue": "Endelea",
     "levelComplete": "🎉 Kiwango {{level}} kimekamilika!"
+  },
+  "onboarding": {
+    "progress": "Maendeleo ya usajili",
+    "optional": "Si lazima",
+    "back": "Rudi",
+    "continue": "Endelea",
+    "checkingPhotos": "Tunakagua picha zako…",
+    "addMorePhotos": "Ongeza picha {{count}} zaidi ili uendelee",
+    "select": "Chagua",
+    "showPassword": "Onyesha nenosiri",
+    "hidePassword": "Ficha nenosiri",
+    "pw": {
+      "tooShort": "Fupi sana - tumia angalau herufi 6",
+      "okay": "Sawa",
+      "good": "Nzuri",
+      "strong": "Imara"
+    },
+    "steps": {
+      "account": {
+        "title": "Fungua akaunti yako",
+        "hint": "Tumia barua pepe unayoifungua."
+      },
+      "location": {
+        "title": "Unaishi wapi?",
+        "hint": "Ili tukuonyeshe watu walio karibu."
+      },
+      "work": {
+        "title": "Kazi na elimu",
+        "hintRequired": "Tuambie unafanya kazi gani.",
+        "hintOptional": "Shiriki kinachoonekana sawa."
+      },
+      "signs": {
+        "title": "Chagua alama zako za kitamaduni",
+        "hint": "Chagua angalau {{min}}.",
+        "hintOptional": "Chagua vinavyokufaa."
+      },
+      "face": {
+        "title": "Thibitisha kuwa ni wewe",
+        "hint": "Selfie ya haraka huifanya DripLove kuwa halisi. Haionyeshwi kamwe."
+      },
+      "photos": {
+        "title": "Ongeza picha zako bora",
+        "hint": "Ongeza angalau picha 2 zilizo wazi zako."
+      },
+      "bio": {
+        "title": "Simulia hadithi yako",
+        "hint": "Maneno machache ya kweli yanatosha."
+      },
+      "details": {
+        "title": "Kidogo zaidi kukuhusu",
+        "hint": "Huwasaidia watu kukufahamu."
+      },
+      "lifestyle": {
+        "title": "Maisha yako ya kila siku",
+        "hint": "Chagua kinachokufaa."
+      },
+      "interests": {
+        "title": "Nini kinakufurahisha?",
+        "hint": "Chagua unachopenda - hukusaidia kupata mechi bora."
+      },
+      "love": {
+        "title": "Unapendaje?",
+        "hint": "Uhusiano mzuri unaonekanaje kwako."
+      },
+      "you": {
+        "title": "Tuanze na wewe",
+        "hint": "Jina lako, siku ya kuzaliwa na wewe ni nani."
+      },
+      "looking": {
+        "title": "Unamtafuta nani?",
+        "hint": "Tuambie ungependa kukutana na nani."
+      },
+      "celebrate": {
+        "title": "Umeingia!",
+        "hint": "Unataka wasifu wako ung'ae?"
+      },
+      "values": {
+        "title": "Nini kinakujali zaidi?",
+        "hint": "Chagua hadi 5 - vinaathiri tunaokuonyesha."
+      },
+      "music": {
+        "title": "Unasikiliza nini?",
+        "hint": "Chagua muziki wako - tunalinganisha pia kwa ladha."
+      }
+    },
+    "face": {
+      "done": "Uso umethibitishwa"
+    },
+    "photos": {
+      "tipsLink": "Vidokezo vya picha",
+      "add": "Ongeza picha",
+      "alt": "Picha yako {{n}}",
+      "crop": "Kata picha",
+      "remove": "Ondoa picha",
+      "main": "Kuu",
+      "approved": "Imekubaliwa"
+    },
+    "promo": {
+      "toggle": "Una msimbo wa ofa?"
+    },
+    "tips": {
+      "title": "Vidokezo bora vya picha ya wasifu",
+      "subtitle": "Picha wazi na za kweli hupata mechi nyingi zaidi. Ongeza hadi {{max}}.",
+      "doHeading": "Fanya",
+      "avoidHeading": "Tafadhali epuka",
+      "smile": "Tabasamu la kweli",
+      "light": "Mwanga wa asili",
+      "life": "Onyesha maisha yako",
+      "sunglasses": "Miwani ya jua",
+      "dark": "Mwanga hafifu",
+      "group": "Picha za kikundi",
+      "mirror": "Selfie za kioo",
+      "cta": "Chagua picha"
+    },
+    "skip": "Ruka",
+    "showMore": "Onyesha zaidi",
+    "showFewer": "Onyesha pungufu",
+    "bio": {
+      "placeholder": "Andika mistari michache kukuhusu…",
+      "starter1": "Ninafurahi zaidi ninapo…",
+      "starter2": "Wikendi yangu kamili ni…",
+      "starter3": "Niulize kuhusu…",
+      "starter4": "Natafuta mtu ambaye…"
+    },
+    "details": {
+      "languages": "Lugha unazozungumza (hadi {{max}})"
+    },
+    "lifestyle": {
+      "pets": "Wanyama kipenzi",
+      "social": "Mtindo wa mitandao ya kijamii"
+    },
+    "interests": {
+      "counter": "{{count}} kati ya {{max}} zimechaguliwa"
+    },
+    "love": {
+      "loveStyle": "Jinsi unavyoonyesha upendo",
+      "communication": "Jinsi unavyopenda kuwasiliana",
+      "family": "Mipango ya familia"
+    },
+    "celebrate": {
+      "add": "Ongeza zaidi (si lazima)",
+      "skip": "Ruka - nipeleke DripLove"
+    },
+    "bonus": "Ung'arishe",
+    "welcomeBack": "Karibu, {{name}} - maelezo machache tu yamebaki.",
+    "cheer": {
+      "start": "Mwanzo mzuri",
+      "great": "Unafanya vizuri sana",
+      "almost": "Karibu kumaliza!",
+      "last": "Hatua ya mwisho!"
+    },
+    "vibe": {
+      "selected": "zimechaguliwa"
+    },
+    "music": {
+      "artists": "Wasanii unaowapenda",
+      "artistN": "Msanii {{n}}",
+      "artistPlaceholder": "mf. Burna Boy",
+      "link": "Shiriki wimbo au orodha",
+      "linkHelp": "Huchezwa moja kwa moja kwenye wasifu wako.",
+      "linkInvalid": "Bandika kiungo cha Spotify, Apple Music, YouTube au SoundCloud."
+    }
+  },
+  "circleUp": {
+    "permTitle": "Kamera na maikrofoni zimezimwa",
+    "permBody": "Ziwashe kwa DripLove kwenye mipangilio ya kifaa chako ili uingie moja kwa moja.",
+    "permBodyIos": "Ruhusu kamera na maikrofoni kwa DripLove kwenye Mipangilio ili uingie moja kwa moja.",
+    "openSettings": "Fungua Mipangilio",
+    "tryAgain": "Jaribu tena",
+    "endCallTitle": "Maliza simu hii?",
+    "endCallBody": "Utaondoka kwenye simu na mechi yako itaarifiwa.",
+    "endCall": "Maliza",
+    "stay": "Baki",
+    "tapToPlay": "Gusa kuanza video",
+    "finding": "Tunakutafutia mtu",
+    "searchNear": "Tunaanza na watu walio karibu nawe",
+    "searchCountry": "Tunapanua hadi nchi nzima",
+    "searchAbroad": "Kisha nje ya nchi",
+    "reconnecting": "Inaunganisha tena…",
+    "connecting": "Inaunganisha…",
+    "flipCamera": "Badili kamera",
+    "callEnded": "Simu imeisha",
+    "callEndedBody": "Asante kwa kuunganika.",
+    "findNew": "Tafuta mtu mpya",
+    "backToCircle": "Rudi kwenye Circle"
+  },
+  "rating": {
+    "title": "Unapenda DripLove?",
+    "body": "Ukadiriaji wa haraka husaidia watu zaidi kupata mapenzi ya kweli.",
+    "rateCta": "Kadiria DripLove",
+    "rateFailed": "Imeshindwa kufungua duka. Tafuta DripLove kwenye duka lako la programu ili kukadiria.",
+    "feedbackCta": "Tuambie nini cha kuboresha",
+    "feedbackTitle": "Tusaidie kuboresha",
+    "feedbackSubtitle": "Ujumbe wako unaenda moja kwa moja kwa timu yetu.",
+    "feedbackPlaceholder": "Nini kinaweza kuwa bora?",
+    "feedbackSend": "Tuma maoni",
+    "feedbackThanks": "Asante - tunasoma kila ujumbe.",
+    "feedbackError": "Imeshindwa kutuma. Tafadhali jaribu tena.",
+    "cat_matches": "Matches",
+    "cat_chat": "Gumzo",
+    "cat_photos": "Picha na uthibitisho",
+    "cat_payments": "Malipo",
+    "cat_bug": "Hitilafu na kasi",
+    "cat_other": "Nyingine"
+  },
+  "permissions": {
+    "title": {
+      "camera": "Ruhusa ya kamera imezimwa",
+      "microphone": "Ruhusa ya maikrofoni imezimwa",
+      "cameraMicrophone": "Ruhusa ya kamera na maikrofoni imezimwa",
+      "location": "Ruhusa ya eneo imezimwa",
+      "photos": "Ruhusa ya picha imezimwa",
+      "notifications": "Arifa zimezimwa"
+    },
+    "bodyIos": "Iwashe kwenye Mipangilio, kisha rudi DripLove.",
+    "bodyAndroid": "Fungua Mipangilio → Programu → DripLove → Ruhusa kisha uiwashe.",
+    "bodyWeb": "Ruhusu ufikiaji kivinjari kinapoomba, au uiwashe kwenye mipangilio ya tovuti ya kivinjari chako.",
+    "openSettings": "Fungua Mipangilio",
+    "tryAgain": "Jaribu tena"
+  },
+  "legal": {
+    "contents": "Yaliyomo",
+    "related": "Sera zinazohusiana",
+    "links": {
+      "terms": "Masharti ya Huduma",
+      "privacy": "Sera ya Faragha",
+      "community": "Miongozo ya Jamii",
+      "childSafety": "Usalama wa Watoto",
+      "safetyTips": "Vidokezo vya Usalama"
+    }
+  },
+  "vibe": {
+    "sharedTitle": "Mnapenda wote",
+    "more": "+{{count}}",
+    "musicMatch": "Mechi ya muziki - mna ladha moja",
+    "valuesTitle": "Yanayojali zaidi",
+    "musicTitle": "Ladha ya muziki",
+    "values": {
+      "honesty": "Ukweli",
+      "loyalty": "Uaminifu",
+      "humor": "Ucheshi",
+      "kindness": "Wema",
+      "respect": "Heshima",
+      "communication": "Mawasiliano",
+      "family": "Familia",
+      "faith": "Imani",
+      "ambition": "Tamaa ya mafanikio",
+      "growth": "Ukuaji",
+      "adventure": "Matukio",
+      "affection": "Mapenzi",
+      "stability": "Utulivu",
+      "independence": "Uhuru",
+      "culture": "Utamaduni na asili",
+      "fun": "Furaha",
+      "generosity": "Ukarimu",
+      "intimacy": "Ukaribu"
+    },
+    "genres": {
+      "afrobeats": "Afrobeats",
+      "amapiano": "Amapiano",
+      "highlife": "Highlife",
+      "hiphop": "Hip-Hop",
+      "rnb": "R&B",
+      "gospel": "Injili",
+      "reggae": "Reggae na Dancehall",
+      "pop": "Pop",
+      "rock": "Rock",
+      "jazz": "Jazz",
+      "soul": "Soul",
+      "house": "House",
+      "latin": "Kilatini",
+      "country": "Country",
+      "classical": "Muziki wa kale",
+      "alternative": "Mbadala"
+    }
+  },
+  "handoff": {
+    "welcomeName": "Karibu, {{name}}",
+    "welcome": "Karibu DripLove",
+    "line": "Inatafuta watu karibu nawe…"
+  },
+  "termsAccept": {
+    "hint": "Weka alama kwenye kisanduku ili kuendelea",
+    "saving": "Inahifadhi…",
+    "failed": "Hatukuweza kuhifadhi. Angalia muunganisho wako na ujaribu tena."
+  },
+  "cards": {
+    "heroMeet": "Mjue {{name}}",
+    "sharedHeadline": "Wewe na {{name}} mna mambo mnayoshirikiana",
+    "basicsTitle": "Kwa mtazamo",
+    "basics": {
+      "work": "Kazi",
+      "education": "Elimu",
+      "height": "Urefu",
+      "lives": "Anaishi",
+      "distance": "Umbali",
+      "languages": "Anazungumza",
+      "away": "Umbali wa {{distance}}"
+    },
+    "lookingTitle": "Anatafuta",
+    "looking": {
+      "family": "Mipango ya familia",
+      "loveStyle": "Mtindo wa mapenzi",
+      "communication": "Mawasiliano"
+    },
+    "interestsTitle": "Anachopenda {{name}}",
+    "interestsEyebrow": "Mapendeleo",
+    "valuesEyebrow": "Maadili",
+    "music": {
+      "artists": "Anazozisikiliza sana",
+      "play": "Sikiliza wimbo wake"
+    },
+    "lifestyleTitle": "Mtindo wa maisha",
+    "lifestyle": {
+      "exercise": "Mazoezi",
+      "drinking": "Kunywa",
+      "smoking": "Kuvuta sigara",
+      "sleep": "Usingizi",
+      "pets": "Wanyama kipenzi"
+    },
+    "signTitle": "Alama ya kitamaduni",
+    "sign": {
+      "shared": "Mnashiriki alama hii ✨",
+      "compatible": "Inaendana vizuri na alama yako ✨"
+    },
+    "trustTitle": "Vizuri kujua",
+    "trust": {
+      "verified": "Wasifu uliothibitishwa",
+      "activeNow": "Yupo sasa",
+      "activeToday": "Alikuwepo leo",
+      "activeWeek": "Alikuwepo wiki hii",
+      "profile": "Wasifu",
+      "lastSeen": "Alionekana mwisho",
+      "headlineVerified": "{{name}} ni mtu halisi aliyethibitishwa",
+      "headlineActive": "{{name}} alikuwepo hivi karibuni"
+    },
+    "starterTitle": "Vunja ukimya",
+    "starter": {
+      "interest": "Nini kilikuvutia kwenye {{thing}}?",
+      "value": "{{thing}} ina maana gani kwako?",
+      "music": "Ni wimbo gani unaousikiliza sana siku hizi?",
+      "city": "Ni sehemu gani unayoipenda {{city}}?",
+      "generic": "Hujambo {{name}} 👋 wiki yako inaendeleaje?",
+      "hint": "Ujumbe rahisi wa kwanza - gusa gumzo mtakapopatana.",
+      "headline": "Mwambie {{name}} habari"
+    },
+    "welcomeTitle": "Mgeni hapa",
+    "welcomeBody": "{{name}} anaanza tu - kuwa wa kwanza kusalimu.",
+    "promptFunFact": "Jambo la kuvutia",
+    "promptFirstDate": "Miadi kamili ya kwanza",
+    "promptGoogled": "Alichotafuta mwisho",
+    "heroHint": "Gusa upande wa kulia wa kadi kuona zaidi"
+  },
+  "circle": {
+    "title": "Circle Up",
+    "subtitle": "Pata watu wanaoshiriki ulimwengu wako.",
+    "verifiedNearYou": "Wanachama {{count}} waliothibitishwa karibu nawe",
+    "premiumTag": "Premium",
+    "unlockTitle": "wanachama katika {{circle}}",
+    "unlockTitleMany": "Jiunge na wanachama wengi katika {{circle}}",
+    "unlockBody": "Fungua duara hili kukutana na wanachama wanaolingana na unachotafuta.",
+    "unlockCta": "Fungua kwa Premium",
+    "unlockCtaTrial": "Anza jaribio la bure",
+    "maybeLater": "Labda baadaye",
+    "lockedCardTitle": "Fungua ili kuona",
+    "endTitle": "Umewaona wote hapa",
+    "endBody": "Umewaona wote katika \"{{circle}}\" kwa sasa. Rudi hivi karibuni au chunguza duara lingine.",
+    "endCta": "Chunguza duara zingine",
+    "many": "Wengi",
+    "members": "wanachama",
+    "worldwideHint": "Jumla ya programu nzima",
+    "pickCountries": "Chagua nchi zako"
+  },
+  "icebreaker": {
+    "errors": {
+      "dailyLimit": "Umefikia kikomo cha leo cha ujumbe wa kuanzisha mazungumzo. Jaribu kesho.",
+      "generic": "Imeshindwa kutuma. Tafadhali jaribu tena.",
+      "invalid": "Tafadhali andika ujumbe mfupi (hadi herufi {{max}}).",
+      "rateLimited": "Unatuma ujumbe mwingi sana. Jaribu tena baadaye kidogo.",
+      "unavailable": "Mtu huyu hawezi kupokea ujumbe huu kwa sasa."
+    },
+    "inbox": {
+      "accept": "Kubali na anza kuzungumza",
+      "acceptNote": "Ukikubali, mnakuwa mechi na {{name}} na gumzo lako linafunguka. Ikiwa huna nia, hakuna kinachotumwa tena.",
+      "decline": "Si sasa",
+      "empty": "Hakuna ujumbe wa kuanzisha kwa sasa",
+      "emptySub": "Mtu akikutumia ujumbe wa kwanza, utaonekana hapa.",
+      "error": "Haikuwezekana kwa sasa. Tafadhali jaribu tena.",
+      "intro": "Kukubali kunaunda mechi na kufungua gumzo lako.",
+      "matched": "Ni mechi!",
+      "matchedBody": "Wewe na {{name}} mnaweza kuzungumza sasa.",
+      "readMore": "Soma zaidi",
+      "reportBlock": "Ripoti au zuia",
+      "requestTitle": "Ujumbe wa kuanzisha",
+      "said": "{{name}} anasema",
+      "showLess": "Onyesha kidogo",
+      "title": "Ujumbe wa kuanzisha"
+    },
+    "matched": {
+      "body": "Sema habari kwenye gumzo lako.",
+      "cta": "Fungua gumzo",
+      "title": "Tayari mmekuwa mechi"
+    },
+    "quota": "Zimebaki {{remaining}} kati ya {{limit}} bure",
+    "quotaEmpty": "Hakuna ujumbe wa bure uliobaki",
+    "row": {
+      "aria": "Fungua ujumbe wa kuanzisha, {{count}} wanasubiri",
+      "sub": "{{count}} wanakusubiri"
+    },
+    "sayHi": "Sema habari",
+    "sentLabel": "Ujumbe umetumwa",
+    "sheet": {
+      "done": "Sawa",
+      "hint": "Ataona kwanza. Akikubali, mtaoana na mnaweza kuendelea kuzungumza.",
+      "ideas": "Unahitaji wazo?",
+      "placeholder": "Andika ujumbe wa kwanza wa kirafiki…",
+      "safety": "Yeye huamua kukubali au la. Kuwa mwema – unaweza kuripoti au kuzuia wakati wowote.",
+      "send": "Tuma ujumbe",
+      "sending": "Inatuma…",
+      "sentBody": "Tutakujulisha {{name}} akijibu.",
+      "sentTitle": "Imetumwa!",
+      "to": "Kwa {{name}}",
+      "title": "Tuma ujumbe wako wa kwanza kwa {{name}}"
+    },
+    "someone": "Mtu",
+    "title": "Anzisha mazungumzo",
+    "toast": {
+      "body": "Fungua kusoma ujumbe wake",
+      "title": "{{name}} ameanzisha mazungumzo",
+      "view": "Tazama"
+    },
+    "upsell": {
+      "body": "Jiunge na Premium uanzishe mazungumzo na watu wengi upendavyo.",
+      "cta": "Jiunge na Premium",
+      "later": "Si sasa",
+      "title": "Umetumia ujumbe wako {{limit}} wa bure"
+    },
+    "useOpener": "Tumia ujumbe huu: {{text}}",
+    "copyOpener": "Nakili: {{text}}",
+    "copied": "Imenakiliwa",
+    "chances": {
+      "left_one": "Nafasi {{count}} imebaki",
+      "left_other": "Nafasi {{count}} zimebaki",
+      "of": "Nafasi {{remaining}} kati ya {{limit}} za bure zimebaki",
+      "none": "Nafasi zimeisha - pata Premium",
+      "unlimited": "Nafasi zisizo na kikomo"
+    }
   }
 }

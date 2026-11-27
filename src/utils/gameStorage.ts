@@ -9,16 +9,7 @@ export type LocalGameResult = {
   timeTakenSeconds?: number;
   playedAt: string; // ISO
 };
-
-type LocalGameProgress = {
-  gameType: GameType;
-  level: number;
-  state: unknown;
-  savedAt: string; // ISO
-};
-
 const RESULTS_KEY = 'driplove:games:results:v1';
-const PROGRESS_KEY = 'driplove:games:progress:v1';
 const LEVEL_BEST_KEY = 'driplove:games:best-by-level:v1';
 
 const safeParse = <T,>(raw: string | null): T | null => {
@@ -55,7 +46,6 @@ const safeSetItem = (storage: Storage, key: string, value: string): void => {
 };
 
 type ResultsStore = Partial<Record<GameType, LocalGameResult[]>>;
-type ProgressStore = Partial<Record<GameType, LocalGameProgress>>;
 type LevelBestStore = Partial<Record<GameType, Record<number, LocalGameResult>>>;
 
 export const getBestResults = (gameType: GameType): LocalGameResult[] => {
@@ -146,37 +136,4 @@ export const clearResults = (gameType: GameType) => {
   const store = safeParse<ResultsStore>(storage.getItem(RESULTS_KEY)) ?? {};
   delete store[gameType];
   safeSetItem(storage, RESULTS_KEY, JSON.stringify(store));
-};
-
-export const saveProgress = (gameType: GameType, level: number, state: unknown) => {
-  const storage = safeGetLocalStorage();
-  if (!storage) return;
-
-  const store = safeParse<ProgressStore>(storage.getItem(PROGRESS_KEY)) ?? {};
-  store[gameType] = {
-    gameType,
-    level,
-    state,
-    savedAt: new Date().toISOString(),
-  };
-  safeSetItem(storage, PROGRESS_KEY, JSON.stringify(store));
-};
-
-export const loadProgress = (gameType: GameType): { level: number; state: unknown } | null => {
-  const storage = safeGetLocalStorage();
-  if (!storage) return null;
-
-  const store = safeParse<ProgressStore>(storage.getItem(PROGRESS_KEY)) ?? {};
-  const entry = store[gameType];
-  if (!entry || typeof entry.level !== 'number') return null;
-  return { level: entry.level, state: entry.state };
-};
-
-export const clearProgress = (gameType: GameType) => {
-  const storage = safeGetLocalStorage();
-  if (!storage) return;
-
-  const store = safeParse<ProgressStore>(storage.getItem(PROGRESS_KEY)) ?? {};
-  delete store[gameType];
-  safeSetItem(storage, PROGRESS_KEY, JSON.stringify(store));
 };

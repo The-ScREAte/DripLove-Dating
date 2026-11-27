@@ -40,7 +40,9 @@ const AppleOAuthTest = () => {
         <Button 
           onClick={handleTestAppleOAuth}
           disabled={testing}
-          className="w-full bg-black hover:bg-gray-800 text-white"
+          variant="socialDark"
+          size="md"
+          className="w-full"
         >
           {testing ? 'Redirecting to Apple...' : '🍎 Test Apple Sign-In'}
         </Button>

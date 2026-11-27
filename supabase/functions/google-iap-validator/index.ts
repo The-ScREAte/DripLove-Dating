@@ -185,6 +185,11 @@ serve(async (req: Request) => {
 
     // 2️⃣ Try to get user from auth header, but DON'T FAIL if missing - use bodyUserId as fallback
     let userId: string | null = null
+    // True only when the user id was proven by a valid session token. The body
+    // user_id fallback below is unauthenticated, so it may only add access for a
+    // purchase Google verified and must never overwrite an account that already
+    // has a live subscription from a different purchase.
+    let identityFromToken = false
     const authHeader = req.headers.get('Authorization')
     
     if (authHeader) {
@@ -192,6 +197,7 @@ serve(async (req: Request) => {
       const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
       if (!userError && userData.user) {
         userId = userData.user.id
+        identityFromToken = true
         console.log('[GOOGLE-IAP-VALIDATOR] User authenticated via token:', userId)
       }
     }
@@ -421,6 +427,25 @@ serve(async (req: Request) => {
         purchaseToken,
         already_processed: true,
       })
+    }
+
+    // Unauthenticated (body user_id) activation must not overwrite an account
+    // that already has a live subscription from a different purchase.
+    if (!identityFromToken) {
+      const { data: liveSub } = await supabaseClient
+        .from('user_subscriptions')
+        .select('status, expires_at, provider_transaction_id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      const liveAndDifferent =
+        liveSub &&
+        ['active', 'cancelled', 'payment_pending'].includes(liveSub.status) &&
+        liveSub.expires_at && new Date(liveSub.expires_at) > new Date() &&
+        liveSub.provider_transaction_id !== purchaseToken
+      if (liveAndDifferent) {
+        console.warn('🚫 [GOOGLE-IAP-VALIDATOR] Unauthenticated activation refused: account already has a live subscription')
+        return json(200, { valid: false, active: false, error: 'Please sign in again to activate this purchase.' })
+      }
     }
 
     // 6️⃣ Update Supabase subscription ONLY after Google confirms active

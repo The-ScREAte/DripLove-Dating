@@ -1,8 +1,9 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useMobileOAuth } from '@/hooks/useMobileOAuth';
 import { useNavigate } from 'react-router-dom';
 import ChunkLoadBoundary from '@/components/ChunkLoadBoundary';
+import { BrandLoader } from '@/components/ui/LoadingStates';
 
 // Eagerly load only essential pages
 import Index from "@/pages/Index";
@@ -37,13 +38,10 @@ const CircleUpPrepare = lazy(() => import('../pages/circle-up/CircleUpPrepare'))
 const CircleUpMatching = lazy(() => import('../pages/circle-up/CircleUpMatching'));
 const CircleUpCall = lazy(() => import('../pages/circle-up/CircleUpCall'));
 
-// Shown while a lazy route's chunk is being fetched. A blank screen here reads as "the tap did
-// nothing" on a slow mobile connection — a visible spinner confirms the navigation registered.
-const PageLoader = () => (
-  <div className="min-h-screen w-full flex items-center justify-center bg-black">
-    <div className="w-8 h-8 rounded-full border-2 border-pink-500/30 border-t-pink-500 animate-spin" />
-  </div>
-);
+// Shown while a lazy route's chunk is being fetched. Branded, and only visible if the wait is
+// longer than ~150ms (no spinner flash on fast loads); the black surface is already there, so
+// nothing flashes white either.
+const PageLoader = () => <BrandLoader fullScreen />;
 
 const AppRoutes = ({
   user,
@@ -60,10 +58,20 @@ const AppRoutes = ({
   // Initialize mobile OAuth handler inside router context
   useMobileOAuth();
   const navigate = useNavigate();
+  // Opened directly (no in-app history, e.g. from a shared link)? Go home instead of leaving.
+  const safeBack = () => {
+    const idx = (window.history.state && (window.history.state as { idx?: number }).idx) || 0;
+    if (idx > 0) navigate(-1);
+    else navigate('/', { replace: true });
+  };
+  const location = useLocation();
 
   return (
     <ChunkLoadBoundary>
     <Suspense fallback={<PageLoader />}>
+      {/* Keyed by pathname: a real route change fades the new screen in (opacity only, so fixed
+          headers/sheets inside pages never shift). Query-string/tab changes never replay it. */}
+      <div key={location.pathname} className="dl-route w-full h-full">
       <Routes>
         <Route path="/" element={<Index user={user} isAuthenticated={isAuthenticated} />} />
         {/* Nothing in the app links here - the real Discover experience lives in
@@ -82,11 +90,11 @@ const AppRoutes = ({
       <Route path="/auth/apple-test" element={<AppleOAuthTest />} />
       <Route path="/complete-profile" element={<ProfileCompletionPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/terms-of-service" element={<TermsOfService onBack={() => navigate(-1)} />} />
-      <Route path="/privacy-policy" element={<PrivacyPolicy onBack={() => navigate(-1)} />} />
-      <Route path="/child-safety" element={<ChildSafetyStandards onBack={() => navigate(-1)} />} />
-      <Route path="/community-guidelines" element={<CommunityGuidelines onBack={() => navigate(-1)} />} />
-      <Route path="/safety-tips" element={<SafetyTips onBack={() => navigate(-1)} />} />
+      <Route path="/terms-of-service" element={<TermsOfService onBack={safeBack} />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy onBack={safeBack} />} />
+      <Route path="/child-safety" element={<ChildSafetyStandards onBack={safeBack} />} />
+      <Route path="/community-guidelines" element={<CommunityGuidelines onBack={safeBack} />} />
+      <Route path="/safety-tips" element={<SafetyTips onBack={safeBack} />} />
       <Route path="/influencer" element={<InfluencerPortal />} />
       <Route path="/influencer/set-password" element={<InfluencerSetPassword />} />
       <Route path="/games" element={<Games />} />
@@ -101,6 +109,7 @@ const AppRoutes = ({
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
       </Routes>
+      </div>
     </Suspense>
     </ChunkLoadBoundary>
   );

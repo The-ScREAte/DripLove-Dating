@@ -1,33 +1,72 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
+import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Heart, Shield, Users, FileText } from 'lucide-react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { BadgeCheck, Heart, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import HoppingLogo from '@/components/HoppingLogo';
 import { preloadPricingConfig } from '@/hooks/usePricingConfig';
-import { FORM_PAGE_BG, formPrimaryButton } from '@/components/forms/formTheme';
+import { FORM_PAGE_BG } from '@/components/forms/formTheme';
+import { useBackClose } from '@/utils/backStack';
+import { firstNameFromAuthUser } from '@/utils/handoff';
+import '@/components/auth/auth.css';
 
 const TermsOfService = lazy(() => import('./TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 
+/** What the parent gets back on accept (used for the "Welcome, {name}" moment). */
+export interface TermsAcceptInfo {
+  firstName?: string | null;
+}
+
+type TermsUser = { id: string; user_metadata?: Record<string, unknown> | null };
+
 interface TermsAcceptanceProps {
-  user: any;
-  onAccept: () => void;
+  user: TermsUser;
+  onAccept: (info?: TermsAcceptInfo) => void;
 }
 
 const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   const { t } = useTranslation();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
-  const { toast } = useToast();
+  const [firstName, setFirstName] = useState<string | null>(() => firstNameFromAuthUser(user));
+  const savingRef = useRef(false);
+  // Remember which link opened a document so focus returns to it when the dialog closes.
+  const termsLinkRef = useRef<HTMLButtonElement | null>(null);
+  const privacyLinkRef = useRef<HTMLButtonElement | null>(null);
 
-  // Preload pricing in the background while the user views terms
+  // Android hardware back closes the open document instead of leaving the screen.
+  // With nothing open it keeps its default (leave the app): the session survives and the
+  // app resumes right here on the next launch, so users are never trapped on this screen.
+  useBackClose(showTerms, () => setShowTerms(false), { escape: false });
+  useBackClose(showPrivacy, () => setShowPrivacy(false), { escape: false });
+
+  // The saved first name (from the profile they just filled in) for the welcome moment.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await supabase.from('profiles').select('first_name').eq('id', user.id).maybeSingle();
+        const n = typeof data?.first_name === 'string' ? data.first_name.trim() : '';
+        if (!cancelled && n) setFirstName(n);
+      } catch {
+        // purely cosmetic - the plain greeting is used instead
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Warm everything the next screen needs while the user reads this one, so the hand-off
+  // doesn't wait on code downloads: the app shell + Discover chunks, pricing, session flag.
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
@@ -36,20 +75,17 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
     const preloadInBackground = () => {
       if (cancelled) return;
-    
-      // Mark user as authenticated for instant app load
       try {
         sessionStorage.setItem('driplove_user_session', 'authenticated');
-      } catch {}
-
-      // Preload pricing (cached and reused by the paywall) without blocking
-      // first paint. This used to also download a full batch of Discover
-      // profiles and photos here, into a cache the Discover page never
-      // reads - pure wasted data and battery while the user read the terms.
+      } catch {
+        // ignore storage errors
+      }
       preloadPricingConfig(user.id);
+      void import('@/components/MainApp').catch(() => undefined);
+      void import('@/components/DiscoverPage').catch(() => undefined);
     };
 
-    // Defer heavy background preloading to idle time to keep this page snappy.
+    // requestIdleCallback is missing on Safari/WKWebView: fall back to a short timeout.
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
       idleId = (window as Window & { requestIdleCallback: (cb: () => void, options?: { timeout: number }) => number }).requestIdleCallback(
         preloadInBackground,
@@ -61,9 +97,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
     return () => {
       cancelled = true;
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
       if (idleId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
         (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleId);
       }
@@ -71,7 +105,7 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   }, [user?.id]);
 
   // Tracks whether this screen is still up, for the reload safety net below.
-  const isMountedRef = React.useRef(true);
+  const isMountedRef = useRef(true);
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -80,14 +114,10 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
   }, []);
 
   const handleAccept = async () => {
-    if (!termsAccepted) {
-      toast({
-        title: "Please accept terms",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    // Double-tap / Enter-repeat protection: one save at a time.
+    if (!termsAccepted || savingRef.current) return;
+    savingRef.current = true;
+    setSaveError(false);
     setLoading(true);
 
     try {
@@ -95,42 +125,44 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
         .from('profiles')
         .update({
           terms_accepted: true,
-          terms_accepted_at: new Date().toISOString()
+          terms_accepted_at: new Date().toISOString(),
         })
         .eq('id', user.id);
 
       if (error) throw error;
 
-      sessionStorage.setItem('driplove_user_session', 'authenticated');
-      sessionStorage.removeItem('driplove_current_view');
+      try {
+        sessionStorage.setItem('driplove_user_session', 'authenticated');
+        sessionStorage.removeItem('driplove_current_view');
+      } catch {
+        // ignore storage errors
+      }
 
-      // Hand over to the app in place. This used to be followed by an
-      // unconditional window.location.reload() 300ms later (an old Android
-      // fix), which cold-started the whole app again - splash, auth check,
-      // loading screen - right after the user had already been let in.
-      onAccept();
+      // Hand over to the app in place (no reload - that used to cold-start the whole app
+      // again right after the user had been let in).
+      onAccept({ firstName });
 
-      // Safety net only: if the parent somehow didn't move on and this screen
-      // is still showing a few seconds later, fall back to the reload.
+      // Safety net only: if the parent somehow didn't move on and this screen is still
+      // showing a few seconds later, fall back to the reload.
       setTimeout(() => {
         if (isMountedRef.current) window.location.reload();
       }, 4000);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Terms acceptance error:', error);
+      savingRef.current = false;
       setLoading(false);
-      toast({
-        title: "Something went wrong",
-        description: "Please check your connection and try again.",
-        variant: "destructive",
-      });
+      setSaveError(true);
     }
   };
 
-  const guidelines = [
-    { icon: Shield, title: 'Your safety is in your hands', text: 'Meet in public, protect your information and report anything unsafe.' },
-    { icon: Heart, title: 'Keep others safe', text: 'Respect boundaries and consent, and treat everyone with kindness.' },
-    { icon: Users, title: 'Be authentic', text: 'Use real photos and honest information.' },
+  const principles = [
+    { icon: Shield, text: 'Your safety is in your hands' },
+    { icon: Heart, text: 'Respect boundaries and treat everyone kindly' },
+    { icon: BadgeCheck, text: 'Use real photos and honest information' },
   ];
+
+  const linkClass =
+    'dl-inline-link touch-manipulation rounded-sm font-semibold text-brand-ink underline decoration-current/40 underline-offset-2 hover:decoration-current';
 
   return (
     <div
@@ -138,103 +170,133 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       style={{
         background: FORM_PAGE_BG,
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
         paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 20px)',
         paddingRight: 'calc(env(safe-area-inset-right, 0px) + 20px)',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'touch',
       }}
     >
-      <div
-        className="dl-fade-in mx-auto flex w-full max-w-md flex-col justify-center"
-        style={{
-          minHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 44px)'
-        }}
-      >
-        <header className="mb-8 text-center">
-          <div className="mb-4 flex justify-center">
+      <div className="dl-fade-in mx-auto flex min-h-full w-full max-w-md flex-col md:max-w-lg">
+        <header className="mb-6 mt-2 text-center [@media(max-height:680px)]:mb-4">
+          {/* On short phones (iPhone SE class) the logo gives way so the consent text is visible. */}
+          <div className="mb-4 flex justify-center [@media(max-height:680px)]:hidden">
             <HoppingLogo size={56} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Welcome to DripLove</h1>
           <p className="mt-1.5 text-sm text-white/60">Let's keep things safe and fun for everyone.</p>
         </header>
 
-        {/* Key Points */}
-        <ul className="space-y-3">
-          {guidelines.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex items-center gap-3.5 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5">
+        {/* Three principles: quiet, scannable, no box-in-a-box. */}
+        <ul className="mb-5 space-y-3 [@media(max-height:680px)]:mb-4 [@media(max-height:680px)]:space-y-2">
+          {principles.map(({ icon: Icon, text }, i) => (
+            <li
+              key={text}
+              className="dl-rise flex items-center gap-3"
+              style={{ animationDelay: `${120 + i * 70}ms` }}
+            >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-500/15">
-                <Icon className="h-5 w-5 text-pink-400" />
+                <Icon className="h-[19px] w-[19px] text-pink-400" aria-hidden="true" />
               </span>
-              <span>
-                <span className="block text-[15px] font-semibold text-white">{title}</span>
-                <span className="block text-sm text-white/60">{text}</span>
-              </span>
+              <span className="text-[15px] font-medium leading-snug text-white/90">{text}</span>
             </li>
           ))}
         </ul>
 
-        {/* Document Links */}
-        <div className="mt-5 flex justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowTerms(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full border border-white/15 px-4 text-[13px] font-medium text-white/85 transition-colors hover:bg-white/[0.06]"
-          >
-            <FileText className="h-4 w-4 text-pink-400" />
-            Terms of Service
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowPrivacy(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full border border-white/15 px-4 text-[13px] font-medium text-white/85 transition-colors hover:bg-white/[0.06]"
-          >
-            <Shield className="h-4 w-4 text-pink-400" />
-            Privacy Policy
-          </button>
-        </div>
-
-        {/* Acceptance Checkbox - the whole row is the tap target */}
+        {/* The consent: ONE checkbox = one affirmative act (never pre-checked). The whole row is
+            the tap target (>=44px); the document links open their dialogs without toggling it. */}
         <label
           htmlFor="terms-acceptance"
-          className={`mt-6 flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3.5 transition-colors ${
-            termsAccepted ? 'border-pink-500/60 bg-pink-500/[0.08]' : 'border-white/15 bg-white/[0.04]'
-          }`}
+          className={`dl-rise flex min-h-[64px] cursor-pointer items-start gap-3.5 rounded-2xl border px-4 py-3.5 transition-colors ${
+            termsAccepted ? 'border-pink-500/60 bg-pink-500/[0.09]' : 'border-white/10 bg-white/[0.04]'
+          } focus-within:ring-2 focus-within:ring-pink-500/60`}
+          style={{ animationDelay: '340ms' }}
         >
-          <Checkbox
+          <CheckboxPrimitive.Root
             id="terms-acceptance"
             checked={termsAccepted}
-            onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-            className="mt-0.5 h-5 w-5 shrink-0 rounded-md border-white/40 data-[state=checked]:border-pink-500 data-[state=checked]:bg-pink-500 data-[state=checked]:text-white"
-          />
-          <span className="text-sm leading-snug text-white/85">
-            I meet the minimum age to use DripLove in my country, and I agree to the Terms of Service (including the
-            arbitration agreement and class action waiver), the Privacy Policy and the Community Guidelines. I
-            understand that I am responsible for my own safety and for my conduct towards other members.
+            onCheckedChange={(checked) => {
+              setTermsAccepted(checked === true);
+              if (checked === true) setSaveError(false);
+            }}
+            className="dl-check-box mt-0.5 flex h-7 w-7 !min-h-0 !min-w-0 shrink-0 items-center justify-center rounded-lg border-2 border-white/40 text-white outline-none data-[state=checked]:border-transparent data-[state=checked]:bg-brand-gradient"
+          >
+            <CheckboxPrimitive.Indicator forceMount>
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path className="dl-check-path" d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            </CheckboxPrimitive.Indicator>
+          </CheckboxPrimitive.Root>
+          <span className="text-[13px] leading-[1.55] text-white/65 md:text-[14px]">
+            I meet the minimum age to use DripLove in my country, and I agree to the{' '}
+            <button
+              type="button"
+              ref={termsLinkRef}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowTerms(true);
+              }}
+              className={linkClass}
+            >
+              Terms of Service
+            </button>{' '}
+            (including the arbitration agreement and class action waiver), the{' '}
+            <button
+              type="button"
+              ref={privacyLinkRef}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowPrivacy(true);
+              }}
+              className={linkClass}
+            >
+              Privacy Policy
+            </button>{' '}
+            and the Community Guidelines. I understand that I am responsible for my own safety and for my conduct
+            towards other members.
           </span>
         </label>
 
-        {/* Action Button */}
-        <Button
-          type="button"
-          onClick={handleAccept}
-          disabled={loading || !termsAccepted}
-          className={`${formPrimaryButton} mt-5 w-full`}
+        {/* Action area: sticky inside the safe area so the button is always in view, even on the
+            smallest phones, while the legal text scrolls. */}
+        <div
+          className="sticky bottom-0 mt-auto pb-1 pt-5"
+          style={{ background: `linear-gradient(to top, ${FORM_PAGE_BG} 78%, rgba(11,11,15,0))` }}
         >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Getting things ready…
-            </span>
-          ) : (
-            "Let's go"
-          )}
-        </Button>
+          <div className="min-h-[20px] text-center text-[13px]" aria-live="polite">
+            {saveError ? (
+              <p role="alert" className="text-red-300">
+                {t('termsAccept.failed')}
+              </p>
+            ) : !termsAccepted ? (
+              <p className="text-white/45">{t('termsAccept.hint')}</p>
+            ) : null}
+          </div>
+          <Button
+            key={termsAccepted ? 'ready' : 'idle'}
+            variant="primary"
+            size="lg"
+            className={`mt-2 w-full ${termsAccepted && !loading ? 'dl-cta-ready' : ''}`}
+            type="button"
+            onClick={handleAccept}
+            disabled={!termsAccepted}
+            loading={loading}
+            aria-disabled={!termsAccepted || loading}
+          >
+            {loading ? t('termsAccept.saving') : "Let's go"}
+          </Button>
+        </div>
       </div>
 
       {/* Terms of Service Dialog - z above this screen's own z-[10000],
           otherwise it opened hidden behind it. */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
-        <DialogContent className="z-[10002] max-w-4xl max-h-[90vh] w-[calc(100vw-24px)] rounded-2xl">
+        <DialogContent
+          className="z-[10002] max-w-4xl max-h-[90vh] w-[calc(100vw-24px)] rounded-2xl"
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            termsLinkRef.current?.focus();
+          }}
+        >
           <DialogTitle className="sr-only">Terms of Service</DialogTitle>
           <ScrollArea className="h-[80vh] pr-4">
             <Suspense
@@ -254,7 +316,13 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
 
       {/* Privacy Policy Dialog */}
       <Dialog open={showPrivacy} onOpenChange={setShowPrivacy}>
-        <DialogContent className="z-[10002] max-w-4xl max-h-[90vh] w-[calc(100vw-24px)] rounded-2xl">
+        <DialogContent
+          className="z-[10002] max-w-4xl max-h-[90vh] w-[calc(100vw-24px)] rounded-2xl"
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            privacyLinkRef.current?.focus();
+          }}
+        >
           <DialogTitle className="sr-only">Privacy Policy</DialogTitle>
           <ScrollArea className="h-[80vh] pr-4">
             <Suspense

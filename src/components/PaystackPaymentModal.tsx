@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
-import { isIOS, buyIAPProduct } from '@/utils/iap';
+import { isIOS } from '@/utils/iap';
+import { toast } from '@/hooks/use-toast';
 import { Capacitor } from '@capacitor/core';
 
 interface PaystackPaymentModalProps {
@@ -12,7 +13,7 @@ interface PaystackPaymentModalProps {
   displayCurrency?: string; // USD to show user
   email: string;
   onSuccess: () => void;
-  paymentMethod?: 'card' | 'momo' | 'iap';
+  paymentMethod?: 'card' | 'momo';
   isOneTime?: boolean; // New prop to distinguish one-time vs subscription
 }
 
@@ -111,7 +112,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
   isOneTime = false 
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'momo' | 'iap'>(paymentMethod);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'momo'>(paymentMethod);
   const [paystackPublicKey, setPaystackPublicKey] = useState<string>('');
 
   // Prefetch on mount rather than waiting for `isOpen` - this component is
@@ -132,32 +133,18 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
   }, []);
 
   const handlePay = async () => {
-    if (selectedPaymentMethod === 'iap') {
-      setIsLoading(true);
-      try {
-        // Use the correct App Store Connect product ID for monthly premium
-        const productId = 'com.driplove.dating.premium.monthlysub2';
-        await buyIAPProduct(productId);
-        onSuccess();
-      } catch (err: any) {
-        alert(err?.message || String(err) || 'IAP failed');
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
+    // Double-tap guard: a second tap while a payment is starting must not open a second checkout.
+    if (isLoading) return;
     setIsLoading(true);
     // ...existing code for Paystack/MoMo...
     // Validate Paystack configuration
     if (!paystackPublicKey) {
-      alert(
-        'Paystack is not configured. Please contact support.'
-      );
+      toast({ title: 'Payments are temporarily unavailable', description: 'Please try again in a little while or contact support.', variant: 'destructive' });
       setIsLoading(false);
       return;
     }
     if (!paystackPublicKey.startsWith('pk_')) {
-      alert('Invalid Paystack public key format. It should start with "pk_".');
+      toast({ title: 'Payments are temporarily unavailable', description: 'Please try again in a little while or contact support.', variant: 'destructive' });
       setIsLoading(false);
       return;
     }
@@ -168,13 +155,13 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
 
     // Validate email (Paystack requires an email)
     if (!emailToUse || !emailToUse.includes('@')) {
-      alert('Please provide a valid email address.');
+      toast({ title: 'Email needed', description: 'Please add a valid email address to your account to pay.', variant: 'destructive' });
       setIsLoading(false);
       return;
     }
     await loadPaystackScript();
     if (!(window as any).PaystackPop) {
-      alert('Payment system is not ready. Please refresh and try again.');
+      toast({ title: 'Payment is not ready yet', description: 'Please check your connection and try again.', variant: 'destructive' });
       setIsLoading(false);
       return;
     }
@@ -294,7 +281,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
 
         const paystackAmount = Math.round(Number(amount) * 100);
         if (!Number.isFinite(paystackAmount) || paystackAmount < 100) {
-          alert('Amount invalid. Minimum amount is 1.00');
+          toast({ title: 'Payment amount unavailable', description: 'Please reopen this screen and try again.', variant: 'destructive' });
           setIsLoading(false);
           return;
         }
@@ -305,7 +292,7 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
         const handler = (window as any).PaystackPop.setup(paymentConfig);
         handler.openIframe();
       } catch (fallbackErr) {
-        alert('Payment initialization failed. Please try again later.');
+        toast({ title: "We couldn't start your payment", description: 'Nothing was charged. Please try again.', variant: 'destructive' });
         setIsLoading(false);
       }
     }
@@ -386,16 +373,12 @@ const PaystackPaymentModal: React.FC<PaystackPaymentModalProps> = ({
           onClick={handlePay}
           disabled={isLoading}
           className={`w-full mt-2 py-3 rounded font-bold text-lg ${
-            selectedPaymentMethod === 'iap'
-              ? (isLoading ? 'bg-yellow-300 text-black cursor-not-allowed' : 'bg-yellow-500 text-black hover:bg-yellow-600')
-              : (isLoading ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700')
+            isLoading ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'
           }`}
         >
           {isLoading
             ? 'Processing...'
-            : selectedPaymentMethod === 'iap'
-              ? `Subscribe Now (${displayCurrency || currency} ${displayAmount || amount})`
-              : `Pay ${displayCurrency || currency} ${(displayAmount || amount).toFixed(2)}`}
+            : `Pay ${displayCurrency || currency} ${(displayAmount || amount).toFixed(2)}`}
         </button>
       </div>
     </div>

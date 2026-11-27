@@ -4,6 +4,56 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { visualizer } from 'rollup-plugin-visualizer';
 
+// Leaf modules (import only vendor packages / each other) shared by the
+// first-paint entry and the lazy page chunks - see manualChunks 'app-core'.
+const APP_CORE_MODULES = [
+  '/src/integrations/supabase/client.ts',
+  '/src/integrations/supabase/types.ts',
+  '/src/utils/platformUtils.ts',
+  '/src/hooks/use-toast.ts',
+  '/src/lib/utils.ts',
+  '/src/components/ui/toast.tsx',
+  '/src/components/ui/button.tsx',
+  '/src/components/ui/input.tsx',
+  '/src/components/ui/card.tsx',
+  '/src/components/ui/badge.tsx',
+  '/src/components/ui/label.tsx',
+  '/src/components/ui/dialog.tsx',
+  '/src/components/HoppingLogo.tsx',
+  '/src/services/exchangeRateService.ts',
+  '/src/hooks/usePricingConfig.ts',
+  '/src/utils/iapOfferInfo.ts',
+  '/src/components/forms/formTheme.ts',
+  '/src/cache/chatCache.ts',
+  '/src/constants/locationData.ts',
+  '/src/services/pushNotifications.ts',
+  '/src/components/ui/dropdown-menu.tsx',
+  '/src/components/ui/toaster.tsx',
+  '/src/components/ui/sonner.tsx',
+  '/src/components/ui/tooltip.tsx',
+  '/src/components/ui/LoadingStates.tsx',
+  '/src/i18n/',
+];
+
+
+// Modules the app entry (src/main.tsx) reaches through static imports only.
+// Computed once per build from Rollup's module graph.
+let entryClosureCache: Set<string> | null = null;
+const entryStaticClosure = (getModuleInfo: (id: string) => { importedIds: readonly string[] } | null): Set<string> => {
+  if (entryClosureCache) return entryClosureCache;
+  const closure = new Set<string>();
+  const stack = [path.resolve(__dirname, 'src/main.tsx')];
+  while (stack.length) {
+    const cur = stack.pop() as string;
+    if (closure.has(cur) || cur.startsWith('\0') || cur.includes('node_modules')) continue;
+    closure.add(cur);
+    const info = getModuleInfo(cur);
+    if (info) for (const dep of info.importedIds) stack.push(dep);
+  }
+  entryClosureCache = closure;
+  return closure;
+};
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   // Web must use absolute base so routes like /r/:id can load assets.
@@ -76,7 +126,12 @@ export default defineConfig(({ mode }) => ({
   build: {
     chunkSizeWarningLimit: 500, // Reduced from 1000kb for faster Android parsing
     // Optimize for mobile devices (especially Android)
-    target: 'es2020',
+    // Support floor = the native minimums: iOS 15.0 (Podfile/pbxproj) -> WebKit 15,
+    // Android minSdk 26 with a Chromium 92+ System WebView. esbuild lowers any
+    // syntax newer than this; cssTarget stops the CSS minifier from emitting
+    // syntax older WebViews can't parse (e.g. modern color/nesting forms).
+    target: ['es2020', 'chrome92', 'safari15'],
+    cssTarget: ['chrome92', 'safari15'],
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -84,10 +139,11 @@ export default defineConfig(({ mode }) => ({
         drop_debugger: true,
         pure_funcs: mode === 'production' ? ['console.log', 'console.info', 'console.debug', 'console.warn', 'console.error', 'console.trace'] : [],
         passes: 3, // More compression passes for smaller output
-        unsafe_arrows: true,
-        unsafe_methods: true,
-        unsafe_comps: true,
-        unsafe_math: true,
+        // The terser `unsafe_*` options were removed on purpose: they can change
+        // behaviour (comparison operand order with NaN/valueOf, floating-point
+        // re-association in distance/animation math, arrow/method rewrites that
+        // break `new` calls) for a negligible size win - not worth a subtle
+        // production-only bug on one device family.
       },
       format: {
         comments: false
@@ -98,7 +154,7 @@ export default defineConfig(({ mode }) => ({
     },
     rollupOptions: {
       output: {
-        manualChunks(id) {
+        manualChunks(id, { getModuleInfo }) {
           // CRITICAL: React must load before anything that depends on it
           if (id.includes('node_modules')) {
             // 1. React ecosystem - MUST be first (no libraries that use createContext!)
@@ -146,7 +202,7 @@ export default defineConfig(({ mode }) => ({
               return 'radix-dialog';
             }
             if (id.includes('@radix-ui/react-select') || id.includes('@radix-ui/react-checkbox') || 
-                id.includes('@radix-ui/react-radio-group') || id.includes('@radix-ui/react-switch')) {
+                id.includes('@radix-ui/react-switch')) {
               return 'radix-forms';
             }
             if (id.includes('@radix-ui')) {
@@ -175,6 +231,36 @@ export default defineConfig(({ mode }) => ({
             // to avoid loading order issues
           }
           
+          // Shared foundation modules the first-paint entry (Index/Welcome/Auth)
+          // needs. Without their own chunk Rollup absorbed them into whichever
+          // big page chunk bundled them first (admin-page, discover-page,
+          // profile-tools, chat-tools), so the entry statically depended on -
+          // and the browser eagerly downloaded - entire pages (~2MB raw) before
+          // first paint. Every module listed here imports only vendor packages
+          // or other modules in this same list (leaf chunk -> no circular init).
+          if (APP_CORE_MODULES.some((m) => id.includes(m))) {
+            return 'app-core';
+          }
+
+          // Automatic version of the list above: any app module the entry
+          // statically imports (transitively) goes to app-core. That set is
+          // closed under static imports, so app-core can only import vendor
+          // chunks or itself - never a page chunk - which keeps the first-paint
+          // load small and rules out the circular-init crash, without having to
+          // remember to add every new shared file (popups, ratings, back stack,
+          // profile-card helpers...) to a hand-kept list.
+          if (!id.includes('node_modules') && entryStaticClosure(getModuleInfo).has(id)) {
+            return 'app-core';
+          }
+
+          // Tiny lazy route: with experimentalMinChunkSize Rollup merged it into
+          // the entry chunk, which then statically imported FaceVerification
+          // (profile-tools) and made the whole profile bundle eager. A manual
+          // chunk is exempt from that merge, keeping it truly lazy.
+          if (id.includes('/src/pages/FaceVerificationPage')) {
+            return 'face-verification-page';
+          }
+
           // Split large app components for better Android performance
           if (id.includes('/src/components/DiscoverPage')) {
             return 'discover-page';

@@ -1,9 +1,14 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
 import { ChatMessage, CurrentUser } from '@/types';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
-import { Reply, Trash2, Check, CheckCheck } from 'lucide-react';
+import { Reply, Trash2, Check, CheckCheck, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { isEmojiOnly, splitLinks } from './chatFormat';
+import { useBackClose } from '@/utils/backStack';
+import { useToast } from '@/hooks/use-toast';
+import { copyToClipboard } from '@/utils/copyToClipboard';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -33,6 +38,34 @@ interface MessageBubbleProps {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// A bubble only pops in the first time it appears, and only if it's actually
+// new. The virtualized list unmounts/remounts rows as you scroll - without
+// this, scrolling back through history would replay the animation.
+const animatedMessageIds = new Set<string>();
+const NEW_MESSAGE_WINDOW_MS = 4000;
+
+/** Plain text with http(s) links made tappable. Never uses innerHTML. */
+const renderMessageText = (text: string, own: boolean): React.ReactNode => {
+  const parts = splitLinks(text);
+  if (parts.length === 1 && parts[0].type === 'text') return text;
+  return parts.map((part, i) =>
+    part.type === 'link' ? (
+      <a
+        key={i}
+        href={part.href}
+        target="_blank"
+        rel="noopener noreferrer nofollow ugc"
+        onClick={(e) => e.stopPropagation()}
+        className={`underline underline-offset-2 ${own ? 'text-white' : 'text-brand-ink'}`}
+      >
+        {part.value}
+      </a>
+    ) : (
+      <React.Fragment key={i}>{part.value}</React.Fragment>
+    )
+  );
+};
+
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   currentUser,
@@ -53,6 +86,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isOwnMessage = message.sender_id === currentUser.id;
   const isSystemMessage = message.sender_id === '00000000-0000-0000-0000-000000000000';
   const isDeletedForMe = !!(message.deleted_for && message.deleted_for.includes(currentUser.id));
+
+  const [animateIn] = useState<boolean>(() => {
+    if (animatedMessageIds.has(message.id)) return false;
+    if (animatedMessageIds.size > 2000) animatedMessageIds.clear();
+    animatedMessageIds.add(message.id);
+    const sentAt = new Date(message.sent_at || message.created_at || '').getTime();
+    return Number.isFinite(sentAt) && Date.now() - sentAt < NEW_MESSAGE_WINDOW_MS;
+  });
 
   const [showConfirm, setShowConfirm] = useState(false);
   // "Delete for all" only within 24h of sending, same window the delete RLS
@@ -142,6 +183,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     setIsOptionsOpen(false);
   }, []);
 
+  // Android hardware back closes the selection overlay before anything else.
+  useBackClose(isOptionsOpen, closeOptionsMenu);
+
   // Play the pop-in transition once the menu actually opens, and make sure
   // scrolling the conversation while it's open closes it instead of leaving
   // the floating clone hanging in a stale position (native 'scroll' events
@@ -226,6 +270,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     openOptionsMenu();
   }, [openOptionsMenu]);
 
+  const { toast } = useToast();
+  // Text selection is disabled app-wide (it would fight the long-press menu), so copying
+  // is an explicit action here. Clipboard API first, execCommand fallback for older WebViews.
+  const handleCopy = useCallback(async () => {
+    closeOptionsMenu();
+    const text = message.message || '';
+    if (!text) return;
+    // One shared implementation (Clipboard API, then an iOS-safe execCommand fallback).
+    const copied = await copyToClipboard(text);
+    if (copied) toast({ title: t('chat.copied') });
+  }, [closeOptionsMenu, message.message, toast, t]);
+
   const handleReply = useCallback(() => {
     if (onReply) onReply(message);
     closeOptionsMenu();
@@ -273,18 +329,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <p className="text-sm text-amber-200 text-center mb-3">{message.message}</p>
           {!hasResponded && onDormancyResponse && (
             <div className="flex gap-2 justify-center">
-              <button
+              <Button variant="success" size="sm"
                 onClick={() => handleDormancyResponse(true)}
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full text-sm font-medium transition-colors"
+               
               >
                 Yes ✓
-              </button>
-              <button
+              </Button>
+              <Button variant="danger" size="sm"
                 onClick={() => handleDormancyResponse(false)}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full text-sm font-medium transition-colors"
+               
               >
                 No ✗
-              </button>
+              </Button>
             </div>
           )}
           {hasResponded && (
@@ -301,14 +357,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   // Shared between the real (in-flow) bubble and its floating clone in the
   // selection overlay, so the two always look identical.
+  // Run-aware corners: a bubble that continues a run squares the corner that
+  // touches its neighbour, and the last bubble of a run gets the small "tail".
+  const cornerClasses = isOwnMessage
+    ? `${isConsecutive ? 'rounded-tr-md' : ''} ${isLastInGroup ? 'rounded-br-sm' : 'rounded-br-md'}`
+    : `${isConsecutive ? 'rounded-tl-md' : ''} ${isLastInGroup ? 'rounded-bl-sm' : 'rounded-bl-md'}`;
+
+  // 1-3 emoji with nothing else read as big stickers, not as a bubble.
+  const emojiOnly = !isDeletedForMe && !repliedMessage && isEmojiOnly(message.message);
+
   const bubbleClasses = `
-    relative max-w-[82%] sm:max-w-lg
-    rounded-2xl
-    ${isOwnMessage
-      ? `bg-gradient-to-br from-rose-500 to-pink-600 text-white border border-rose-300/40 shadow-[0_6px_18px_rgba(236,72,153,0.22)] ${isLastInGroup ? 'rounded-br-md' : ''}`
-      : `bg-black/80 text-gray-100 border border-pink-500/30 shadow-[0_3px_10px_rgba(0,0,0,0.4)] ${isLastInGroup ? 'rounded-bl-md' : ''}`
+    relative max-w-[78%] sm:max-w-lg
+    rounded-2xl ${cornerClasses}
+    ${emojiOnly
+      ? 'bg-transparent text-white'
+      : isOwnMessage
+        ? 'bg-brand-gradient text-white shadow-dl-brand'
+        : 'bg-white/[0.08] text-white/95 border border-white/10'
     }
     ${isHighlighted ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}
+    ${animateIn ? (isOwnMessage ? 'dl-bubble-in dl-bubble-in-own' : 'dl-bubble-in') : ''}
   `;
 
   const renderBubbleContent = () => (
@@ -346,9 +414,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
       })()}
 
       {/* Message Content */}
-      <div className="px-2.5 pt-1 pb-1">
-        <p className={`text-[15px] leading-[1.3] whitespace-pre-wrap break-words ${isDeletedForMe ? 'italic opacity-60' : ''}`}>
-          {isDeletedForMe ? t('chat.deleted', 'This message was deleted') : message.message}
+      <div className={emojiOnly ? 'px-1 pt-0.5 pb-0' : 'px-3 pt-1.5 pb-1'}>
+        <p
+          className={`${emojiOnly ? 'text-5xl leading-tight' : 'text-[15px] leading-[1.35]'} whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${isDeletedForMe ? 'italic opacity-60' : ''}`}
+        >
+          {isDeletedForMe ? t('chat.deleted', 'This message was deleted') : renderMessageText(message.message, isOwnMessage)}
         </p>
       </div>
 
@@ -356,12 +426,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           matching every mainstream chat app's grouping convention (no
           point repeating the same-minute timestamp on every bubble). */}
       {isLastInGroup && (
-        <div className={`flex items-center justify-end gap-1 px-2.5 pb-1 pt-0.5 ${isOwnMessage ? 'text-white/70' : 'text-gray-400'}`}>
+        <div className={`flex items-center justify-end gap-1 px-3 pb-1.5 pt-0.5 ${emojiOnly ? 'text-white/50' : isOwnMessage ? 'text-white/75' : 'text-white/45'}`}>
           <span className="text-[11px]">
             {formatTime(message.sent_at || message.created_at)}
           </span>
           {isOwnMessage && (
-            <span className={`flex items-center ${message.is_read ? 'text-white' : 'text-rose-100/80'}`}>
+            <span className={`flex items-center ${message.is_read ? 'text-white' : 'text-white/60'}`}>
               {message.is_read ? (
                 <CheckCheck className="w-3.5 h-3.5" />
               ) : (
@@ -491,6 +561,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <button onClick={handleReply} className={menuItemClass}>
                   <Reply className="w-4 h-4 text-gray-300" />
                   {t('chat.reply', 'Reply')}
+                </button>
+              )}
+              {!isDeletedForMe && !!message.message && (
+                <button onClick={handleCopy} className={menuItemClass}>
+                  <Copy className="w-4 h-4 text-gray-300" />
+                  {t('chat.copy')}
                 </button>
               )}
               {/* "Delete for me" removes it from only your own view - the

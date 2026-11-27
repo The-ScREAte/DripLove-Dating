@@ -33,15 +33,15 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
 
   return (
   <div
-    className="fixed right-[clamp(16px,4vw,24px)] z-[100000] sm:absolute sm:right-[clamp(16px,4vw,24px)]"
+    className="dl-under-popup fixed right-[clamp(16px,4vw,24px)] z-[100000] sm:absolute sm:right-[clamp(16px,4vw,24px)]"
     style={{ bottom: bottomOffset }}
   >
       <div className="relative">
-        <Button
+        <Button variant="overlay" className="p-0 disabled:opacity-30"
           onClick={onReverse}
-          variant="outline"
+         
           disabled={!canReverse}
-          className="rounded-full border-2 border-white/70 bg-white/20 hover:bg-white/35 disabled:opacity-30 backdrop-blur-md shadow-lg hover:border-white transition-all duration-200 p-0"
+         
           style={{
             width: 'clamp(34px, 9vw, 40px)',
             height: 'clamp(34px, 9vw, 40px)',

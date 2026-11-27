@@ -1,11 +1,11 @@
 import React from 'react';
 
-export interface ChipOption {
+interface ChipOption {
   value: string;
   label: string;
 }
 
-export type ChipAccent = 'pink' | 'blue' | 'amber' | 'emerald' | 'purple' | 'cyan' | 'rose';
+type ChipAccent = 'pink' | 'blue' | 'amber' | 'emerald' | 'purple' | 'cyan' | 'rose';
 
 // Fully-static class strings (never built dynamically) so Tailwind's JIT scanner
 // always picks them up regardless of which accent is chosen at runtime.

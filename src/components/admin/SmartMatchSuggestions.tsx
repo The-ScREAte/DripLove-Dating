@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Lightbulb, Heart, Users, Sparkles, Check } from 'lucide-react';
+import { calculateAge } from '@/utils/dateUtils';
 
 interface UserProfile {
   id: string;
@@ -37,17 +38,6 @@ const SmartMatchSuggestions: React.FC<Props> = ({ users, onMatchCreated }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [matchingIds, setMatchingIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
-
-  const calculateAge = (dateOfBirth: string): number => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
 
   const getGenderPreference = (pref: string | null | undefined): string[] => {
     if (!pref) return ['male', 'female', 'other'];

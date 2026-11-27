@@ -1,6 +1,5 @@
 import i18n from '@/i18n/config';
 import { supabase } from '@/integrations/supabase/client';
-import { getLanguageForCountry } from '@/i18n/config';
 
 /**
  * Detect and set language based on device language or region

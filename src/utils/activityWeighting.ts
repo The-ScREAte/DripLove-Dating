@@ -1,25 +1,3 @@
-/**
- * Activity-Based Visibility Weighting
- * 
- * Bias feed toward recently active users (within 72 hours) without filtering anyone out.
- * This is Tinder-style behavior: active users appear earlier and more frequently,
- * but inactive users are still shown (just later in the queue).
- * 
- * SAFETY:
- * - No users are removed (only reordered)
- * - No filters are touched
- * - No premium logic is touched
- * - Deterministic shuffle still applies
- */
-
-// Minimal interface - profiles just need id and optional activity timestamps
-export interface ProfileWithActivity {
-  id: string;
-  last_login_at?: string | null;
-  created_at?: string | null;
-  current_streak?: number | null;
-}
-
 // 72-hour activity window (Tinder's standard)
 const ACTIVE_WINDOW_MS = 72 * 60 * 60 * 1000;
 

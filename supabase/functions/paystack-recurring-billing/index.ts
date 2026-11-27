@@ -5,6 +5,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
+import { claimPaymentReference } from '../_shared/payment-guards.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -306,22 +307,37 @@ serve(async (req) => {
         console.log(`[PAYSTACK-RECURRING] Charge response for ${sub.user_id}:`, chargeData)
 
         if (chargeData.status && chargeData.data?.status === 'success') {
-          // Payment successful - extend subscription
-          const nextExpiry = new Date()
-          nextExpiry.setDate(nextExpiry.getDate() + 30)
+          // Payment successful. The Paystack webhook (charge.success) fires for
+          // this same charge too, so the reference is claimed first: whichever
+          // path claims it extends the subscription, the other skips.
+          const claim = await claimPaymentReference(supabase, {
+            user_id: sub.user_id,
+            subscription_id: sub.id,
+            amount: chargeAmountGHS, // GHS amount (not kobo)
+            currency: 'GHS',
+            payment_method: 'paystack',
+            transaction_id: reference,
+          })
 
-          await supabase
-            .from('user_subscriptions')
-            .update({
-              // Ensure renewal always keeps the user on premium
-              status: 'active',
-              plan_name: 'premium',
-              expires_at: nextExpiry.toISOString(),
-              next_billing_date: nextExpiry.toISOString(),
-              payment_attempts: 0,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', sub.id)
+          if (claim.claimed) {
+            const nextExpiry = new Date()
+            nextExpiry.setDate(nextExpiry.getDate() + 30)
+
+            await supabase
+              .from('user_subscriptions')
+              .update({
+                // Ensure renewal always keeps the user on premium
+                status: 'active',
+                plan_name: 'premium',
+                expires_at: nextExpiry.toISOString(),
+                next_billing_date: nextExpiry.toISOString(),
+                payment_attempts: 0,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id)
+          } else {
+            console.log(`[PAYSTACK-RECURRING] Reference ${reference} already processed by the webhook, not extending again`)
+          }
 
           await supabase
             .from('paystack_charge_attempts')
@@ -332,18 +348,6 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             })
             .eq('reference', reference)
-
-          // Record payment with current pricing amount
-          await supabase
-            .from('subscription_payments')
-            .insert({
-              user_id: sub.user_id,
-              subscription_id: sub.id,
-              amount: chargeAmountGHS, // GHS amount (not kobo)
-              currency: 'GHS',
-              payment_method: 'paystack',
-              transaction_id: reference,
-            })
 
           charged++
           console.log(`[PAYSTACK-RECURRING] Successfully charged user ${sub.user_id}`)

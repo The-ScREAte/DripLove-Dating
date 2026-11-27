@@ -4,7 +4,7 @@
 // instead of silently ending up with no coordinates at all - see the
 // matching backfill migration (20260914000000_backfill_missing_coordinates_with_capitals.sql)
 // for the same list applied to existing profiles.
-export const COUNTRY_CAPITAL_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+const COUNTRY_CAPITAL_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
   GH: { latitude: 5.6037, longitude: -0.1870 },   // Accra
   NG: { latitude: 9.0765, longitude: 7.3986 },    // Abuja
   US: { latitude: 38.9072, longitude: -77.0369 }, // Washington, D.C.

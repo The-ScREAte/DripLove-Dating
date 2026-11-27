@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
+import AuthStatusScreen from '@/components/auth/AuthStatusScreen';
 
 const OAuthCallback = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
+  // One calm failure state instead of a toast + silent redirect.
+  const [failure, setFailure] = useState<{ message: string; actionLabel?: string } | null>(null);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -85,23 +88,13 @@ const OAuthCallback = () => {
         // Check account status (only if profile exists)
         if (profile?.account_status === 'blocked') {
           await supabase.auth.signOut();
-          toast({ 
-            title: 'Account Blocked', 
-            description: 'Your account has been blocked.',
-            variant: 'destructive' 
-          });
-          navigate('/', { replace: true });
+          setFailure({ message: t('auth.accountBlockedDesc'), actionLabel: t('auth.backToSignIn') });
           return;
         }
 
         if (profile?.account_status === 'on_hold') {
           await supabase.auth.signOut();
-          toast({ 
-            title: 'Account On Hold', 
-            description: 'Your account is on hold. Please contact support.',
-            variant: 'destructive' 
-          });
-          navigate('/', { replace: true });
+          setFailure({ message: t('auth.accountOnHoldDesc'), actionLabel: t('auth.backToSignIn') });
           return;
         }
 
@@ -137,33 +130,32 @@ const OAuthCallback = () => {
           }
         }
         
-        toast({
-          title: 'Authentication Error',
-          description: error.message || 'Failed to complete sign in. Please try again.',
-          variant: 'destructive',
-        });
-        navigate('/', { replace: true });
+        // Plain-language reason only - never the raw provider/technical message.
+        const raw = String(error?.message || '').toLowerCase();
+        const cancelled = raw.includes('cancel') || raw.includes('access_denied');
+        setFailure({ message: cancelled ? t('auth.signInCancelled') : t('auth.signInFailedBody') });
       } finally {
         setLoading(false);
       }
     };
 
     handleAuthCallback();
-  }, [navigate, toast]);
+  }, [navigate, t]);
+
+  if (failure) {
+    return (
+      <AuthStatusScreen
+        state="error"
+        message={failure.message}
+        actionLabel={failure.actionLabel}
+        onRetry={() => navigate('/', { replace: true })}
+      />
+    );
+  }
 
   // Show loading state during callback processing
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-secondary/20">
-        <div className="text-center space-y-4">
-          <div className="relative w-16 h-16 mx-auto">
-            <div className="absolute inset-0 border-4 border-primary/30 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p className="text-lg font-medium">Signing you in...</p>
-        </div>
-      </div>
-    );
+    return <AuthStatusScreen state="loading" />;
   }
 
   return null;

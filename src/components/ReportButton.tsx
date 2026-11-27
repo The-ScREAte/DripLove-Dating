@@ -94,7 +94,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({
 
   return (
     <div className={className}>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button variant="line" size="sm" onClick={() => setOpen(true)}>
         Report
       </Button>
       {open && createPortal(
@@ -121,8 +121,8 @@ const ReportButton: React.FC<ReportButtonProps> = ({
               placeholder="Add more info (optional)"
             />
             <div className="flex gap-2 justify-end">
-              <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={loading}>Cancel</Button>
-              <Button size="sm" onClick={handleSubmit} disabled={!reason || loading}>
+              <Button variant="quiet" size="sm" onClick={() => setOpen(false)} disabled={loading}>Cancel</Button>
+              <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!reason || loading}>
                 {loading ? 'Reporting...' : 'Submit'}
               </Button>
             </div>

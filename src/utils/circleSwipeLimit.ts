@@ -5,8 +5,8 @@
 // devices, exactly like the Discover swipe counter does.
 import { supabase } from '@/integrations/supabase/client';
 
-export const FREE_CIRCLE_DAILY_LIKES = 20;
-export const PREMIUM_CIRCLE_DAILY_LIKES = 100;
+const FREE_CIRCLE_DAILY_LIKES = 20;
+const PREMIUM_CIRCLE_DAILY_LIKES = 100;
 
 export const getCircleDailyLikeLimit = (isPremium?: boolean): number =>
   isPremium ? PREMIUM_CIRCLE_DAILY_LIKES : FREE_CIRCLE_DAILY_LIKES;

@@ -12,8 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { usePromoCodeEnabled, togglePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
 import { 
   Users, 
-  DollarSign, 
-  TrendingUp, 
   Plus, 
   Edit2, 
   Trash2, 

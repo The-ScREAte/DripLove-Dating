@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Users, Globe, CheckCircle2, AlertCircle, Trash2, Ban, RotateCw, Eye, History, Copy, Mail, Calendar, Bell, Download, ShieldOff } from 'lucide-react';
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { fetchAllRows, applyDebugFilter } from '@/hooks/useBatchFetch';
 import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctionError';
+import { getCountryName } from '@/constants/locationData';
 
 interface Country {
   code: string;
@@ -270,7 +271,7 @@ export default function BroadcastNotifications() {
       const countryList: Country[] = Array.from(countryMap.entries())
         .map(([code, userCount]) => ({
           code,
-          name: getCountryName(code),
+          name: getCountryName(code, 'Unknown'),
           userCount,
         }))
         .sort((a, b) => b.userCount - a.userCount);
@@ -474,15 +475,6 @@ export default function BroadcastNotifications() {
     } finally {
       setIsLoadingRecipients(false);
     }
-  };
-
-  const getCountryName = (code: string): string => {
-    const countryNames: Record<string, string> = {
-      'GH': 'Ghana', 'NG': 'Nigeria', 'US': 'United States', 'GB': 'United Kingdom',
-      'CA': 'Canada', 'KE': 'Kenya', 'ZA': 'South Africa', 'UG': 'Uganda',
-      'TZ': 'Tanzania', 'RW': 'Rwanda',
-    };
-    return countryNames[code] || code || 'Unknown';
   };
 
   const toggleCountry = (countryCode: string) => {
@@ -806,7 +798,7 @@ export default function BroadcastNotifications() {
     return (
       `${u.first_name} ${u.last_name}`.toLowerCase().includes(q) ||
       (u.city || '').toLowerCase().includes(q) ||
-      getCountryName(u.country).toLowerCase().includes(q)
+      getCountryName(u.country, 'Unknown').toLowerCase().includes(q)
     );
   });
 
@@ -999,7 +991,7 @@ export default function BroadcastNotifications() {
                                 )}
                               </div>
                               <div className="text-[9px] text-gray-500 truncate">
-                                {user.city}, {getCountryName(user.country)}
+                                {user.city}, {getCountryName(user.country, 'Unknown')}
                               </div>
                             </div>
                           </div>

@@ -1,5 +1,10 @@
 import React, { Suspense, lazy } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { IconButton } from '@/components/ui/icon-button';
+import { useBackClose } from '@/utils/backStack';
+import './auth/auth.css';
 
 // Was a static import - AuthDialog itself renders unconditionally alongside
 // WelcomeScreen (gated only by its own `open` prop, not by whether it's
@@ -12,37 +17,67 @@ const AuthForm = lazy(() => import('./AuthForm'));
 interface AuthDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  isLogin: boolean;
+  /** "Sign Up" inside the sheet: the host closes it and shows the sign-up flow. */
   onToggle: () => void;
-  onOAuthSuccess?: (needsCompletion: boolean) => void;
 }
 
-const AuthDialog: React.FC<AuthDialogProps> = ({ 
-  open, 
-  onOpenChange, 
-  isLogin, 
+/**
+ * The email sign-in sheet. A bottom sheet on phones (thumb-reachable, slides up
+ * over the Welcome screen) and a centred card on larger screens. Same near-black
+ * surface as the sign-up flow so the whole entry reads as one product.
+ */
+const AuthDialog: React.FC<AuthDialogProps> = ({
+  open,
+  onOpenChange,
   onToggle,
-  onOAuthSuccess 
 }) => {
+  const { t } = useTranslation();
+  // Android hardware back closes the sheet instead of leaving the app (Radix already handles Escape).
+  useBackClose(open, () => onOpenChange(false), { escape: false });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[90vw] sm:w-full sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-0 bg-transparent border-none">
-        <DialogTitle className="sr-only">{isLogin ? 'Sign In' : 'Sign Up'}</DialogTitle>
-        <DialogDescription className="sr-only">
-          {isLogin ? 'Enter your credentials to sign in to your account' : 'Create a new account by providing your information'}
-        </DialogDescription>
-        <div className="bg-white/30 backdrop-blur-xl rounded-2xl">
-          <Suspense fallback={null}>
-            <AuthForm
-              isLogin={isLogin}
-              onToggle={onToggle}
-              onOAuthSuccess={onOAuthSuccess}
-              onBack={() => onOpenChange(false)}
-            />
-          </Suspense>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="dl-auth-overlay fixed inset-0 z-50" />
+        <DialogPrimitive.Content
+          className="dl-auth-panel rounded-t-sheet border-t border-white/10 bg-[#0B0B0F] text-white shadow-dl-lg sm:rounded-sheet sm:border"
+          // On touch devices don't pop the keyboard the instant the sheet opens
+          // (it would cover half the sheet mid-animation); the field is one tap away.
+          onOpenAutoFocus={(e) => {
+            if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <DialogPrimitive.Title className="sr-only">
+            {t('auth.signIn')}
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">
+            {t('auth.welcomeBack')}
+          </DialogPrimitive.Description>
+
+          {/* Grabber (phones) + close */}
+          <div className="dl-auth-top relative flex h-12 items-center justify-center sm:h-4">
+            <span aria-hidden="true" className="h-1 w-9 rounded-full bg-white/20 sm:hidden" />
+            <DialogPrimitive.Close asChild>
+              <IconButton
+                aria-label={t('common.close', { defaultValue: 'Close' })}
+                size="sm"
+                className="absolute right-3 top-2 text-white/70 hover:text-white sm:top-3"
+              >
+                <X />
+              </IconButton>
+            </DialogPrimitive.Close>
+          </div>
+
+          <div className="px-6 pb-1 sm:px-8 sm:pb-2">
+            <Suspense fallback={<div className="h-64" aria-hidden="true" />}>
+              <AuthForm onToggle={onToggle} />
+            </Suspense>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 };
 

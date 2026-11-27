@@ -2,13 +2,14 @@ import 'cordova-plugin-purchase';
 import { Capacitor } from '@capacitor/core';
 import { selectPurchasableProduct } from '@/utils/iapOfferInfo';
 import { toast } from '@/hooks/use-toast';
+import { recordRatingNegative } from '@/rating/ratingMoments';
+import { isTransientInvokeError, withTransientRetry } from '@/utils/iapRetry';
+import { isEntitledToPremium } from '@/utils/subscriptionEntitlement';
 
 const noopLog = (..._args: unknown[]) => {};
 
 // Detect platform
 const isAndroid = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
-const isIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
-
 // Check if we're already on the payment success page (prevents redirect loops)
 function isOnPaymentSuccessPage(): boolean {
   try {
@@ -152,32 +153,40 @@ async function validateReceiptWithServer(
   transactionId: string | undefined,
   receiptData: string,
   purchaseToken?: string
-): Promise<{ valid: boolean; active: boolean; error?: any }> {
+): Promise<{ valid: boolean; active: boolean; error?: any; transient?: boolean }> {
   const { supabase } = await import('@/integrations/supabase/client');
   const validatorFunction = isAndroid() ? 'google-iap-validator' : 'iap-receipt-validator';
 
-  const validationTimeout = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
-  });
-
-  const validationPromise = supabase.functions.invoke(validatorFunction, {
-    body: {
-      receiptData,
-      productId,
-      user_id: userId,
-      purchaseToken: purchaseToken || transactionId,
-      transactionId,
-    },
-  });
+  const invokeOnce = () => {
+    const validationTimeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Receipt validation timeout')), 25000);
+    });
+    const validationPromise = supabase.functions.invoke(validatorFunction, {
+      body: {
+        receiptData,
+        productId,
+        user_id: userId,
+        purchaseToken: purchaseToken || transactionId,
+        transactionId,
+      },
+    });
+    return Promise.race([validationPromise, validationTimeout]) as Promise<{ data: any; error: any }>;
+  };
 
   try {
-    const result: any = await Promise.race([validationPromise, validationTimeout]);
+    // A network blip or 5xx must not be treated as a bad purchase: retry briefly.
+    const result = await withTransientRetry(invokeOnce);
     if (result.error || !result.data?.valid || !result.data?.active) {
-      return { valid: false, active: false, error: result.error || result.data };
+      return {
+        valid: false,
+        active: false,
+        error: result.error || result.data,
+        transient: !!result.error && isTransientInvokeError(result.error),
+      };
     }
     return { valid: true, active: true };
   } catch (error) {
-    return { valid: false, active: false, error };
+    return { valid: false, active: false, error, transient: isTransientInvokeError(error) };
   }
 }
 
@@ -247,13 +256,25 @@ async function handleApprovedTransaction(t: any) {
     // after verifying the receipt with Apple/Google. The client never
     // activates premium itself; a database trigger also rejects any
     // client-originated write that grants or extends entitlement.
-    const { valid, active, error: validationError } = await validateReceiptWithServer(
+    const { valid, active, error: validationError, transient } = await validateReceiptWithServer(
       userId, productId, transactionId, receiptData, purchaseToken
     );
 
     if (!valid || !active) {
       console.warn('[IAP] Server validation failed or subscription inactive:', validationError);
       const message = extractValidationErrorMessage(validationError);
+      if (transient) {
+        // The user WAS charged; our server just could not be reached. Do NOT
+        // finish the transaction: the store keeps it pending and redelivers it
+        // on the next launch/refresh until validation succeeds, so premium
+        // arrives on its own. (Finishing it here used to leave a paying user on
+        // the free plan until they found "Restore Purchases".)
+        toast({
+          title: 'Your purchase is safe',
+          description: "We couldn't reach our server just now. Premium will activate automatically as soon as you're back online - or tap \"Restore Purchases\".",
+        });
+        return;
+      }
       if (message && message.toLowerCase().includes('already linked')) {
         // Tell them the real reason instead of the generic "try again"
         // message - retrying or restoring will never succeed here, since
@@ -302,9 +323,7 @@ async function handleApprovedTransaction(t: any) {
         .limit(1)
         .maybeSingle();
 
-      const isPremiumNow = !!subRow && subRow.plan_name === 'premium' &&
-        (subRow.status === 'active' || subRow.status === 'cancelled') &&
-        (!subRow.expires_at || new Date(subRow.expires_at) > new Date());
+      const isPremiumNow = isEntitledToPremium(subRow);
 
       if (!isPremiumNow) {
         console.warn('[IAP] Validation ok but subscription not yet applied; skipping redirect');
@@ -323,40 +342,13 @@ async function handleApprovedTransaction(t: any) {
     window.location.href = '/payment-success?status=successful&payment_type=iap';
   } catch (error: any) {
     console.error('[IAP] Error processing approved transaction:', error);
-    // Handle error - ensure user doesn't get premium access on failure
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Get current payment attempts
-        const { data: currentSub } = await supabase
-          .from('user_subscriptions')
-          .select('payment_attempts')
-          .eq('user_id', user.id)
-          .single();
-
-        const attempts = (currentSub?.payment_attempts || 0) + 1;
-
-        if (attempts >= 3) {
-          // Max attempts reached, deactivate subscription
-          await supabase.rpc('handle_payment_failure', {
-            p_user_id: user.id,
-            p_reason: `IAP verification failed after ${attempts} attempts: ` + error.message
-          });
-        } else {
-          // Increment attempt counter
-          await supabase
-            .from('user_subscriptions')
-            .update({
-              payment_attempts: attempts,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', user.id);
-        }
-      }
-    } catch (fallbackError) {
-      console.error('[IAP] Fallback error handling failed:', fallbackError);
-    }
+    // An exception here is an app/network problem, never evidence that the
+    // purchase was bad. Do NOT touch the user's subscription: the client used to
+    // count failures and after 3 called handle_payment_failure, which downgraded
+    // genuine subscribers on flaky networks (and handle_payment_failure should
+    // only ever be called server-side). Premium is granted/revoked by the
+    // validators and store webhooks only.
+    recordRatingNegative('payment_failed'); // never ask for a review right after a payment problem
     toast({ title: 'Payment processing failed.', description: 'Please try again or contact support.' });
     if (t.finish && typeof t.finish === 'function') {
       t.finish();
@@ -805,22 +797,3 @@ export function restorePurchases(): Promise<{ restored: boolean; message: string
 }
 
 // Debug helper function
-export function debugIAPState() {
-  // @ts-ignore
-  const { store } = window.CdvPurchase || {};
-  if (!store) {
-    console.error('[IAP Debug] CdvPurchase.store not available');
-    return;
-  }
-
-  let product, offer;
-  try {
-    product = store.get ? store.get('com.driplove.dating.premium.monthlysub1') : null;
-    offer = product?.getOffer?.();
-  } catch (error) {
-    console.error('[IAP Debug] Error getting product:', error);
-  }
-  
-  // Debug function - logs removed for production
-  // Can be re-enabled for debugging if needed
-}

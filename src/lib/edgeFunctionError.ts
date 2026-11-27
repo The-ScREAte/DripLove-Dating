@@ -27,3 +27,19 @@ export const getEdgeFunctionErrorMessage = async (err: unknown, fallback = 'Edge
 
   return fallback;
 };
+
+/**
+ * Best-effort synchronous message from a thrown Error or Supabase error object.
+ * Supabase/Postgrest errors are plain objects, not real Error instances, so
+ * `err instanceof Error` alone would miss them and fall back to a generic
+ * message - masking the actual reason a query failed (RLS denial, a unique
+ * constraint, etc.).
+ */
+export const getSupabaseErrorMessage = (err: unknown): string | undefined => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return undefined;
+};

@@ -4,6 +4,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getAuthedCaller, isServiceRoleRequest } from '../_shared/caller-auth.ts'
 import { getPaystackSecretKey } from '../_shared/paystack-utils.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
@@ -29,7 +30,16 @@ serve(async (req) => {
 
   try {
     const { user_id } = await req.json()
-    if (!user_id) return json(400, { error: 'Missing user_id' })
+    if (!user_id || typeof user_id !== 'string') return json(400, { error: 'Missing user_id' })
+
+    // Only the subscription's owner (or an admin / internal service caller) may
+    // change it. The user id in the body used to be trusted as-is, so any
+    // logged-in user could cancel someone else's subscription.
+    if (!isServiceRoleRequest(req)) {
+      const caller = await getAuthedCaller(req)
+      if (!caller) return json(401, { error: 'Unauthorized' })
+      if (caller.id !== user_id && !caller.isAdmin) return json(403, { error: 'Forbidden' })
+    }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     

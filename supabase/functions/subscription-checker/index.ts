@@ -5,6 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { isCronAuthorized } from '../_shared/caller-auth.ts'
 import { cancelledTrialFields, isCancelledFreeTrial, revokeGoogleSubscription } from '../_shared/google-trial.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
@@ -240,6 +241,12 @@ serve(async (req) => {
     console.log('[SUBSCRIPTION-CHECKER] Starting subscription status check at', new Date().toISOString())
     
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
+
+    // Cron-only endpoint: it calls the Google/Apple APIs for every subscriber, so
+    // it must not be triggerable by arbitrary callers.
+    if (!(await isCronAuthorized(req, supabase, 'subscription_cron_secret'))) {
+      return json(401, { error: 'Unauthorized' })
+    }
     
     // ========== STEP 1: Handle expired subscriptions ==========
     const { data: beforeCheck } = await supabase

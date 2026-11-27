@@ -3,7 +3,7 @@ import type { Json } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getCountriesList, getCountryByCode } from '@/constants/locationData';
+import { getCountriesList } from '@/constants/locationData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,19 +34,16 @@ const BroadcastNotifications = lazy(() => import('./admin/BroadcastNotifications
 const InfluencerManagement = lazy(() => import('./admin/InfluencerManagement'));
 const SmartMatchSuggestions = lazy(() => import('./admin/SmartMatchSuggestions'));
 const SmartLikeGiving = lazy(() => import('./admin/SmartLikeGiving'));
-import { debounce, userDataCache, createPagination } from '@/utils/performanceOptimizer';
-import { useSupabaseSubscription, useMemoryMonitor } from '@/hooks/usePerformance';
-import { CurrentUser, AdminStats } from '@/types';
+import { debounce, userDataCache } from '@/utils/performanceOptimizer';
+import { useMemoryMonitor } from '@/hooks/usePerformance';
+import { AdminStats } from '@/types';
+import { calculateAge } from '@/utils/dateUtils';
 import { 
   LogOut, 
   Shield, 
   Users, 
   Heart, 
-  MessageSquare, 
-  TrendingUp, 
-  Calendar, 
   Pause, 
-  UserX, 
   UserPlus, 
   Eye, 
   Search, 
@@ -1032,19 +1029,6 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       setLoading(false);
     }
   }, 300), [toast, statusFilter, genderFilter, interestedInFilter, countryFilter, relationshipIntentFilter, activityFilter]);
-
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
 
   // Fetches exactly one page of the Users-tab table via the server-side
   // admin_search_users_page RPC - replaces the old "fetch every non-admin

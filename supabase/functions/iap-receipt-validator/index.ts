@@ -86,6 +86,11 @@ serve(async (req) => {
 
     // 2️⃣ Try to get user from auth header, but DON'T FAIL if missing - use bodyUserId as fallback
     let userId: string | null = null
+    // True only when the user id was proven by a valid session token. The body
+    // user_id fallback below is unauthenticated (anyone holding the public anon
+    // key can send any id), so it may only ever ADD access for a receipt Apple
+    // verified - it must never downgrade or overwrite another user's account.
+    let identityFromToken = false
     const authHeader = req.headers.get('Authorization')
     
     if (authHeader) {
@@ -93,6 +98,7 @@ serve(async (req) => {
       const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
       if (!userError && userData.user) {
         userId = userData.user.id
+        identityFromToken = true
         console.log('[IAP-RECEIPT-VALIDATOR] User authenticated via token:', userId)
       }
     }
@@ -144,10 +150,15 @@ serve(async (req) => {
     if (appleResponse.status !== 0) {
       console.error('[❌] Receipt validation failed:', appleResponse.status)
 
-      await supabaseClient.rpc('handle_payment_failure', {
-        p_user_id: userId,
-        p_reason: `IAP validation failed: status ${appleResponse.status}`,
-      })
+      // Only a proven session may downgrade: an unauthenticated caller with
+      // somebody else's user id and a junk receipt must not be able to strip
+      // that person's premium.
+      if (identityFromToken) {
+        await supabaseClient.rpc('handle_payment_failure', {
+          p_user_id: userId,
+          p_reason: `IAP validation failed: status ${appleResponse.status}`,
+        })
+      }
 
       return json(400, { valid: false, status: appleResponse.status, error: 'Invalid receipt' })
     }
@@ -228,6 +239,25 @@ serve(async (req) => {
 
     // 9️⃣ Update Supabase
     if (isActive) {
+      // Unauthenticated (body user_id) activation must not overwrite an account
+      // that already has a live subscription from a different purchase.
+      if (!identityFromToken) {
+        const { data: liveSub } = await supabaseClient
+          .from('user_subscriptions')
+          .select('status, expires_at, original_transaction_id, provider_transaction_id')
+          .eq('user_id', userId)
+          .maybeSingle()
+        const liveAndDifferent =
+          liveSub &&
+          ['active', 'cancelled', 'payment_pending'].includes(liveSub.status) &&
+          liveSub.expires_at && new Date(liveSub.expires_at) > new Date() &&
+          liveSub.original_transaction_id !== originalTransactionId &&
+          liveSub.provider_transaction_id !== latest.transaction_id
+        if (liveAndDifferent) {
+          console.warn('🚫 [IAP-RECEIPT-VALIDATOR] Unauthenticated activation refused: account already has a live subscription')
+          return json(200, { valid: false, active: false, error: 'Please sign in again to activate this purchase.' })
+        }
+      }
       const { error } = await supabaseClient
         .from('user_subscriptions')
         .upsert({
@@ -356,11 +386,13 @@ serve(async (req) => {
         transaction_id: latest.transaction_id,
       })
     } else {
-      // Expired
-      await supabaseClient.rpc('handle_payment_failure', {
-        p_user_id: userId,
-        p_reason: 'IAP subscription expired',
-      })
+      // Expired (only a proven session may downgrade, see identityFromToken)
+      if (identityFromToken) {
+        await supabaseClient.rpc('handle_payment_failure', {
+          p_user_id: userId,
+          p_reason: 'IAP subscription expired',
+        })
+      }
 
       return json(200, {
         valid: true,
