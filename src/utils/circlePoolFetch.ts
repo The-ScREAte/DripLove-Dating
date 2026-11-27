@@ -21,7 +21,8 @@ import { boundingBoxDegrees } from '@/utils/geoBox';
 // notion of "how far is too far" never drifts from Discover's - free users
 // get the same generous-but-capped radius, premium the same uncapped one.
 const DEFAULT_MAX_DISTANCE_KM = 50;
-const FREE_USER_MAX_DISTANCE_KM = 600;
+// Same as premium: 5000 km spans a whole country, and the radius never leaves the home country anyway.
+const FREE_USER_MAX_DISTANCE_KM = 5000;
 const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 // Approximate km-per-degree of latitude - same conversion DiscoverPage uses
 // to turn a straight-line distance cap into the RPC's lat/lon bounding box,

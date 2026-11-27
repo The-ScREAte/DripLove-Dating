@@ -104,12 +104,14 @@ const FREE_DAILY_UNDO_LIMIT = 2;
 const URGENT_REFILL_AT = 5;
 
 // Free users are capped at this distance (km) regardless of their own
-// max_distance/distance_preference setting. This was independently
+// max_distance/distance_preference setting. 5000 km covers a whole country (the radius is always
+// additionally bounded by the home country), so free members see everyone in their own country;
+// what premium adds is OTHER countries (see unlocked_countries), not a longer radius. This was independently
 // redeclared as a local const under two different names
 // (FREE_USER_MAX_DISTANCE, FREE_USER_MAX_DISTANCE_CACHE) plus two more raw
 // "500" literals, in four separate places in this file - the same drift
 // risk that caused the swipe-limit bug. One constant now.
-const FREE_USER_MAX_DISTANCE_KM = 600;
+const FREE_USER_MAX_DISTANCE_KM = 5000;
 // Premium users can search further than free users, but still up to a
 // concrete ceiling rather than being fully unbounded - matches the max on
 // the distance slider in the profile's Location section. The radius is

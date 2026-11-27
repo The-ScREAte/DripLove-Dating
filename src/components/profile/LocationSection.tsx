@@ -15,7 +15,8 @@ import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/
 // the chk_max_distance DB constraint's outer bound (5000km). The radius is
 // always additionally bounded by the user's own country - a larger radius
 // never spills into a neighbouring country.
-const FREE_MAX_DISTANCE_KM = 600;
+// Free members get the same radius as premium (5000 km spans a whole country); premium adds other countries.
+const FREE_MAX_DISTANCE_KM = 5000;
 const PREMIUM_MAX_DISTANCE_KM = 5000;
 
 interface LocationSectionProps {
@@ -165,12 +166,6 @@ const LocationSection = ({
               Always stays inside your own country.
             </p>
           </div>
-          {!isPremium && (
-            <p className="text-xs text-yellow-200/80 flex items-center gap-1.5">
-              <Crown className="w-3.5 h-3.5 text-yellow-500 shrink-0" />
-              Go Premium for more distance.
-            </p>
-          )}
         </div>
       </div>
 
