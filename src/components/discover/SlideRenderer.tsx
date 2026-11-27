@@ -223,7 +223,8 @@ const ImageSlide = React.memo<{
                 className="w-full h-full object-fill"
                 style={{
                   transform: 'scaleY(-1)',
-                  filter: `blur(${isAndroidPlatform() ? 2 : 3}px)`,
+                  // Deeply blurred: the reflection is atmosphere, not a second copy of the photo.
+                  filter: `blur(${isAndroidPlatform() ? 8 : 16}px)`,
                 }}
                 draggable={false}
               />
@@ -238,19 +239,22 @@ const ImageSlide = React.memo<{
                 className="absolute inset-0 w-full h-full object-fill"
                 style={{
                   transform: 'scaleY(-1)',
+                  // Soft, not razor sharp: still close enough to the photo edge row to join it without a visible
+                  // line, but no longer a crisp second copy of the picture.
+                  filter: `blur(${isAndroidPlatform() ? 3 : 6}px)`,
                   // Mask is applied before the flip, so the opaque end sits at
                   // the photo-adjacent edge after scaleY(-1).
                   // Eased (multi-stop) fade instead of a straight line so the
                   // hand-off to the softer copy has no visible banding/edge.
-                  maskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.82) 6%, rgba(0,0,0,0.58) 12%, rgba(0,0,0,0.3) 18%, rgba(0,0,0,0.1) 23%, transparent 28%)`,
-                  WebkitMaskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.82) 6%, rgba(0,0,0,0.58) 12%, rgba(0,0,0,0.3) 18%, rgba(0,0,0,0.1) 23%, transparent 28%)`,
+                  maskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.78) 4%, rgba(0,0,0,0.5) 9%, rgba(0,0,0,0.26) 14%, rgba(0,0,0,0.1) 18%, transparent 23%)`,
+                  WebkitMaskImage: `linear-gradient(to ${side === 'top' ? 'bottom' : 'top'}, #000 0%, rgba(0,0,0,0.78) 4%, rgba(0,0,0,0.5) 9%, rgba(0,0,0,0.26) 14%, rgba(0,0,0,0.1) 18%, transparent 23%)`,
                 }}
                 draggable={false}
               />
               <div
                 className="absolute inset-0"
                 style={{
-                  background: `linear-gradient(to ${side}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.08) 12%, rgba(0,0,0,0.22) 24%, rgba(0,0,0,0.42) 38%, rgba(0,0,0,0.64) 54%, rgba(0,0,0,0.82) 72%, rgba(0,0,0,0.92) 100%)`,
+                  background: `linear-gradient(to ${side}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.10) 8%, rgba(0,0,0,0.26) 20%, rgba(0,0,0,0.46) 34%, rgba(0,0,0,0.68) 52%, rgba(0,0,0,0.84) 72%, rgba(0,0,0,0.94) 100%)`,
                 }}
               />
             </div>

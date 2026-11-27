@@ -29,6 +29,9 @@ interface NextCardPreviewProps {
   blurPx: number;
   darkOpacity: number;
   durationMs: number;
+  /** Corner radius while resting behind the front card / once revealed (CSS border-radius values). */
+  restRadius?: string;
+  revealedRadius?: string;
 }
 
 const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -44,6 +47,8 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
   blurPx,
   darkOpacity,
   durationMs,
+  restRadius = `${REST_RADIUS_PX}px`,
+  revealedRadius = '0px',
 }) => {
   const t = (prop: string) => (dragging ? 'none' : `${prop} ${durationMs}ms ${EASE}`);
   const slide = React.useMemo(
@@ -56,7 +61,7 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
       className="absolute inset-0 overflow-hidden bg-black"
       style={{
         transform: `scale(${revealed ? 1 : REST_SCALE})`,
-        borderRadius: revealed ? 0 : REST_RADIUS_PX,
+        borderRadius: revealed ? revealedRadius : restRadius,
         transition: dragging ? 'none' : `transform ${durationMs}ms ${EASE}, border-radius ${durationMs}ms ${EASE}`,
         transformOrigin: 'center center',
         willChange: 'transform',

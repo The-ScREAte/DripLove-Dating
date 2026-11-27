@@ -1567,7 +1567,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
 
   return (
     <div
-      className="h-full flex flex-col bg-black"
+      className="h-full flex flex-col bg-black dl-card-fade-now"
       style={{
         touchAction: 'pan-x pan-y',
         userSelect: 'none',

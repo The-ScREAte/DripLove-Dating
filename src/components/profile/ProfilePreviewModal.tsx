@@ -20,6 +20,7 @@ import { useBackClose } from '@/utils/backStack';
 import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import { SlideRenderer } from '../discover/SlideRenderer';
 import SwipeButtons from '../discover/SwipeButtons';
+import { NextCardPreview } from '../discover/NextCardPreview';
 import { useCardSwipe, CARD_EXIT_MS, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from '../discover/useCardSwipe';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { Button } from '@/components/ui/button';
@@ -346,30 +347,18 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           while the card on top slides away - it's what's being revealed,
           not something that should move with the drag. */}
       {swipeEnabled && nextPreviewImageUrl && (
-        <div
-          className="absolute inset-0 overflow-hidden bg-black"
-          style={{ borderRadius: '0px 0px 22px 22px' }}
-          aria-hidden="true"
-        >
-          <img
-            src={getDetailImageUrl(nextPreviewImageUrl)}
-            decoding="async"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover object-center"
-            style={{
-              transform: 'scale(1.08)',
-              filter: `blur(${NEXT_CARD_MAX_BLUR_PX * (1 - nextCardRevealProgress)}px)`,
-              transition: 'filter 250ms ease-out',
-            }}
-          />
-          <div
-            className="absolute inset-0 bg-black"
-            style={{
-              opacity: NEXT_CARD_MAX_DARK_OPACITY * (1 - nextCardRevealProgress),
-              transition: 'opacity 250ms ease-out',
-            }}
-          />
-        </div>
+        <NextCardPreview
+          imageUrl={nextPreviewImageUrl}
+          name={{ first: '', last: '' }}
+          getOptimizedUrl={(url) => getSafeImageSrc(url) || url}
+          userBackgroundColor="#000"
+          revealed={!!swipeExitDirection}
+          dragging={isSwipeDragging}
+          blurPx={NEXT_CARD_MAX_BLUR_PX * (1 - nextCardRevealProgress)}
+          darkOpacity={NEXT_CARD_MAX_DARK_OPACITY * (1 - nextCardRevealProgress)}
+          durationMs={CARD_EXIT_MS}
+          revealedRadius="0px 0px 22px 22px"
+        />
       )}
 
       {/* The card itself - border, rounded corners and the whole drag
@@ -641,6 +630,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
                 {/* Name / location / highlights caption + expand control (shared with Discover
             and Liked Me so every screen shows the same header). */}
         <ProfileCaption
+          animateIn
           name={`${toTitleCase(profile.first_name)} ${toTitleCase(profile.last_name)}`.trim()}
           age={calculateAge(profile.date_of_birth)}
           online={isRecentlyOnline(profile.last_login_at, SWIPE_ONLINE_WINDOW_MS)}
