@@ -334,8 +334,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         // would sit INSIDE the bordered box, so the border would still touch
         // the nav with no visible gap between them. A margin on a shorter box
         // actually leaves the gap outside the border, matching Discover's.
-        height: 'calc(100% - var(--dl-card-nav-gap, clamp(4px, 1.2vw, 6px)))',
-        marginBottom: 'var(--dl-card-nav-gap, clamp(4px, 1.2vw, 6px))',
+        height: 'calc(100% - var(--dl-card-nav-gap, clamp(2px, 0.7vw, 4px)))',
+        marginBottom: 'var(--dl-card-nav-gap, clamp(2px, 0.7vw, 4px))',
       }}
     >
       {/* Next card, loaded and waiting behind the current one - same idea as

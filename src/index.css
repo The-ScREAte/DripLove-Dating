@@ -58,7 +58,7 @@
    The expand button is pinned just above the undo button, derived from the same numbers, so it never overlaps it
    and never moves with the amount of caption text. */
 :root {
-  --dl-card-nav-gap: clamp(4px, 1.2vw, 6px);
+  --dl-card-nav-gap: clamp(2px, 0.7vw, 4px);
   --dl-undo-size: clamp(44px, 11vw, 48px);
   --dl-undo-lift: clamp(28px, 5vw, 38px);
   /* undo top (+8px count badge) + 8px air, minus the 7px the 44px hit area extends beyond the 30px visual circle */

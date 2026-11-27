@@ -1759,7 +1759,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             // Small breathing room between the discover card's rounded bottom edge and the
             // floating nav pill below it, so they read as two distinct surfaces instead of
             // touching. Other tabs don't need this gap.
-            paddingBottom: activeTab === 'dripcheck' ? 'var(--dl-card-nav-gap, clamp(4px, 1.2vw, 6px))' : undefined,
+            paddingBottom: activeTab === 'dripcheck' ? 'var(--dl-card-nav-gap, clamp(2px, 0.7vw, 4px))' : undefined,
           }}
         >
           {showTerms ? (
@@ -1890,7 +1890,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // 22px gap above it is now a clamp so a small-screen phone gets a
               // proportionally smaller gap instead of the same absolute value as
               // a large phone.
-              marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + clamp(12px, 4vw, 22px))',
+              marginBottom: 'calc(env(safe-area-inset-bottom, 0px) + clamp(6px, 2vw, 12px))',
               // Bigger side margins than the old flat mx-3 (12px) - that made
               // the bar stretch nearly edge-to-edge, which is what read as
               // "too wide" even after the internal item spacing was tightened.
