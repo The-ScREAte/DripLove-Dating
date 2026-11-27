@@ -7,16 +7,16 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #3d0320 0%, #7a0a40 52%, #d6136e 100%);
+  background: radial-gradient(120% 80% at 50% 38%, #8f0d4d 0%, #5a0a33 45%, #2a0216 100%);
   color: #fff;
   opacity: 1;
   transition: opacity 320ms ease-out;
 }
 .dl-splash--leaving { opacity: 0; pointer-events: none; }
-.dl-splash[data-season='christmas'] { background: linear-gradient(135deg, #0b1f3a 0%, #5a0f2e 55%, #b3122f 100%); }
-.dl-splash[data-season='newyear'] { background: linear-gradient(135deg, #1a0a3d 0%, #5b1465 52%, #d6136e 100%); }
-.dl-splash[data-season='halloween'] { background: linear-gradient(135deg, #1a0b2e 0%, #4a1259 52%, #d9561a 100%); }
-.dl-splash[data-season='thanksgiving'] { background: linear-gradient(135deg, #3b1504 0%, #8a2f0a 52%, #d9801f 100%); }
+.dl-splash[data-season='christmas'] { background: radial-gradient(120% 80% at 50% 38%, #a3182f 0%, #5c0f2c 45%, #0d1c36 100%); }
+.dl-splash[data-season='newyear'] { background: radial-gradient(120% 80% at 50% 38%, #9a1568 0%, #4c1266 45%, #16093a 100%); }
+.dl-splash[data-season='halloween'] { background: radial-gradient(120% 80% at 50% 38%, #a8451a 0%, #4a1259 50%, #170a29 100%); }
+.dl-splash[data-season='thanksgiving'] { background: radial-gradient(120% 80% at 50% 38%, #b5651a 0%, #6d230a 48%, #301204 100%); }
 
 .dl-splash__content {
   position: relative;
@@ -30,6 +30,31 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* The logo sits on a soft frosted disc with a slow glow, so it reads clearly on any season's colour. */
+.dl-splash__badge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  height: 148px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07) 70%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), 0 0 60px rgba(255, 120, 180, 0.28);
+  animation: dlSplashPop 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.dl-splash__badge::after {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  animation: dlSplashRing 2.6s ease-out infinite;
+}
+@keyframes dlSplashPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes dlSplashRing { 0% { transform: scale(0.92); opacity: 0.7; } 100% { transform: scale(1.25); opacity: 0; } }
+
 .dl-splash__title {
   margin: 6px 0 0;
   font-size: clamp(40px, 12vw, 58px);
@@ -113,6 +138,7 @@ html[data-motion='reduced'] .dl-splash__glyph, html[data-motion='reduced'] .dl-s
 
 @media (prefers-reduced-motion: reduce) {
   .dl-splash__glyph, .dl-splash__confetti { animation: none; opacity: 0.35; top: 20%; }
-  .dl-splash__title, .dl-splash__sub, .dl-splash__foot, .dl-splash__progress span { animation: none; }
+  .dl-splash__title, .dl-splash__sub, .dl-splash__foot, .dl-splash__progress span, .dl-splash__badge, .dl-splash__badge::after { animation: none; }
   .dl-splash__progress span { transform: scaleX(1); }
 }
+html[data-motion='lite'] .dl-splash__badge::after, html[data-motion='reduced'] .dl-splash__badge::after { display: none; }

@@ -23,7 +23,7 @@ interface Props {
   durationMs?: number;
 }
 
-const SeasonalSplash: React.FC<Props> = ({ leaving = false, onSkip, durationMs = 4000 }) => {
+const SeasonalSplash: React.FC<Props> = ({ leaving = false, onSkip, durationMs = 5000 }) => {
   const { t } = useTranslation();
   const season = useMemo(() => seasonOverride() ?? seasonFor(), []);
   const message = useMemo(() => seasonMessage(season), [season]);
@@ -82,7 +82,9 @@ const SeasonalSplash: React.FC<Props> = ({ leaving = false, onSkip, durationMs =
       </div>
 
       <div className="dl-splash__content">
-        <HoppingLogo size={76} />
+        <div className="dl-splash__badge">
+          <HoppingLogo size={104} />
+        </div>
         <h1 className="dl-splash__title font-brush">{t(season.key, season.text)}</h1>
         <p className="dl-splash__sub">{t(message.key, message.text)}</p>
         <p className="dl-splash__foot">{t('season.footer', "We're here with you.")}</p>

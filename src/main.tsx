@@ -104,7 +104,7 @@ if (import.meta.env.PROD) {
 
 // The opening splash is held for at least this long (from the first paint), so the seasonal greeting is actually seen.
 // Data Saver / slow link / reduced-motion users (data-motion="reduced") get a shorter one: nothing should hold them up.
-const SPLASH_MIN_MS = document.documentElement.dataset.motion === 'reduced' ? 2000 : 4000;
+const SPLASH_MIN_MS = document.documentElement.dataset.motion === 'reduced' ? 2000 : 5000;
 const SPLASH_FADE_MS = 340;
 
 const AppWrapper = () => {
