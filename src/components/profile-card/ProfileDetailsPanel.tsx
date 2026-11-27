@@ -8,6 +8,7 @@ import {
   Gift,
   Heart,
   Languages,
+  MapPin,
   MessageCircle,
   PawPrint,
   Ruler,
@@ -28,7 +29,7 @@ import MusicLinkBadge from '../discover/MusicLinkBadge';
 import { CaptionPhotoCard } from './CaptionPhotoCard';
 import { SharedWithYou, VibeProfileSections } from './VibeSections';
 import { FactRow, LabelValueRow, PersonalityBar, ProfileSection, TraitChips } from './ProfileSection';
-import { asList, displayValue, isLongText, isSpecified, relationshipIntentLabel, traitText } from './profileCardUtils';
+import { asList, displayValue, formatLocationLabel, isLongText, isSpecified, relationshipIntentLabel, traitText } from './profileCardUtils';
 import type { CaptionedPhoto, PhotoAnchor, ProfileCardData } from './types';
 
 interface ProfileDetailsPanelProps {
@@ -92,8 +93,9 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
   const bio = profile.bio?.trim();
   const intent = relationshipIntentLabel(profile.relationship_intent, t as never);
   const hasHeight = typeof profile.height_cm === 'number' && profile.height_cm > 0;
+  const locationLabel = formatLocationLabel(profile.city, profile.country);
   const hasGlance =
-    !!intent || hasHeight || isSpecified(profile.family_plans) || !!profile.occupation?.trim() || !!profile.industry?.trim() || !!profile.education_level?.trim();
+    !!locationLabel || !!intent || hasHeight || isSpecified(profile.family_plans) || !!profile.occupation?.trim() || !!profile.industry?.trim() || !!profile.education_level?.trim();
 
   const lifestyleRows = [
     { emoji: '🚬', label: label('smoking', 'Smoking'), value: profile.smoking },
@@ -141,6 +143,7 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
       {hasGlance && (
         <ProfileSection title={label('atAGlance', 'At a glance')}>
           <div className="space-y-2.5">
+            {locationLabel && <FactRow icon={<MapPin />}>{locationLabel}</FactRow>}
             {intent && <FactRow icon={<Heart />}>{intent}</FactRow>}
             {hasHeight && <FactRow icon={<Ruler />}>{formatHeightLabel(profile.height_cm as number)}</FactRow>}
             {isSpecified(profile.family_plans) && (

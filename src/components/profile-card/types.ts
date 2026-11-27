@@ -9,6 +9,8 @@ export interface ProfileCardData {
   id?: string | null;
   first_name?: string | null;
   bio?: string | null;
+  city?: string | null;
+  country?: string | null;
   occupation?: string | null;
   education_level?: string | null;
   industry?: string | null;

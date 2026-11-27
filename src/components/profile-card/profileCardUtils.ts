@@ -104,3 +104,28 @@ export const toTitleCase = (value?: string | null): string => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 };
+
+/**
+ * "City, Country" for display. People type their own city, so the raw value can carry a postal code ("Camargo, OK 73835
+ * United States") and repeat the country. Drop postal-code-like numbers and don't print the country twice.
+ */
+export const formatLocationLabel = (city?: string | null, country?: string | null): string => {
+  const clean = (s?: string | null) =>
+    (s ?? '')
+      .replace(/\b\d{4,6}(-\d{4})?\b/g, '') // postal codes
+      .replace(/\s+,/g, ',')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/^[\s,]+|[\s,]+$/g, '');
+  const c = clean(city);
+  const k = clean(country);
+  if (!c) return k;
+  if (!k) return c;
+  const lowerC = c.toLowerCase();
+  const lowerK = k.toLowerCase();
+  if (lowerC.includes(lowerK)) {
+    // the country is already in the city text: keep one copy, with a comma before it
+    const stripped = c.replace(new RegExp(`[\\s,]*${lowerK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), '').replace(/[\s,]+$/g, '');
+    return stripped ? `${stripped}, ${k}` : k;
+  }
+  return `${c}, ${k}`;
+};

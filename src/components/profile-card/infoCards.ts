@@ -189,7 +189,6 @@ export function buildInfoCards(match: PotentialMatch, ctx: CardContext): InfoCar
   const name = toTitleCase(match.first_name) || '';
   const vibe = getVibe(match.favorites);
   const interests = asList(match.interests).filter((v): v is string => typeof v === 'string' && !!clean(v)).map(clean);
-  const cities = [clean(match.city), clean(match.country)].filter(Boolean);
   const ranked: Ranked[] = [];
   const add = (rank: number, kind: InfoCardKind, data: InfoCardData) => ranked.push({ rank, card: makeCard(kind, data, seed) });
 
@@ -216,7 +215,8 @@ export function buildInfoCards(match: PotentialMatch, ctx: CardContext): InfoCar
     // Two quick facts under the quote so a short bio never floats in a void.
     const aboutFacts: NonNullable<InfoCardData['facts']> = [];
     if (isSpecified(match.occupation)) aboutFacts.push({ key: 'work', value: clean(match.occupation) });
-    if (cities.length > 0) aboutFacts.push({ key: 'place', value: cities.join(', ') });
+    // No address here: a typed city can carry a street / postal code and the country twice. Where someone is lives in the
+    // photo caption and in the details below (cleaned), not on the bio card.
     add(2, 'about', { name, text: match.bio.trim().slice(0, 700), facts: aboutFacts.slice(0, 2) });
   }
 

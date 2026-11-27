@@ -128,7 +128,6 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
   // (the full text is in the details below the photo).
   const boxRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<HTMLDivElement>(null);
-  const [truncated, setTruncated] = useState(false);
   useLayoutEffect(() => {
     const box = boxRef.current;
     const el = fitRef.current;
@@ -153,16 +152,35 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
           if (need * MIN_TEXT_ZOOM <= avail) break;
         }
       }
-      // cut off by the line clamp (default or the one just applied)?
-      setTruncated(!!textEl && textEl.scrollHeight > textEl.clientHeight + 1);
 
       if (need > avail) el.style.zoom = String(Math.max(0.68, avail / need));
+      // (measured AFTER the shrink: scaling changes how the text wraps, so it may fit where it did not at 100%)
+      // Is the text actually cut by the line clamp? Compare the full (unclamped) height with the height shown. Set as a data
+      // attribute (not React state) so the hint can never go stale while the layout settles.
+      let cut = false;
+      if (textEl) {
+        const shownH = textEl.clientHeight;
+        const prevClamp = textEl.style.getPropertyValue('-webkit-line-clamp');
+        textEl.style.setProperty('-webkit-line-clamp', 'unset');
+        cut = textEl.scrollHeight > shownH + 2;
+        if (prevClamp) textEl.style.setProperty('-webkit-line-clamp', prevClamp);
+        else textEl.style.removeProperty('-webkit-line-clamp');
+      }
+      if (cut) el.setAttribute('data-truncated', 'true');
+      else el.removeAttribute('data-truncated');
     };
     apply();
+    // The first measurement can run before the card has finished laying out (fonts, the card's own size): measure again
+    // on the next frame and once fonts are ready, so the "read more" hint and the fit never go stale.
+    const raf = window.requestAnimationFrame(apply);
+    let cancelled = false;
+    void document.fonts?.ready?.then(() => { if (!cancelled) apply(); });
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null;
     ro?.observe(box);
     window.addEventListener('resize', apply);
     return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf);
       ro?.disconnect();
       window.removeEventListener('resize', apply);
     };
@@ -212,7 +230,7 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
           <p dir="auto" data-fit-text className={cx(styles.text, textSize((data.text || '').length))}>{data.text}</p>
           <div dir="auto" className={styles.byline}>
             — {name}
-            {truncated && <span className={styles.moreHint}> · {tr('cards.readMoreHint', 'tap ↓ to read more')}</span>}
+            <span className={styles.moreHint}> · {tr('cards.readMoreHint', 'tap ↓ to read more')}</span>
           </div>
           {aboutFacts.length > 0 && (
             <div className={styles.chips}>

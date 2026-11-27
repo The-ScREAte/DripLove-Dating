@@ -164,6 +164,10 @@
   font-weight: 500;
   opacity: 0.75;
   white-space: nowrap;
+  display: none; /* only when the text had to be cut: InfoCardSlide sets data-truncated on the .fit block */
+}
+.fit[data-truncated='true'] .moreHint {
+  display: inline;
 }
 
 /* Giant decorative quote mark for the About card */
