@@ -1392,6 +1392,22 @@
     "findNew": "Find someone new",
     "backToCircle": "Back to Circle"
   },
+  "season": {
+    "newyear": "Happy New Year!",
+    "newyearSub": "Here's to new beginnings and real love.",
+    "valentine": "Happy Valentine's Day",
+    "valentineSub": "Love is in the air.",
+    "easter": "Happy Easter",
+    "easterSub": "Wishing you a lovely weekend.",
+    "halloween": "Happy Halloween",
+    "halloweenSub": "Find someone to haunt your heart.",
+    "thanksgiving": "Happy Thanksgiving",
+    "thanksgivingSub": "Grateful for you.",
+    "christmas": "Merry Christmas",
+    "christmasSub": "Warm wishes from DripLove.",
+    "default": "Slide In & Fall Into Real Love",
+    "defaultSub": "Welcome to DripLove."
+  },
   "rating": {
     "title": "Love DripLove?",
     "body": "A quick rating helps more people find real love.",

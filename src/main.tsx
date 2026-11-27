@@ -10,6 +10,7 @@ import { supabase } from "./integrations/supabase/client";
 import { clearAllUserCaches, noteSignedInUser } from "./utils/clearUserCaches";
 import { reloadForStaleChunk } from "./utils/chunkReload";
 import HoppingLogo from "./components/HoppingLogo";
+import SeasonalSplash from "./components/SeasonalSplash";
 import { getPlatformSync } from "./utils/platformUtils";
 import { ensureNotificationTapListener } from "./services/pushNotifications";
 
@@ -101,21 +102,17 @@ if (import.meta.env.PROD) {
   console.log = () => {};
 }
 
-// Minimal branded loading screen used during bootstrap/session hydration.
-// Same background as the native splash screen (#7A0A40, both platforms) and
-// Index.tsx's own loading screen further down the boot sequence - three
-// different loading screens with three different colors used to fire in a
-// row on cold start (native splash -> this -> Index's), each swap reading
-// as a visible "blink" purely from the background color jumping, even
-// though nothing was actually broken. One consistent color removes that.
-const LoadingScreen = () => (
-  <div className="w-full h-screen flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#3d0320] via-[#7a0a40] to-[#d6136e]">
-    <HoppingLogo size={64} />
-  </div>
-);
+// The opening splash is held for at least this long (from the first paint), so the seasonal greeting is actually seen.
+const SPLASH_MIN_MS = 2000;
+const SPLASH_FADE_MS = 340;
 
-// App wrapper that handles initialization
 const AppWrapper = () => {
+  const [splashMinElapsed, setSplashMinElapsed] = React.useState(false);
+  const [splashGone, setSplashGone] = React.useState(false);
+  React.useEffect(() => {
+    const id = window.setTimeout(() => setSplashMinElapsed(true), SPLASH_MIN_MS);
+    return () => window.clearTimeout(id);
+  }, []);
   const [isInitialized, setIsInitialized] = React.useState(false);
   const [authChecked, setAuthChecked] = React.useState(false);
   const [hasSession, setHasSession] = React.useState(false);
@@ -398,11 +395,26 @@ const AppWrapper = () => {
     };
   }, []);
 
-  if (!isInitialized || !authChecked) {
-    return <LoadingScreen />;
+  const ready = isInitialized && authChecked;
+  const splashDone = ready && splashMinElapsed;
+
+  // Once the splash has faded out, take it off the screen for good.
+  React.useEffect(() => {
+    if (!splashDone) return undefined;
+    const id = window.setTimeout(() => setSplashGone(true), SPLASH_FADE_MS + 40);
+    return () => window.clearTimeout(id);
+  }, [splashDone]);
+
+  if (!ready) {
+    return <SeasonalSplash />;
   }
 
-  return <App user={user} isAuthenticated={hasSession} />;
+  return (
+    <>
+      <App user={user} isAuthenticated={hasSession} />
+      {!splashGone && <SeasonalSplash leaving={splashDone} />}
+    </>
+  );
 };
 
 // Vite fires this when a lazy chunk (or its CSS) can't be fetched - i.e. a new version replaced the files while
