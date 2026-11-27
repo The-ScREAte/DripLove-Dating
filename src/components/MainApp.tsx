@@ -1759,7 +1759,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
             // Small breathing room between the discover card's rounded bottom edge and the
             // floating nav pill below it, so they read as two distinct surfaces instead of
             // touching. Other tabs don't need this gap.
-            paddingBottom: activeTab === 'dripcheck' ? 'clamp(6px, 2vw, 10px)' : undefined,
+            paddingBottom: activeTab === 'dripcheck' ? 'var(--dl-card-nav-gap, clamp(4px, 1.2vw, 6px))' : undefined,
           }}
         >
           {showTerms ? (

@@ -30,6 +30,53 @@
   transform: translateZ(0);
 }
 
+/* A new Discover card's overlays (name/caption, photo dots, report button) ease in instead of popping into place the
+   instant the swipe completes. Only the overlays animate - the photo is already visible behind the card (the "next
+   card" preview unblurs while the old card flies off), so there is no flash of a different image. Re-keyed per
+   profile, so it replays for every new card. */
+@keyframes dl-card-enter {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.dl-card-enter {
+  animation: dl-card-enter 360ms cubic-bezier(0.32, 0.72, 0, 1) 40ms backwards;
+}
+@keyframes dl-card-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.dl-card-fade {
+  animation: dl-card-fade 300ms ease-out 80ms backwards;
+}
+
+/* --- Card / nav / undo geometry shared by Discover, Circle and the profile preview ---
+   The floating undo button sits `--dl-undo-lift` above the nav; the card ends `--dl-card-nav-gap` above the nav.
+   The expand button is pinned just above the undo button, derived from the same numbers, so it never overlaps it
+   and never moves with the amount of caption text. */
+:root {
+  --dl-card-nav-gap: clamp(4px, 1.2vw, 6px);
+  --dl-undo-size: clamp(44px, 11vw, 48px);
+  --dl-undo-lift: clamp(28px, 5vw, 38px);
+  /* undo top (+8px count badge) + 8px air, minus the 7px the 44px hit area extends beyond the 30px visual circle */
+  --dl-expand-above-undo: calc(var(--dl-undo-lift) - var(--dl-card-nav-gap) + var(--dl-undo-size) + 16px - 7px);
+}
+/* >= 640px the undo button is absolutely positioned inside the card frame (Tailwind `sm:absolute`), so it sits the
+   full nav height + lift above the card's bottom edge instead of just the lift above the nav. */
+@media (min-width: 640px) {
+  :root {
+    --dl-expand-above-undo: calc(var(--app-bottom-nav-height, 88px) + var(--dl-undo-lift) + var(--dl-undo-size) + 16px - 7px);
+  }
+}
+.dl-expand-btn {
+  right: calc(1rem - 7px);
+  transition: bottom var(--dl-expand-ms, 420ms) var(--dl-expand-ease, cubic-bezier(0.32, 0.72, 0, 1));
+}
+/* collapsed: pinned just above the undo button, whatever the caption holds */
+.dl-expand-btn[data-placement="above-undo"] { bottom: var(--dl-expand-above-undo); }
+/* expanded: the photo is short and the undo button is over the details, so rest beside the name row instead */
+.dl-expand-btn[data-placement="above-undo"][data-expanded="true"] { bottom: 8px; }
+.dl-expand-btn[data-placement="corner"] { bottom: calc(1.25rem - 7px); }
+
 /* Shared expanded/collapsed details layout for Discover, Liked Me,
    profile preview and Circle.
 
@@ -126,6 +173,9 @@
   .profile-info-panel,
   .profile-info-panel > *,
   .dl-fold,
+  .dl-card-enter,
+  .dl-card-fade,
+  .dl-expand-btn,
   .dl-caption-pad,
   .dl-chevron,
   .hopping-logo {

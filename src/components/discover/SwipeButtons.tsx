@@ -29,7 +29,7 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
   // MainApp measures the real nav height via ResizeObserver and publishes
   // it as --app-bottom-nav-height (see MainApp.tsx), so this always clears
   // the actual nav at any screen size instead of estimating it.
-  const bottomOffset = 'calc(var(--app-bottom-nav-height, 88px) + clamp(28px, 5vw, 38px))';
+  const bottomOffset = 'calc(var(--app-bottom-nav-height, 88px) + var(--dl-undo-lift, clamp(28px, 5vw, 38px)))';
 
   return (
   <div

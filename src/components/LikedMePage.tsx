@@ -1436,7 +1436,8 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               currentSlide={currentSlide}
               showAbout={showAbout}
               expanded={showMoreInfo}
-              onToggle={() => setShowMoreInfo((v) => !v)}
+              togglePlacement="corner"
+            onToggle={() => setShowMoreInfo((v) => !v)}
             />
           </div>
 

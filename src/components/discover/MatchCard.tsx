@@ -358,7 +358,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
                   of DiscoverTopBar duplicating report's own logic. */}
               {isActiveTab && slides[currentSlide]?.type === 'image' && createPortal(
                 <div
-                  className="dl-under-popup fixed right-3 z-[9999]"
+                  key={match.id}
+                  className="dl-under-popup dl-card-fade fixed right-3 z-[9999]"
                   style={{
                     top: 'calc(var(--app-header-height, 72px) + 8px)'
                   }}
@@ -400,7 +401,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
               Centred just below DiscoverTopBar's row. */}
           {isActiveTab && slides && slides.length > 1 && createPortal(
             <div
-              className="dl-under-popup fixed z-[9999] flex justify-center"
+              key={match.id}
+              className="dl-under-popup dl-card-fade fixed z-[9999] flex justify-center"
               style={{
                 left: 0,
                 right: 0,
@@ -418,6 +420,8 @@ const MatchCard: React.FC<MatchCardProps> = ({
           {/* Name / location / highlights caption + expand control (shared with Liked Me
               and the preview, so all three show the same header). */}
           <ProfileCaption
+            key={match.id}
+            animateIn
             name={`${toTitleCase(match.first_name)} ${toTitleCase(match.last_name)}`.trim()}
             age={calculateAge(match.date_of_birth)}
             online={isRecentlyOnline(match.last_login_at, SWIPE_ONLINE_WINDOW_MS)}

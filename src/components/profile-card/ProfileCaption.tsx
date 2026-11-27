@@ -30,6 +30,14 @@ export interface ProfileCaptionProps {
   showAbout: boolean;
   expanded: boolean;
   onToggle: () => void;
+  /**
+   * Where the expand button sits. 'above-undo' (Discover, Circle, profile preview - screens with the floating undo
+   * button) pins it just above that button; 'corner' (Liked Me, no undo button) pins it low in the corner.
+   * Either way it is fixed to the card, so it never moves with how much caption text there is.
+   */
+  togglePlacement?: 'above-undo' | 'corner';
+  /** Ease the caption in when it mounts (Discover keys it per profile so every new card animates in). */
+  animateIn?: boolean;
 }
 
 /**
@@ -55,6 +63,8 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
   showAbout,
   expanded,
   onToggle,
+  togglePlacement = 'above-undo',
+  animateIn = false,
 }) => {
   const { t } = useTranslation();
 
@@ -68,14 +78,14 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
 
   return (
     <div
-      className={`dl-caption-pad absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}`}
+      className={`dl-caption-pad absolute inset-x-0 bottom-0 z-20 px-4 pt-16 ${expanded ? 'pb-2' : 'pb-5'}${animateIn ? ' dl-card-enter' : ''}`}
       style={{
         background:
           'linear-gradient(to bottom, rgba(0,0,0,0) 30%, rgba(0,0,0,0.6) 45%, rgba(0,0,0,0.85) 58%, rgba(0,0,0,0.92) 70%)',
       }}
     >
       <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 pr-11">
           <div className="mb-1 flex items-center gap-2 leading-tight">
             <h2 dir="auto" className="min-w-0 break-words text-[clamp(15px,4.4vw,18px)] font-bold text-white">
               {name}
@@ -163,8 +173,9 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
               ? t('discover.matchCard.hideDetails', 'Hide details')
               : t('discover.matchCard.showDetails', 'Show details')
           }
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full dl-focus"
-          style={{ margin: '-13px -7px -7px 0' }}
+          className="dl-expand-btn absolute z-10 flex h-11 w-11 items-center justify-center rounded-full dl-focus"
+          data-placement={togglePlacement}
+          data-expanded={expanded ? 'true' : 'false'}
         >
           <span
             className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-white backdrop-blur-md transition-colors duration-200"
