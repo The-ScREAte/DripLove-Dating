@@ -62,6 +62,31 @@
   0% { opacity: 0.06; }
   100% { opacity: 0.11; }
 }
+/* Small icons floating behind the text, each on its own slow loop. transform + opacity only (composited, no
+   layout/paint per frame); at most 6 per card; everything pauses while a card is being dragged/thrown and on the
+   card underneath, so swiping stays at full frame rate. */
+.decor { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.decorItem {
+  position: absolute;
+  color: #fff;
+  opacity: var(--op, 0.15);
+  animation: decorDrift var(--dur, 10s) ease-in-out var(--delay, 0s) infinite alternate, decorTwinkle calc(var(--dur, 10s) * 0.6) ease-in-out var(--delay, 0s) infinite alternate;
+  will-change: transform, opacity;
+}
+.decorItem svg { width: 100%; height: 100%; stroke-width: 1.5; }
+@keyframes decorDrift {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(0.92); }
+  100% { transform: translate3d(var(--dx, 12px), var(--dy, -16px), 0) rotate(var(--rot, 18deg)) scale(1.08); }
+}
+@keyframes decorTwinkle {
+  0% { opacity: calc(var(--op, 0.15) * 0.55); }
+  100% { opacity: calc(var(--op, 0.15) * 1.25); }
+}
+:global(html[data-dl-swiping]) .watermark,
+:global(html[data-dl-swiping]) .decorItem,
+:global([data-next-card-preview]) .watermark,
+:global([data-next-card-preview]) .decorItem { animation-play-state: paused; }
+
 /* the corner glow breathes with it */
 .shell::before { animation: glowBreathe 7s ease-in-out infinite alternate; }
 @keyframes glowBreathe {
@@ -69,9 +94,10 @@
   100% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .watermark, .shell::before { animation: none; }
+  .watermark, .shell::before, .decorItem { animation: none; }
 }
 :global([data-motion='reduced']) .watermark,
+:global([data-motion='reduced']) .decorItem,
 :global([data-motion='reduced']) .shell::before { animation: none; }
 .watermark svg {
   width: 100%;
@@ -447,12 +473,6 @@
 
 /* Break the ice card: a script headline (like the app slogan) and two faint hearts */
 .romance { font-family: 'Caveat', cursive; font-weight: 700; font-size: clamp(46px, 13vw, 62px); line-height: 1.02; letter-spacing: 0; }
-.shell[data-card-kind='starter'] { overflow: hidden; }
-.shell[data-card-kind='starter']::before,
-.shell[data-card-kind='starter']::after { content: '\2665'; position: absolute; pointer-events: none; z-index: 0; }
-.shell[data-card-kind='starter']::before { top: 12%; right: 8%; font-size: 84px; color: rgba(255, 255, 255, 0.09); transform: rotate(14deg); }
-.shell[data-card-kind='starter']::after { bottom: 22%; left: 4%; font-size: 120px; color: rgba(255, 255, 255, 0.06); transform: rotate(-12deg); }
-
 /* "New here" card: calm and compact - small wave, one title, one line of copy, one quiet meta line */
 .badgeSm { width: clamp(52px, 8vh, 68px); height: clamp(52px, 8vh, 68px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
 .badgeSm.badgeEmoji { font-size: clamp(24px, 4vh, 32px); }

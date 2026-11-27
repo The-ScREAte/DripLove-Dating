@@ -112,6 +112,13 @@ function lockStampEl(on: HTMLElement | null | undefined, off: HTMLElement | null
   on.style.transform = `scale(1.3) rotate(${dir === 'right' ? 8 : -8}deg)`;
 }
 
+/** Marks the page as mid-swipe so decorative loops (card background icons) pause and cannot cost frames. */
+function setSwiping(on: boolean) {
+  if (typeof document === 'undefined') return;
+  if (on) document.documentElement.setAttribute('data-dl-swiping', '');
+  else document.documentElement.removeAttribute('data-dl-swiping');
+}
+
 function prefersReducedMotion(): boolean {
   if (typeof document === 'undefined') return false;
   if (document.documentElement.dataset.motion === 'reduced') return true;
@@ -203,6 +210,7 @@ export function useCardSwipe(options: Options) {
     const card = opts.current.cardRef.current;
     if (card) card.style.transition = 'none';
     dragging.current = true;
+    setSwiping(true);
     lastPushed.current = { dir: null, dist: 0 };
     opts.current.onUiChange({ isDragging: true, swipeDirection: null, swipeDistance: 0 });
     return true;
@@ -246,6 +254,7 @@ export function useCardSwipe(options: Options) {
   };
 
   const resetStamps = useCallback(() => {
+    setSwiping(false);
     const o = opts.current;
     for (const el of [o.likeStampRef?.current, o.passStampRef?.current]) {
       if (el) el.style.transition = 'none';
@@ -444,6 +453,7 @@ export function useCardSwipe(options: Options) {
   useEffect(
     () => () => {
       cancelFrame();
+      setSwiping(false);
       if (exitTimer.current !== null) window.clearTimeout(exitTimer.current);
     },
     [],
