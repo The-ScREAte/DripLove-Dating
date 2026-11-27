@@ -1399,7 +1399,6 @@
     "halloween": "Happy Halloween",
     "thanksgiving": "Happy Thanksgiving",
     "christmas": "Merry Christmas",
-    "default": "Slide In & Fall Into Real Love",
     "newyearSub1": "Grateful for every person who made this year warmer.",
     "newyearSub2": "Thank you for your effort, your honesty and your hope.",
     "newyearSub3": "May this year bring someone who truly gets you.",
@@ -1421,7 +1420,8 @@
     "defaultSub1": "We’re glad you’re here.",
     "defaultSub2": "Real connections start with people like you.",
     "defaultSub3": "Every hello matters, and we’re with you.",
-    "footer": "We're here with you."
+    "footer": "We're here with you.",
+    "thanks": "Thank you"
   },
   "rating": {
     "title": "Love DripLove?",

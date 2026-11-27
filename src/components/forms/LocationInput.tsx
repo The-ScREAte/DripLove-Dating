@@ -310,7 +310,12 @@ const LocationInput = ({
       setSelectedCountryCode(result.countryCode);
       setIsCountryLocked(true);
       setDetectionMethod(result.method);
-      
+      // Keep the detected coordinates: typing a ZIP afterwards re-emits the location from this state, and without it
+      // the profile was saved with no coordinates (-> country-capital fallback, e.g. Washington DC for any US user).
+      if (typeof result.latitude === 'number' && typeof result.longitude === 'number') {
+        setCoordinates({ lat: result.latitude, lng: result.longitude });
+      }
+
       // If city was detected, auto-populate it (user can change it later)
       if (result.city) {
         setCityInput(result.city);

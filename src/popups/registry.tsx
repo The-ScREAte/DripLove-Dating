@@ -12,6 +12,8 @@ import { PaymentIssueDialog, type PaymentIssuePayload } from '@/components/premi
 import { isVerifyPromptEligible } from '@/utils/verifyPromptStorage';
 import IcebreakerToast, { type IcebreakerToastPayload } from '@/components/icebreaker/IcebreakerToast';
 import { getIcebreakerHandlers, openIcebreakerInbox } from '@/components/icebreaker/store';
+import FestiveGreeting from '@/components/FestiveGreeting';
+import { festivalDue, markFestivalSeen } from './festive';
 import type { PopupRecord } from './types';
 
 // Heavy content loads only when its popup is actually due.
@@ -191,6 +193,28 @@ registerPopup<StreakPayload>(
 registerPopup<StreakPayload>(
   { id: 'streak-tap', tier: 'transactional', userInitiated: true, ignoreDataReady: true, ttlMs: 60_000 },
   streakRenderer
+);
+
+// ---- Festive greeting (engagement) ----------------------------------------------------------
+// Only on the festival itself, once per person per festival; marked seen the moment it appears (so ignoring it never
+// brings it back later). See ./festive.ts.
+interface FestivePayload {
+  userId: string;
+  key: string;
+}
+registerPopup<FestivePayload>(
+  {
+    id: 'festive-greeting',
+    tier: 'engagement',
+    ignoreDataReady: true,
+    ttlMs: 20 * 60_000,
+    maxPerSession: 1,
+    eligible: (_env, payload) => !!payload && festivalDue(payload.userId) === payload.key,
+    onShown: (payload) => {
+      if (payload && !payload.key.startsWith('preview-')) markFestivalSeen(payload.userId, payload.key);
+    },
+  },
+  ({ close }) => <FestiveGreeting onClose={() => close('dismissed')} />
 );
 
 // ---- App update (engagement; native only) -----------------------------------------------

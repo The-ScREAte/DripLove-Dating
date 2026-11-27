@@ -14,7 +14,7 @@ import { openIcebreakerInbox } from '@/components/icebreaker/store';
 import { useIcebreakerInbox } from '@/services/icebreaker';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
 import { usePopupEnvSync, usePopupBusy, requestPopup, cancelPopup, closePopup, setPopupBusy } from '@/popups';
-import { useFreeTrialPopupRequests } from '@/popups/auto';
+import { useFreeTrialPopupRequests, useFestivePopupRequest } from '@/popups/auto';
 import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
 import { PUBLIC_PROFILE_COLUMNS } from '@/utils/profileColumns';
@@ -372,6 +372,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     closePopup('premium-upgrade');
   }, [activeTab]);
   useFreeTrialPopupRequests(userId);
+  useFestivePopupRequest(userId);
 
   // Daily streak: once per calendar day, from day 2 on (day 1 has nothing to celebrate yet).
   const streakToCelebrate = dailyStreak?.isNewDay && dailyStreak.currentStreak >= 2 ? dailyStreak.currentStreak : 0;

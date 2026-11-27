@@ -1,6 +1,6 @@
 /**
- * Which seasonal greeting (if any) the opening splash should show today. Pure + date-driven, so it changes by itself
- * every year: nothing to edit or release when a holiday comes round. Windows are inclusive, local time.
+ * Which festive greeting (if any) applies today. Pure + date-driven, so it changes by itself every year: nothing to edit
+ * or release when a holiday comes round. Windows are inclusive, local time. 'default' = an ordinary day (no greeting).
  */
 export type SeasonId = 'newyear' | 'valentine' | 'easter' | 'halloween' | 'thanksgiving' | 'christmas' | 'default';
 
@@ -76,6 +76,17 @@ export function seasonFor(date: Date = new Date()): Season {
   if (m === 10 && d >= t - 2 && d <= t + 1) return SEASONS.thanksgiving;
 
   return SEASONS.default;
+}
+
+/**
+ * One id per festival *occurrence* (e.g. 'christmas-2026'), or null on an ordinary day. Used to show each greeting once
+ * per person per festival. New Year spans Dec 30 - Jan 3 and belongs to the year it welcomes.
+ */
+export function festiveKey(date: Date = new Date()): string | null {
+  const season = seasonFor(date);
+  if (season.id === 'default') return null;
+  const y = date.getFullYear() + (season.id === 'newyear' && date.getMonth() === 11 ? 1 : 0);
+  return `${season.id}-${y}`;
 }
 
 /** The message for today: rotates daily through the season's lines, so it feels fresh without changing mid-day. */

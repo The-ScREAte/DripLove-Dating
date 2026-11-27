@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seasonFor, seasonMessage, easterSunday, thanksgivingDay } from '../seasons';
+import { seasonFor, seasonMessage, easterSunday, thanksgivingDay, festiveKey } from '../seasons';
 
 const on = (y: number, m: number, d: number) => seasonFor(new Date(y, m - 1, d, 12)).id;
 
@@ -47,5 +47,18 @@ describe('seasonMessage', () => {
     expect(seasonMessage(s, new Date(2026, 11, 25, 22))).toEqual(a);
     const seen = new Set([0, 1, 2].map((d) => seasonMessage(s, new Date(2026, 11, 25 + d, 12)).key));
     expect(seen.size).toBe(3);
+  });
+});
+
+describe('festiveKey', () => {
+  it('is null on an ordinary day and one stable id per festival occurrence', () => {
+    expect(festiveKey(new Date(2026, 5, 10))).toBeNull();
+    expect(festiveKey(new Date(2026, 11, 24))).toBe('christmas-2026');
+    expect(festiveKey(new Date(2026, 11, 26))).toBe('christmas-2026');
+    expect(festiveKey(new Date(2026, 10, 26))).toBe('thanksgiving-2026');
+  });
+  it('new year spanning two calendar years is one occurrence', () => {
+    expect(festiveKey(new Date(2026, 11, 31))).toBe('newyear-2027');
+    expect(festiveKey(new Date(2027, 0, 2))).toBe('newyear-2027');
   });
 });
