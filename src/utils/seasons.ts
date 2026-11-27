@@ -96,13 +96,17 @@ export function seasonMessage(season: Season, date: Date = new Date()): { key: s
   return { key: `season.${season.id}Sub${i + 1}`, text: season.subs[i] };
 }
 
-/** For previews/QA: `?season=newyear` in the URL or localStorage `dl_season` (ignored unless it is a known id). */
+/**
+ * For previews/QA only: `?season=newyear` shows that festival's greeting. Never active in a normal production build - it
+ * needs a dev build or a build made with VITE_SEASON_PREVIEW=1, so a shared link or a stale storage key can't trigger it.
+ */
 export function seasonOverride(): Season | null {
+  if (!(import.meta.env.DEV || import.meta.env.VITE_SEASON_PREVIEW === '1')) return null;
   try {
-    const q = new URLSearchParams(window.location.search).get('season') || localStorage.getItem('dl_season');
-    if (q && q in SEASONS) return SEASONS[q as SeasonId];
+    const q = new URLSearchParams(window.location.search).get('season');
+    if (q && Object.prototype.hasOwnProperty.call(SEASONS, q) && q !== 'default') return SEASONS[q as SeasonId];
   } catch {
-    /* storage/URL unavailable */
+    /* URL unavailable */
   }
   return null;
 }

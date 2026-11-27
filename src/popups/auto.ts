@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
-import { cancelPopup, requestPopup } from './instance';
+import { cancelPopup, popupStore, requestPopup } from './instance';
 import { festivalDue } from './festive';
 
 const RECHECK_MS = 5 * 60_000;
@@ -43,7 +43,9 @@ export const useFestivePopupRequest = (userId: string | undefined): void => {
     const ask = () => {
       const key = festivalDue(userId);
       if (key) requestPopup('festive-greeting', { userId, key }, { ttlMs: 20 * 60_000, delayMs: 2500 });
-      else cancelPopup('festive-greeting');
+      // Withdraw a queued request, but never close the greeting while the person is looking at it (it is marked
+      // seen the moment it appears, so returning from the background would otherwise make it vanish).
+      else if (!popupStore.isActive('festive-greeting')) cancelPopup('festive-greeting');
     };
     ask();
     const onVisible = () => {
