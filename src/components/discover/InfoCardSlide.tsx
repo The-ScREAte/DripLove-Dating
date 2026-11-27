@@ -123,18 +123,40 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
   const name = data.name || '';
 
   // Fit-to-space: dense cards on short phones scale down instead of colliding with the top bar / caption.
+  // Long text is handled in two steps so it never ends in a half-clipped line: first a modest shrink (down to 85%),
+  // then, if it still does not fit, the text is cut at a WHOLE line with an ellipsis and a small "read more" hint
+  // (the full text is in the details below the photo).
   const boxRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<HTMLDivElement>(null);
+  const [truncated, setTruncated] = useState(false);
   useLayoutEffect(() => {
     const box = boxRef.current;
     const el = fitRef.current;
     if (!box || !el) return undefined;
+    const MIN_TEXT_ZOOM = 0.85;
     const apply = () => {
       el.style.zoom = '';
+      const textEl = el.querySelector<HTMLElement>('[data-fit-text]');
+      textEl?.style.removeProperty('-webkit-line-clamp'); // back to the stylesheet's default clamp
       const cs = window.getComputedStyle(box);
       const avail = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-      const need = el.scrollHeight;
-      if (avail > 0 && need > avail) el.style.zoom = String(Math.max(0.68, avail / need));
+      if (avail <= 0) return;
+
+      let need = el.scrollHeight;
+      if (textEl && need * MIN_TEXT_ZOOM > avail) {
+        const tcs = window.getComputedStyle(textEl);
+        const lineH = parseFloat(tcs.lineHeight) || parseFloat(tcs.fontSize) * 1.4 || 24;
+        const shownLines = Math.max(1, Math.round(textEl.clientHeight / lineH));
+        for (let n = shownLines - 1; n >= 3; n -= 1) {
+          textEl.style.setProperty('-webkit-line-clamp', String(n));
+          need = el.scrollHeight;
+          if (need * MIN_TEXT_ZOOM <= avail) break;
+        }
+      }
+      // cut off by the line clamp (default or the one just applied)?
+      setTruncated(!!textEl && textEl.scrollHeight > textEl.clientHeight + 1);
+
+      if (need > avail) el.style.zoom = String(Math.max(0.68, avail / need));
     };
     apply();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(apply) : null;
@@ -187,8 +209,11 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       body = (
         <>
           <div className={styles.quoteMark} aria-hidden="true">“</div>
-          <p dir="auto" className={cx(styles.text, textSize((data.text || '').length))}>{data.text}</p>
-          <div dir="auto" className={styles.byline}>— {name}</div>
+          <p dir="auto" data-fit-text className={cx(styles.text, textSize((data.text || '').length))}>{data.text}</p>
+          <div dir="auto" className={styles.byline}>
+            — {name}
+            {truncated && <span className={styles.moreHint}> · {tr('cards.readMoreHint', 'tap ↓ to read more')}</span>}
+          </div>
           {aboutFacts.length > 0 && (
             <div className={styles.chips}>
               {aboutFacts.map((f, i) => (
@@ -209,7 +234,7 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       body = (
         <>
           <Eyebrow icon={PROMPT_ICON[pt] || Lightbulb}>{title}</Eyebrow>
-          <p dir="auto" className={cx(styles.text, textSize((data.text || '').length))}>{data.text}</p>
+          <p dir="auto" data-fit-text className={cx(styles.text, textSize((data.text || '').length))}>{data.text}</p>
         </>
       );
       break;

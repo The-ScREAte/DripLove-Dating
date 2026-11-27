@@ -81,6 +81,9 @@
   max-width: 560px;
   margin-inline: auto;
   min-height: 0;
+  /* never squeezed by the card: InfoCardSlide measures its natural height to decide how to fit it (a squeezed box hid
+     the overflow and left a half-clipped last line of text) */
+  flex-shrink: 0;
 }
 .center .fit {
   align-items: center;
@@ -128,6 +131,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 7;
   overflow: hidden;
+  flex-shrink: 0; /* a clamped text block keeps its whole lines - it must not be squeezed to a partial line */
 }
 .textXl {
   font-size: clamp(32px, 6vh, 54px);
@@ -153,6 +157,13 @@
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.86);
   font-weight: 500;
+}
+
+/* "tap down to read more" shown after the byline when the text had to be cut */
+.moreHint {
+  font-weight: 500;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 /* Giant decorative quote mark for the About card */
