@@ -4,6 +4,7 @@ import { getVibe, MAX_ARTISTS } from '@/constants/vibe';
 import type { User } from '@supabase/supabase-js';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchMyProfile } from '@/utils/myProfile';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePromoCodeEnabled } from '@/hooks/usePromoCodeEnabled';
@@ -232,13 +233,8 @@ const OnboardingWizard = ({
     if (mode !== 'complete' || !user) return;
     let cancelled = false;
     (async () => {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select(
-          'first_name, last_name, date_of_birth, gender, preference, relationship_intent, city, country, country_code, zip_code, latitude, longitude, is_custom_city, occupation, industry, education_level, adinkra_symbols, bio, interests, favorites',
-        )
-        .eq('id', user.id)
-        .maybeSingle();
+      // Own full row via get_my_profile (zip_code is not publicly readable).
+      const { data: profile } = await fetchMyProfile(user.id);
 
       // Name from OAuth metadata (Google and Apple).
       const fullName = (user.user_metadata?.full_name || user.user_metadata?.name || '') as string;

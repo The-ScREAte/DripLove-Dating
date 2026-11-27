@@ -152,7 +152,7 @@ const InfluencerManagement = () => {
       // canonical get_influencer_full_stats RPC the influencer portal itself
       // uses, so admin and influencer-facing numbers can never drift apart.
       const codesWithStats = await Promise.all((data || []).map(async (code) => {
-        const { data: stats, error: statsError } = await supabase.rpc('get_influencer_full_stats', {
+        const { data: stats, error: statsError } = await supabase.rpc('admin_get_influencer_full_stats', {
           p_promo_code_id: code.id,
         });
 
@@ -239,7 +239,7 @@ const InfluencerManagement = () => {
       const { data: existing } = await supabase
         .from('promo_codes')
         .select('id')
-        .ilike('code', formData.code.trim())
+        .ilike('code', formData.code.trim().replace(/[\\%_]/g, '\\$&'))
         .is('deleted_at', null)
         .maybeSingle();
 
@@ -456,8 +456,7 @@ const InfluencerManagement = () => {
             user_deleted_at,
             profiles (
               first_name,
-              last_name,
-              email
+              last_name
             )
           `)
           .eq('promo_code_id', promoCode.id)
@@ -474,7 +473,7 @@ const InfluencerManagement = () => {
           .order('created_at', { ascending: false }),
         // Authoritative totals - same RPC the influencer portal uses, so this
         // modal can never disagree with what the influencer sees.
-        supabase.rpc('get_influencer_full_stats', { p_promo_code_id: promoCode.id }),
+        supabase.rpc('admin_get_influencer_full_stats', { p_promo_code_id: promoCode.id }),
       ]);
 
       setDetailStats({
@@ -796,7 +795,7 @@ const InfluencerManagement = () => {
 
       {/* Create Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-md w-[calc(100%-3rem)] max-h-[80vh] overflow-y-auto px-5">
+        <DialogContent className="max-w-md w-[calc(100%-3rem)] max-h-[85dvh] overflow-y-auto px-5">
           <DialogHeader>
             <DialogTitle>Create New Promo Code</DialogTitle>
           </DialogHeader>
@@ -1053,7 +1052,7 @@ const InfluencerManagement = () => {
 
       {/* Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedPromoCode?.code} - {selectedPromoCode?.owner_name}

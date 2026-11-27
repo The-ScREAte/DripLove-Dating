@@ -1,3 +1,4 @@
+import { requireInternalCaller, getAuthedCaller } from '../_shared/caller-auth.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -203,6 +204,8 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const gate = await requireInternalCaller(req, corsHeaders, { allowUser: true }); if (gate) return gate;
+
   console.log('🔔 send-push-notification edge function called')
   
   try {
@@ -233,6 +236,35 @@ serve(async (req) => {
     // ORIGINAL notification as opened, which stops further reminders.
     const rawReminderOf = (data as Record<string, unknown>)?.reminderOf
     const reminderOf = typeof rawReminderOf === 'string' && rawReminderOf ? rawReminderOf : undefined
+
+    // A signed-in USER (not a server/cron caller, not an admin) may only push to themself (e.g. a match-expiry
+    // reminder) or send a chat-message push to someone they are matched with and have no block with.
+    // Server callers (service role / cron secret) have no user session and are unrestricted.
+    const userCaller = await getAuthedCaller(req, supabase)
+    if (userCaller && !userCaller.isAdmin && userId !== userCaller.id) {
+      let allowed = false
+      if (kind === 'message' && typeof userId === 'string' && String(rawSender ?? userCaller.id) === userCaller.id) {
+        const { data: m } = await supabase
+          .from('matches')
+          .select('id')
+          .or(`and(user1_id.eq.${userCaller.id},user2_id.eq.${userId}),and(user1_id.eq.${userId},user2_id.eq.${userCaller.id})`)
+          .limit(1)
+        if (m && m.length > 0) {
+          const { data: b } = await supabase
+            .from('blocks')
+            .select('blocker_id')
+            .or(`and(blocker_id.eq.${userCaller.id},blocked_id.eq.${userId}),and(blocker_id.eq.${userId},blocked_id.eq.${userCaller.id})`)
+            .limit(1)
+          allowed = !b || b.length === 0
+        }
+      }
+      if (!allowed) {
+        console.warn('🚫 send-push-notification: user', userCaller.id, 'is not allowed to notify', userId, 'kind', kind)
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403,
+        })
+      }
+    }
 
     console.log(`📤 Processing notification for user ${userId}:`, { title, body, type, category, kind })
 

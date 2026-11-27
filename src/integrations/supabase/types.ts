@@ -3000,6 +3000,10 @@ export type Database = {
         Args: { p_promo_code_id: string }
         Returns: Json
       }
+      admin_get_influencer_full_stats: {
+        Args: { p_promo_code_id: string }
+        Returns: Json
+      }
       get_influencer_lead_demographics: {
         Args: { p_code: string; p_password: string }
         Returns: Json

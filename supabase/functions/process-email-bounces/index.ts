@@ -1,3 +1,4 @@
+import { requireInternalCaller } from '../_shared/caller-auth.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { ImapFlow } from 'npm:imapflow@1.7.8';
@@ -30,6 +31,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+
+  const gate = await requireInternalCaller(req, corsHeaders, { allowAdmin: true }); if (gate) return gate;
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
   const json = (body: unknown, status = 200) =>

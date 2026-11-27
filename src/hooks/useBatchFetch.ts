@@ -1,4 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles, type AdminProfileFilters } from '@/utils/adminProfiles';
+
+/**
+ * Which of these users are premium. user_subscriptions is RLS-limited to the
+ * owner, so an admin's direct select sees nobody else's rows - this goes
+ * through the admin RPC (admin-only, security definer) instead.
+ */
+export async function fetchPremiumUserIds(userIds: string[]): Promise<Set<string>> {
+  const premium = new Set<string>();
+  const CHUNK = 500;
+  for (let i = 0; i < userIds.length; i += CHUNK) {
+    const { data, error } = await supabase.rpc('admin_get_premium_status_for_users', {
+      target_user_ids: userIds.slice(i, i + CHUNK),
+    });
+    if (error) throw error;
+    (Array.isArray(data) ? data : []).forEach((row: { user_id?: string; is_premium?: boolean }) => {
+      if (row?.user_id && row.is_premium) premium.add(row.user_id);
+    });
+  }
+  return premium;
+}
 
 /**
  * Batch fetch all rows from a table to bypass 1000 row limit
@@ -114,13 +135,7 @@ export async function applyDebugFilter(
     filteredProfiles = profiles.filter(p => p.account_status === 'active');
     console.log(`[DebugFilter] active: ${filteredProfiles.length} active accounts`);
   } else if (debugFilter === 'premium' || debugFilter === 'premium_users') {
-    // Fetch ALL active subscriptions using batch fetch
-    const allSubs = await fetchAllRows<{ user_id: string; status: string }>('user_subscriptions', 'user_id, status', [
-      { column: 'status', op: 'eq', value: 'active' }
-    ]);
-    allSubs.forEach(sub => {
-      if (sub.user_id) premiumUserIds.add(sub.user_id);
-    });
+    (await fetchPremiumUserIds(userIds)).forEach(id => premiumUserIds.add(id));
     // Keep only premium users
     filteredProfiles = profiles.filter(p => premiumUserIds.has(p.id));
     console.log(`[DebugFilter] premium: ${premiumUserIds.size} premium users found, ${filteredProfiles.length} in list`);
@@ -148,48 +163,27 @@ export async function fetchAllProfiles(
   
   for (let page = 0; ; page++) {
     const from = page * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
 
-    let query = supabase
-      .from('profiles')
-      .select('id, first_name, last_name, email, country, city, account_status, gender, preference, relationship_intent, is_archived, bio')
-      .in('country', countryArray)
-      .eq('is_admin', filters?.isAdmin ?? false);
+    const f: AdminProfileFilters = {
+      countries: countryArray,
+      is_admin: filters?.isAdmin ?? false,
+      // Safety: exclude deleted/suspended users
+      exclude_statuses: ['deleted', 'suspended'],
+    };
+    if (filters?.genderFilter && filters.genderFilter !== 'all') f.gender = filters.genderFilter;
+    if (filters?.preferenceFilter && filters.preferenceFilter !== 'all') f.preference = filters.preferenceFilter;
+    if (filters?.intentFilter && filters.intentFilter !== 'all') f.relationship_intent = filters.intentFilter;
+    f.account_status = filters?.statusFilter && filters.statusFilter !== 'all' ? filters.statusFilter : 'active';
+    if (filters?.archiveFilter === 'not_archived') f.archive = 'not_archived';
+    else if (filters?.archiveFilter === 'archived_only') f.archive = 'archived_only';
 
-    // Apply gender filter
-    if (filters?.genderFilter && filters.genderFilter !== 'all') {
-      query = query.eq('gender', filters.genderFilter);
-    }
-
-    // Apply preference filter
-    if (filters?.preferenceFilter && filters.preferenceFilter !== 'all') {
-      query = query.eq('preference', filters.preferenceFilter);
-    }
-
-    // Apply intent filter
-    if (filters?.intentFilter && filters.intentFilter !== 'all') {
-      query = query.eq('relationship_intent', filters.intentFilter);
-    }
-
-    // Apply status filter
-    if (filters?.statusFilter && filters.statusFilter !== 'all') {
-      query = query.eq('account_status', filters.statusFilter);
-    } else {
-      query = query.eq('account_status', 'active');
-    }
-
-    // Apply archive filter
-    if (filters?.archiveFilter === 'not_archived') {
-      query = query.or('is_archived.is.null,is_archived.eq.false');
-    } else if (filters?.archiveFilter === 'archived_only') {
-      query = query.eq('is_archived', true);
-    }
-
-    // Safety: exclude deleted/suspended users
-    query = query.neq('account_status', 'deleted')
-                 .neq('account_status', 'suspended');
-
-    const { data: pageRows, error } = await query.order('id').range(from, to);
+    // Admin-only RPC (needs email); falls back to a direct query until the lockdown migration exists.
+    const { data: pageRows, error } = await adminGetProfiles<any>({
+      filters: f,
+      limit: PAGE_SIZE,
+      offset: from,
+      fallbackColumns: 'id, first_name, last_name, email, country, city, account_status, gender, preference, relationship_intent, is_archived, bio',
+    });
 
     if (error) throw error;
     if (!pageRows || pageRows.length === 0) break;

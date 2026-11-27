@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { registerPopup, requestPopup } from './instance';
+import { registerPopup } from './instance';
 import type { PopupRenderArgs } from './instance';
 import MatchAnimation from '@/components/MatchAnimation';
 import VerifyIdentityPrompt from '@/components/VerifyIdentityPrompt';

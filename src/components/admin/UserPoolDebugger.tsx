@@ -135,19 +135,19 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
       ] = await Promise.all([
         supabase
           .from('profiles')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .neq('id', currentUserId)
           .eq('is_admin', false),
         supabase
           .from('profiles')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .neq('id', currentUserId)
           .eq('account_status', 'active')
           .eq('is_admin', false)
           .eq('is_archived', false),
         supabase
           .from('profiles')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .neq('id', currentUserId)
           .eq('is_archived', true)
           .eq('is_admin', false),
@@ -263,7 +263,8 @@ const UserPoolDebugger: React.FC<Props> = ({ currentUserId, userPreferences, onV
         { count: recentLikeCount }
       ] = await Promise.all([
         supabase.from('push_tokens').select('*', { count: 'exact', head: true }),
-        supabase.from('user_subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+        // RLS hides other users' subscriptions from a direct count; the admin stats RPC is authoritative.
+        supabase.rpc('get_admin_stats').then(({ data }) => ({ count: Number((data as { premium_users?: number } | null)?.premium_users) || 0 })),
         supabase.from('scheduled_broadcasts').select('*', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('payout_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('matches').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),

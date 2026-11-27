@@ -14,6 +14,8 @@
  * - Cache-first strategy: Instant display from cache, then background refresh
  */
 
+import { fetchBlockRows } from '@/utils/blockCounterparts';
+import { boundingBoxDegrees } from '@/utils/geoBox';
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -72,7 +74,7 @@ import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar
 import DiscoverFiltersModal from './discover/DiscoverFiltersModal';
 import { hasSignCompatibility } from '@/utils/signCompatibility';
 import { useFreeTrialOffer } from '@/hooks/useFreeTrialOffer';
-import { recordRatingMoment, recordRatingNegative } from '@/rating/ratingMoments';
+import { recordRatingNegative } from '@/rating/ratingMoments';
 import { requestPopup, openPremiumUpgrade, closePopup, popupTimesShown, useIsPopupActive, usePopupBusy } from '@/popups';
 import { CurrentUser, PotentialMatch } from '@/types';
 import { publishSwipeDecision } from '@/utils/swipeSync';
@@ -92,8 +94,10 @@ const SWIPES_BEFORE_VERIFY_PROMPT = 1;
 // five different places in this file, which is exactly how they drift out
 // of sync with each other and with the server.
 const FREE_DAILY_SWIPE_LIMIT = 50;
-const PREMIUM_DAILY_SWIPE_LIMIT = 200;
-// Free undos per day: must match update_user_usage's 'reverse_dislike' limit (2).
+// Premium is unlimited (server: update_user_usage limit -1; llms.txt FAQ). This used to be 200, which
+// locked heavy premium swipers out client-side.
+const PREMIUM_DAILY_SWIPE_LIMIT = Number.POSITIVE_INFINITY;
+// Free undos per day: must match update_user_usage's 'reverse_dislike' limit (live DB is still 1 until the pending 20261128000000 migration is applied).
 const FREE_DAILY_UNDO_LIMIT = 2;
 // With this many real cards left, a refill runs on every swipe (see moveToNext).
 const URGENT_REFILL_AT = 5;
@@ -1365,10 +1369,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           user2:profiles!matches_user2_id_fkey(id)
         `)
         .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-      supabase
-        .from('blocks')
-        .select('blocked_id, blocker_id')
-        .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
+      fetchBlockRows(userId),
       supabase
         .from('passes')
         .select('passed_id, passed_at')
@@ -1520,7 +1521,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             const viewerLat = currentUserData?.latitude;
             const viewerLon = currentUserData?.longitude;
             const hasCoords = Number.isFinite(Number(viewerLat)) && Number.isFinite(Number(viewerLon)) && !!viewerLat && !!viewerLon;
-            const radiusInDegrees = hasCoords ? safeUserMaxDistance / 111.32 : null;
+            const radiusInDegrees = hasCoords ? boundingBoxDegrees(safeUserMaxDistance, Number(viewerLat), Number(viewerLon)) : null;
 
             // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
             // indexed column reshuffled once nightly via pg_cron, not a
@@ -1681,7 +1682,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
         // Apply bounding box distance filter if user has coordinates
         const userLat = currentUserData?.latitude;
         const userLon = currentUserData?.longitude;
-        const radiusInDegrees = (userLat && userLon) ? safeUserMaxDistance / 111.32 : null;
+        const radiusInDegrees = (userLat && userLon) ? boundingBoxDegrees(safeUserMaxDistance, Number(userLat), Number(userLon)) : null;
 
         // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
         // indexed column reshuffled once nightly via pg_cron, not a fresh
@@ -1769,7 +1770,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // (it would wrongly exclude the unlocked countries' candidates); those
       // are distance-filtered client-side for home-country rows only, below.
       const archivedRadiusInDegrees = (baseCountryCode && userLat && userLon && !hasUnlockedCountries)
-        ? safeUserMaxDistance / 111.32
+        ? boundingBoxDegrees(safeUserMaxDistance, Number(userLat), Number(userLon))
         : null;
 
       // A small, bounded fetch is enough for a ≤10% mix-in; only the
@@ -1990,7 +1991,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       // more profiles" despite a large archived pool existing in those
       // countries.
       const archivedRetryRadiusInDegrees = (!premiumForFeed && baseCountryCode && userLat && userLon)
-        ? safeUserMaxDistance / 111.32
+        ? boundingBoxDegrees(safeUserMaxDistance, Number(userLat), Number(userLon))
         : null;
 
       // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,
@@ -2977,7 +2978,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             .single(),
           fetchAllRows<{ liked_id: string }>(() => supabase.from('likes').select('liked_id').eq('liker_id', userId)),
           supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-          supabase.from('blocks').select('blocked_id,blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
+          fetchBlockRows(userId),
           supabase
             .from('passes')
             .select('passed_id,passed_at')
@@ -3061,7 +3062,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             // client-side, home-country rows only, below.
             const hasUnlockedInRecovery = premiumActive && recoveryCountryCodes.length > 1;
             const recoveryRadiusInDegrees = (!hasUnlockedInRecovery && currentUserData.latitude && currentUserData.longitude)
-              ? maxDistance / 111.32
+              ? boundingBoxDegrees(maxDistance, Number(currentUserData.latitude), Number(currentUserData.longitude))
               : null;
 
             // ⭐ FAIRNESS: server-side ORDER BY feed_random_weight (a stable,

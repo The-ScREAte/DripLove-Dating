@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { defaultPaymentMethods, PaymentMethod } from '@/constants/paymentConfig';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles, type AdminProfileFilters } from '@/utils/adminProfiles';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import UserProfileModal from '@/components/UserProfileModal';
 import AdminErrorBoundary from './admin/AdminErrorBoundary';
@@ -373,7 +374,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       )}
       {showPaymentConfig && !loadingConfig && (
         <div className="admin-keyboard-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="admin-keyboard-modal bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto border-2 border-yellow-300">
+          <div className="admin-keyboard-modal bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[90dvh] overflow-y-auto border-2 border-yellow-300">
             <button
               onClick={() => setShowPaymentConfig(false)}
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold transition-colors"
@@ -638,7 +639,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       const { data: chats } = await supabase.from('chats').select('id, message, sender_id, match_id, created_at').in('id', messageIds || []);
 
       // Fetch profiles for reporter and reported users
-      const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds || []);
+      const { data: profiles } = await adminGetProfiles({ ids: userIds || [], fallbackColumns: 'id, first_name, last_name, email' });
 
       const chatRows = (chats || []) as ChatMessageSummary[];
       const profileRows = (profiles || []) as MinimalProfile[];
@@ -875,51 +876,22 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       let hasMore = true;
 
       while (hasMore) {
-        let query = supabase
-          .from('profiles')
-          .select(`
-            id, 
-            first_name, 
-            last_name, 
-            email, 
-            account_status, 
-            created_at, 
-            city, 
-            country, 
-            date_of_birth, 
-            is_admin, 
-            gender, 
-            preference, 
-            relationship_intent,
-            last_login_at,
-            login_count,
-            is_archived
-          `)
-          .eq('is_admin', false)
-          .order('created_at', { ascending: false })
-          .range(offset, offset + BATCH_SIZE - 1);
+        const batchFilters: AdminProfileFilters = { is_admin: false };
+        if (statusFilter !== 'all') batchFilters.account_status = statusFilter;
+        if (genderFilter !== 'all') batchFilters.gender = genderFilter;
+        if (interestedInFilter !== 'all') batchFilters.preference = interestedInFilter;
+        if (countryFilter !== 'all') batchFilters.countries = [countryFilter];
+        if (relationshipIntentFilter !== 'all') batchFilters.relationship_intent = relationshipIntentFilter;
 
-        if (statusFilter !== 'all') {
-          query = query.eq('account_status', statusFilter);
-        }
-        
-        if (genderFilter !== 'all') {
-          query = query.eq('gender', genderFilter);
-        }
-        
-        if (interestedInFilter !== 'all') {
-          query = query.eq('preference', interestedInFilter);
-        }
-        
-        if (countryFilter !== 'all') {
-          query = query.eq('country', countryFilter);
-        }
-        
-        if (relationshipIntentFilter !== 'all') {
-          query = query.eq('relationship_intent', relationshipIntentFilter);
-        }
-
-        const { data: batchData, error } = await query;
+        // Full rows (incl. email) come from the admin-only RPC; falls back to a direct query pre-lockdown.
+        const { data: batchData, error } = await adminGetProfiles<RawUserProfile>({
+          filters: batchFilters,
+          limit: BATCH_SIZE,
+          offset,
+          newestFirst: true,
+          fallbackColumns:
+            'id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent, last_login_at, login_count, is_archived',
+        });
 
         if (error) throw error;
 
@@ -985,11 +957,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
       // This ensures all users are loaded and filters work dynamically
 
       // Fetch admin users separately
-      const { data: adminData } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent')
-        .eq('is_admin', true)
-        .order('created_at', { ascending: false });
+      const { data: adminData } = await adminGetProfiles<any>({
+        filters: { is_admin: true },
+        newestFirst: true,
+        fallbackColumns: 'id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent',
+      });
 
       const adminsWithAge = adminData?.map(user => ({
         ...user,
@@ -1066,7 +1038,9 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
         ...row,
         age: calculateAge(row.date_of_birth),
       })));
-      setTableTotalCount(rows[0]?.total_count ?? 0);
+      setTableTotalCount(Number(rows[0]?.total_count) || 0);
+      // The page ran past the end (e.g. the last row on it was just deleted).
+      if (rows.length === 0 && currentPage > 1) setCurrentPage(1);
     } catch (error) {
       console.error('Error fetching users page:', error);
       const missingDebugSupport = (error as ErrorLike)?.message?.includes('admin_search_users_page');
@@ -1090,11 +1064,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // of rows (is_admin = true).
   const fetchAdminUsersList = useCallback(async () => {
     try {
-      const { data: adminData, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent')
-        .eq('is_admin', true)
-        .order('created_at', { ascending: false });
+      const { data: adminData, error } = await adminGetProfiles<any>({
+        filters: { is_admin: true },
+        newestFirst: true,
+        fallbackColumns: 'id, first_name, last_name, email, account_status, created_at, city, country, date_of_birth, is_admin, gender, preference, relationship_intent',
+      });
 
       if (error) throw error;
 
@@ -1222,11 +1196,11 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
   // Face record first (AWS Rekognition), then the account and all its data.
   const deleteUserAndData = async (userId: string) => {
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('face_descriptor')
-        .eq('id', userId)
-        .single();
+      const { data: profileRows } = await adminGetProfiles<{ face_descriptor?: string | null }>({
+        ids: [userId],
+        fallbackColumns: 'face_descriptor',
+      });
+      const profile = profileRows?.[0] ?? null;
 
       if (profile?.face_descriptor) {
         await supabase.functions.invoke('face-verify', {

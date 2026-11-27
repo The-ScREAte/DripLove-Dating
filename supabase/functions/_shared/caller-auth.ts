@@ -97,3 +97,32 @@ export async function isCronAuthorized(
   }
   return false
 }
+
+/**
+ * Gate for internal worker endpoints (verify_jwt = false, or reachable with the
+ * public anon key). Returns null when the caller is allowed, else a 401/403
+ * Response. Allowed: service-role Bearer, `x-cron-secret` equal to
+ * internal_secrets['worker_cron_secret'], the legacy anon-key cron call
+ * (until ALLOW_LEGACY_ANON_CRON=false), and - when requested - a logged-in
+ * admin (`allowAdmin`) or any logged-in user (`allowUser`).
+ */
+export async function requireInternalCaller(
+  req: Request,
+  corsHeaders: Record<string, string>,
+  opts: { allowAdmin?: boolean; allowUser?: boolean } = {},
+): Promise<Response | null> {
+  const deny = (status: number, msg: string) =>
+    new Response(JSON.stringify({ error: msg }), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return deny(500, 'Server misconfigured')
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  if (await isCronAuthorized(req, admin, 'worker_cron_secret')) return null
+  if (opts.allowAdmin || opts.allowUser) {
+    const caller = await getAuthedCaller(req, admin)
+    if (caller && (opts.allowUser || caller.isAdmin)) return null
+    if (caller) return deny(403, 'Forbidden')
+  }
+  return deny(401, 'Unauthorized')
+}

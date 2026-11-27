@@ -7,6 +7,7 @@
 // before the user has ever opened either tab, so by the time they tap in
 // it's already there. Circle never had an equivalent, so it was the one tab
 // that always started from a blank loading spinner.
+import { fetchBlockRows } from '@/utils/blockCounterparts';
 import { supabase } from '@/integrations/supabase/client';
 import { CurrentUser } from '@/types';
 import { calculateAge } from '@/utils/dateUtils';
@@ -14,6 +15,7 @@ import { normalizeCountryCode } from '@/utils/countryCode';
 import { matchesReciprocalPreference, normalizeCountryCodeList } from '@/components/discover/discoverFeedUtils';
 import { parseFavorites } from '@/constants/favorites';
 import { calculateDistance } from '@/constants/locationData';
+import { boundingBoxDegrees } from '@/utils/geoBox';
 
 // Mirrors DiscoverPage.tsx's own distance-cap constants exactly, so Circle's
 // notion of "how far is too far" never drifts from Discover's - free users
@@ -25,7 +27,6 @@ const PREMIUM_USER_MAX_DISTANCE_KM = 5000;
 // to turn a straight-line distance cap into the RPC's lat/lon bounding box,
 // which is then narrowed to a true circle by the client-side calculateDistance
 // check below (a bounding box is a rough pre-filter, not the real answer).
-const KM_PER_DEGREE_LATITUDE = 111.32;
 
 // How long a cached window.circleCache snapshot is trusted before a fresh
 // fetch replaces it - shared by CirclePage's own read and MainApp's
@@ -118,7 +119,7 @@ export const getCircleDistanceParams = (currentUser: CurrentUser, isPremium?: bo
     isPremium ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
   );
   const hasCoords = typeof userLat === 'number' && typeof userLon === 'number';
-  const radiusDegrees = hasCoords ? maxDistanceKm / KM_PER_DEGREE_LATITUDE : null;
+  const radiusDegrees = hasCoords ? boundingBoxDegrees(maxDistanceKm, userLat as number, userLon as number) : null;
   return { userLat, userLon, hasCoords, maxDistanceKm, radiusDegrees };
 };
 
@@ -200,7 +201,7 @@ export const fetchCircleExclusionIds = async (userId: string): Promise<Set<strin
   const [likesRes, matchesRes, blocksRes, passesRes, cooldownsRes] = await Promise.all([
     supabase.from('likes').select('liked_id').eq('liker_id', userId),
     supabase.from('matches').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-    supabase.from('blocks').select('blocked_id,blocker_id').or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
+    fetchBlockRows(userId),
     supabase.from('passes').select('passed_id').eq('passer_id', userId).gte('passed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     supabase.from('match_cooldowns').select('user1_id,user2_id').or(`user1_id.eq.${userId},user2_id.eq.${userId}`).gt('expires_at', new Date().toISOString()),
   ]);

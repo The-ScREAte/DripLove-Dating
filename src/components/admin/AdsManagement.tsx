@@ -874,7 +874,7 @@ const AdsManagement = () => {
           match (colors, spacing, feathering, everything) rather than
           something that can quietly drift out of sync with the real card. */}
       <Dialog open={!!previewAd} onOpenChange={() => setPreviewAd(null)}>
-        <DialogContent className="max-w-sm h-[80vh] p-0 bg-black border border-pink-500/30 overflow-hidden">
+        <DialogContent className="max-w-sm h-[80dvh] p-0 bg-black border border-pink-500/30 overflow-hidden">
           <DialogHeader className="p-4 pb-0">
             <DialogTitle className="text-white">Ad Preview</DialogTitle>
           </DialogHeader>

@@ -62,20 +62,64 @@ if (firebaseReady) {
   console.warn('⚠️ Firebase Admin not initialized (service account missing)');
 }
 
+const crypto = require('crypto');
 const app = express();
-app.use(express.json());
-app.use((req, res, next) => {
-  const allowedOrigin = process.env.EMAIL_ALLOWED_ORIGIN || '*';
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-email-api-key');
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '1mb' }));
 
+// Security headers (this server only serves JSON APIs).
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
+// CORS: only the configured origins (comma separated EMAIL_ALLOWED_ORIGIN).
+// These endpoints are server-to-server (API key), so no wildcard.
+const allowedOrigins = (process.env.EMAIL_ALLOWED_ORIGIN || '')
+  .split(',').map((o) => o.trim()).filter((o) => o && o !== '*');
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-email-api-key');
+  }
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
-
   next();
 });
+
+// Minimal in-memory rate limiter (per IP): 60 requests / minute.
+const hits = new Map();
+setInterval(() => hits.clear(), 60 * 1000).unref();
+app.use((req, res, next) => {
+  const ip = req.ip || 'unknown';
+  const n = (hits.get(ip) || 0) + 1;
+  hits.set(ip, n);
+  if (n > 60) return res.status(429).json({ error: 'Too many requests' });
+  next();
+});
+
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
+}
+// Internal endpoints require x-api-key equal to INTERNAL_API_KEY (disabled when unset).
+function requireInternalKey(req, res, next) {
+  const key = process.env.INTERNAL_API_KEY;
+  if (!key) return res.status(503).json({ error: 'Endpoint disabled' });
+  if (!safeEqual(req.header('x-api-key'), key)) return res.status(401).json({ error: 'Unauthorized' });
+  next();
+}
 
 app.use('/api/email', emailRoutes);
 
@@ -83,9 +127,9 @@ const APPLE_PRODUCTION_URL = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
 
 // POST /verify-apple-receipt
-app.post('/verify-apple-receipt', async (req, res) => {
-  const { receiptData } = req.body;
-  if (!receiptData) {
+app.post('/verify-apple-receipt', requireInternalKey, async (req, res) => {
+  const { receiptData } = req.body || {};
+  if (!receiptData || typeof receiptData !== 'string' || receiptData.length > 2000000) {
     return res.status(400).json({ error: 'Missing receiptData' });
   }
 
@@ -110,7 +154,7 @@ app.post('/verify-apple-receipt', async (req, res) => {
 });
 
 // GET /firebase-test - Test Firebase connection
-app.get('/firebase-test', async (req, res) => {
+app.get('/firebase-test', requireInternalKey, async (req, res) => {
   if (!firebaseReady) {
     return res.status(503).json({
       success: false,
@@ -136,7 +180,7 @@ app.get('/firebase-test', async (req, res) => {
   } catch (error) {
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: 'Firebase check failed'
     });
   }
 });

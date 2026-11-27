@@ -9,7 +9,6 @@ import { preloadImageToBlob } from '@/utils/imageCache';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 // ⭐ ANDROID FIX: Use platform utils instead of synchronous Capacitor import
-import { getPlatformSync } from '@/utils/platformUtils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { chatCache, updateChatCacheForUser, isCacheValidForUser, cacheUserName, type CachedChat } from '@/cache/chatCache';
 // SafeAreaView removed — use plain divs with env(...) padding where necessary
@@ -31,6 +30,8 @@ import { useTranslation } from 'react-i18next';
 import { useChatKeyboardFix } from '@/hooks/useChatKeyboardFix';
 import { isRecentlyOnline, CHAT_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import { withTimeout } from '@/utils/withTimeout';
+import { fetchBlockRows } from '@/utils/blockCounterparts';
+import { blockCounterpartIdSet } from '@/utils/blockRows';
 
 import { uniqueTopic, acquireSharedChannel } from '@/utils/realtime';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -94,6 +95,9 @@ const isAutoDeletableDormantChat = (match: ChatMatch) => {
   const lastActivity = new Date(match.last_message_time).getTime();
   return Date.now() - lastActivity > (DORMANT_DAYS + DORMANT_DELETE_AFTER_DAYS_IN_EARLIER) * MS_PER_DAY;
 };
+
+// Mirrors the DB CHECK (chats_message_length_chk) - keep in sync with the migration.
+const MAX_CHAT_MESSAGE_LENGTH = 2000;
 
 // Global cache for chat matches - persists across component mounts
 const chatMatchesCache = new Map<string, { matches: ChatMatch[], timestamp: number }>();
@@ -1256,8 +1260,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         autoDeletingDormantMatchIdsRef.current.add(id);
       }
 
+      // A block (either direction) must also take the conversation out of the list; the block
+      // insert itself never deletes the match. Fails open (empty set) if the lookup errors.
+      const blockedPartnerIds = blockCounterpartIdSet((await fetchBlockRows(currentUser.id)).data, currentUser.id);
       const visibleMatches = processedMatches.filter(
         (m) => !autoDeletingDormantMatchIdsRef.current.has(m.id)
+          && !blockedPartnerIds.has(m.user1_id === currentUser.id ? m.user2_id : m.user1_id)
       );
 
       // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
@@ -1340,8 +1348,12 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         autoDeletingDormantMatchIdsRef.current.add(id);
       }
 
+      // A block (either direction) must also take the conversation out of the list; the block
+      // insert itself never deletes the match. Fails open (empty set) if the lookup errors.
+      const blockedPartnerIds = blockCounterpartIdSet((await fetchBlockRows(currentUser.id)).data, currentUser.id);
       const visibleMatches = processedMatches.filter(
         (m) => !autoDeletingDormantMatchIdsRef.current.has(m.id)
+          && !blockedPartnerIds.has(m.user1_id === currentUser.id ? m.user2_id : m.user1_id)
       );
 
       // Unread counts come from match-level counters (user1_unread_count/user2_unread_count).
@@ -1667,6 +1679,10 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
   const sendMessage = async (rawText: string) => {
     const messageText = rawText.trim();
     if (!messageText || !selectedMatch || isSending) return;
+    if (messageText.length > MAX_CHAT_MESSAGE_LENGTH) {
+      toast({ title: t('chat.cannotSend'), description: `Message is too long (max ${MAX_CHAT_MESSAGE_LENGTH} characters)`, variant: 'destructive' });
+      return;
+    }
 
     if (selectedMatch.partner?.is_admin) {
       toast({
@@ -1686,15 +1702,13 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
           ? selectedMatch.user2_id
           : selectedMatch.user1_id;
 
-        const { data: blockData, error: blockError } = await supabase
-          .from('blocks')
-          .select('id')
-          .or(`and(blocker_id.eq.${currentUser.id},blocked_id.eq.${partnerId}),and(blocker_id.eq.${partnerId},blocked_id.eq.${currentUser.id})`)
-          .limit(1);
+        // The plain blocks select only sees rows the caller created (RLS), so it never saw
+        // "they blocked me"; the RPC returns both directions. The DB also rejects the insert.
+        const { data: blockRows, error: blockError } = await fetchBlockRows(currentUser.id);
 
         if (blockError) throw blockError;
 
-        if (blockData && blockData.length > 0) {
+        if (blockCounterpartIdSet(blockRows, currentUser.id).has(partnerId)) {
           toast({
             title: t('chat.cannotSend'),
             description: 'Cannot send messages to this user',

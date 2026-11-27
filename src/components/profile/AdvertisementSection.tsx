@@ -1216,7 +1216,7 @@ const AdvertisementSection: React.FC<AdvertisementSectionProps> = ({ currentUser
       {/* Preview Modal - renders the real AdCard component for a guaranteed
           exact match with how it looks on Discover. */}
       <Dialog open={!!previewAd} onOpenChange={() => setPreviewAd(null)}>
-        <DialogContent className="max-w-sm h-[80vh] p-0 bg-black border border-pink-500/30 overflow-hidden">
+        <DialogContent className="max-w-sm h-[80dvh] p-0 bg-black border border-pink-500/30 overflow-hidden">
           <DialogHeader className="p-4 pb-0">
             <DialogTitle className="text-white">Ad Preview</DialogTitle>
           </DialogHeader>

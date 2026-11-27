@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export { applyCircleCountFilters } from '@/utils/circleCountFilters';
 export type { CategoryFilter } from '@/utils/circleCountFilters';
+import { fetchBlockRows } from '@/utils/blockCounterparts';
 import type { CategoryFilter } from '@/utils/circleCountFilters';
 import { applyCircleCountFilters } from '@/utils/circleCountFilters';
 
@@ -13,10 +14,7 @@ interface TotalsViewer {
 export const fetchViewerExclusions = async (viewerId: string): Promise<Set<string>> => {
   const excluded = new Set<string>([viewerId]);
   try {
-    const { data } = await supabase
-      .from('blocks')
-      .select('blocked_id,blocker_id')
-      .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`);
+    const { data } = await fetchBlockRows(viewerId);
     (data || []).forEach((b) => {
       if (b.blocked_id) excluded.add(b.blocked_id);
       if (b.blocker_id) excluded.add(b.blocker_id);

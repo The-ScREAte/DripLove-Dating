@@ -17,6 +17,8 @@ import { usePopupEnvSync, usePopupBusy, requestPopup, cancelPopup, closePopup, s
 import { useFreeTrialPopupRequests } from '@/popups/auto';
 import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
+import { PUBLIC_PROFILE_COLUMNS } from '@/utils/profileColumns';
+import { fetchMyProfile } from '@/utils/myProfile';
 import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -409,7 +411,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // just sit pending the whole time.
       const PROFILE_FETCH_TIMEOUT_MS = 10000;
       const { data, error } = await Promise.race([
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        fetchMyProfile(userId),
         new Promise<never>((_, reject) =>
           window.setTimeout(() => reject(new Error('Profile fetch timed out')), PROFILE_FETCH_TIMEOUT_MS)
         ),
@@ -921,7 +923,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       // 4. Fetch all profiles in one go
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PUBLIC_PROFILE_COLUMNS)
         .in('id', likerIds)
         .neq('is_admin', true);
 
@@ -1895,6 +1897,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // This actually narrows the bar itself, not just what's inside it.
               marginLeft: 'clamp(28px, 9vw, 46px)',
               marginRight: 'clamp(28px, 9vw, 46px)',
+              // On tablet/desktop keep the pill a sensible width, centered,
+              // instead of stretching with the viewport.
+              width: 'min(32rem, calc(100% - 2 * clamp(28px, 9vw, 46px)))',
+              alignSelf: 'center',
               // A large flat value, not a clamp tuned to roughly match the bar's
               // height - the browser automatically caps an oversized border-radius
               // at half the box's shorter side, so this always renders as a true

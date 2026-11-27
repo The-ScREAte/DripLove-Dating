@@ -264,7 +264,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] h-[650px] flex flex-col p-0 gap-0 bg-black border border-pink-500/50 overflow-hidden">
+      <DialogContent className="sm:max-w-[500px] h-[min(650px,90dvh)] flex flex-col p-0 gap-0 bg-black border border-pink-500/50 overflow-hidden">
         {/* Header */}
         <DialogHeader className="px-6 py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white rounded-t-lg shrink-0">
           <DialogDescription className="sr-only">

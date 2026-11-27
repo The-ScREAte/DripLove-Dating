@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles } from '@/utils/adminProfiles';
 import { useToast } from '@/components/ui/use-toast';
 import { getCountriesList } from '@/constants/locationData';
 import { Heart, Users, Search, X, Loader2, UserPlus, Filter, Undo2, Clock } from 'lucide-react';
@@ -194,14 +195,13 @@ const SmartLikeGiving: React.FC<Props> = ({ users, onLikesCreated }) => {
       const PAGE_SIZE = 1000;
       const receivers: UserProfile[] = [];
       for (let offset = 0; ; offset += PAGE_SIZE) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email, gender, country, country_code, city, last_login_at, created_at')
-          .eq('is_admin', false)
-          .neq('id', giverId)
-          .order('created_at', { ascending: false }) // Newest first to see more recent users
-          .order('id', { ascending: true }) // Stable paging when created_at ties
-          .range(offset, offset + PAGE_SIZE - 1);
+        const { data, error } = await adminGetProfiles<UserProfile>({
+          filters: { is_admin: false, exclude_id: giverId },
+          newestFirst: true, // Newest first to see more recent users; id tiebreak keeps paging stable
+          limit: PAGE_SIZE,
+          offset,
+          fallbackColumns: 'id, first_name, last_name, email, gender, country, country_code, city, last_login_at, created_at',
+        });
 
         if (error) throw error;
         receivers.push(...(data || []));

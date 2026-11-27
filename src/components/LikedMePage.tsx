@@ -10,6 +10,7 @@ import { Users, Heart, X, ArrowLeft, Crown, Lock } from 'lucide-react';
 import { getPlatformSync } from '@/utils/platformUtils';
 
 import { supabase } from '@/integrations/supabase/client';
+import { PUBLIC_PROFILE_COLUMNS } from '@/utils/profileColumns';
 import { uniqueTopic } from '@/utils/realtime';
 import { useToast } from '@/hooks/use-toast';
 import { requestPopup, openPremiumUpgrade } from '@/popups';
@@ -344,7 +345,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
     // list without stopping them from being liked back / matched elsewhere.
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
-      .select('*')
+      .select(PUBLIC_PROFILE_COLUMNS)
       .in('id', likerIds)
       .neq('is_admin', true);
 

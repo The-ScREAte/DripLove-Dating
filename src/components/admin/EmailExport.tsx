@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles, type AdminProfileFilters } from '@/utils/adminProfiles';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Copy, Check, Mail, Users, Globe, Filter, Download } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchAllRows, applyDebugFilter } from '@/hooks/useBatchFetch';
+import { fetchAllRows, applyDebugFilter, fetchPremiumUserIds } from '@/hooks/useBatchFetch';
 import { getCountryName } from '@/constants/locationData';
 
 interface Country {
@@ -120,52 +121,23 @@ export default function EmailExport() {
       let hasMore = true;
       
       while (hasMore) {
-        // Build the query for each batch
-        let query = supabase
-          .from('profiles')
-          .select('id, email, gender, preference, relationship_intent, account_status, country, is_archived, bio, city');
-
-        // Apply country filter
-        if (selectedCountries.size > 0) {
-          query = query.in('country', Array.from(selectedCountries));
-        }
-
-        // Apply gender filter
-        if (genderFilter !== 'all') {
-          query = query.eq('gender', genderFilter);
-        }
-
-        // Apply preference filter
-        if (preferenceFilter !== 'all') {
-          query = query.eq('preference', preferenceFilter);
-        }
-
-        // Apply intent filter
-        if (intentFilter !== 'all') {
-          query = query.eq('relationship_intent', intentFilter);
-        }
-
-        // Apply status filter
-        if (statusFilter !== 'all') {
-          query = query.eq('account_status', statusFilter);
-        }
-
-        // Apply archive filter
-        if (archiveFilter === 'not_archived') {
-          query = query.or('is_archived.is.null,is_archived.eq.false');
-        } else if (archiveFilter === 'archived_only') {
-          query = query.eq('is_archived', true);
-        }
+        // Admin-only RPC (needs email); falls back to a direct query until the lockdown migration exists.
+        const exportFilters: AdminProfileFilters = { exclude_statuses: ['deleted', 'suspended'] };
+        if (selectedCountries.size > 0) exportFilters.countries = Array.from(selectedCountries);
+        if (genderFilter !== 'all') exportFilters.gender = genderFilter;
+        if (preferenceFilter !== 'all') exportFilters.preference = preferenceFilter;
+        if (intentFilter !== 'all') exportFilters.relationship_intent = intentFilter;
+        if (statusFilter !== 'all') exportFilters.account_status = statusFilter;
+        if (archiveFilter === 'not_archived') exportFilters.archive = 'not_archived';
+        else if (archiveFilter === 'archived_only') exportFilters.archive = 'archived_only';
         // 'all' means no filter on archive status
 
-        // Safety: exclude deleted/suspended users (even if archived is checked)
-        query = query.neq('account_status', 'deleted')
-                     .neq('account_status', 'suspended');
-
-        // Add pagination
-        query = query.range(offset, offset + BATCH_SIZE - 1);
-
-        const { data: profiles, error: profileError } = await query;
+        const { data: profiles, error: profileError } = await adminGetProfiles<any>({
+          filters: exportFilters,
+          limit: BATCH_SIZE,
+          offset,
+          fallbackColumns: 'id, email, gender, preference, relationship_intent, account_status, country, is_archived, bio, city',
+        });
 
         if (profileError) throw profileError;
         
@@ -183,16 +155,8 @@ export default function EmailExport() {
 
       // Apply premium filter (requires joining with subscriptions)
       if (premiumFilter !== 'all') {
-        // Use batch fetch for all subscriptions
-        const allSubs = await fetchAllRows<{ user_id: string; status: string; expires_at: string }>('user_subscriptions', 'user_id, status, expires_at', [
-          { column: 'status', op: 'eq', value: 'active' }
-        ]);
-
-        const premiumUserIds = new Set(
-          allSubs
-            .filter(s => s.status === 'active' && new Date(s.expires_at || 0) > new Date())
-            .map(s => s.user_id)
-        );
+        // Admin RPC - user_subscriptions rows of other users are hidden by RLS.
+        const premiumUserIds = await fetchPremiumUserIds(filteredProfiles.map(p => p.id));
 
         if (premiumFilter === 'premium') {
           filteredProfiles = filteredProfiles.filter(p => premiumUserIds.has(p.id));

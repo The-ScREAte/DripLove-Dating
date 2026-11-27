@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': '*', // public GET redirect, no credentials
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 }
@@ -46,20 +46,19 @@ serve(async (req) => {
       ua.includes('driplove') ||
       (ua.includes('android') && originIsNative)
 
-    // Determine web redirect destination
-    let webRedirect: string
-    if (originParam && (originParam.includes('localhost') || originParam.includes('127.0.0.1'))) {
-      // Localhost: redirect back to localhost
-      webRedirect = `${originParam}/payment-success?${params}`
-    } else if (originParam && originParam.startsWith('http')) {
-      // Custom origin provided: use it
-      webRedirect = `${originParam}/payment-success?${params}`
-    } else {
-      // Default: production web
-      const webOriginRaw = Deno.env.get('APP_WEB_ORIGIN') || 'https://driplove.love'
-      const webOrigin = webOriginRaw.replace(/\/$/, '')
-      webRedirect = `${webOrigin}/payment-success?${params}`
-    }
+    // Determine web redirect destination. The `origin` query param is attacker
+    // controllable, so only allow our own web origins (or localhost for dev);
+    // anything else falls back to production (prevents an open redirect).
+    const webOriginRaw = Deno.env.get('APP_WEB_ORIGIN') || 'https://driplove.love'
+    const prodOrigin = webOriginRaw.replace(/\/$/, '')
+    const allowedOrigins = new Set([prodOrigin, 'https://driplove.love', 'https://www.driplove.love'])
+    let webOrigin = prodOrigin
+    try {
+      const o = new URL(originParam)
+      const isLocal = (o.hostname === 'localhost' || o.hostname === '127.0.0.1') && (o.protocol === 'http:' || o.protocol === 'https:')
+      if (allowedOrigins.has(o.origin) || isLocal) webOrigin = o.origin
+    } catch { /* invalid origin -> production */ }
+    const webRedirect = `${webOrigin}/payment-success?${params}`
 
     // For mobile app: redirect to deep link (it will open the app)
     // For web: redirect to appropriate web URL

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles } from '@/utils/adminProfiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Send, Users, Globe } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchAllRows, applyDebugFilter, fetchAllProfiles } from '@/hooks/useBatchFetch';
+import { fetchAllRows, applyDebugFilter, fetchAllProfiles, fetchPremiumUserIds } from '@/hooks/useBatchFetch';
 import RichTextEditor from './RichTextEditor';
 import { getEdgeFunctionErrorMessage } from '@/lib/edgeFunctionError';
 import { getCountryName } from '@/constants/locationData';
@@ -114,15 +115,12 @@ export default function EmailBroadcast({ cloneSeed }: EmailBroadcastProps = {}) 
       const allProfiles: { country: string | null; id: string; email: string | null }[] = [];
       for (let page = 0; ; page++) {
         const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
-        const { data: pageRows, error } = await supabase
-          .from('profiles')
-          .select('country, id, email')
-          .not('country', 'is', null)
-          .not('email', 'is', null)
-          .eq('is_admin', false)
-          .order('id')
-          .range(from, to);
+        const { data: pageRows, error } = await adminGetProfiles<{ country: string | null; id: string; email: string | null }>({
+          filters: { country_not_null: true, email_not_null: true, is_admin: false },
+          limit: PAGE_SIZE,
+          offset: from,
+          fallbackColumns: 'country, id, email',
+        });
 
         if (error) throw error;
         if (!pageRows || pageRows.length === 0) break;
@@ -177,15 +175,8 @@ export default function EmailBroadcast({ cloneSeed }: EmailBroadcastProps = {}) 
 
       // Apply premium/free filter if needed
       if (recipientFilter === 'premium' || recipientFilter === 'free') {
-        // Use batch fetch for all subscriptions
-        const allSubs = await fetchAllRows<{ user_id: string; status: string; expires_at: string }>('user_subscriptions', 'user_id, status, expires_at', [
-          { column: 'status', op: 'eq', value: 'active' }
-        ]);
-        
-        const premiumUserIds = new Set<string>();
-        allSubs
-          .filter(s => s.status === 'active' && new Date(s.expires_at || 0) > new Date())
-          .forEach(s => premiumUserIds.add(s.user_id));
+        // Admin RPC - user_subscriptions rows of other users are hidden by RLS.
+        const premiumUserIds = await fetchPremiumUserIds(filteredProfiles.map(p => p.id));
 
         if (recipientFilter === 'premium') {
           filteredProfiles = filteredProfiles.filter(p => premiumUserIds.has(p.id));
@@ -275,6 +266,15 @@ export default function EmailBroadcast({ cloneSeed }: EmailBroadcastProps = {}) 
       return;
     }
 
+    const recipientCount = users.filter(u => selectedUsers.has(u.id) && u.email).length;
+    if (
+      !confirm(
+        `Send "${emailSubject.trim()}" by email to ${recipientCount} ${recipientCount === 1 ? 'person' : 'people'} now? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
     setIsSending(true);
 
     try {
@@ -331,10 +331,9 @@ export default function EmailBroadcast({ cloneSeed }: EmailBroadcastProps = {}) 
       } else if (failedCount > 0) {
         toast({
           title: 'Emails Sent with Issues',
-          description: `Sent: ${sentCount}, Failed: ${failedCount}. Check console for details.`,
+          description: `Sent: ${sentCount}, Failed: ${failedCount}.`,
           duration: 5000,
         });
-        console.log('Failed emails:', results?.details?.failed);
       } else {
         toast({
           title: 'Emails Sent Successfully',

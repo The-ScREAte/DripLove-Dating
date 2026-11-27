@@ -85,7 +85,7 @@ export const AppUpdateDialog = ({ config, appVersion, platform, onClose }: AppUp
     if (!storeUrl || storeUrl.trim() === '') {
       storeUrl = platform === 'ios' ? config.app_store_url : config.play_store_url;
     }
-    if (storeUrl) window.open(storeUrl, '_blank');
+    if (storeUrl && /^(https?:\/\/|market:\/\/|itms-apps:\/\/)/i.test(storeUrl.trim())) window.open(storeUrl.trim(), '_blank');
     onClose(true);
   };
 

@@ -1,3 +1,4 @@
+import { requireInternalCaller } from '../_shared/caller-auth.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -11,6 +12,8 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
+
+  const gate = await requireInternalCaller(req, corsHeaders); if (gate) return gate;
 
   try {
     const supabase = createClient(

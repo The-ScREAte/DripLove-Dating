@@ -4,9 +4,9 @@ import './circle.css';
 /**
  * The tiny avatar cluster on LOCKED Circle tiles (an advertisement for Premium).
  *
- * Up to 3 bubbles: a real member's moderated main photo where one is available (heavily blurred
+ * Up to 4 bubbles: a real member's moderated main photo where one is available (heavily blurred
  * with CSS so nobody is identifiable, `alt=""`, lazy, async-decoded), otherwise a brand-hue
- * silhouette. When the circle has more than 3 members a 4th bubble shows "+". Photos load lazily
+ * silhouette. When the circle has more than 4 members a 4th bubble shows "+". Photos load lazily
  * and never block the tile: until a photo arrives (or if it fails) the silhouette shows.
  * Nothing here carries a name or id.
  */
@@ -19,14 +19,14 @@ export const TeaserAvatars = ({
 }: {
   hues: number[];
   size?: number;
-  /** URLs of real members' moderated main photos (at most 3 used). */
+  /** URLs of real members' moderated main photos (at most 4 used). */
   photos?: string[];
-  /** Show the "+" bubble (the circle has more than 3 members). */
+  /** Show the "+" bubble (the circle has more than 4 members). */
   more?: boolean;
   className?: string;
 }) => {
   const [failed, setFailed] = useState<Record<string, true>>({});
-  const bubbles = hues.slice(0, 3);
+  const bubbles = hues.slice(0, 4);
   return (
     <span className={`ci-avatars ${className}`} aria-hidden="true" style={{ ['--ci-av' as string]: `${size}px` }}>
       {bubbles.map((h, i) => {

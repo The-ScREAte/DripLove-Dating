@@ -449,7 +449,7 @@ const Index = ({
         {currentView === 'register' && (
           // One solid background for the whole sign-up flow (no video/gradient
           // behind the form) - the form sets the colour itself, see formTheme.
-          <div className="h-fill flex items-start justify-center overflow-y-auto relative" style={{ minHeight: '100vh', background: FORM_PAGE_BG }}>
+          <div className="h-fill flex items-start justify-center overflow-y-auto relative" style={{ minHeight: '100dvh', background: FORM_PAGE_BG }}>
             <Suspense fallback={<PageLoader />}>
               <RegistrationForm
                 onSubmit={handleRegister}
@@ -461,7 +461,7 @@ const Index = ({
         )}
 
         {currentView === 'profile-completion' && user && (
-          <div className="h-fill flex items-start justify-center overflow-y-auto relative" style={{ minHeight: '100vh', background: FORM_PAGE_BG }}>
+          <div className="h-fill flex items-start justify-center overflow-y-auto relative" style={{ minHeight: '100dvh', background: FORM_PAGE_BG }}>
             <Suspense fallback={<PageLoader />}>
               <ProfileCompletionPage onComplete={handleTermsAccept} />
             </Suspense>

@@ -198,7 +198,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         {showEmojiPicker && (
           <div
             ref={emojiPickerRef}
-            className="dl-pop absolute bottom-full left-2 mb-2 flex gap-0.5 rounded-2xl border border-white/10 bg-neutral-950 p-1.5 shadow-lg"
+            className="dl-pop absolute bottom-full left-2 right-2 mb-2 flex w-fit max-w-[calc(100%-1rem)] flex-wrap gap-0.5 rounded-2xl border border-white/10 bg-neutral-950 p-1.5 shadow-lg"
           >
             {QUICK_EMOJIS.map((emoji) => (
               <button

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchMyProfile } from '@/utils/myProfile';
 import { useToast } from '@/hooks/use-toast';
 import { extractDuplicateFaceDetails, formatDuplicateFaceMessage } from '@/utils/faceReference';
 import type { OnboardingMode } from './types';
@@ -47,11 +48,8 @@ export function useOnboardingFace(mode: OnboardingMode, userId: string | null) {
     let cancelled = false;
     (async () => {
       try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('face_descriptor')
-          .eq('id', userId)
-          .maybeSingle();
+        // Own full row via get_my_profile (face_descriptor is not publicly readable).
+        const { data: profile } = await fetchMyProfile(userId);
         if (!cancelled && profile?.face_descriptor) setFaceVerified(true);
       } finally {
         if (!cancelled) setFaceChecked(true);

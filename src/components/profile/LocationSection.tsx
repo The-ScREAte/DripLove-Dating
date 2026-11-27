@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Globe, Crown, ChevronRight } from 'lucide-react';
 import LocationInput from '@/components/forms/LocationInput';
 import UnlockCountriesDialog from './UnlockCountriesDialog';
-import { getCountriesList, getCountryName } from '@/constants/locationData';
+import { getCountryName } from '@/constants/locationData';
 import { getDistanceUnitLabel, toDisplayDistance, fromDisplayDistance } from '@/utils/distanceUnits';
 
 // Must match FREE_USER_MAX_DISTANCE_KM / PREMIUM_USER_MAX_DISTANCE_KM in

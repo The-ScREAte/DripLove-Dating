@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 // Custom hook for cleanup and memory management
 // Custom hook for managing Supabase subscriptions

@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { upsertOwnProfile } from '@/utils/myProfile';
 import { invokeImageModeration } from '@/utils/invokeImageModeration';
 import { withRetry } from '@/utils/withRetry';
 import { fileToBase64 } from '@/utils/faceVerificationUtils';
@@ -98,7 +99,8 @@ export async function submitCompletion(ctx: CompleteSubmitContext): Promise<bool
       preferred_language: getLanguageForCountry(formData.country) || currentLanguage || 'en',
     };
 
-    const { error } = await supabase.from('profiles').upsert({ id: user.id, email: user.email, ...profileData });
+    // Not .upsert(): ON CONFLICT DO UPDATE needs SELECT on email, which is locked down.
+    const { error } = await upsertOwnProfile(user.id, { email: user.email, ...profileData });
     if (error) throw error;
 
     // Save referral if a promo code was used (never blocks completion).

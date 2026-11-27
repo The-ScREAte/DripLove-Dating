@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAuthedCaller, isServiceRoleRequest } from "../_shared/caller-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -272,7 +273,25 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    
+
+    // Destructive / enumerating actions were open to anyone holding the public anon key.
+    // Admin-only: list/delete a face, orphan cleanup, wiping the collection.
+    // delete_user_faces: the user themself (account deletion) or an admin.
+    const ADMIN_ONLY_ACTIONS = ['list_faces', 'delete_face', 'delete_orphaned_faces', 'clear_collection'];
+    if (ADMIN_ONLY_ACTIONS.includes(body.action) || body.action === 'delete_user_faces') {
+      const denyJson = (status: number, error: string) =>
+        new Response(JSON.stringify({ success: false, error }), {
+          status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      if (!isServiceRoleRequest(req)) {
+        const caller = await getAuthedCaller(req);
+        if (!caller) return denyJson(401, 'Unauthorized');
+        const selfDelete = body.action === 'delete_user_faces' && caller.id === body.userId;
+        if (!caller.isAdmin && !selfDelete) return denyJson(403, 'Forbidden');
+      }
+    }
+
     // Handle list faces request (for admin)
     if (body.action === 'list_faces') {
       console.log('📋 Listing all faces...');

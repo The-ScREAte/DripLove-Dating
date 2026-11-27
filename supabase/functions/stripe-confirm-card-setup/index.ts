@@ -51,6 +51,16 @@ serve(async (req: Request) => {
       throw new Error('Payment method does not belong to this user');
     }
 
+    // During onboarding there is no advertiser_profiles row yet: the customer
+    // created by stripe-setup-intent carries the owner's id in its metadata,
+    // so require that to match (never touch a customer that isn't theirs).
+    if (!profileRow?.stripe_customer_id && paymentMethod.customer) {
+      const cust = await stripe.customers.retrieve(paymentMethod.customer as string);
+      if ('deleted' in cust || cust.metadata?.supabase_user_id !== user.id) {
+        throw new Error('Payment method does not belong to this user');
+      }
+    }
+
     // The most recently added card becomes the one actually billed.
     if (paymentMethod.customer) {
       await stripe.customers.update(paymentMethod.customer as string, {

@@ -9,7 +9,6 @@
  * This allows us to keep Supabase configured for native (App ID) while supporting web.
  */
 
-import { supabase } from '@/integrations/supabase/client';
 
 const noopLog = (..._args: unknown[]) => {};
 

@@ -214,7 +214,7 @@ export async function submitRegistration(ctx: RegisterSubmitContext): Promise<bo
     try {
       const { data: existingProfile } = await supabase
         .from('profiles')
-        .select('id, email')
+        .select('id')
         .eq('id', userId)
         .single();
 

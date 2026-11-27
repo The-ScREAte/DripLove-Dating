@@ -4,12 +4,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
 
     <!-- Casual brush/handwriting font used for the header tagline and the
          swipe-guide tagline (see .font-brush in index.css). -->
+    <link rel="preconnect" href="https://tgjsyyihabsovironesw.supabase.co" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet"></noscript>
 
     <!-- SEO / AI-SEO. The app itself is client-rendered, so crawlers and AI
          answer engines that don't run JavaScript read this <head> plus the
@@ -20,9 +24,8 @@
          a short brand message, not search keywords. -->
     <title>DripLove – Dating, Love &amp; Matchmaking</title>
     <meta name="description" content="DripLove is a free dating app for love and matchmaking. Meet real singles near you or around the world for international love, with verified profiles and real-time chat." />
-    <meta name="keywords" content="dating, love, matchmaking, drip, drip love, driplove, dating app, international love, international dating, find love, meet singles, singles, online dating, relationships, soulmate" />
-    <meta name="author" content="The ScREAte" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="author" content="The ScREAte" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
     <link rel="canonical" href="https://www.driplove.love/" />
     <meta name="apple-itunes-app" content="app-id=6751401155" />
 
@@ -33,12 +36,15 @@
     <meta property="og:site_name" content="DripLove" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:image" content="https://www.driplove.love/driplove-logo.png" />
+    <meta property="og:image:width" content="363" />
+    <meta property="og:image:height" content="279" />
+    <meta property="og:image:alt" content="DripLove logo" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@driplove" />
-    <meta name="twitter:title" content="DripLove – Slide Into Real Love" />
+        <meta name="twitter:title" content="DripLove – Slide Into Real Love" />
     <meta name="twitter:description" content="Meet real people near you and around the world. Chat, connect and find real love on DripLove." />
     <meta name="twitter:image" content="https://www.driplove.love/driplove-logo.png" />
+    <meta name="twitter:image:alt" content="DripLove logo" />
 
     <!-- Structured data for search engines and AI answer engines. No
          aggregateRating/review markup: ratings must come from the stores,
@@ -59,7 +65,7 @@
           "sameAs": [
             "https://apps.apple.com/us/app/driplove/id6751401155",
             "https://play.google.com/store/apps/details?id=com.driplove.dating",
-            "https://twitter.com/driplove"
+            "https://www.instagram.com/driplove_official"
           ]
         },
         {
@@ -85,7 +91,6 @@
             "https://play.google.com/store/apps/details?id=com.driplove.dating"
           ],
           "description": "DripLove is a dating app for love and matchmaking. Meet real singles near you and around the world, with verified profiles, real-time chat, icebreaker games and international matching. Free to join, with an optional Premium subscription.",
-          "keywords": "dating, love, matchmaking, drip, international love, dating app, meet singles, online dating",
           "inLanguage": ["en", "fr", "es", "pt", "de", "ar", "zh", "sw"],
           "publisher": { "@id": "https://www.driplove.love/#organization" },
           "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
@@ -133,6 +138,8 @@
     <meta name="appleid-signin-use-popup" content="true">
 
     <link rel="icon" href="/favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/driplove-logo.png">
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt">
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
   </head>
 

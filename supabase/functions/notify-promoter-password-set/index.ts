@@ -46,6 +46,10 @@ serve(async (req: Request) => {
     if (!promoCode.email) throw new Error('This promoter has no email on file');
     if (promoCode.status !== 'active') throw new Error('Password has not been set for this promo code');
 
+    // Public endpoint: cap confirmation emails per promo code (anti email-bombing).
+    const { error: throttleError } = await supabase.rpc('_throttle', { p_key: `notify-pw:${promoCodeId}`, p_max: 2, p_window: '1 hour' });
+    if (throttleError) throw new Error('Too many requests. Please try again later.');
+
     const loginLink = `${appUrl}/influencer`;
     const subject = 'Your DripLove Promoter account is ready';
     const bodyContent = `

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles } from '@/utils/adminProfiles';
 import { Eye, Trash2, CheckCircle, XCircle, Clock, AlertTriangle, User, Pencil, ImageOff } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import ImageViewer from '@/components/ImageViewer';
@@ -142,10 +143,10 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
       // Fetch user profiles for these images
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(img => img.user_id))];
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', userIds);
+        const { data: profiles, error: profilesError } = await adminGetProfiles<any>({
+          ids: userIds,
+          fallbackColumns: 'id, first_name, last_name, email',
+        });
 
         if (profilesError) throw profilesError;
 
@@ -195,10 +196,10 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
 
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(img => img.user_id))];
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', userIds);
+        const { data: profiles, error: profilesError } = await adminGetProfiles<any>({
+          ids: userIds,
+          fallbackColumns: 'id, first_name, last_name, email',
+        });
 
         if (profilesError) throw profilesError;
 
@@ -239,10 +240,10 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
         const reportedUserIds = [...new Set(data.map(img => img.reported_user_id))];
         const allUserIds = [...new Set([...reporterIds, ...reportedUserIds])];
 
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', allUserIds);
+        const { data: profiles, error: profilesError } = await adminGetProfiles<any>({
+          ids: allUserIds,
+          fallbackColumns: 'id, first_name, last_name, email',
+        });
 
         if (profilesError) throw profilesError;
 
@@ -489,17 +490,27 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
         // Don't fail the deletion if notification fails
       }
 
-      // Delete from storage
+      // Delete from storage. The object path is "<userId>/<file>", so take everything
+      // after the bucket name, not just the last segment. Storage delete is limited
+      // to the file's owner by RLS, so for an admin this can remove nothing - track it
+      // so the confirmation below doesn't claim more than happened.
+      let storageRemoved = false;
       try {
-        const fileName = imageUrl.split('/').pop();
-        if (fileName) {
-          const { error: storageError } = await supabase.storage
+        const marker = '/user-photos/';
+        const idx = imageUrl.indexOf(marker);
+        const objectPath = idx >= 0
+          ? decodeURIComponent(imageUrl.slice(idx + marker.length).split('?')[0])
+          : imageUrl.split('/').pop();
+        if (objectPath) {
+          const { data: removed, error: storageError } = await supabase.storage
             .from('user-photos')
-            .remove([fileName]);
-          
+            .remove([objectPath]);
+
           if (storageError) {
             console.error('Storage deletion error:', storageError);
             // Continue even if storage deletion fails
+          } else {
+            storageRemoved = (removed?.length ?? 0) > 0;
           }
         }
       } catch (storageError) {
@@ -525,7 +536,9 @@ const ImageModerationPanel = ({ onViewProfile }: ImageModerationPanelProps) => {
 
       toast({
         title: 'Success',
-        description: 'Inappropriate image permanently deleted from database and storage'
+        description: storageRemoved
+          ? 'Inappropriate image permanently deleted from database and storage'
+          : 'Image removed from the app. The stored file could not be deleted (storage only lets the owner delete it).'
       });
 
       // Refresh both lists

@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { sanitizeHtml } from './sanitizeHtml';
 import { supabase } from '@/integrations/supabase/client';
+import { adminGetProfiles } from '@/utils/adminProfiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -447,12 +449,18 @@ export default function BroadcastNotifications() {
           status,
           error_message,
           sent_at,
-          next_attempt_at,
-          user:profiles(first_name, last_name, email)
+          next_attempt_at
         `)
         .eq('campaign_id', campaignId);
 
       if (error) throw error;
+
+      // Recipient names/emails: admin-only RPC (profiles.email is not readable through a normal join).
+      const { data: recipientProfiles } = await adminGetProfiles<any>({
+        ids: Array.from(new Set((data || []).map((r: any) => r.user_id).filter(Boolean))) as string[],
+        fallbackColumns: 'id, first_name, last_name, email',
+      });
+      const recipientProfileById = new Map((recipientProfiles || []).map((pr: any) => [pr.id, pr]));
 
       const recipients: Recipient[] = (data || []).map((item: any) => ({
         id: item.id,
@@ -461,7 +469,10 @@ export default function BroadcastNotifications() {
         error_message: item.error_message,
         sent_at: item.sent_at,
         next_attempt_at: item.next_attempt_at,
-        user: item.user,
+        user: (() => {
+          const pr: any = recipientProfileById.get(item.user_id);
+          return pr ? { first_name: pr.first_name, last_name: pr.last_name, email: pr.email } : null;
+        })(),
       }));
 
       setCampaignRecipients(recipients);
@@ -506,11 +517,20 @@ export default function BroadcastNotifications() {
   };
 
   const toggleAllUsers = () => {
-    if (selectedUsers.size === users.length) {
-      setSelectedUsers(new Set());
-    } else {
-      setSelectedUsers(new Set(users.map(u => u.id)));
-    }
+    // Acts on the people currently shown (the search box can hide some).
+    const visible = users.filter(u => {
+      if (!searchTerm) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        `${u.first_name} ${u.last_name}`.toLowerCase().includes(q) ||
+        (u.city || '').toLowerCase().includes(q) ||
+        getCountryName(u.country, 'Unknown').toLowerCase().includes(q)
+      );
+    });
+    const allSelected = visible.length > 0 && visible.every(u => selectedUsers.has(u.id));
+    const next = new Set(selectedUsers);
+    visible.forEach(u => (allSelected ? next.delete(u.id) : next.add(u.id)));
+    setSelectedUsers(next);
   };
 
   const sendNotifications = async () => {
@@ -529,6 +549,14 @@ export default function BroadcastNotifications() {
         description: 'Please enter both title and message for the notification.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (
+      !confirm(
+        `Send "${notificationTitle.trim()}" to ${selectedUsers.size} ${selectedUsers.size === 1 ? 'person' : 'people'} now (${selectedUsersWithTokens} with a push device)? This cannot be undone.`,
+      )
+    ) {
       return;
     }
 
@@ -672,8 +700,9 @@ export default function BroadcastNotifications() {
 
     setBulkDeleting(true);
     try {
-      const pushIds = selected.filter(i => i.type === 'push').map(i => i.id);
-      const emailIds = selected.filter(i => i.type === 'email').map(i => i.id);
+      // HistoryItem.id is "push-<uuid>" / "email-<uuid>" - the tables want the raw uuid.
+      const pushIds = selected.filter(i => i.type === 'push' && i.push).map(i => i.push!.id);
+      const emailIds = selected.filter(i => i.type === 'email' && i.email).map(i => i.email!.id);
 
       if (pushIds.length > 0) {
         // broadcast_recipients.campaign_id is ON DELETE CASCADE
@@ -918,7 +947,7 @@ export default function BroadcastNotifications() {
                     disabled={isLoadingUsers || users.length === 0}
                     className="h-6 text-[11px] px-2"
                   >
-                    {selectedUsers.size === users.length ? 'Deselect All' : 'Select All'}
+                    {filteredUsers.length > 0 && filteredUsers.every(u => selectedUsers.has(u.id)) ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
               </CardHeader>
@@ -1015,10 +1044,10 @@ export default function BroadcastNotifications() {
                   <Label htmlFor="title" className="text-xs">Title</Label>
                   <Input
                     id="title"
-                    placeholder="e.g., New Features Available!"
+                    placeholder="Short title (max 50 characters)"
                     value={notificationTitle}
                     onChange={(e) => setNotificationTitle(e.target.value)}
-                    maxLength={100}
+                    maxLength={50}
                     className="text-xs h-8"
                   />
                 </div>
@@ -1034,7 +1063,7 @@ export default function BroadcastNotifications() {
                     maxLength={3000}
                     className="text-xs"
                   />
-                  <p className="text-[10px] text-gray-400 text-right">{notificationMessage.length}/3000</p>
+                  <p className="text-[10px] text-gray-400 text-right">{notificationMessage.length}/3000 (push shows about the first 120 characters)</p>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -1144,7 +1173,7 @@ export default function BroadcastNotifications() {
                   <p className="text-gray-500 text-xs">Nothing sent yet</p>
                 </div>
               ) : (
-                <div className="h-[480px] overflow-auto">
+                <div className="max-h-[70dvh] overflow-auto">
                   <div className="space-y-1.5 pr-3">
                     {historyItems.map((item) => {
                       const isActive = item.status === 'queued' || item.status === 'processing';
@@ -1333,7 +1362,7 @@ export default function BroadcastNotifications() {
 
       {/* Push Campaign Details Dialog */}
       <Dialog open={showCampaignDetails} onOpenChange={setShowCampaignDetails}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedCampaign?.title}</DialogTitle>
             <DialogDescription>
@@ -1423,7 +1452,7 @@ export default function BroadcastNotifications() {
 
       {/* Email Campaign Details Dialog */}
       <Dialog open={showEmailDetails} onOpenChange={setShowEmailDetails}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedEmailCampaign?.subject}</DialogTitle>
             <DialogDescription>
@@ -1446,7 +1475,7 @@ export default function BroadcastNotifications() {
               <ScrollArea className="max-h-[240px] rounded border p-3">
                 <div
                   className="text-xs [&_a]:text-purple-600 [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_img]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: selectedEmailCampaign.message }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedEmailCampaign.message) }}
                 />
               </ScrollArea>
               {selectedEmailCampaign.error_details && selectedEmailCampaign.error_details.length > 0 && (
@@ -1470,7 +1499,7 @@ export default function BroadcastNotifications() {
 
       {/* Export Email List Dialog */}
       <Dialog open={showExport} onOpenChange={setShowExport}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Export Email List</DialogTitle>
             <DialogDescription>Export user emails for external campaigns</DialogDescription>

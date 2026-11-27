@@ -12,7 +12,6 @@ import NotFound from "@/pages/NotFound";
 // Lazy load all heavy pages for better performance
 const AdminPage = lazy(() => import('./AdminPage'));
 const ProfileCompletionPage = lazy(() => import('./ProfileCompletionPage'));
-const EmailConfirmPage = lazy(() => import('./EmailConfirmPage'));
 const AppleOAuthCallback = lazy(() => import('./AppleOAuthCallback'));
 const AppleOAuthTest = lazy(() => import('./AppleOAuthTest'));
 const OAuthCallback = lazy(() => import('./OAuthCallback'));

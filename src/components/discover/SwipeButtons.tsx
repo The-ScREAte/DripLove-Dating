@@ -43,10 +43,10 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
           disabled={!canReverse}
          
           style={{
-            width: 'clamp(34px, 9vw, 40px)',
-            height: 'clamp(34px, 9vw, 40px)',
-            minWidth: 'clamp(34px, 9vw, 40px)',
-            minHeight: 'clamp(34px, 9vw, 40px)',
+            width: 'clamp(44px, 11vw, 48px)',
+            height: 'clamp(44px, 11vw, 48px)',
+            minWidth: 'clamp(44px, 11vw, 48px)',
+            minHeight: 'clamp(44px, 11vw, 48px)',
           }}
           aria-label="Undo last action"
         >

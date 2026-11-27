@@ -256,7 +256,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onAbout, onTerms, onPriva
       {/* Logo and tagline: the only things competing for attention above the buttons */}
       <div
         className="flex flex-col items-center relative z-10 px-6 w-full max-w-md dl-rise"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + clamp(36px, 11vh, 104px))' }}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + clamp(36px, 11dvh, 104px))' }}
       >
         <img
           src="/driplove-logo.webp"

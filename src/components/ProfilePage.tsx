@@ -10,6 +10,7 @@ import CachedImage from '@/components/common/CachedImage';
 import { PotentialMatch } from '@/types';
 import ProfilePreviewModal from './profile/ProfilePreviewModal';
 import { supabase } from '@/integrations/supabase/client';
+import { upsertOwnProfile } from '@/utils/myProfile';
 import type { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -804,16 +805,13 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
       const profilePayload = { id: currentUser.id, ...updateData } as unknown as Database['public']['Tables']['profiles']['Insert'];
 
       if (profileExists) {
-        const { error } = await supabase
-          .from('profiles')
-          .upsert(profilePayload)
-          .select();
+        // Not .upsert(): ON CONFLICT DO UPDATE needs SELECT on zip_code, which is locked down.
+        const { error } = await upsertOwnProfile(currentUser.id, profilePayload as unknown as Record<string, any>);
         if (error) throw new Error('Update failed: ' + error.message);
       } else {
         const { error } = await supabase
           .from('profiles')
-          .insert(profilePayload)
-          .select();
+          .insert(profilePayload);
         if (error) throw new Error('Insert failed: ' + error.message);
       }
 
@@ -1296,7 +1294,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
           {isOwnProfile && (
             <Dialog open={isProfileMessagesOpen} onOpenChange={setIsProfileMessagesOpen}>
-              <DialogContent className="sm:max-w-[550px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-black border-pink-500/30">
+              <DialogContent className="sm:max-w-[550px] max-h-[85dvh] p-0 gap-0 overflow-hidden bg-black border-pink-500/30">
                 <DialogHeader className="px-6 py-4 border-b border-pink-500/20 bg-gradient-to-r from-pink-950/40 to-purple-950/40">
                   <DialogTitle className="text-xl font-semibold text-white flex items-center gap-2">
                     <MessageCircle className="w-5 h-5 text-pink-400" />
@@ -1304,7 +1302,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   </DialogTitle>
                 </DialogHeader>
 
-                <div className="px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 80px)' }}>
+                <div className="px-6 py-4 overflow-y-auto" style={{ maxHeight: 'calc(85dvh - 80px)' }}>
                   {isLoadingBroadcastMessages ? (
                     <div className="flex items-center justify-center py-12">
                       <div className="text-center">

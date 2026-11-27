@@ -2309,7 +2309,9 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
                 <div className="ci-tile-top">
                   {isLockedForFree ? (
                     <>
-                      <TeaserAvatars hues={teaserHues(key, 3)} size={18} photos={teaserPhotos[key]} more={(appTotals[key] ?? 0) > 3} />
+                      <span className="ci-tile-icon">
+                        <Icon className="w-4 h-4" />
+                      </span>
                       <span className="ci-lock" aria-label={t('circle.premiumTag', 'Premium')}>
                         <Lock className="w-3 h-3" />
                       </span>
@@ -2334,14 +2336,19 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
                 </div>
                 <div className="ci-tile-foot">
                   <span className="ci-tile-label">{label}</span>
-                  {isLockedForFree && (teaser?.label || teaser?.vague) && (
-                    <span
-                      className="ci-pill ci-pill-hot"
-                      aria-label={teaser?.label ? `${teaser.label} ${t('circle.members', 'members')}` : t('circle.many', 'Many')}
-                    >
-                      <Users className="w-3 h-3" aria-hidden="true" />
-                      {teaser?.label ?? t('circle.many', 'Many')}
-                    </span>
+                  {isLockedForFree && (
+                    <div className="ci-tile-meta">
+                      {(teaser?.label || teaser?.vague) && (
+                        <span
+                          className="ci-pill ci-pill-hot ci-pill-sm"
+                          aria-label={teaser?.label ? `${teaser.label} ${t('circle.members', 'members')}` : t('circle.many', 'Many')}
+                        >
+                          <Users className="w-3 h-3" aria-hidden="true" />
+                          {teaser?.label ?? t('circle.many', 'Many')}
+                        </span>
+                      )}
+                      <TeaserAvatars hues={teaserHues(key, 4)} size={14} photos={teaserPhotos[key]} more={(appTotals[key] ?? 0) > 4} />
+                    </div>
                   )}
                 </div>
               </button>
@@ -2360,7 +2367,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
         >
           <div className="ci-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center">
-              <TeaserAvatars hues={teaserHues(lockedTile.key, 3)} size={22} photos={teaserPhotos[lockedTile.key]} more={(appTotals[lockedTile.key] ?? 0) > 3} />
+              <TeaserAvatars hues={teaserHues(lockedTile.key, 4)} size={22} photos={teaserPhotos[lockedTile.key]} more={(appTotals[lockedTile.key] ?? 0) > 4} />
             </div>
             {lockedTeaser?.label && <div className="ci-sheet-count">{lockedTeaser.label}</div>}
             <h3 className="ci-sheet-title">

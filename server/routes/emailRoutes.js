@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const { sendBulkEmails } = require('../utils/emailHelper');
 
@@ -8,7 +9,9 @@ function isAuthorized(req) {
   if (!configuredKey) return false;
 
   const headerKey = req.header('x-email-api-key') || '';
-  return headerKey === configuredKey;
+  const a = Buffer.from(headerKey);
+  const b = Buffer.from(configuredKey);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 router.post('/send-broadcast-email-smtp', async (req, res) => {
@@ -20,6 +23,15 @@ router.post('/send-broadcast-email-smtp', async (req, res) => {
 
   if (!Array.isArray(recipients) || recipients.length === 0) {
     return res.status(400).json({ error: 'No recipients provided' });
+  }
+
+  const MAX_RECIPIENTS = Number(process.env.EMAIL_MAX_RECIPIENTS || 500);
+  if (recipients.length > MAX_RECIPIENTS) {
+    return res.status(400).json({ error: 'Too many recipients' });
+  }
+
+  if (typeof subject !== 'string' || /[\r\n]/.test(subject) || subject.length > 300) {
+    return res.status(400).json({ error: 'Invalid subject' });
   }
 
   if (!subject || !htmlContent) {
@@ -42,7 +54,7 @@ router.post('/send-broadcast-email-smtp', async (req, res) => {
   } catch (error) {
     console.error('[SMTP Email] send error:', error);
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'SMTP email send failed',
+      error: 'SMTP email send failed',
     });
   }
 });

@@ -38,15 +38,24 @@ export const fetchCircleTeaserPhotos = async (
     const day = today();
     const perCircle = await Promise.all(
       defs.map(async (d) => {
-        // deterministic-per-day window into the circle so the faces vary from day to day
-        const total = totals[d.key] ?? 0;
-        const span = Math.max(1, Math.min(total, 400) - PER_CIRCLE_SAMPLE + 1);
-        const offset = total > PER_CIRCLE_SAMPLE ? hash(`${d.key}:${day}`) % span : 0;
-        const { data } = await applyCircleCountFilters(
-          supabase.from('profiles').select('id, is_verified'),
-          { excluded, filter: d.filter, activeOnly: true }
-        ).range(offset, offset + PER_CIRCLE_SAMPLE - 1);
-        return { key: d.key, members: ((data || []) as TeaserMember[]) };
+        // Active members are few (most accounts are archived), so a window sized from the TOTAL
+        // (which includes archived) usually lands past the end and comes back empty. Take the
+        // active members from the start, then top up from a per-day window of archived members.
+        const base = () => supabase.from('profiles').select('id, is_verified');
+        const active = await applyCircleCountFilters(base(), { excluded, filter: d.filter, activeOnly: true }).range(0, PER_CIRCLE_SAMPLE - 1);
+        let data = (active.data || []) as TeaserMember[];
+        if (data.length < PER_CIRCLE_SAMPLE) {
+          const total = totals[d.key] ?? 0;
+          const span = Math.max(1, Math.min(total, 400) - PER_CIRCLE_SAMPLE + 1);
+          const offset = total > PER_CIRCLE_SAMPLE ? hash(`${d.key}:${day}`) % span : 0;
+          const more = await applyCircleCountFilters(base(), { excluded, filter: d.filter }).eq('is_archived', true).range(offset, offset + PER_CIRCLE_SAMPLE - 1);
+          data = [...data, ...((more.data || []) as TeaserMember[])];
+          if (data.length === (active.data || []).length && offset > 0) {
+            const retry = await applyCircleCountFilters(base(), { excluded, filter: d.filter }).eq('is_archived', true).range(0, PER_CIRCLE_SAMPLE - 1);
+            data = [...data, ...((retry.data || []) as TeaserMember[])];
+          }
+        }
+        return { key: d.key, members: data };
       })
     );
     const ids = Array.from(new Set(perCircle.flatMap((c) => c.members.map((m) => m.id))));
@@ -59,7 +68,7 @@ export const fetchCircleTeaserPhotos = async (
       .neq('image_order', -1);
     const photos: Record<string, string[]> = {};
     for (const c of perCircle) {
-      photos[c.key] = pickTeaserPhotos(c.members, (photoRows || []) as TeaserPhotoRow[], { max: 3, seed: `${c.key}:${day}` });
+      photos[c.key] = pickTeaserPhotos(c.members, (photoRows || []) as TeaserPhotoRow[], { max: 4, seed: `${c.key}:${day}` });
     }
     cache.set(viewerId, { at: Date.now(), photos });
     return photos;

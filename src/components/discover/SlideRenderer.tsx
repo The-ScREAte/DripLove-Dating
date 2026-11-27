@@ -3,7 +3,6 @@ import React from 'react';
 import { User } from 'lucide-react';
 import { SlideContent } from './MatchCardHelpers';
 import { InfoCardSlide } from './InfoCardSlide';
-import { useTranslation } from 'react-i18next';
 import styles from './MatchCard.module.css';
 import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';

@@ -78,3 +78,15 @@ verify_jwt = false
 
 [functions.check-auth-provider]
 verify_jwt = false
+
+[functions.apple-oauth-callback]
+verify_jwt = false
+
+[functions.stripe-confirm-card-setup]
+verify_jwt = true
+
+[functions.process-missed-notifications]
+verify_jwt = true
+
+[functions.email-sender-health-check]
+verify_jwt = true

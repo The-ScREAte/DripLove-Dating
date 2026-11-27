@@ -15,3 +15,7 @@ verification SQL in the comments at the bottom of the file.
 ## Undo + server-side swipe limit (added 2026-11-26)
 - `20261128000000_free_undo_limit_2_for_review.sql` - free undo limit 1 -> 2 per day in `update_user_usage`. The app already shows 2; until this is applied the server refuses the 2nd undo.
 - `20261128010000_server_side_swipe_limits_for_review.sql` - `discover_swipe` (limit + like/pass + usage in one transaction) and `undo_pass` (2/day free, gives the swipe back). The app calls them when they exist and falls back to the old calls when they don't. Apply the undo-limit file first.
+
+
+## Applied 2026-11-27
+`20261128000000_free_undo_limit_2_for_review.sql` and `20261128010000_server_side_swipe_limits_for_review.sql` were consolidated (with the ownership guard, expiry-aware premium, block/cooldown checks) into `supabase/migrations/20261127190000_server_side_swipe_limits.sql` and applied. Do not apply the two files above.

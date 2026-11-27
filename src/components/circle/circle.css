@@ -135,6 +135,9 @@
   background: rgba(236, 72, 153, 0.22);
   border-color: rgba(244, 114, 182, 0.4);
 }
+.ci-tile-meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; min-width: 0; }
+.ci-pill-sm { padding: 1px 6px; font-size: 11px; gap: 3px; }
+.ci-pill-sm svg { width: 11px; height: 11px; }
 .ci-lock {
   display: flex;
   align-items: center;
@@ -159,7 +162,7 @@
   display: inline-block;
   width: var(--ci-av, 18px);
   height: var(--ci-av, 18px);
-  margin-left: -6px;
+  margin-left: -4px;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 28%, hsl(var(--h) 70% 72%), hsl(var(--h) 55% 46%) 62%, hsl(var(--h2) 50% 34%));
   box-shadow: 0 0 0 1.5px var(--ci-ring, #0b0b0f);
@@ -180,8 +183,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(2.6px);
-  transform: scale(1.25); /* hide the soft edge the blur would leave at the circle's rim */
+  filter: blur(1.3px);
+  transform: scale(1.2); /* hide the soft edge the blur would leave at the circle's rim */
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -248,7 +251,9 @@
 @media (max-width: 359px) {
   .ci-grid { gap: 10px; }
   .ci-tile { padding: 12px; min-height: 108px; border-radius: 18px; }
-  .ci-tile .ci-avatars { --ci-av: 16px !important; }
+  .ci-tile .ci-avatars { --ci-av: 12px !important; }
+  .ci-tile-meta { gap: 4px; }
+  .ci-pill-sm { font-size: 10px; padding: 1px 5px; }
   .ci-tile-label { font-size: 15px; }
 }
 @media (min-width: 640px) {

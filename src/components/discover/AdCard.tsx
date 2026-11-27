@@ -71,7 +71,11 @@ const AdCard: React.FC<AdCardProps> = ({ ad, onSwipe, onAdvertiseClick, trackAna
       });
     }
     if (ad.link) {
-      window.open(ad.link, '_blank', 'noopener,noreferrer');
+      // advertiser-supplied URL: only ever open http(s) (blocks javascript:/data: links)
+      try {
+        const u = new URL(ad.link, window.location.origin);
+        if (u.protocol === 'https:' || u.protocol === 'http:') window.open(u.href, '_blank', 'noopener,noreferrer');
+      } catch { /* invalid link: ignore */ }
     }
   };
 

@@ -45,7 +45,7 @@ export const ProfileReportModal: React.FC<{
         role="dialog"
         aria-modal="true"
         aria-label={t('reportModal.title')}
-        className="mx-auto flex max-h-[85vh] w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-brand/30 bg-black shadow-2xl"
+        className="mx-auto flex max-h-[85dvh] w-full max-w-[400px] flex-col overflow-hidden rounded-2xl border border-brand/30 bg-black shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative shrink-0 border-b border-brand/20 bg-black px-3 pb-2 pt-3">

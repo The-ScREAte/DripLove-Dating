@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Heart, MapPin, User, Trash2, X, Settings, Save, Pencil, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { PUBLIC_PROFILE_COLUMNS } from '@/utils/profileColumns';
+import { adminGetProfiles } from '@/utils/adminProfiles';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ImageViewer from './ImageViewer';
 import { useBackClose } from '@/utils/backStack';
@@ -169,17 +171,28 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
 
   const fetchUserProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Profile fetch error:', error);
-        throw error;
+      // Admins read the full row through the admin RPC; everyone else only gets public columns.
+      let data: any = null;
+      if (isAdmin) {
+        const res = await adminGetProfiles({ ids: [userId] });
+        if (res.error) {
+          console.error('Profile fetch error:', res.error);
+          throw res.error;
+        }
+        data = res.data?.[0] ?? null;
+      } else {
+        const res = await supabase
+          .from('profiles')
+          .select(PUBLIC_PROFILE_COLUMNS)
+          .eq('id', userId)
+          .single();
+        if (res.error) {
+          console.error('Profile fetch error:', res.error);
+          throw res.error;
+        }
+        data = res.data;
       }
-      
+
       setProfile(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -288,7 +301,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
           <DialogHeader>
             <DialogTitle className="text-white">{t('userProfileModal.loading')}</DialogTitle>
           </DialogHeader>
@@ -304,7 +317,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   if (!profile && !loading) {
     return (
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
           <DialogHeader>
             <DialogTitle className="text-white">{t('userProfileModal.unavailable')}</DialogTitle>
           </DialogHeader>
@@ -323,7 +336,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
+        <DialogContent className="max-w-2xl max-h-[80dvh] overflow-y-auto bg-black border-pink-500/30 text-white outline-none focus:outline-none focus-visible:outline-none">
           {/* Absolutely positioned (not a normal grid row) so the close button
               doesn't reserve its own gap-4 row above the avatar - it just
               floats in the corner instead of pushing everything else down. */}

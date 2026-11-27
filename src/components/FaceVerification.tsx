@@ -8,7 +8,7 @@ import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import PermissionDeniedPanel from "@/components/PermissionDeniedPanel";
 import { isPermissionDeniedError } from "@/utils/openAppSettings";
-import { getFaceReferenceCode, extractDuplicateFaceDetails, formatDuplicateFaceMessage, type DuplicateFaceDetails } from "@/utils/faceReference";
+import { extractDuplicateFaceDetails, formatDuplicateFaceMessage } from "@/utils/faceReference";
 import { Camera as CameraIcon, CheckCircle2, RefreshCw } from "lucide-react";
 
 type FaceVerificationProps = {

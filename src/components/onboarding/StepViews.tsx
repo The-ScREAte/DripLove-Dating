@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle, ChevronDown, Heart, Link as LinkIcon, Music2, Clock, Eye, EyeOff, Gift, Lock, Mail, Pencil, Plus, ShieldCheck, Upload, User, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ChevronDown, Heart, Link as LinkIcon, Music2, Clock, Eye, EyeOff, Gift, Lock, Mail, Pencil, ShieldCheck, Upload, User, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import FaceVerification from '@/components/FaceVerification';
 import LocationInput from '@/components/forms/LocationInput';
 import AdinkraSymbolSelector from '@/components/forms/AdinkraSymbolSelector';
 import PromoCodeInput from '@/components/forms/PromoCodeInput';
-import { formError, formInput, formSelectContent, formSelectTrigger } from '@/components/forms/formTheme';
+import { formError, formSelectContent, formSelectTrigger } from '@/components/forms/formTheme';
 import { occupationOptions, industryOptions } from '@/constants/professionOptions';
 import { getPhotoAcceptAttribute } from '@/utils/imageNormalizer';
 import { getLatestAllowedDateOfBirth } from '@/utils/formValidation';

@@ -1,0 +1,9 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self' https://appleid.apple.com https://accounts.google.com https://checkout.paystack.com
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'unsafe-inline' https://js.paystack.co https://js.stripe.com https://accounts.google.com https://apis.google.com https://appleid.cdn-apple.com https://www.gstatic.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: https:; connect-src 'self' https: wss: blob: data:; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.paystack.com https://accounts.google.com https://appleid.apple.com https://*.firebaseapp.com https://tgjsyyihabsovironesw.supabase.co https://www.youtube.com https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com https://www.tiktok.com https://www.instagram.com https://www.facebook.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self' https://appleid.apple.com https://accounts.google.com https://checkout.paystack.com
+  Permissions-Policy: camera=(self), microphone=(self), geolocation=(self), payment=(self), fullscreen=(self)
+  Strict-Transport-Security: max-age=15552000; includeSubDomains
+  Cross-Origin-Opener-Policy: same-origin-allow-popups

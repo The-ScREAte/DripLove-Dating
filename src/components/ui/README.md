@@ -44,7 +44,7 @@ colours, radius, height or `hover:` classes - layout classes only (`w-full`,
 - **IconButton** - icon-only, `aria-label` required (type-enforced).
 - **Chip** - selectable pill (interests, filters, presets); `selected` + `aria-pressed`.
 - **PageHeader** - back button + title for pushed screens; handles safe area.
-- **EmptyState**, **SectionTitle**.
+- **EmptyState**.
 - **Input / Textarea / SelectTrigger** - 44px, 16px text (no iOS zoom), brand
   focus ring. Use `tone="dark"` on the app's dark screens.
 - **Card** - `variant="surface"` on dark screens (default = light card, admin).

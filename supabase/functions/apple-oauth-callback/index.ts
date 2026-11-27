@@ -5,6 +5,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Never redirect (with the auth code) to a caller-chosen origin.
+const ALLOWED_ORIGINS = ['https://www.driplove.love', 'https://driplove.love']
+function safeOrigin(req: Request): string {
+  const o = req.headers.get('origin') || ''
+  return ALLOWED_ORIGINS.includes(o) ? o : ALLOWED_ORIGINS[0]
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -32,31 +39,31 @@ serve(async (req: Request) => {
       
       if (error) {
         // Redirect back to frontend with error
-        const errorUrl = `${req.headers.get('origin') || 'http://localhost:8081'}/auth/apple-callback?error=${encodeURIComponent(error)}`
+        const errorUrl = `${safeOrigin(req)}/auth/apple-callback?error=${encodeURIComponent(error)}`
         return Response.redirect(errorUrl, 302)
       }
       
       if (code && state) {
         // Redirect back to frontend with the code and state as URL parameters
-        let callbackUrl = `${req.headers.get('origin') || 'http://localhost:8081'}/auth/apple-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`
+        let callbackUrl = `${safeOrigin(req)}/auth/apple-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`
         
         if (user) {
           // Also include user data if available
           callbackUrl += `&user=${encodeURIComponent(user)}`
         }
         
-        console.log('🍎 Redirecting to frontend:', callbackUrl)
+        console.log('🍎 Redirecting to frontend')
         return Response.redirect(callbackUrl, 302)
       }
     }
     
     // For GET requests or other cases, just redirect to the main app
-    const frontendUrl = req.headers.get('origin') || 'http://localhost:8081'
+    const frontendUrl = safeOrigin(req)
     return Response.redirect(`${frontendUrl}/?error=invalid_apple_callback`, 302)
     
   } catch (error) {
     console.error('🍎 Apple OAuth callback error:', error)
-    const frontendUrl = req.headers.get('origin') || 'http://localhost:8081'
+    const frontendUrl = safeOrigin(req)
     return Response.redirect(`${frontendUrl}/?error=callback_processing_failed`, 302)
   }
 })

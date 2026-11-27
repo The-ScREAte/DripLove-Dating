@@ -385,6 +385,10 @@ export default function ScheduledBroadcasts() {
   // Sends the message to a few named accounts right away - for checking a new
   // message on a test phone without reaching everyone.
   const sendTest = async (broadcast: ScheduledBroadcast) => {
+    if (broadcast.channel === 'email') {
+      toast({ title: 'Push only', description: 'Test sends deliver a push notification; email schedules cannot be tested this way.', variant: 'destructive' });
+      return;
+    }
     const input = window.prompt(
       `Send "${broadcast.title}" as a test push to these accounts (emails, comma separated):`,
       readTestEmails(),
@@ -393,6 +397,13 @@ export default function ScheduledBroadcasts() {
     const emails = parseEmails(input);
     if (emails.length === 0 || emails.length > 20) {
       toast({ title: 'Error', description: 'Enter 1 to 20 email addresses.', variant: 'destructive' });
+      return;
+    }
+    if (
+      !confirm(
+        `TEST SEND: "${broadcast.title}" will be pushed right now to ONLY these ${emails.length} ${emails.length === 1 ? 'account' : 'accounts'} (if they exist):\n\n${emails.join('\n')}\n\nMake sure every address is one of your own test accounts - a real member's address would really notify them. Send?`,
+      )
+    ) {
       return;
     }
     saveTestEmails(emails.join(', '));
@@ -652,7 +663,7 @@ export default function ScheduledBroadcasts() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <CardTitle>Scheduled Broadcasts</CardTitle>
               <CardDescription>
@@ -885,7 +896,7 @@ export default function ScheduledBroadcasts() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       <Button
                         variant="outline"
                         size="icon"
@@ -962,7 +973,7 @@ export default function ScheduledBroadcasts() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingBroadcast ? 'Edit Schedule' : 'Create Schedule'}

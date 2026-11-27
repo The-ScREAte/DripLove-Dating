@@ -291,17 +291,17 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
           otherwise it opened hidden behind it. */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
         <DialogContent
-          className="z-[10002] max-w-4xl max-h-[90vh] w-[calc(100vw-24px)] rounded-2xl"
+          className="z-[10002] max-w-4xl max-h-[90dvh] w-[calc(100vw-24px)] rounded-2xl"
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             termsLinkRef.current?.focus();
           }}
         >
           <DialogTitle className="sr-only">Terms of Service</DialogTitle>
-          <ScrollArea className="h-[80vh] pr-4">
+          <ScrollArea className="h-[80dvh] pr-4">
             <Suspense
               fallback={
-                <div className="h-[60vh] flex items-center justify-center">
+                <div className="h-[60dvh] flex items-center justify-center">
                   <HoppingLogo size={56} />
                 </div>
               }
@@ -317,17 +317,17 @@ const TermsAcceptance = ({ user, onAccept }: TermsAcceptanceProps) => {
       {/* Privacy Policy Dialog */}
       <Dialog open={showPrivacy} onOpenChange={setShowPrivacy}>
         <DialogContent
-          className="z-[10002] max-w-4xl max-h-[90vh] w-[calc(100vw-24px)] rounded-2xl"
+          className="z-[10002] max-w-4xl max-h-[90dvh] w-[calc(100vw-24px)] rounded-2xl"
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             privacyLinkRef.current?.focus();
           }}
         >
           <DialogTitle className="sr-only">Privacy Policy</DialogTitle>
-          <ScrollArea className="h-[80vh] pr-4">
+          <ScrollArea className="h-[80dvh] pr-4">
             <Suspense
               fallback={
-                <div className="h-[60vh] flex items-center justify-center">
+                <div className="h-[60dvh] flex items-center justify-center">
                   <HoppingLogo size={56} />
                 </div>
               }
