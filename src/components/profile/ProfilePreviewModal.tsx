@@ -21,7 +21,7 @@ import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import { SlideRenderer } from '../discover/SlideRenderer';
 import SwipeButtons from '../discover/SwipeButtons';
 import { NextCardPreview } from '../discover/NextCardPreview';
-import { useCardSwipe, CARD_EXIT_MS, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from '../discover/useCardSwipe';
+import { useCardSwipe, CARD_EXIT_MS, CARD_EXIT_EASE, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from '../discover/useCardSwipe';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -396,7 +396,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           transition: isSwipeDragging
             ? 'border-radius 0.2s ease'
             : swipeExitDirection
-              ? `transform ${CARD_EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease`
+              ? `transform ${CARD_EXIT_MS}ms ${CARD_EXIT_EASE}, border-radius 0.3s ease`
               : 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.3s ease',
         }}
       >

@@ -26,7 +26,13 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 export type SwipeDir = 'left' | 'right';
 
-export const CARD_EXIT_MS = 320;
+export const CARD_EXIT_MS = 520;
+/**
+ * The throw: a short push in the swipe direction, then gravity takes over and the card tips over and falls completely
+ * out of view. Starts with momentum (not a standing start) and accelerates - the opposite of the old ease-out, which
+ * slowed down at the end and read as the card fading away.
+ */
+export const CARD_EXIT_EASE = 'cubic-bezier(0.38, 0.1, 0.72, 0.5)';
 export const CARD_REST_TRANSFORM = 'translate3d(0, 0, 0) rotate(0deg) scale(1)';
 const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const SNAP_BACK = `transform 0.35s ${EASE_OUT}`;
@@ -67,11 +73,13 @@ export function dragTransform(dx: number, dy: number): string {
 
 /** Transform for the fly-away. `reduced` = plain slide + fade, no tilt/shrink. */
 export function exitTransform(dir: SwipeDir, vw: number, vh: number, reduced = false): string {
-  const x = dir === 'right' ? vw * 1.5 : -vw * 1.5;
-  if (reduced) return `translate3d(${x}px, 0, 0) rotate(0deg) scale(1)`;
-  const y = vh * 0.3;
-  const rot = dir === 'right' ? 24 : -24;
-  return `translate3d(${x}px, ${y}px, 0) rotate(${rot}deg) scale(0.55)`;
+  if (reduced) return `translate3d(${dir === 'right' ? vw * 1.5 : -vw * 1.5}px, 0, 0) rotate(0deg) scale(1)`;
+  // Drifts out sideways while it drops past the bottom of the screen, tipping as it goes. Same size all the way
+  // down (no shrinking), so it visibly falls instead of dissolving.
+  const x = dir === 'right' ? vw * 0.85 : -vw * 0.85;
+  const y = vh * 1.25;
+  const rot = dir === 'right' ? 32 : -32;
+  return `translate3d(${x}px, ${y}px, 0) rotate(${rot}deg) scale(0.96)`;
 }
 
 /**
@@ -247,7 +255,7 @@ export function useCardSwipe(options: Options) {
       // Written directly: the live transform was set imperatively, so React's
       // own style update alone can land a frame late and the card would spring
       // back to centre before vanishing.
-      card.style.transition = reduced ? `transform ${ms}ms ease-out, opacity ${ms}ms ease-out` : `transform ${ms}ms ${EASE_OUT}`;
+      card.style.transition = reduced ? `transform ${ms}ms ease-out, opacity ${ms}ms ease-out` : `transform ${ms}ms ${CARD_EXIT_EASE}`;
       card.style.transform = exitTransform(dir, window.innerWidth, window.innerHeight, reduced);
       if (reduced) card.style.opacity = '0';
     }

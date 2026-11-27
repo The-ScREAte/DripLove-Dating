@@ -69,7 +69,7 @@ import SwipeButtons from './discover/SwipeButtons';
 import { NextCardPreview } from './discover/NextCardPreview';
 import { DiscoverSkeleton, DiscoverEmptyState } from './discover/DiscoverStates';
 import { useBackClose } from '@/utils/backStack';
-import { useCardSwipe, CARD_EXIT_MS, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
+import { useCardSwipe, CARD_EXIT_MS, CARD_EXIT_EASE, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
 import AdCard from './discover/AdCard';
 import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar';
 import DiscoverFiltersModal from './discover/DiscoverFiltersModal';
@@ -5618,7 +5618,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
                transform: adCardTransform,
                transformOrigin: 'center center',
                transition: exitingCard
-                 ? `transform ${CARD_EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` // Same curve as the imperative fly-off
+                 ? `transform ${CARD_EXIT_MS}ms ${CARD_EXIT_EASE}` // Same curve as the imperative fly-off
                  : swipeUI.isDragging
                    ? 'none' // transform tracks the finger instantly
                    : 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)', // Springy snap-back
@@ -5929,7 +5929,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             transform: cardTransform,
             transformOrigin: 'center center',
             transition: exitingCard
-              ? `transform ${CARD_EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` // Same curve as the imperative fly-off
+              ? `transform ${CARD_EXIT_MS}ms ${CARD_EXIT_EASE}` // Same curve as the imperative fly-off
               : swipeUI.isDragging
                 ? 'none' // transform tracks the finger instantly
                 : 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)', // Springy snap-back

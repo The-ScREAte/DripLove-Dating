@@ -41,8 +41,8 @@ describe('transforms', () => {
     expect(dragTransform(100, 20)).toBe('translate3d(100px, 20px, 0) rotate(6deg) scale(1)');
   });
   it('exit flies off the correct side', () => {
-    expect(exitTransform('right', 400, 800)).toContain('translate3d(600px, 240px, 0) rotate(24deg) scale(0.55)');
-    expect(exitTransform('left', 400, 800)).toContain('translate3d(-600px, 240px, 0) rotate(-24deg)');
+    expect(exitTransform('right', 400, 800)).toContain('translate3d(340px, 1000px, 0) rotate(32deg) scale(0.96)');
+    expect(exitTransform('left', 400, 800)).toContain('translate3d(-340px, 1000px, 0) rotate(-32deg)');
   });
   it('reduced-motion exit is a plain slide without tilt or shrink', () => {
     expect(exitTransform('right', 400, 800, true)).toBe('translate3d(600px, 0, 0) rotate(0deg) scale(1)');
