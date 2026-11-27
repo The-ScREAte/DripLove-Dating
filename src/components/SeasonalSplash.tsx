@@ -21,11 +21,9 @@ interface Props {
   onSkip?: () => void;
   /** How long the splash is held, for the progress line. */
   durationMs?: number;
-  /** 'quick' = just the logo badge on the brand background (ordinary opens): no greeting, particles or progress. */
-  variant?: 'full' | 'quick';
 }
 
-const SeasonalSplash: React.FC<Props> = ({ leaving = false, onSkip, durationMs = 5000, variant = 'full' }) => {
+const SeasonalSplash: React.FC<Props> = ({ leaving = false, onSkip, durationMs = 5000 }) => {
   const { t } = useTranslation();
   const season = useMemo(() => seasonOverride() ?? seasonFor(), []);
   const message = useMemo(() => seasonMessage(season), [season]);
@@ -52,7 +50,7 @@ const SeasonalSplash: React.FC<Props> = ({ leaving = false, onSkip, durationMs =
 
   return (
     <div
-      className={`dl-splash${leaving ? ' dl-splash--leaving' : ''}${variant === 'quick' ? ' dl-splash--quick' : ''}`}
+      className={`dl-splash${leaving ? ' dl-splash--leaving' : ''}`}
       data-season={season.id}
       role="status"
       aria-live="polite"
