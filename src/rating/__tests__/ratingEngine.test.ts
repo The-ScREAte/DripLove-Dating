@@ -189,3 +189,14 @@ describe('buildReviewUrls', () => {
     expect(buildReviewUrls('android', cfg)[0]).toBe('market://details?id=com.x.y');
   });
 });
+
+import { hasUserRated, emptyState as freshState } from '../ratingEngine';
+describe('hasUserRated', () => {
+  it('is false for a new user', () => {
+    expect(hasUserRated(freshState(Date.now()))).toBe(false);
+  });
+  it('is true once the account flag was mirrored, or the store page was opened through the card', () => {
+    expect(hasUserRated({ hasRated: true, storeOpenedAt: null })).toBe(true);
+    expect(hasUserRated({ hasRated: false, storeOpenedAt: 1700000000000 })).toBe(true);
+  });
+});

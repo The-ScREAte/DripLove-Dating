@@ -80,6 +80,10 @@ export const MOMENT_WEIGHT: Record<MomentType, number> = {
   profile_complete: 1,
 };
 
+/** Has this user already rated (or opened the store's review page through our card)? Shared by the engine and the Rate card. */
+export const hasUserRated = (state: Pick<RatingState, 'hasRated' | 'storeOpenedAt'>): boolean =>
+  state.hasRated || state.storeOpenedAt !== null;
+
 export const emptyState = (now: number): RatingState => ({
   v: 3,
   firstSeenAt: now,
@@ -131,7 +135,7 @@ export const evaluateRating = (
   trigger?: MomentType
 ): Decision => {
   if (!ctx.native) return no('web');
-  if (state.hasRated || state.storeOpenedAt !== null) return no('already_rated');
+  if (hasUserRated(state)) return no('already_rated');
 
   const createdAt = ctx.accountCreatedAt ?? state.firstSeenAt;
   if (now - createdAt < RULES.minAccountAgeMs) return no('account_too_new');

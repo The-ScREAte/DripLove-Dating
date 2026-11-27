@@ -1396,6 +1396,8 @@
     "title": "Love DripLove?",
     "body": "A quick rating helps more people find real love.",
     "rateCta": "Rate DripLove",
+    "thanksTitle": "Thanks for rating DripLove",
+    "thanksBody": "You help more people find real love.",
     "rateFailed": "Couldn't open the store. Search for DripLove in your app store to leave a rating.",
     "feedbackCta": "Tell us what to improve",
     "feedbackTitle": "Help us improve",

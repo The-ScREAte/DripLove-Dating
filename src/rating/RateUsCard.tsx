@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageCircleHeart, Star } from 'lucide-react';
+import { Heart, MessageCircleHeart, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +14,7 @@ import { canOpenStoreReview, openStoreReviewPage } from './storeLinks';
 import { mutateRatingState } from './ratingMoments';
 import { trackRating } from './ratingAnalytics';
 import FeedbackSheet from './FeedbackSheet';
+import { useHasRated } from './useHasRated';
 import './rating.css';
 
 const RateUsCard = ({ className = '' }: { className?: string }) => {
@@ -22,10 +23,11 @@ const RateUsCard = ({ className = '' }: { className?: string }) => {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const canRate = canOpenStoreReview();
+  const { rated, ready, markRated } = useHasRated();
 
   useEffect(() => {
-    trackRating('rate_card_viewed');
-  }, []);
+    if (ready && !rated) trackRating('rate_card_viewed');
+  }, [ready, rated]);
 
   const rate = async () => {
     if (opening) return;
@@ -40,6 +42,7 @@ const RateUsCard = ({ className = '' }: { className?: string }) => {
     trackRating('store_page_opened');
     // The user is going to rate on their own: stop asking, on every device.
     mutateRatingState((s) => ({ ...s, storeOpenedAt: Date.now(), hasRated: true }));
+    markRated();
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -52,6 +55,35 @@ const RateUsCard = ({ className = '' }: { className?: string }) => {
       // best effort
     }
   };
+
+  // Not known yet (the account check is still answering): show nothing rather than flash the card at someone who rated.
+  if (!ready) return null;
+
+  // Already rated: no star card, just a small thank-you - the feedback line stays available.
+  if (rated) {
+    return (
+      <div className={`rounded-card border border-pink-500/20 bg-black p-4 text-white ${className}`}>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <Heart className="h-6 w-6 fill-pink-500 text-pink-500" aria-hidden="true" />
+          <p className="dl-heading">{t('rating.thanksTitle', 'Thanks for rating DripLove')}</p>
+          <p className="text-sm text-white/65">{t('rating.thanksBody', 'You help more people find real love.')}</p>
+          <Button
+            variant="quiet"
+            size="md"
+            className="mt-1 w-full text-white/80"
+            onClick={() => {
+              trackRating('feedback_opened');
+              setFeedbackOpen(true);
+            }}
+          >
+            <MessageCircleHeart />
+            {t('rating.feedbackCta')}
+          </Button>
+        </div>
+        <FeedbackSheet open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      </div>
+    );
+  }
 
   return (
     <div className={`dl-rate-glow rounded-card border border-pink-500/25 bg-black p-4 text-white ${className}`}>
