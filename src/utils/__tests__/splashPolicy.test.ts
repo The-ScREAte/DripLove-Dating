@@ -32,3 +32,25 @@ describe('shouldShowSplash', () => {
     expect(shouldShowSplash({ now: at(2026, 6, 1), season: 'default', last })).toBe(true);
   });
 });
+
+import { vi, afterEach } from 'vitest';
+import { readSplashRecord, writeSplashRecord, SPLASH_STORAGE_KEY } from '../splashPolicy';
+
+describe('storage safety', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('reads null (=> show the splash) when storage throws or holds junk, and never throws on write', () => {
+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });
+    expect(readSplashRecord()).toBeNull();
+    expect(() => writeSplashRecord(new Date(), 'default')).not.toThrow();
+    vi.stubGlobal('localStorage', { getItem: () => '{{nope', setItem: () => {} });
+    expect(readSplashRecord()).toBeNull();
+  });
+  it('round-trips a valid record', () => {
+    const store: Record<string, string> = {};
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; } });
+    const now = new Date(2026, 5, 10, 12);
+    writeSplashRecord(now, 'default');
+    expect(JSON.parse(store[SPLASH_STORAGE_KEY])).toEqual({ at: now.getTime(), day: '2026-06-10', season: 'default' });
+    expect(readSplashRecord()?.season).toBe('default');
+  });
+});
