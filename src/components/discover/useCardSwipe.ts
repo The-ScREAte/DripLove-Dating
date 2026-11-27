@@ -26,7 +26,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 export type SwipeDir = 'left' | 'right';
 
-export const CARD_EXIT_MS = 520;
+export const CARD_EXIT_MS = 700;
 /**
  * The throw: a short push in the swipe direction, then gravity takes over and the card tips over and falls completely
  * out of view. Starts with momentum (not a standing start) and accelerates - the opposite of the old ease-out, which

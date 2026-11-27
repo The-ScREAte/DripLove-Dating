@@ -85,7 +85,6 @@
 .dl-splash__confetti {
   position: absolute;
   top: 0;
-  will-change: transform, opacity;
   animation: dlSplashFall var(--dur, 4s) linear var(--delay, 0s) infinite;
 }
 .dl-splash__confetti { border-radius: 2px; opacity: 0.95; animation-name: dlSplashConfetti; }
@@ -107,6 +106,10 @@
   15% { opacity: 0.85; }
   100% { transform: translate3d(var(--drift, 0px), -108vh, 0) scale(1.15); opacity: 0; }
 }
+
+/* Weaker phones: half the particles. */
+html[data-motion='lite'] .dl-splash__particles > :nth-child(n + 9) { display: none; }
+html[data-motion='reduced'] .dl-splash__glyph, html[data-motion='reduced'] .dl-splash__confetti { animation: none; opacity: 0.35; top: 20%; }
 
 @media (prefers-reduced-motion: reduce) {
   .dl-splash__glyph, .dl-splash__confetti { animation: none; opacity: 0.35; top: 20%; }
