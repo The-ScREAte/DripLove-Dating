@@ -69,6 +69,7 @@ import SwipeButtons from './discover/SwipeButtons';
 import { NextCardPreview } from './discover/NextCardPreview';
 import { DiscoverSkeleton, DiscoverEmptyState } from './discover/DiscoverStates';
 import { useBackClose } from '@/utils/backStack';
+import { buildSlides } from './discover/MatchCardHelpers';
 import { useCardSwipe, CARD_EXIT_MS, CARD_EXIT_EASE, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
 import AdCard from './discover/AdCard';
 import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar';
@@ -94,6 +95,24 @@ const SWIPES_BEFORE_VERIFY_PROMPT = 1;
 // supabase/migrations). Previously "29"/"200" were hardcoded separately in
 // five different places in this file, which is exactly how they drift out
 // of sync with each other and with the server.
+// Profiles with no photos open on a designed "Meet {name}" card. The card waiting behind the front one shows that same
+// card (not a dark placeholder), so the hand-over after a swipe has no colour jump. Cached so the preview keeps a stable
+// prop and does not re-render on every state change of this large page.
+const heroPreviewCache = new Map<string, ReturnType<typeof buildSlides>[number]>();
+const heroPreviewFor = (match: { id: string }): ReturnType<typeof buildSlides>[number] | undefined => {
+  const hit = heroPreviewCache.get(match.id);
+  if (hit) return hit;
+  try {
+    const slide = buildSlides(match as never, [])[0];
+    if (slide?.type !== 'card') return undefined;
+    if (heroPreviewCache.size > 60) heroPreviewCache.clear();
+    heroPreviewCache.set(match.id, slide);
+    return slide;
+  } catch {
+    return undefined;
+  }
+};
+
 const FREE_DAILY_SWIPE_LIMIT = 50;
 // Premium is unlimited (server: update_user_usage limit -1; llms.txt FAQ). This used to be 200, which
 // locked heavy premium swipers out client-side.
@@ -5793,7 +5812,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   // DominantColorImageBg already applies to its own backdrop blur) - capped
   // lower there. Opacity does most of the actual hiding work everywhere and
   // is essentially free on any device, so it isn't reduced by platform.
-  const NEXT_CARD_MAX_BLUR_PX = isAndroidPlatform() ? 7 : 15;
+  const NEXT_CARD_MAX_BLUR_PX = 15; // same on iOS and Android (the blur is static now, so it costs nothing per frame)
   const NEXT_CARD_MAX_DARK_OPACITY = 0.3;
   const nextCardRevealProgress = exitingCard ? 1 : 0;
   const nextCardBlurPx = NEXT_CARD_MAX_BLUR_PX * (1 - nextCardRevealProgress);
@@ -5904,6 +5923,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             key={nextMatch.id}
             name={{ first: nextMatch.first_name || '', last: nextMatch.last_name || '' }}
             imageUrl={nextMatchImages[0]}
+            heroSlide={nextMatch && Array.isArray(userImages[nextMatch.id]) && userImages[nextMatch.id].length === 0 ? heroPreviewFor(nextMatch as { id: string }) : undefined}
             blobUrls={preloadedBlobImages[nextMatch.id]}
             getOptimizedUrl={getOptimizedUrl}
             userBackgroundColor="#000"

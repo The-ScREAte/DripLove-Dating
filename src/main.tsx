@@ -45,19 +45,18 @@ if (getPlatformSync() === 'web') {
 }
 
 // Motion tier, decided once before first paint (see src/motion.css):
-//   reduced = user asked for less motion, Data Saver is on, or the link is 2G/3G
-//   lite    = weak device (<=2GB RAM or <=4 cores): same motion, much shorter
-//   full    = everything else
+//   reduced = the person turned on "reduce motion" in the OS
+//   lite    = only truly tiny devices (1GB RAM or less)
+//   full    = everything else - iPhone, every Android phone, tablets
+// Android used to get a cut-down experience whenever the connection reported 3G or the phone had 4 cores, so cards,
+// icons and animations looked different from iOS. The look is now the same everywhere; speed comes from doing the
+// work cheaply (transform/opacity only), not from removing motion.
 try {
   type NetInfo = { saveData?: boolean; effectiveType?: string };
   const nav = navigator as Navigator & { deviceMemory?: number; connection?: NetInfo };
-  const conn = nav.connection;
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const slowLink = !!conn && (conn.saveData === true || ['slow-2g', '2g', '3g'].includes(conn.effectiveType ?? ''));
-  const weakDevice =
-    (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 2) ||
-    (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 4);
-  document.documentElement.dataset.motion = reducedMotion || slowLink ? 'reduced' : weakDevice ? 'lite' : 'full';
+  const tinyDevice = typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 1;
+  document.documentElement.dataset.motion = reducedMotion ? 'reduced' : tinyDevice ? 'lite' : 'full';
 
   // Photo fade-in: <img data-fade> starts transparent and gets .is-loaded on load
   // (images that never fire load still appear via the CSS fail-safe).

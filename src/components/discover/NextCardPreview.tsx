@@ -19,6 +19,8 @@ const REST_RADIUS_PX = 26;
 interface NextCardPreviewProps {
   name: { first: string; last: string };
   imageUrl: string | undefined;
+  /** For profiles with no photos: the designed card they open on, drawn instead of a plain placeholder. */
+  heroSlide?: unknown;
   blobUrls?: Record<string, string>;
   getOptimizedUrl: (url: string) => string;
   userBackgroundColor: string;
@@ -39,6 +41,7 @@ const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
   name,
   imageUrl,
+  heroSlide,
   blobUrls,
   getOptimizedUrl,
   userBackgroundColor,
@@ -51,8 +54,8 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
   revealedRadius = '0px',
 }) => {
   const slide = React.useMemo(
-    () => ({ type: imageUrl ? ('image' as const) : ('placeholder' as const), content: imageUrl ?? '', index: 0 }),
-    [imageUrl]
+    () => (heroSlide && !imageUrl ? heroSlide : { type: imageUrl ? ('image' as const) : ('placeholder' as const), content: imageUrl ?? '', index: 0 }),
+    [imageUrl, heroSlide]
   );
   return (
     <div

@@ -1,13 +1,6 @@
 // Performance optimization utilities for the dating app
 
 /**
- * Detect if running on Android
- */
-const isAndroid = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return /Android/i.test(navigator.userAgent);
-};
-/**
  * Get device performance tier (low, medium, high)
  */
 const getDevicePerformanceTier = (): 'low' | 'medium' | 'high' => {
@@ -27,17 +20,7 @@ const getDevicePerformanceTier = (): 'low' | 'medium' | 'high' => {
 const getOptimalImageQuality = (): number => {
   const tier = getDevicePerformanceTier();
   
-  // Android gets lower quality by default for better performance
-  if (isAndroid()) {
-    switch (tier) {
-      case 'low': return 50;
-      case 'medium': return 60;
-      case 'high': return 70;
-      default: return 60;
-    }
-  }
-  
-  // iOS can handle higher quality
+  // Same table on every platform so photos look the same on Android as on iOS.
   switch (tier) {
     case 'low': return 60;
     case 'medium': return 75;
@@ -64,16 +47,12 @@ const optimizeImageUrl = (url: string, maxWidth: number = 300): string => {
   // Get optimal quality based on device
   const quality = getOptimalImageQuality();
   
-  // ⭐ ANDROID OPTIMIZATION: More aggressive size reduction for Android
-  const isAndroidDevice = isAndroid();
-  const width = isAndroidDevice ? Math.min(maxWidth, 600) : maxWidth; // Reduced from 800 to 600 for Android
+  const width = maxWidth;
   const format = 'webp';
   
   // Ultra-aggressive optimization for maximum speed and concurrent users
   if (url.includes('supabase')) {
-    // ⭐ ANDROID FIX: Use resize=contain for better performance
-    const resizeMode = isAndroidDevice ? 'contain' : 'fill';
-    return `${url}?width=${width}&quality=${quality}&format=${format}&resize=${resizeMode}`;
+    return `${url}?width=${width}&quality=${quality}&format=${format}&resize=fill`;
   }
   return url;
 };
