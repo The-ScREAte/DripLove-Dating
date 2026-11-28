@@ -120,7 +120,7 @@
     "saveProfile": "Save Profile",
     "profileCompletion": "Completion",
     "completeYourProfile": "Complete Profile",
-    "completeProfilePrompt": "Complete your profile for better matches:",
+    "completeProfilePrompt": "To finish your profile",
     "profileCompletionPercentage": "{{percentage}}% complete",
     "basicInfo": "Basic Info",
     "firstName": "First Name",
@@ -1578,13 +1578,13 @@
     "premiumTag": "Premium",
     "unlockTitle": "members in {{circle}}",
     "unlockTitleMany": "Join lots of members in {{circle}}",
-    "unlockBody": "Unlock this circle to meet the members who match exactly what you're looking for.",
+    "unlockBody": "Unlock this circle to meet its members.",
     "unlockCta": "Unlock with Premium",
     "unlockCtaTrial": "Start free trial",
     "maybeLater": "Maybe later",
     "lockedCardTitle": "Unlock to see",
     "endTitle": "You've seen everyone here",
-    "endBody": "You've seen everyone in \"{{circle}}\" for now. Check back soon, or explore another circle.",
+    "endBody": "You've seen everyone in \"{{circle}}\". Check back soon.",
     "endCta": "Explore other circles",
     "many": "Many",
     "members": "members",
@@ -1592,80 +1592,129 @@
     "pickCountries": "Choose your countries"
   },
   "icebreaker": {
-    "row": {
-      "aria": "Open icebreakers, {{count}} waiting",
-      "sub": "{{count}} waiting for you"
+    "chatTimer": {
+      "toReply": "to reply",
+      "toReplyAria": "{{time}} left to reply",
+      "waiting": "Waiting for a reply",
+      "waitingAria": "Waiting for a reply, {{time}} left"
     },
-    "inbox": {
-      "title": "Icebreakers",
-      "requestTitle": "Break the ice",
-      "reportBlock": "Report or block",
-      "said": "{{name}} says",
-      "showLess": "Show less",
-      "readMore": "Read more",
-      "acceptNote": "Accepting matches you with {{name}} and opens your chat. If you're not interested, nothing is sent back.",
-      "error": "Couldn't do that right now. Please try again.",
-      "accept": "Accept & start chatting",
-      "decline": "Not now",
-      "intro": "Accepting creates a match and opens your chat.",
-      "empty": "No icebreakers right now",
-      "emptySub": "When someone sends you a first message, it'll show up here."
+    "inline": {
+      "label": "Break the ice",
+      "hint": "Be the first to say hi",
+      "openChat": "Open chat",
+      "sent": "Hi sent",
+      "renews": "New chances in {{time}}",
+      "usedUp": "All used this week"
     },
-    "someone": "Someone",
-    "toast": {
-      "title": "{{name}} broke the ice",
-      "body": "Open to read their message",
-      "view": "View"
+    "renewing": {
+      "title": "All {{limit}} used this week",
+      "body": "{{limit}} new hellos in {{time}}.",
+      "bodyNoTime": "{{limit}} new hellos every 7 days.",
+      "ok": "Got it"
     },
     "sentLabel": "Hi sent",
     "sayHi": "Say hi",
     "title": "Break the ice",
     "errors": {
-      "rateLimited": "You're sending a lot of icebreakers - try again in a little while.",
-      "dailyLimit": "You've reached today's icebreaker limit. Try again tomorrow.",
+      "rateLimited": "Too many at once. Try again shortly.",
+      "dailyLimit": "You've used this week's icebreakers.",
       "invalid": "Please write a short message (up to {{max}} characters).",
-      "unavailable": "This person can't receive icebreakers right now.",
-      "generic": "Couldn't send that - please try again."
+      "unavailable": "This person can't get hellos right now.",
+      "generic": "Couldn't send. Try again."
     },
     "sheet": {
-      "ideas": "Need an idea?",
-      "placeholder": "Say something sweet…",
+      "ideas": "Ideas",
+      "placeholder": "Write your first message…",
       "sending": "Sending…",
-      "send": "Say hi first",
-      "sentTitle": "Sent!",
-      "sentBody": "We'll let you know if {{name}} replies.",
-      "done": "Done",
-      "title": "Be the first to say hi",
+      "send": "Send",
+      "sentTitle": "Sent",
+      "sentBody": "Opening your chat with {{name}}…",
+      "sentBodyPlain": "{{name}} has 24 hours to reply.",
+      "title": "Say hi to {{name}}",
+      "sub": "It starts a chat. {{name}} has 24 hours to reply.",
       "more": "More ideas"
     },
-    "upsell": {
-      "title": "You've used your {{limit}} free icebreakers",
-      "body": "Go Premium to break the ice with as many people as you like.",
-      "cta": "Go Premium",
-      "later": "Not now"
-    },
     "matched": {
-      "title": "You're already matched",
+      "title": "You're already chatting",
       "body": "Say hi in your chat.",
       "cta": "Open chat"
     },
-    "copied": "Copied",
+    "notAvailable": "Not available yet. Try again later.",
     "chances": {
       "left_one": "{{count}} chance left",
       "left_other": "{{count}} chances left",
       "none": "No chances left"
     },
     "free": {
-      "evening": "If we had one perfect evening, what would we do? 🌙",
-      "song": "What song is stuck in your head right now? 🎶",
+      "evening": "What would a perfect evening look like for you?",
+      "song": "What song do you have on repeat right now?",
       "laugh": "What's the last thing that made you laugh out loud?",
-      "coffee": "Coffee, tea, or something sweeter? ☕💗",
-      "sunday": "Dream Sunday: sunrise walk or sleeping in? ☀️",
-      "secret": "Tell me one thing most people don't know about you 😉",
-      "escape": "Beach, mountains or a big city - where should we escape to? ✈️",
-      "smile": "You've got a smile that's hard to ignore. What's the story behind it? ✨",
-      "dance": "Be honest: are you a great dancer or a great pretender? 💃",
-      "love": "What does a perfect first date feel like to you? 💕"
+      "coffee": "Coffee, tea, or something sweeter?",
+      "sunday": "Ideal Sunday: an early walk or a slow lie-in?",
+      "secret": "What's something most people don't know about you?",
+      "escape": "Beach, mountains or a big city - where would you escape to?",
+      "smile": "What's been making you smile lately?",
+      "dance": "Honest question: great dancer or great pretender?",
+      "love": "What does a great first date look like to you?"
+    }
+  },
+  "boost": {
+    "button": {
+      "ready": "Boost your profile",
+      "active": "Boost is on",
+      "waiting": "Next free boost in {{time}}",
+      "upsell": "Premium boosts any time"
+    },
+    "launch": {
+      "title": "Boost activated",
+      "sub": "Let's go for a ride",
+      "working": "Putting you in front of people nearby"
+    },
+    "timer": {
+      "label": "Boost",
+      "aria": "Boost on, {{time}} left"
+    },
+    "sheet": {
+      "activeTitle": "You're boosted",
+      "activeBody": "People see you first in Discover until the timer runs out.",
+      "premiumAgain": "Boost again when it ends.",
+      "freeNext": "Your next free boost is tomorrow. Premium boosts any time.",
+      "ok": "Got it",
+      "getPremium": "Get Premium",
+      "readyTitle": "Boost your profile",
+      "readyBody": "Be one of the first people others see in Discover for {{minutes}} minutes.",
+      "tip": "Tip: evenings are when most people swipe.",
+      "boostNow": "Boost now",
+      "error": "Couldn't start your boost. Try again.",
+      "waitTitle": "Next free boost in {{time}}",
+      "waitTitleSoon": "Your free boost is almost back",
+      "waitBody": "Free members get one {{free}}-minute boost a day. With Premium you can boost for {{premium}} minutes whenever you like.",
+      "notNow": "Not now",
+      "likes_one": "{{count}} like",
+      "likes_other": "{{count}} likes",
+      "messages_one": "{{count}} message",
+      "messages_other": "{{count}} messages",
+      "resultsBoth": "{{likes}} and {{messages}} so far",
+      "resultsOne": "{{what}} so far"
+    },
+    "win": {
+      "badge": "Boost got you this",
+      "short": "Boost"
+    },
+    "toast": {
+      "likes_one": "Someone liked you while you were boosted",
+      "likes_other": "{{count}} new likes while you were boosted",
+      "messages_one": "New message while you were boosted",
+      "messages_other": "{{count}} new messages while you were boosted",
+      "both": "New likes and messages while you were boosted",
+      "ended": "Your boost has ended",
+      "endedBoth": "It brought you new likes and messages.",
+      "endedLikes_one": "It brought you 1 like.",
+      "endedLikes_other": "It brought you {{count}} likes.",
+      "endedMessages_one": "It brought you 1 message.",
+      "endedMessages_other": "It brought you {{count}} messages.",
+      "endedPremium": "Boost again whenever you like.",
+      "endedFree": "Your next free boost is tomorrow."
     }
   }
 }

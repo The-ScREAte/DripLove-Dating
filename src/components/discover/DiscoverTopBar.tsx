@@ -114,10 +114,17 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
     <div
       className="dl-under-popup fixed inset-x-0 z-[9999] pointer-events-none"
       style={{
+        // Starts right under the header's (pink) bottom border: the header paints a black strip behind its rounded
+        // corners and 2px past its edge, so there is no photo sliver between the two and the border stays visible.
         top: 'var(--app-header-height, 72px)',
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 55%, rgba(0,0,0,0) 100%)',
-        paddingTop: 8,
-        paddingBottom: 28,
+        // Feathering under the header border: darkest right at the border and fading the whole way down (no flat dark
+        // band at the top, which read as a solid line), over many small stops so there is no banding.
+        // identical on iOS and Android.
+        background:
+          'linear-gradient(to bottom, rgba(0,0,0,0.960) 0.0%, rgba(0,0,0,0.930) 2.5%, rgba(0,0,0,0.900) 5.0%, rgba(0,0,0,0.871) 7.5%, rgba(0,0,0,0.842) 10.0%, rgba(0,0,0,0.812) 12.5%, rgba(0,0,0,0.784) 15.0%, rgba(0,0,0,0.755) 17.5%, rgba(0,0,0,0.726) 20.0%, rgba(0,0,0,0.698) 22.5%, rgba(0,0,0,0.670) 25.0%, rgba(0,0,0,0.642) 27.5%, rgba(0,0,0,0.615) 30.0%, rgba(0,0,0,0.587) 32.5%, rgba(0,0,0,0.560) 35.0%, rgba(0,0,0,0.533) 37.5%, rgba(0,0,0,0.507) 40.0%, rgba(0,0,0,0.481) 42.5%, rgba(0,0,0,0.455) 45.0%, rgba(0,0,0,0.429) 47.5%, rgba(0,0,0,0.404) 50.0%, rgba(0,0,0,0.379) 52.5%, rgba(0,0,0,0.354) 55.0%, rgba(0,0,0,0.329) 57.5%, rgba(0,0,0,0.305) 60.0%, rgba(0,0,0,0.282) 62.5%, rgba(0,0,0,0.258) 65.0%, rgba(0,0,0,0.236) 67.5%, rgba(0,0,0,0.213) 70.0%, rgba(0,0,0,0.191) 72.5%, rgba(0,0,0,0.170) 75.0%, rgba(0,0,0,0.149) 77.5%, rgba(0,0,0,0.128) 80.0%, rgba(0,0,0,0.109) 82.5%, rgba(0,0,0,0.090) 85.0%, rgba(0,0,0,0.071) 87.5%, rgba(0,0,0,0.054) 90.0%, rgba(0,0,0,0.038) 92.5%, rgba(0,0,0,0.023) 95.0%, rgba(0,0,0,0.010) 97.5%, rgba(0,0,0,0.000) 100.0%)',
+        paddingTop: 6,
+        paddingBottom: 76,
+        textShadow: '0 1px 4px rgba(0,0,0,0.45)',
       }}
     >
       {/* Every element on this row shares the same fixed 24px height (the
@@ -135,7 +142,7 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
           type="button"
           onClick={onFilterClick}
           aria-label={t('discover.filtersAria')}
-          className="dl-hit shrink-0 w-9 h-9 min-h-0 flex items-center justify-center rounded-full text-white active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
+          className="dl-hit shrink-0 w-9 h-9 min-h-0 flex items-center justify-center rounded-full text-white bg-black/20 active:scale-90 transition-transform outline-none focus:outline-none focus-visible:outline-none"
         >
           <SlidersHorizontal className="w-[22px] h-[22px]" />
         </button>
@@ -167,7 +174,7 @@ const DiscoverTopBar: React.FC<DiscoverTopBarProps> = ({
                 className="dl-hit shrink-0 h-7 min-h-0 px-1 flex items-center justify-center text-[13px] leading-none font-semibold outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-full"
               >
                 <span
-                  className={selected ? 'text-white' : 'text-white/70'}
+                  className={selected ? 'text-white' : 'text-white/80'}
                   style={{ transition: 'color var(--dl-dur) var(--dl-ease-out)' }}
                 >
                   {t(labelKey)}

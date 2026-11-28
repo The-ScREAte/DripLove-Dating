@@ -8,7 +8,7 @@ import { buyMonthly, restorePurchases } from '../iap';
 import { buyGoogleMonthly, canUseGoogleIAP, restoreGooglePurchases, isAndroid, getGoogleProducts } from '../iap-google';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles, ChevronLeft, Circle, SlidersHorizontal } from 'lucide-react';
+import { Crown, Heart, RotateCcw, Users, Check, X, Globe, CheckCircle, Sparkles, ChevronLeft, Circle, SlidersHorizontal, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useEnhancedSubscription } from '@/hooks/useEnhancedSubscription';
@@ -607,6 +607,7 @@ const PremiumUpgrade = ({ currentUser, onClose, preselectedPlan }: PremiumUpgrad
     { name: t('premium.features.unlimitedSwipes.name'), free: t('premium.features.unlimitedSwipes.free'), premium: t('premium.features.unlimitedSwipes.premium'), icon: Heart },
     { name: t('premium.features.reverseDislikes.name'), free: t('premium.features.reverseDislikes.free'), premium: t('premium.features.reverseDislikes.premium'), icon: RotateCcw },
     { name: t('premium.features.seeWhoLiked.name'), free: t('premium.features.seeWhoLiked.free'), premium: t('premium.features.seeWhoLiked.premium'), icon: Users },
+    { name: t('premium.features.boost.name', 'Boost'), free: t('premium.features.boost.free', '1 x 15 min a day'), premium: t('premium.features.boost.premium', '20 min, any time'), icon: Zap },
     { name: t('premium.features.unlockCountries.name'), free: t('premium.features.unlockCountries.free'), premium: t('premium.features.unlockCountries.premium'), icon: Globe },
     { name: t('premium.features.circleUp.name'), free: t('premium.features.circleUp.free'), premium: t('premium.features.circleUp.premium'), icon: Circle },
     { name: t('premium.features.filteredSearch.name'), free: t('premium.features.filteredSearch.free'), premium: t('premium.features.filteredSearch.premium'), icon: SlidersHorizontal },

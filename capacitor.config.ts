@@ -181,6 +181,9 @@ const config: CapacitorConfig = {
     // Web has no equivalent of either mechanism - no browser API can block
     // or reliably detect a screenshot/recording at all, native-only.
     PrivacyScreen: {
+      // Stays false: the native side turns protection on at launch itself when the saved-session flag
+      // (Capacitor Preferences key "dl_secure_session", see privacyScreenBridge.ts) is set - MainActivity.java
+      // (FLAG_SECURE before the first frame) and PrivacyScreen.swift. Logged-out screens stay capturable.
       enable: false,
       preventScreenshots: true // iOS only - see note above
     }

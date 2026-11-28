@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
-import { Heart, MessageCircle, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 import { uniqueTopic } from '@/utils/realtime';
@@ -158,31 +157,22 @@ const ProfileSummaryCard = ({ currentUser }: ProfileSummaryCardProps) => {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4">
-      <Card className="shadow-lg bg-black border-pink-500/40 w-full">
-        <CardContent className="px-4 pt-3 pb-4">
+      <Card className="shadow-none bg-white/[0.04] border-0 rounded-2xl w-full">
+        <CardContent className="px-4 py-3">
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="space-y-1">
-              <div className="flex justify-center">
-                <Heart className="w-4 h-4 text-red-400" />
-              </div>
-              <div className="text-lg font-bold text-red-400">{stats.totalMatches}</div>
-              <p className="text-[10px] leading-tight text-gray-400">{t('profile.totalMatches')}</p>
+            <div className="space-y-0.5">
+              <div className="text-lg font-semibold text-white">{stats.totalMatches}</div>
+              <p className="text-[10.5px] leading-tight text-white/50 whitespace-nowrap">{t('profile.totalMatches')}</p>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-center">
-                <MessageCircle className="w-4 h-4 text-blue-400" />
-              </div>
-              <div className="text-lg font-bold text-blue-400">{stats.activeChats}</div>
-              <p className="text-[10px] leading-tight text-gray-400">{t('profile.activeChats')}</p>
+            <div className="space-y-0.5">
+              <div className="text-lg font-semibold text-white">{stats.activeChats}</div>
+              <p className="text-[10.5px] leading-tight text-white/50 whitespace-nowrap">{t('profile.activeChats')}</p>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex justify-center">
-                <Users className="w-4 h-4 text-purple-400" />
-              </div>
-              <div className="text-lg font-bold text-purple-400">{stats.totalLikes}</div>
-              <p className="text-[10px] leading-tight text-gray-400">{t('profile.likesGiven')}</p>
+            <div className="space-y-0.5">
+              <div className="text-lg font-semibold text-white">{stats.totalLikes}</div>
+              <p className="text-[10.5px] leading-tight text-white/50 whitespace-nowrap">{t('profile.likesGiven')}</p>
             </div>
           </div>
         </CardContent>

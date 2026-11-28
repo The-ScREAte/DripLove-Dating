@@ -4,7 +4,7 @@ import { chancesDisplay, type IcebreakerQuota } from '@/utils/icebreaker';
 
 /**
  * How many first hellos are left: a small heart and a number, nothing else on screen
- * (free = 4 in total, premium = 10 a day - never written out). Screen readers get a full sentence.
+ * (10 per week for everyone - never written out). Screen readers get a full sentence.
  * Renders nothing until the quota is known.
  */
 export const ChancesPill = ({ quota, className = '' }: { quota: IcebreakerQuota | null; className?: string }) => {

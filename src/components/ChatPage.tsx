@@ -19,6 +19,7 @@ import DeleteChatDialog from './chat/DeleteChatDialog';
 import MessageBubble from './chat/MessageBubble';
 import MessageInput from './chat/MessageInput';
 import ChatHeader from './chat/ChatHeader';
+import IcebreakerChatTimer from './icebreaker/IcebreakerChatTimer';
 import ChatList from './chat/ChatList';
 import ChatEmptyConversation from './chat/ChatEmptyConversation';
 import SafetyTip from './chat/SafetyTip';
@@ -1849,10 +1850,14 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
         return updated;
       });
       
+      // A "Break the ice" chat: the sender can send up to 2 messages before the other person replies.
+      const waitForReply = /icebreaker_wait_for_reply/.test(String((error as { message?: string } | null)?.message || ''));
       toast({
-        title: t('chat.error'),
-        description: t('chat.failedToSend'),
-        variant: 'destructive'
+        title: waitForReply ? t('icebreaker.chatTimer.limitTitle', 'Wait for a reply') : t('chat.error'),
+        description: waitForReply
+          ? t('icebreaker.chatTimer.limitBody', 'You can send more once {{name}} replies.', { name: selectedMatch.first_name || '' })
+          : t('chat.failedToSend'),
+        variant: waitForReply ? undefined : 'destructive'
       });
       return;
       }
@@ -2370,6 +2375,7 @@ const ChatPage = ({ currentUser, onUnreadChange, onDetailViewChange, deepLinkMat
       </div>
 
       <SafetyTip matchId={selectedMatch.id} />
+      <IcebreakerChatTimer matchId={selectedMatch.id} myId={currentUser.id} messageCount={messages.length} mySentCount={messages.filter((m) => m.sender_id === currentUser.id).length} />
 
       {/* Scrollable Messages Area (only this area scrolls). The faint dot
           pattern on bg-black gives the background a little depth instead of

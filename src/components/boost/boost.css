@@ -1,0 +1,459 @@
+/* Boost - card button, launch animation, header timer, sheet, toast and "Boost got you this" badges.
+   Transform / opacity animations only (compositor-friendly, same on iOS and Android). Reduced motion -> no motion.
+   No :has() / color-mix / container queries (iOS 15.4 / WebView 92). */
+
+:root {
+  --dl-boost-from: #ec4899;
+  --dl-boost-to: #a855f7;
+  --dl-boost-grad: linear-gradient(135deg, #f472b6 0%, #ec4899 45%, #a855f7 100%);
+  --dl-boost-glow: 0 6px 18px -4px rgba(236, 72, 153, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.14) inset;
+}
+
+/* ------------------------------ card button (above the expand button) ------------------------------ */
+.dl-boost-btn {
+  right: calc(1rem - 13px);
+  /* the expand button's 44px hit area + 4px air (the Boost button is the bigger, bolder one) */
+  bottom: calc(var(--dl-expand-above-undo) + 48px);
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 220ms ease, transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.dl-boost-btn[data-hidden="true"] {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0) scale(0.8);
+  pointer-events: none;
+}
+.dl-boost-disc {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  transition: transform 160ms ease;
+}
+.dl-boost-btn:active .dl-boost-disc { transform: scale(0.9); }
+.dl-boost-btn[data-state="ready"] .dl-boost-disc {
+  background: var(--dl-boost-grad);
+  box-shadow: var(--dl-boost-glow), inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+/* a soft halo breathes around the ready button (pauses mid-swipe) */
+.dl-boost-btn[data-state="ready"] .dl-boost-disc::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid rgba(244, 114, 182, 0.7);
+  opacity: 0;
+  animation: dl-boost-halo 2.8s ease-out 1.2s infinite;
+  pointer-events: none;
+}
+html[data-dl-swiping] .dl-boost-btn .dl-boost-disc::before { animation-play-state: paused; }
+@keyframes dl-boost-halo {
+  0% { opacity: 0.8; transform: scale(0.9); }
+  55%, 100% { opacity: 0; transform: scale(1.35); }
+}
+.dl-boost-btn[data-state="active"] .dl-boost-disc,
+.dl-boost-btn[data-state="waiting"] .dl-boost-disc {
+  background: rgba(0, 0, 0, 0.38);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.dl-boost-btn[data-state="waiting"] .dl-boost-glyph { opacity: 0.55; }
+.dl-boost-btn[data-busy="true"] .dl-boost-disc { animation: dl-boost-busy 700ms ease-in-out infinite; }
+@keyframes dl-boost-busy {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.88); }
+}
+.dl-boost-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.dl-boost-ring-track { fill: none; stroke: rgba(255, 255, 255, 0.18); stroke-width: 2.5; }
+.dl-boost-ring-fill { fill: none; stroke: #f472b6; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.dl-boost-wait {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 4px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+  pointer-events: none;
+}
+
+.dl-boost-lock {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+  color: #fff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+/* ------------------------------ header timer pill ------------------------------ */
+/* Sits at the right end of the app header, where the tagline is: the tagline steps aside while a boost runs. */
+.dl-boost-timer-pos {
+  position: fixed;
+  right: calc(env(safe-area-inset-right, 0px) + clamp(10px, 4vw, 16px));
+  width: max-content;
+  /* vertically centred on the header's logo row (same numbers as MainApp's header) */
+  top: calc(clamp(16px, calc(env(safe-area-inset-top, 16px) + 8px), 80px) + (clamp(30px, 9vw, 40px) - 30px) / 2);
+  height: 30px;
+  z-index: 9998;
+}
+.dl-boost-anchor.dl-boost-anchor { visibility: hidden; pointer-events: none; animation: none; z-index: -1; }
+.dl-boost-anchor::after { display: none; }
+.dl-boost-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px 0 4px;
+  border-radius: 9999px;
+  background: rgba(24, 10, 30, 0.9);
+  border: 1px solid rgba(236, 72, 153, 0.5);
+  box-shadow: 0 4px 16px -6px rgba(236, 72, 153, 0.7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  animation: dl-boost-pill-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.dl-boost-timer[data-leaving="true"] { animation: dl-boost-pill-out 300ms ease-in both; pointer-events: none; }
+[data-driplove-global-header] .font-brush { transition: opacity 240ms ease, transform 240ms ease; }
+html[data-dl-boosting] [data-driplove-global-header] .font-brush { opacity: 0; transform: translate3d(0, -4px, 0); }
+/* a light sweep across the pill every few seconds */
+.dl-boost-timer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: translate3d(-120%, 0, 0);
+  animation: dl-boost-sweep 4.5s ease-in-out 1s infinite;
+  pointer-events: none;
+}
+html[data-dl-swiping] .dl-boost-timer::after { animation-play-state: paused; }
+@keyframes dl-boost-sweep {
+  0% { transform: translate3d(-120%, 0, 0); }
+  30%, 100% { transform: translate3d(320%, 0, 0); }
+}
+@keyframes dl-boost-pill-in {
+  0% { opacity: 0; transform: scale(0.55); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes dl-boost-pill-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.7) translate3d(0, -6px, 0); }
+}
+.dl-boost-timer:active { transform: scale(0.96); }
+.dl-boost-timer-bolt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+  flex: 0 0 auto;
+}
+.dl-boost-timer-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.dl-boost-timer-ring .dl-boost-ring-track { stroke: rgba(255, 255, 255, 0.25); stroke-width: 2; }
+.dl-boost-timer-ring .dl-boost-ring-fill { stroke: #fff; stroke-width: 2; }
+.dl-boost-timer-label { color: rgba(255, 255, 255, 0.82); font-weight: 600; }
+.dl-boost-timer-clock { font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+
+/* ------------------------------ launch animation ------------------------------ */
+.bl-root { position: fixed; inset: 0; z-index: 10050; pointer-events: none; overflow: hidden; }
+.bl-veil {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 40%, rgba(112, 26, 117, 0.45) 0%, rgba(24, 6, 34, 0.72) 42%, rgba(0, 0, 0, 0.82) 78%);
+}
+.bl-center { position: absolute; left: 50%; top: 40%; width: 0; height: 0; }
+.bl-disc {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22) inset, 0 0 0 2px rgba(255, 255, 255, 0.35), 0 14px 50px -6px rgba(236, 72, 153, 0.95);
+  will-change: transform, opacity;
+}
+.bl-disc svg { position: relative; filter: drop-shadow(0 2px 6px rgba(80, 0, 60, 0.45)); }
+.bl-flare {
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 0deg, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, 0.55) 30deg, rgba(255, 255, 255, 0) 70deg, rgba(255, 255, 255, 0) 180deg, rgba(255, 255, 255, 0.35) 210deg, rgba(255, 255, 255, 0) 250deg);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.bl-glow {
+  position: absolute;
+  left: -180px;
+  top: -180px;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 230, 1) 0%, rgba(244, 114, 182, 0.85) 20%, rgba(168, 85, 247, 0.45) 44%, rgba(168, 85, 247, 0) 70%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.bl-ring {
+  position: absolute;
+  left: -64px;
+  top: -64px;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  border: 3px solid rgba(249, 168, 212, 0.95);
+  box-shadow: 0 0 16px 3px rgba(236, 72, 153, 0.75), 0 0 10px 1px rgba(236, 72, 153, 0.6) inset;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.bl-ring[data-big="true"] { border-width: 5px; border-color: rgba(255, 255, 255, 0.95); box-shadow: 0 0 24px 6px rgba(168, 85, 247, 0.8), 0 0 14px 2px rgba(236, 72, 153, 0.7) inset; }
+.bl-spark {
+  position: absolute;
+  left: -5px;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 10px 3px rgba(244, 114, 182, 0.95);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.bl-spark[data-alt="true"] { background: #f5d0fe; box-shadow: 0 0 10px 3px rgba(168, 85, 247, 0.95); }
+.bl-text {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: calc(40% + 104px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+}
+.bl-title, .bl-sub, .bl-work { opacity: 0; will-change: transform, opacity; }
+.bl-title {
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  background: linear-gradient(100deg, #ffffff 0%, #fbcfe8 45%, #e9d5ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+}
+.bl-sub { margin-top: 6px; font-size: 18px; font-weight: 700; color: #fff; }
+.bl-work {
+  margin-top: 14px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+}
+.bl-work-bar {
+  position: relative;
+  display: block;
+  width: 120px;
+  height: 3px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+.bl-work-run {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  border-radius: 3px;
+  background: var(--dl-boost-grad);
+  transform: translate3d(-100%, 0, 0);
+}
+.bl-burst {
+  position: fixed;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(244, 114, 182, 0.65) 40%, rgba(244, 114, 182, 0) 70%);
+  opacity: 0;
+}
+
+/* ------------------------------ sheet ------------------------------ */
+.boost-sheet.boost-sheet {
+  left: 0;
+  right: 0;
+  width: min(100%, 520px);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0;
+  background: #100b17;
+  color: #fff;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px 24px 0 0;
+  max-height: 92vh;
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.boost-sheet.boost-sheet:focus, .boost-sheet.boost-sheet:focus-visible { outline: none; box-shadow: none; }
+/* the sheet's own close "x" sits on a dark surface here */
+.boost-sheet > button[type="button"]:last-child { color: rgba(255, 255, 255, 0.7); }
+.boost-grab { width: 36px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.2); margin: 8px auto 0; }
+.boost-body { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 22px 22px 22px; }
+.boost-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+  box-shadow: 0 10px 30px -8px rgba(236, 72, 153, 0.8);
+  margin-bottom: 4px;
+}
+.boost-emblem[data-state="waiting"] { background: rgba(255, 255, 255, 0.1); box-shadow: none; }
+.boost-emblem[data-state="active"] { animation: dl-boost-emblem 2.4s ease-in-out infinite; }
+@keyframes dl-boost-emblem {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.boost-title { font-size: 20px; font-weight: 800; line-height: 1.2; color: #fff; }
+.boost-clock { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; background: var(--dl-boost-grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding: 2px 0; }
+.boost-sub { font-size: 14px; line-height: 1.45; color: rgba(255, 255, 255, 0.7); max-width: 340px; }
+.boost-results { font-size: 14px; font-weight: 700; color: #f9a8d4; }
+.boost-note { font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-bottom: 6px; }
+.boost-error { font-size: 13px; color: #fca5a5; }
+
+/* ------------------------------ toast ------------------------------ */
+.dl-boost-pop-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: calc(var(--app-header-height, 72px) + 10px);
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  z-index: 10001;
+  pointer-events: none;
+}
+.dl-boost-pop {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(100%, 380px);
+  padding: 10px 14px 10px 10px;
+  border-radius: 18px;
+  background: rgba(26, 14, 34, 0.96);
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.8), 0 0 24px -10px rgba(236, 72, 153, 0.7);
+  color: #fff;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  animation: dl-boost-pop-in 380ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@keyframes dl-boost-pop-in {
+  0% { opacity: 0; transform: translate3d(0, -14px, 0) scale(0.96); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.dl-boost-pop-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+}
+.dl-boost-pop-text { display: flex; flex-direction: column; min-width: 0; }
+.dl-boost-pop-title { font-size: 13px; font-weight: 800; }
+.dl-boost-pop-body { font-size: 13px; color: rgba(255, 255, 255, 0.72); }
+
+/* ------------------------------ "Boost got you this" ------------------------------ */
+.dl-boost-win {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px -2px rgba(236, 72, 153, 0.6);
+}
+.dl-boost-win-card { padding: 4px 8px 4px 6px; font-size: 10.5px; }
+.dl-boost-win-row { padding: 3px 6px 3px 4px; font-size: 10px; }
+.dl-boost-win-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--dl-boost-grad);
+  border: 2px solid #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dl-boost-btn, .dl-boost-disc, .dl-boost-ring-fill { transition-duration: 0.01ms !important; }
+  .dl-boost-btn .dl-boost-disc::before,
+  .dl-boost-btn[data-busy="true"] .dl-boost-disc,
+  .dl-boost-timer::after,
+  .boost-emblem[data-state="active"] { animation: none !important; }
+  .dl-boost-timer, .dl-boost-timer[data-leaving="true"], .dl-boost-pop { animation-duration: 0.01ms !important; }
+}
+html[data-motion="reduced"] .dl-boost-btn .dl-boost-disc::before,
+html[data-motion="reduced"] .dl-boost-btn[data-busy="true"] .dl-boost-disc,
+html[data-motion="reduced"] .dl-boost-timer::after,
+html[data-motion="reduced"] .boost-emblem[data-state="active"] { animation: none !important; }
+html[data-motion="reduced"] .dl-boost-timer,
+html[data-motion="reduced"] .dl-boost-timer[data-leaving="true"],
+html[data-motion="reduced"] .dl-boost-pop { animation-duration: 0.01ms !important; }
+
+/* inline Boost pill (empty Discover deck) */
+.dl-boost-inline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 9999px; border: 1px solid rgba(244, 114, 182, 0.45); background: rgba(236, 72, 153, 0.12); color: #fff; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dl-boost-inline[data-state='ready'] { background: linear-gradient(135deg, #ec4899, #a855f7); border-color: transparent; }
+.dl-boost-inline:active { transform: scale(0.97); }

@@ -1,5 +1,5 @@
 // "Break the ice" - pure logic (no React, no network). The server (supabase/migrations/
-// 20261127000000_icebreakers_for_review.sql) is the authority for quota and rules; everything here
+// 20261128120000_icebreakers_weekly_24h.sql + 20261128150000_icebreakers_as_chats.sql) is the authority for quota and rules; everything here
 // only decides what to SHOW. Kept pure so it is unit-tested.
 
 import { vibeLabel } from '@/constants/vibe';
@@ -8,20 +8,22 @@ export const ICEBREAKER_MAX_LEN = 280;
 
 export interface IcebreakerQuota {
   isPremium: boolean;
-  /** Free: lifetime total (4). Premium: per rolling day (10). null only if unknown. */
+  /** First hellos per 7-day window (10). null only if unknown. */
   limit: number | null;
   used: number;
   remaining: number | null;
+  /** When the current 7-day window ends and the allowance renews to a fresh 10 (null = no window running yet). */
+  resetsAt?: string | null;
 }
 
-export type IcebreakerAction = 'hidden' | 'send' | 'sent' | 'say_hi' | 'upgrade';
+export type IcebreakerAction = 'hidden' | 'send' | 'sent' | 'say_hi' | 'renewing';
 
 /**
  * What the Break the ice button should be for one person.
  *  hidden  - backend not available (migration not applied) or it is your own profile
  *  say_hi  - you're already matched: open the chat instead
  *  sent    - you already have an open icebreaker to them
- *  upgrade - free quota used up: the button stays, tapping it shows the Premium upsell
+ *  renewing - this week's 10 are used up: the button stays, tapping it says when the week renews
  *  send    - normal state (also while the status is still loading, so the button never flickers)
  */
 export function icebreakerAction(input: {
@@ -35,14 +37,14 @@ export function icebreakerAction(input: {
   if (input.matched) return 'say_hi';
   if (input.pending) return 'sent';
   const q = input.quota;
-  if (q && !q.isPremium && q.remaining !== null && q.remaining <= 0) return 'upgrade';
+  if (q && q.remaining !== null && q.remaining <= 0) return 'renewing';
   return 'send';
 }
 
 /**
  * The chances indicator is a heart and a NUMBER (no sentence on screen). Screen readers still get words.
- *  left - count > 0 (free: of 4 total; premium: of 10 today)
- *  none - used up (free -> upsell; premium -> "tomorrow")
+ *  left - count > 0 (of 10 this week)
+ *  none - used up until the week renews
  */
 export type ChancesDisplay = { kind: 'unknown' } | { kind: 'left'; count: number; limit: number | null } | { kind: 'none'; premium: boolean };
 
@@ -69,29 +71,27 @@ export function icebreakerDraftState(text: string): { length: number; canSend: b
 
 export type Starter = { basis: 'interest' | 'value' | 'music' | 'city' | 'generic' | 'free'; value?: string };
 
-/** Free-style, playful openers (not tied to anything on the profile) - the romantic, light-hearted ones. */
+/** Free-style openers (not tied to anything on the profile): short, warm, easy to answer. */
 export const FREE_OPENERS: Record<string, string> = {
-  evening: 'If we had one perfect evening, what would we do? 🌙',
-  song: "What song is stuck in your head right now? 🎶",
+  evening: 'What would a perfect evening look like for you?',
+  song: 'What song do you have on repeat right now?',
   laugh: "What's the last thing that made you laugh out loud?",
-  coffee: 'Coffee, tea, or something sweeter? ☕💗',
-  sunday: 'Dream Sunday: sunrise walk or sleeping in? ☀️',
-  secret: "Tell me one thing most people don't know about you 😉",
-  escape: 'Beach, mountains or a big city - where should we escape to? ✈️',
-  smile: "You've got a smile that's hard to ignore. What's the story behind it? ✨",
-  dance: 'Be honest: are you a great dancer or a great pretender? 💃',
-  love: 'What does a perfect first date feel like to you? 💕',
+  coffee: 'Coffee, tea, or something sweeter?',
+  sunday: 'Ideal Sunday: an early walk or a slow lie-in?',
+  secret: "What's something most people don't know about you?",
+  escape: 'Beach, mountains or a big city - where would you escape to?',
+  smile: "What's been making you smile lately?",
+  dance: 'Honest question: great dancer or great pretender?',
+  love: 'What does a great first date look like to you?',
 };
 export const FREE_OPENER_IDS = Object.keys(FREE_OPENERS);
 
-/** Free quota: first hellos in TOTAL. Premium: per rolling day. (The server is the authority; these only
- *  fill the number in while the backend isn't reachable.) */
-export const FREE_TOTAL = 4;
-export const PREMIUM_DAILY = 10;
-export const defaultQuota = (isPremium: boolean): IcebreakerQuota => {
-  const limit = isPremium ? PREMIUM_DAILY : FREE_TOTAL;
-  return { isPremium, limit, used: 0, remaining: limit };
-};
+/** First hellos per 7-day window. The week renews to a fresh 10 (unused ones are not added on). The server is the
+ *  authority; this only fills the number in while the backend isn't reachable. */
+export const WEEKLY_CHANCES = 10;
+/** How long the other person has to answer. */
+export const ICEBREAKER_REPLY_HOURS = 24;
+export const defaultQuota = (isPremium: boolean): IcebreakerQuota => ({ isPremium, limit: WEEKLY_CHANCES, used: 0, remaining: WEEKLY_CHANCES, resetsAt: null });
 type Tr = (key: string, fallback: string, options?: Record<string, unknown>) => string;
 
 /**
@@ -161,13 +161,30 @@ export function sendErrorKey(code: string | undefined): IcebreakerSendError {
   }
 }
 
-/** Short relative time for the inbox ("now", "5m", "3h", "2d"). */
-export function shortAgo(iso: string, now: number = Date.now()): string {
+/** Milliseconds left until an ISO time (never negative; 0 when unknown or passed). */
+export function msUntil(iso: string | null | undefined, now: number = Date.now()): number {
+  if (!iso) return 0;
   const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return '';
-  const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 60) return 'now';
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
+  return Number.isFinite(t) ? Math.max(0, t - now) : 0;
+}
+
+/** The running timer: 23:59:07 (always hours:minutes:seconds, so it never changes width while it counts). */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(h)}:${p(m)}:${p(s)}`;
+}
+
+/** Long-range countdown for "chances renew in ...": "6d 4h", "5h 20m", "12m". */
+export function formatRenews(ms: number): string {
+  const mins = Math.max(1, Math.ceil(ms / 60_000));
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
+  const m = mins % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  return `${m}m`;
 }

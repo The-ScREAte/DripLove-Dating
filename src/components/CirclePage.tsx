@@ -551,7 +551,7 @@ const CompatibilityBadge = ({ percent, showHint }: { percent: number; showHint?:
   }, [showHint]);
 
   return (
-    <span className="absolute top-2 left-2 bg-black/70 text-white text-xs font-semibold py-0.5 pl-2 pr-2 rounded-full flex items-center">
+    <span className="dl-soft-badge absolute top-2 left-2 text-pink-50 text-xs font-semibold py-0.5 pl-2 pr-2 rounded-full flex items-center">
       <span className="whitespace-nowrap">{percent}%</span>
       <span
         className="whitespace-nowrap overflow-hidden transition-[max-width,opacity,margin-left] duration-500 ease-out"
@@ -603,7 +603,7 @@ const PeopleRow = ({
           <button
             key={p.id}
             onClick={() => (locked ? onLockedTap?.() : onSelect(p))}
-            className="flex-shrink-0 w-40 text-left rounded-2xl bg-black border border-pink-500/20 shadow-lg overflow-hidden p-0"
+            className="dl-soft-card flex-shrink-0 w-40 text-left rounded-2xl overflow-hidden p-0"
             style={{ scrollSnapAlign: 'start' }}
           >
             <div className="relative w-40 h-48 bg-white/5">
@@ -624,8 +624,8 @@ const PeopleRow = ({
               )}
               {locked && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                  <div className="bg-black/80 border border-pink-500/40 rounded-full p-2.5">
-                    <Lock className="w-5 h-5 text-pink-300" />
+                  <div className="dl-soft-badge rounded-full p-2.5">
+                    <Lock className="w-5 h-5 text-pink-100" />
                   </div>
                 </div>
               )}
@@ -635,7 +635,7 @@ const PeopleRow = ({
                   {interestIcons.slice(0, 3).map(({ icon: Icon, label }, i) => (
                     <span
                       key={`${label}-${i}`}
-                      className="w-7 h-7 rounded-full bg-black/70 flex items-center justify-center"
+                      className="dl-soft-badge w-7 h-7 rounded-full flex items-center justify-center"
                       title={label}
                       aria-label={label}
                     >
@@ -1985,6 +1985,21 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
     const inCooldown = exhaustedAt !== null && Date.now() - exhaustedAt < rowCooldownMs;
     const remainingMs = exhaustedAt !== null ? rowCooldownMs - (Date.now() - exhaustedAt) : 0;
 
+    // The row's people are still being worked out (the pool arrived but this row's saved snapshot / ranking hasn't
+    // resolved yet): show the row's shape instead of a false "Nobody new to show right now" that then flips to cards.
+    if ((loading || batch === null) && !inCooldown && items.length === 0) {
+      return (
+        <div className="mb-7" aria-busy="true">
+          <h2 className="text-white font-semibold text-base px-6 mb-3">{title}</h2>
+          <div className="flex gap-3 overflow-hidden px-6">
+            {[0, 1].map((i) => (
+              <div key={i} className="dl-skeleton h-[248px] w-[164px] shrink-0 rounded-3xl" />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (!isPremium) {
       if (items.length > 0) {
         return (
@@ -2131,7 +2146,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
               {emptyCategoryKind === 'error'
                 ? 'Check your connection, then open this circle again.'
                 : emptyCategoryKind === 'seen'
-                ? t('circle.endBody', { circle: emptyCategoryLabel, defaultValue: 'You\'ve seen everyone in "{{circle}}" for now. Check back soon, or explore another circle.' })
+                ? t('circle.endBody', { circle: emptyCategoryLabel, defaultValue: 'You\'ve seen everyone in "{{circle}}". Check back soon.' })
                 : <>No one new matches &quot;{emptyCategoryLabel}&quot; right now. Check back soon, or adjust your preferences in Profile.</>}
             </p>
             {!isPremium && emptyCategoryKind !== 'error' && (
@@ -2203,19 +2218,16 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
   return (
     <div className="h-full w-full bg-black overflow-y-auto scrollbar-hide">
       <div className="sticky top-0 z-10 bg-black pt-1.5 pb-1.5">
-        <div className="flex items-start justify-between px-6 gap-3 mb-1">
+        <div className="flex items-center justify-between px-6 gap-3 pt-1 mb-3">
           <div className="min-w-0">
             <h2 className="ci-title">
               <span className="ci-title-accent">{t('circle.title', 'Circle Up')}</span>
             </h2>
-            <p className="ci-sub">{t('circle.subtitle', 'Find people who share your world.')}</p>
           </div>
           {circleLikesLoaded && (
             <span
-              className={`flex items-center gap-1 flex-shrink-0 text-[11px] font-medium rounded-full border px-2.5 py-1 ${
-                circleLikesLeft === 0
-                  ? 'text-white/70 border-white/15 bg-white/[0.04]'
-                  : 'text-pink-300 border-pink-500/30 bg-pink-500/10'
+              className={`flex items-center gap-1 flex-shrink-0 text-[11px] font-medium rounded-full px-2.5 py-1 ${
+                circleLikesLeft === 0 ? 'bg-white/[0.06] text-white/50' : 'bg-pink-400/10 text-pink-100 shadow-[inset_0_0_0_1px_rgba(244,114,182,0.3)]'
               }`}
               aria-label={`${circleLikesLeft} of ${circleDailyLimit} Circle likes left today`}
             >
@@ -2393,7 +2405,7 @@ const CirclePage = ({ currentUser, isPremium, deepLinkProfileId, onDeepLinkConsu
                   : lockedTile.label}
             </h3>
             <p className="ci-sheet-body">
-              {t('circle.unlockBody', "Unlock this circle to meet the members who match exactly what you're looking for.")}
+              {t('circle.unlockBody', "Unlock this circle to meet its members.")}
             </p>
             <Button variant="premium" size="lg" className="w-full"
               type="button"

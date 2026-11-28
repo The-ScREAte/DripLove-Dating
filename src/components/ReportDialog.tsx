@@ -88,7 +88,7 @@ const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onClose, reporterId
           <div>
             <Label className="text-gray-300">{t('report.reason')}</Label>
             <select
-              className="w-full border border-pink-500/40 rounded p-2 mt-1 bg-neutral-900 text-white"
+              className="w-full border border-pink-500/40 rounded p-2 pr-8 mt-1 bg-neutral-900 text-white"
               value={reason}
               onChange={e => setReason(e.target.value)}
             >

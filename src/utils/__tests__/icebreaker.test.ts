@@ -7,16 +7,19 @@ import {
   chancesDisplay,
   sanitizeIcebreaker,
   sendErrorKey,
-  shortAgo,
+  formatCountdown,
+  formatRenews,
+  msUntil,
+  defaultQuota,
   type IcebreakerQuota,
 } from '../icebreaker';
 
-const free = (remaining: number, limit = 4): IcebreakerQuota => ({ isPremium: false, limit, used: limit - remaining, remaining });
+const free = (remaining: number, limit = 10): IcebreakerQuota => ({ isPremium: false, limit, used: limit - remaining, remaining });
 const premium = (remaining = 10, limit = 10): IcebreakerQuota => ({ isPremium: true, limit, used: limit - remaining, remaining });
 const tr = (_k: string, fallback: string, o?: Record<string, unknown>) => fallback.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(o?.[k] ?? ''));
 
 describe('icebreakerAction (button state machine)', () => {
-  const base = { available: true as boolean | null, matched: false, pending: false, quota: free(4) };
+  const base = { available: true as boolean | null, matched: false, pending: false, quota: free(10) };
   it('is hidden when the backend is missing or it is your own profile', () => {
     expect(icebreakerAction({ ...base, available: false })).toBe('hidden');
     expect(icebreakerAction({ ...base, isOwnProfile: true })).toBe('hidden');
@@ -30,21 +33,21 @@ describe('icebreakerAction (button state machine)', () => {
   it('pending -> sent (disabled)', () => {
     expect(icebreakerAction({ ...base, pending: true })).toBe('sent');
   });
-  it('free quota used up -> upgrade; premium never', () => {
-    expect(icebreakerAction({ ...base, quota: free(0) })).toBe('upgrade');
+  it('this week used up -> renewing (same for everyone)', () => {
+    expect(icebreakerAction({ ...base, quota: free(0) })).toBe('renewing');
     expect(icebreakerAction({ ...base, quota: premium() })).toBe('send');
-    expect(icebreakerAction({ ...base, quota: premium(0) })).toBe('send'); // the server answers with the daily-limit message
+    expect(icebreakerAction({ ...base, quota: premium(0) })).toBe('renewing');
     expect(icebreakerAction({ ...base, quota: free(1) })).toBe('send');
   });
 });
 
 describe('chancesDisplay (a heart and a number)', () => {
-  it('free: 4 in total - shows what is left, then none', () => {
-    expect(chancesDisplay(free(4))).toEqual({ kind: 'left', count: 4, limit: 4 });
-    expect(chancesDisplay(free(2))).toEqual({ kind: 'left', count: 2, limit: 4 });
+  it('free: 10 a week - shows what is left, then none', () => {
+    expect(chancesDisplay(free(10))).toEqual({ kind: 'left', count: 10, limit: 10 });
+    expect(chancesDisplay(free(2))).toEqual({ kind: 'left', count: 2, limit: 10 });
     expect(chancesDisplay(free(0))).toEqual({ kind: 'none', premium: false });
   });
-  it('premium: 10 a day - shows what is left today, then none', () => {
+  it('premium: shows what is left this week, then none', () => {
     expect(chancesDisplay(premium(10))).toEqual({ kind: 'left', count: 10, limit: 10 });
     expect(chancesDisplay(premium(3))).toEqual({ kind: 'left', count: 3, limit: 10 });
     expect(chancesDisplay(premium(0))).toEqual({ kind: 'none', premium: true });
@@ -99,13 +102,34 @@ describe('sendErrorKey', () => {
   });
 });
 
-describe('shortAgo', () => {
-  const now = Date.parse('2026-11-27T12:00:00Z');
-  it('formats now / minutes / hours / days', () => {
-    expect(shortAgo('2026-11-27T11:59:30Z', now)).toBe('now');
-    expect(shortAgo('2026-11-27T11:55:00Z', now)).toBe('5m');
-    expect(shortAgo('2026-11-27T09:00:00Z', now)).toBe('3h');
-    expect(shortAgo('2026-11-25T12:00:00Z', now)).toBe('2d');
-    expect(shortAgo('garbage', now)).toBe('');
+describe('weekly quota + 24h timer helpers', () => {
+  it('everyone starts the week with 10', () => {
+    expect(defaultQuota(false)).toMatchObject({ limit: 10, remaining: 10, used: 0 });
+    expect(defaultQuota(true)).toMatchObject({ limit: 10, remaining: 10 });
+  });
+  it('formats the running timer as hh:mm:ss and never goes negative', () => {
+    expect(formatCountdown(24 * 3600_000)).toBe('24:00:00');
+    expect(formatCountdown(23 * 3600_000 + 59 * 60_000 + 7_000)).toBe('23:59:07');
+    expect(formatCountdown(61_000)).toBe('00:01:01');
+    expect(formatCountdown(-5)).toBe('00:00:00');
+  });
+  it('rounds a partial second up so it never shows 00:00:00 while time remains', () => {
+    expect(formatCountdown(400)).toBe('00:00:01');
+  });
+  it('msUntil ignores bad input and past times', () => {
+    const now = Date.parse('2026-11-28T10:00:00Z');
+    expect(msUntil('2026-11-28T11:00:00Z', now)).toBe(3600_000);
+    expect(msUntil('2026-11-28T09:00:00Z', now)).toBe(0);
+    expect(msUntil(null, now)).toBe(0);
+    expect(msUntil('nope', now)).toBe(0);
+  });
+  it('renew label is short and human', () => {
+    expect(formatRenews(6 * 86400_000 + 4 * 3600_000)).toBe('6d 4h');
+    expect(formatRenews(2 * 86400_000)).toBe('2d');
+    expect(formatRenews(5 * 3600_000 + 20 * 60_000)).toBe('5h 20m');
+    expect(formatRenews(30_000)).toBe('1m');
+  });
+  it('maps the retired "they wrote first" error to the generic message', () => {
+    expect(sendErrorKey('reverse_pending')).toBe('generic');
   });
 });

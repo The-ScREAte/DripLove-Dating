@@ -50,7 +50,7 @@
   pointer-events: none;
   z-index: -1;
   /* Alive but calm: the big icon drifts and tips slowly, and breathes. transform + opacity only (GPU-cheap). */
-  animation: wmFloat 6s ease-in-out infinite alternate, wmBreathe 4s ease-in-out infinite alternate;
+  animation: wmFloat 4s ease-in-out infinite alternate, wmBreathe 2.8s ease-in-out infinite alternate;
 }
 @keyframes wmFloat {
   0% { transform: translate3d(0, 0, 0) rotate(-12deg) scale(1); }
@@ -90,7 +90,7 @@
 :global(html[data-motion='lite']) .shell::before { animation: none; }
 
 /* the corner glow breathes with it */
-.shell::before { animation: glowBreathe 5s ease-in-out infinite alternate; }
+.shell::before { animation: glowBreathe 3.5s ease-in-out infinite alternate; }
 @keyframes glowBreathe {
   0% { opacity: 0.75; }
   100% { opacity: 1; }

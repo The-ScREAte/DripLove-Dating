@@ -10,8 +10,6 @@ import { recordRatingMoment } from '@/rating/ratingMoments';
 import NativeReviewAsk from '@/rating/NativeReviewAsk';
 import { PaymentIssueDialog, type PaymentIssuePayload } from '@/components/premium/PaymentIssueDialog';
 import { isVerifyPromptEligible } from '@/utils/verifyPromptStorage';
-import IcebreakerToast, { type IcebreakerToastPayload } from '@/components/icebreaker/IcebreakerToast';
-import { getIcebreakerHandlers, openIcebreakerInbox } from '@/components/icebreaker/store';
 import FestiveGreeting from '@/components/FestiveGreeting';
 import { festivalDue, markFestivalSeen } from './festive';
 import type { PopupRecord } from './types';
@@ -233,18 +231,3 @@ registerPopup<PaymentIssuePayload>(
     payload ? <PaymentIssueDialog {...payload} onClose={(converted) => close(converted ? 'converted' : 'dismissed')} /> : null
 );
 
-// ---- Someone broke the ice (transactional heads-up; the inbox row/badge is the durable record) ----
-registerPopup<IcebreakerToastPayload>(
-  { id: 'icebreaker-received', tier: 'transactional', screens: ['dripcheck', 'circle', 'liked', 'profile'], ignoreDataReady: true, ttlMs: 60_000, autoCloseMs: 9_000, maxPerSession: 6 },
-  ({ payload, close }) => (
-    <IcebreakerToast
-      payload={payload}
-      onClose={() => close('dismissed')}
-      onView={() => {
-        close('converted');
-        getIcebreakerHandlers().openChat(null);
-        openIcebreakerInbox();
-      }}
-    />
-  )
-);

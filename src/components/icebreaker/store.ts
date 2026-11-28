@@ -1,6 +1,6 @@
-// Where "Break the ice" UI state lives: which person the composer is open for, whether the inbox
-// is open, and the few app-level actions the host (mounted once in MainApp) hands us. A button on
-// any card just calls openIcebreaker(target); one <IcebreakerHost/> draws the sheet/inbox.
+// Where "Break the ice" UI state lives: which person the composer is open for, and the few app-level
+// actions the host (mounted once in MainApp) hands us. A button on any card just calls
+// openIcebreaker(target); one <IcebreakerHost/> draws the composer sheet. A sent hello is a normal chat.
 
 import { useSyncExternalStore } from 'react';
 import type { Starter } from '@/utils/icebreaker';
@@ -17,9 +17,8 @@ export interface IcebreakerTarget {
 
 interface UiState {
   target: IcebreakerTarget | null;
-  inboxOpen: boolean;
 }
-let ui: UiState = { target: null, inboxOpen: false };
+let ui: UiState = { target: null };
 const listeners = new Set<() => void>();
 const set = (next: Partial<UiState>) => {
   ui = { ...ui, ...next };
@@ -28,8 +27,6 @@ const set = (next: Partial<UiState>) => {
 
 export const openIcebreaker = (target: IcebreakerTarget) => set({ target });
 export const closeIcebreaker = () => set({ target: null });
-export const openIcebreakerInbox = () => set({ inboxOpen: true });
-export const closeIcebreakerInbox = () => set({ inboxOpen: false });
 
 export const useIcebreakerUi = (): UiState =>
   useSyncExternalStore(

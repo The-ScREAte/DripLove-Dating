@@ -80,9 +80,8 @@
   text-align: left;
   color: #fff;
   overflow: hidden;
-  border: 1px solid hsl(var(--h1) 40% 55% / 0.2);
-  background: linear-gradient(150deg, hsl(var(--h1) 38% 17%) 0%, hsl(var(--h2) 42% 9%) 85%);
-  box-shadow: 0 6px 16px -12px hsl(var(--h1) 60% 40% / 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(150deg, hsl(var(--h1) 30% 14%) 0%, hsl(var(--h2) 30% 8%) 85%);
   transition: transform var(--dl-dur-fast, 140ms) var(--dl-ease-out, ease-out), opacity 160ms;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;

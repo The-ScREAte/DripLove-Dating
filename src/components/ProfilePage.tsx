@@ -1087,7 +1087,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
          }}> 
       {/* Fixed Header with Progress Bar - completely fixed below main header */}
       <div
-        className="sticky top-0 z-40 bg-black/95 border-b border-pink-500/30 shadow-sm backdrop-blur-sm"
+        className="sticky top-0 z-40 bg-black/95 border-b border-white/[0.06] backdrop-blur-sm"
         style={{
           // Sticky (not fixed) so it is positioned by the browser relative to the
           // real content area that starts right below MainApp's header, which is a
@@ -1106,7 +1106,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {previewImages[0] ? (
                 <div
                   style={{ width: 44, height: 44, minWidth: 44, minHeight: 44, position: 'relative', borderRadius: 9999, overflow: 'hidden', backgroundColor: '#171717' }}
-                  className="shrink-0 border-2 border-pink-500/60"
+                  className="shrink-0 ring-1 ring-white/10"
                 >
                   <CachedImage
                     loading="lazy"
@@ -1124,7 +1124,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                   />
                 </div>
               ) : (
-                <div style={{ width: 44, height: 44, minWidth: 44, minHeight: 44 }} className="rounded-full bg-neutral-800 border border-pink-500/30 shrink-0" />
+                <div style={{ width: 44, height: 44, minWidth: 44, minHeight: 44 }} className="rounded-full bg-neutral-800 shrink-0" />
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }} className="min-w-0">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1 }}>
@@ -1146,7 +1146,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
                       }
                     }}
                     style={{ height: 22, minHeight: 22, padding: '0 8px' }}
-                    className={`dl-hit flex items-center gap-1 rounded-full bg-neutral-900 border border-pink-500/50 text-white text-[11px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer ${
+                    className={`dl-hit flex items-center gap-1 rounded-full bg-white/[0.06] text-white/85 text-[11px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors shrink-0 cursor-pointer ${
                       previewMatch ? '' : 'opacity-50 pointer-events-none cursor-default'
                     }`}
                     aria-label="Preview my profile"
@@ -1175,10 +1175,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
               {/* Message button (own profile only) */}
               {isOwnProfile && (
                 <div className="relative">
-                  <Button variant="line" size="iconSm"
+                  <Button variant="quiet" size="iconSm"
                     onClick={openProfileMessages}
                     style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0, boxShadow: 'none' }}
-                    className="rounded-full bg-neutral-900 border border-pink-500/30 text-white hover:bg-neutral-800"
+                    className="rounded-full bg-white/[0.06] border-0 text-white hover:bg-white/10"
                     aria-label="Open profile messages"
                   >
                     <MessageCircle className="w-4 h-4" />
@@ -1193,10 +1193,10 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
               {/* Games button (own profile only) */}
               {isOwnProfile && (
-                <Button variant="line" size="iconSm"
+                <Button variant="quiet" size="iconSm"
                   onClick={() => navigate('/games')}
                   style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, padding: 0, boxShadow: 'none' }}
-                  className="rounded-full bg-neutral-900 border border-pink-500/30 text-purple-300 hover:bg-neutral-800"
+                  className="rounded-full bg-white/[0.06] border-0 text-white hover:bg-white/10"
                   aria-label="Play games"
                 >
                   <Gamepad2 className="w-4 h-4" />
@@ -1223,25 +1223,24 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
 
             {/* Profile completion notice */}
             {completion < 100 && missingFields.length > 0 && !hideProfileCompletion && (
-              <div className="mt-4 bg-blue-950/40 border border-blue-700/50 rounded-lg px-4 py-3 relative">
+              <div className="mt-3 bg-white/[0.04] rounded-xl px-3.5 py-2.5 relative">
                 <button
-                  className="dl-hit absolute top-2 right-3 text-blue-300 hover:text-blue-100 text-lg font-bold focus:outline-none"
+                  className="dl-hit absolute top-1.5 right-3 text-white/45 hover:text-white/80 text-lg focus:outline-none"
                   aria-label="Dismiss profile completion"
                   onClick={() => setHideProfileCompletion(true)}
                 >
                   ×
                 </button>
                 <div className="pr-8">
-                  <h4 className="font-semibold text-blue-200 mb-2">{t('profile.completeProfilePrompt')}</h4>
-                  <ul className="text-sm text-blue-300 space-y-1">
+                  <h4 className="text-xs font-medium text-white/50 mb-1">{t('profile.completeProfilePrompt')}</h4>
+                  <ul className="text-sm text-white/85 space-y-0.5">
                     {missingFields.slice(0, 3).map((field, index) => (
-                      <li key={index} className="flex items-start">
-                        <span className="text-blue-400 mr-2">•</span>
+                      <li key={index}>
                         {t(field)}
                       </li>
                     ))}
                     {missingFields.length > 3 && (
-                      <li className="text-blue-300 font-medium">
+                      <li className="text-white/50">
                         +{missingFields.length - 3} {t('profile.moreItems')}
                       </li>
                     )}
@@ -1401,7 +1400,7 @@ const ProfilePage = ({ currentUser, profile, onProfileUpdate, onLogout, onShowTe
             title={t('profile.photos')}
             isOpen
             onToggle={() => {}}
-            className="mt-3 border-pink-500/30"
+            className="mt-3"
             showEditButton
             isEditing={isEditing}
             isSaving={isSaving}

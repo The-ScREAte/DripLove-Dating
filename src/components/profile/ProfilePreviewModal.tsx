@@ -531,8 +531,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
             style={{
               top: '4px',
               minHeight: 0,
-              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+              // Soft pink-ring glass, same as Discover's report button (MatchCard.module.css .reportButton).
+              background: 'rgba(0,0,0,0.28)',
+              boxShadow: 'inset 0 0 0 1px rgba(244,114,182,0.45)',
             }}
           >
             <Pencil className="w-3.5 h-3.5" strokeWidth={2.5} />
@@ -542,8 +543,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
         {/* Report - top right, same spot Crop occupies for your own profile.
             Only when viewing someone else's (readOnly - Circle), and only on
             an actual photo slide, since it reports whichever photo is on
-            screen. Same pink-gradient round style as every other floating
-            action button on the card. */}
+            screen. Same soft pink-ring glass as Discover's report button. */}
         {readOnly && currentSlideData?.type === 'image' && currentSlideData.content && (
           <button
             onClick={(e) => { e.stopPropagation(); report.open(); }}
@@ -556,8 +556,9 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
               minWidth: 24,
               minHeight: 24,
               padding: 0,
-              background: 'linear-gradient(135deg, rgba(219,39,119,0.95), rgba(157,23,77,0.92))',
-              boxShadow: '0 2px 10px rgba(157,23,77,0.45), inset 0 0 0 1px rgba(255,255,255,0.25)',
+              // Soft pink-ring glass, same as Discover's report button (MatchCard.module.css .reportButton).
+              background: 'rgba(0,0,0,0.28)',
+              boxShadow: 'inset 0 0 0 1px rgba(244,114,182,0.45)',
             }}
           >
             <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>

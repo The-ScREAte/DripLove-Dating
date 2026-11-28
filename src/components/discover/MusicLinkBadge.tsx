@@ -44,7 +44,7 @@ const MusicLinkBadge = ({ link, label, variant = 'circle' }: MusicLinkBadgeProps
         onClick={(e) => { e.stopPropagation(); setShowPlayer(true); }}
         title={label}
         aria-label="Play shared music in-app"
-        className="flex items-center justify-center bg-pink-400/10 border border-pink-400/60 rounded-full w-6 h-6 shrink-0"
+        className="dl-chip flex items-center justify-center rounded-full w-6 h-6 shrink-0"
       >
         <EqualizerBars />
       </button>

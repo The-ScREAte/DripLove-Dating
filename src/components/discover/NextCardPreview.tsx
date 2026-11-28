@@ -60,6 +60,8 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
   return (
     <div
       data-next-card-preview
+      // read by useCardSwipe, which reveals this card on the DOM the instant a swipe commits (see revealPreviews)
+      data-revealed-radius={revealedRadius}
       className="absolute inset-0 overflow-hidden bg-black"
       style={{
         transform: `scale(${revealed ? 1 : REST_SCALE})`,
@@ -72,6 +74,7 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
       }}
     >
       <div
+        data-ncp-blur
         className="absolute inset-0"
         // The blur clears in one step (not animated): animating a blur over a full-screen photo re-draws it every frame,
         // the most expensive thing in a swipe on mid-range Android. The falling card covers the change anyway.
@@ -88,6 +91,7 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
       </div>
       {/* dark tint over the blur, fading out in step with it */}
       <div
+        data-ncp-tint
         className="pointer-events-none absolute inset-0 bg-black"
         style={{ opacity: darkOpacity }}
       />

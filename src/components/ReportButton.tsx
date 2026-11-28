@@ -103,7 +103,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({
             <h3 className="font-semibold mb-2">Report</h3>
             <label className="block mb-2 text-sm">Reason</label>
             <select
-              className="w-full border rounded p-2 mb-3"
+              className="w-full border rounded p-2 pr-8 mb-3"
               value={reason}
               onChange={e => setReason(e.target.value)}
             >

@@ -146,7 +146,10 @@ function slimGhost(card: HTMLElement, ghost: HTMLElement) {
     ghostStyleAdded = true;
     const st = document.createElement('style');
     st.textContent =
-      '.dl-card-ghost,.dl-card-ghost *{animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important}' +
+      // `filter` is kept: the photo's soft reflection and backdrop are blurred with it, and stripping it made the card
+      // visibly change (sharp mirrored bands) the instant it was let go. A static blur inside a layer that is only
+      // moved is drawn once, not per frame; backdrop-filter re-samples what is behind it every frame, so that goes.
+      '.dl-card-ghost,.dl-card-ghost *{animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}' +
       '.dl-card-ghost video,.dl-card-ghost canvas{display:none!important}';
     document.head.appendChild(st);
   }
@@ -165,6 +168,66 @@ function slimGhost(card: HTMLElement, ghost: HTMLElement) {
   } catch {
     /* cosmetic only */
   }
+}
+
+/**
+ * Chrome (Android WebView) only gives a NEW <img> element its pixels a task or more after it is created, even for a
+ * photo already on screen, unless that URL was loaded by an image request moments before; WebKit (iOS) serves it from
+ * memory at once. Without this, the falling copy and the card that takes over each painted one or more black frames
+ * on Android only. Loading the photos of the card in hand and of the card waiting behind it through a plain Image()
+ * when a drag starts makes every new copy of them complete immediately, so both platforms show the same frames.
+ * Only photos that are already loaded are touched (no new downloads); the last few are kept so they stay warm.
+ */
+const warmed = new Map<string, HTMLImageElement>();
+function warmImages(roots: Array<ParentNode | null | undefined>) {
+  if (typeof Image === 'undefined') return;
+  for (const root of roots) {
+    root?.querySelectorAll?.('img').forEach((img) => {
+      const url = img.currentSrc || img.getAttribute('src');
+      if (!url || !img.complete || !img.naturalWidth) return;
+      const prev = warmed.get(url);
+      warmed.delete(url);
+      if (prev) {
+        warmed.set(url, prev);
+        return;
+      }
+      const w = new Image();
+      w.decoding = 'async';
+      w.src = url;
+      warmed.set(url, w);
+    });
+  }
+  while (warmed.size > 16) warmed.delete(warmed.keys().next().value as string);
+}
+
+/**
+ * The card waiting behind (NextCardPreview) rests smaller, blurred and dimmed, and is meant to be at full size and
+ * sharp the instant a swipe commits. The page's own re-render for that is low priority and often lands only after
+ * the next card has already taken over, so for a frame or two the waiting card showed small and blurred and then
+ * jumped. Reveal it here on the DOM in the same frame the card is thrown; returns an undo that puts back exactly
+ * what the page had written (used when the swipe is handed on or refused).
+ */
+function revealPreviews(card: HTMLElement): (() => void) | null {
+  const els = card.parentElement?.querySelectorAll<HTMLElement>(':scope > [data-next-card-preview]');
+  if (!els || els.length === 0) return null;
+  const saved: Array<[HTMLElement, 'transform' | 'borderRadius' | 'filter' | 'opacity', string]> = [];
+  const set = (el: HTMLElement | null, prop: 'transform' | 'borderRadius' | 'filter' | 'opacity', value: string) => {
+    if (!el) return;
+    saved.push([el, prop, el.style[prop]]);
+    el.style[prop] = value;
+  };
+  els.forEach((el) => {
+    set(el, 'transform', 'scale(1)');
+    set(el, 'borderRadius', el.dataset.revealedRadius || '0px');
+    set(el.querySelector<HTMLElement>(':scope > [data-ncp-blur]'), 'filter', 'none');
+    set(el.querySelector<HTMLElement>(':scope > [data-ncp-tint]'), 'opacity', '0');
+  });
+  return () => {
+    for (let i = saved.length - 1; i >= 0; i--) {
+      const [el, prop, value] = saved[i];
+      el.style[prop] = value;
+    }
+  };
 }
 
 function launchGhost(card: HTMLElement, from: string, to: string, ms: number, ghosts: Set<HTMLElement>, detach: boolean): HTMLElement | null {
@@ -295,6 +358,12 @@ export function useCardSwipe(options: Options) {
   const pointerId = useRef<number | null>(null);
   const captured = useRef(false);
   const ghosts = useRef<Set<HTMLElement>>(new Set());
+  const previewUndo = useRef<(() => void) | null>(null);
+  const undoPreviewReveal = () => {
+    const undo = previewUndo.current;
+    previewUndo.current = null;
+    undo?.();
+  };
 
   const cancelFrame = () => {
     if (rafId.current !== null) {
@@ -319,7 +388,14 @@ export function useCardSwipe(options: Options) {
     velocity.current = { lastX: x, lastT: t, vx: 0 };
     // Drop any snap-back still easing so the card tracks the finger 1:1.
     const card = opts.current.cardRef.current;
-    if (card) card.style.transition = 'none';
+    if (card) {
+      card.style.transition = 'none';
+      try {
+        warmImages([card, ...Array.from(card.parentElement?.querySelectorAll('[data-next-card-preview]') ?? [])]);
+      } catch {
+        /* cosmetic only */
+      }
+    }
     dragging.current = true;
     setSwiping(true);
     lastPushed.current = { dir: null, dist: 0 };
@@ -398,6 +474,14 @@ export function useCardSwipe(options: Options) {
       if (reduced) card.style.opacity = '0';
     }
     lockStamp(dir);
+    if (card) {
+      undoPreviewReveal();
+      try {
+        previewUndo.current = revealPreviews(card);
+      } catch {
+        /* cosmetic only */
+      }
+    }
     o.onExitStart(dir);
 
     // Fast path: drop a copy of the card and hand the decision on straight away.
@@ -448,6 +532,7 @@ export function useCardSwipe(options: Options) {
         c.style.transform = CARD_REST_TRANSFORM;
         c.style.opacity = '';
       }
+      undoPreviewReveal();
       cur.onExitEnd();
       exiting.current = false;
     }, ms);
@@ -476,6 +561,7 @@ export function useCardSwipe(options: Options) {
       // both land in one style recalc and the card slides in from off-screen instead of appearing in place.
       void c.offsetWidth;
     }
+    undoPreviewReveal();
     cur.onExitEnd();
     exiting.current = false;
   }, [resetStamps]);
@@ -495,6 +581,7 @@ export function useCardSwipe(options: Options) {
       c.style.opacity = '';
       c.style.visibility = '';
     }
+    undoPreviewReveal();
     o.onExitEnd();
     exiting.current = false;
   }, [resetStamps]);

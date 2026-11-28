@@ -170,7 +170,7 @@ const ProfileBasicsChips = ({ editedProfile, onOpenSection }: ProfileBasicsChips
       type="button"
       onClick={() => onOpenSection(chip.section)}
       style={{ height: 26, minHeight: 26, padding: '0 10px' }}
-      className={`flex items-center gap-1.5 rounded-full bg-neutral-900 border ${chip.border} text-white text-[12px] leading-none whitespace-nowrap hover:bg-neutral-800 transition-colors capitalize shrink-0`}
+      className="flex items-center gap-1.5 rounded-full bg-white/[0.06] text-white/85 text-[12px] leading-none whitespace-nowrap hover:bg-white/10 transition-colors capitalize shrink-0 [&_svg]:text-white/55"
     >
       {chip.icon}
       {chip.label ? <span>{chip.label}</span> : <Plus className="w-3 h-3 opacity-70" />}

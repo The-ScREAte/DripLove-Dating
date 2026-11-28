@@ -31,6 +31,8 @@ import { SharedWithYou, VibeProfileSections } from './VibeSections';
 import { FactRow, LabelValueRow, PersonalityBar, ProfileSection, TraitChips } from './ProfileSection';
 import { asList, displayValue, formatLocationLabel, isLongText, isSpecified, relationshipIntentLabel, traitText } from './profileCardUtils';
 import type { CaptionedPhoto, PhotoAnchor, ProfileCardData } from './types';
+import IcebreakerInline from '../icebreaker/IcebreakerInline';
+import type { IcebreakerTarget } from '../icebreaker/store';
 
 interface ProfileDetailsPanelProps {
   profile: ProfileCardData;
@@ -40,6 +42,8 @@ interface ProfileDetailsPanelProps {
   preferredLanguageName?: string;
   /** Also list the profile's fun-question answers (used by the full profile dialog). */
   showFunQuestions?: boolean;
+  /** When given, the "Break the ice" button sits at the top of the expanded details. */
+  iceTarget?: IcebreakerTarget | null;
   className?: string;
 }
 
@@ -85,6 +89,7 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
   secondPhotoAnchor = null,
   preferredLanguageName,
   showFunQuestions = false,
+  iceTarget,
   className,
 }) => {
   const { t } = useTranslation();
@@ -130,6 +135,12 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
 
   return (
     <div className={cn('mx-auto w-full max-w-2xl space-y-3 px-4 pb-6 pt-3 text-white', className)}>
+      {iceTarget ? (
+        <div className="flex justify-start">
+          <IcebreakerInline target={iceTarget} className="!mt-0" />
+        </div>
+      ) : null}
+
       <SharedWithYou profile={profile} />
 
       {bio && (

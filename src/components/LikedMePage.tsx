@@ -18,6 +18,7 @@ import { ProfileDetailsPanel } from './profile-card/ProfileDetailsPanel';
 import { useExpandLayoutAnimation } from '@/hooks/useExpandLayoutAnimation';
 import { useCaptionedPhotos, toTitleCase } from './profile-card/profileCardUtils';
 import { ProfileCaption } from './profile-card/ProfileCaption';
+import { BoostWinBadge } from './boost/BoostWinBadge';
 import { ProfileReportModal } from './profile-card/ProfileReportModal';
 import { useProfileReport } from './profile-card/useProfileReport';
 import { useBackClose } from '@/utils/backStack';
@@ -1579,54 +1580,34 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
       {pullToRefresh.indicator}
 
   <div
-    className="flex-shrink-0 shadow-sm border-b border-pink-500/30 px-4 py-4"
-    style={{
-      background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.9))',
-      // No extra top offset here - MainApp's persistent app header is a real
-      // flex sibling above this page's content box, so this box already
-      // starts exactly at the header's bottom edge. The old marginTop here
-      // was a leftover from before that flex-layout refactor (when pages had
-      // to reserve space for a position:fixed header via a pixel guess) and
-      // was just adding a redundant gap between the two headers.
-    }}
+    className="flex-shrink-0 border-b border-white/[0.06] bg-black px-5 pt-3 pb-3"
+    // No extra top offset here - MainApp's persistent app header is a real
+    // flex sibling above this page's content box, so this box already
+    // starts exactly at the header's bottom edge.
   >
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center space-x-1.5">
-            <Users className="w-4 h-4 text-pink-400" />
-            <h1 className="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">{t('matches.peopleWhoLikedYou')}</h1>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h1 className="truncate text-lg font-semibold text-white">{t('matches.peopleWhoLikedYou')}</h1>
+            <span className="shrink-0 text-sm text-white/45" aria-label={t('matches.peopleCount', { count: likers.length })}>{likers.length}</span>
           </div>
           {!isPremium && (
-            <Button variant="premium" size="sm"
+            <Button variant="premium" size="sm" className="shrink-0"
               onClick={() => openPremiumUpgrade()}
-             
-             
+              aria-label={likedMeTrialEligible ? 'Try Premium now for free to see who liked you and interact with them' : t('matches.upgradeToPremium')}
             >
               <Crown className="w-3.5 h-3.5 mr-1" />
-              {t('matches.upgrade')}
+              {likedMeTrialEligible ? t('circle.unlockCtaTrial', 'Start free trial') : t('matches.upgrade')}
             </Button>
           )}
         </div>
-        <p className="text-gray-400 text-xs">({t('matches.peopleCount', { count: likers.length })})</p>
-
-        {!isPremium && (
-          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-2 mt-2">
-            <div className="flex items-center space-x-1.5 text-yellow-300">
-              <Lock className="w-3 h-3" />
-              <span className="text-[10px] font-medium">
-                {likedMeTrialEligible ? 'Try Premium now for free to see who liked you and interact with them' : t('matches.upgradeToPremium')}
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto overscroll-y-contain p-4 pb-24 bg-black" ref={scrollContainerRef}>
         {likers.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <Users className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">{t('matches.noNewLikes')}</h3>
-              <p className="text-gray-400">{t('matches.keepSwiping')}</p>
+              <Users className="w-10 h-10 text-white/25 mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-white/80">{t('matches.noNewLikes')}</h3>
             </div>
           </div>
         ) : (
@@ -1637,10 +1618,10 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
               return (
                 <Card
                   key={liker.id}
-                  className={`cursor-pointer hover:shadow-lg transition-shadow flex flex-col h-full bg-black border-pink-500/30 ${isLocked ? 'opacity-75' : ''}`}
+                  className="dl-soft-card cursor-pointer flex flex-col h-full overflow-hidden rounded-2xl"
                   onClick={() => handleProfileClick(liker, likerIndex)}
                 >
-                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-t-lg">
+                  <div className="relative aspect-[3/4] w-full overflow-hidden">
                     {(() => {
                       const profileImages = userImages[liker.id] || [];
                       return profileImages.length > 0 ? (
@@ -1672,13 +1653,15 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                     })()}
                     {isLocked && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <div className="bg-black/80 border border-pink-500/40 backdrop-blur-sm rounded-full p-3">
-                          <Lock className="w-6 h-6 text-pink-300" />
+                        <div className="dl-soft-badge rounded-full p-2.5">
+                          <Lock className="w-5 h-5 text-pink-100" />
                         </div>
                       </div>
                     )}
+                    {/* This like came while I was boosted. */}
+                    <BoostWinBadge userId={liker.id} variant="card" className="absolute left-2 top-2 z-10" />
                   </div>
-                  <CardContent className="p-3 flex-1 bg-black">
+                  <CardContent className="px-3 py-2.5 flex-1">
                     <h3 className={`flex items-center gap-1.5 font-semibold text-white truncate text-sm ${isLocked ? 'blur-sm' : ''}`}>
                       <span className="truncate">
                         {isLocked
@@ -1689,7 +1672,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                         <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" aria-label="Active now" />
                       )}
                     </h3>
-                    <p className="text-xs text-gray-400 truncate">
+                    <p className="text-xs text-white/50 truncate">
                       {liker.country}, {liker.city}
                     </p>
                   </CardContent>

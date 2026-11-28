@@ -37,7 +37,7 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
     style={{ bottom: bottomOffset }}
   >
       <div className="relative">
-        <Button variant="overlay" className="p-0 disabled:opacity-30"
+        <Button variant="overlay" className="p-0 bg-black/35 backdrop-blur-md shadow-[inset_0_0_0_1px_rgba(244,114,182,0.35)] disabled:opacity-30"
           onClick={onReverse}
          
           disabled={!canReverse}
@@ -57,7 +57,7 @@ const SwipeButtons: React.FC<SwipeButtonsProps> = ({
           />
         </Button>
         {showCount && (
-          <div className="absolute -top-2 -right-2 w-6 h-6 bg-white text-pink-600 text-xs font-bold rounded-full flex items-center justify-center shadow-lg border border-pink-500">
+          <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-pink-200 text-pink-900 text-[11px] font-semibold rounded-full shadow-[0_0_0_1.5px_rgba(0,0,0,0.35)] flex items-center justify-center">
             {reversesLeft}
           </div>
         )}

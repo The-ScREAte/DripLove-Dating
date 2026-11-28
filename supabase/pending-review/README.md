@@ -19,3 +19,15 @@ verification SQL in the comments at the bottom of the file.
 
 ## Applied 2026-11-27
 `20261128000000_free_undo_limit_2_for_review.sql` and `20261128010000_server_side_swipe_limits_for_review.sql` were consolidated (with the ownership guard, expiry-aware premium, block/cooldown checks) into `supabase/migrations/20261127190000_server_side_swipe_limits.sql` and applied. Do not apply the two files above.
+
+
+## Break the ice: weekly allowance + 24h reply timer (added 2026-11-28)
+`20261128120000_icebreakers_weekly_24h_for_review.sql` is the ONE file to apply for "Break the ice" (it replaces
+`20261127000000_icebreakers_for_review.sql`, which must NOT be applied). 10 hellos per 7 days (renews, no carry-over),
+24 hours for the other person to answer, expired hellos return the person to the sender's queue, 5-minute cleanup cron,
+`notify_like_received` based on the current live body. Kept out of `supabase/migrations/` until you approve it. To apply:
+move it into `supabase/migrations/` (same name without `_for_review`) and run it; verification SQL is in the comments.
+
+
+## Applied 2026-11-28
+`20261128120000_icebreakers_weekly_24h` was approved by the owner and applied; it now lives in `supabase/migrations/`.

@@ -26,7 +26,22 @@ export const getPrivacyScreenPlugin = async () => {
   return { plugin: PrivacyScreen };
 };
 
+// Tells native code "a logged-in session is active" (Capacitor Preferences key read by MainActivity.onCreate and
+// PrivacyScreen.swift at launch) so the next cold start protects the very first frame with no JS involved.
+// Only the login lifecycle (enable/disable below) writes it - the temporary Profile/mini-game exemptions
+// (useAllowScreenshots) talk to the plugin directly and never touch it.
+const setSessionFlag = async (active: boolean): Promise<void> => {
+  try {
+    const { Preferences } = await import('@capacitor/preferences');
+    if (active) await Preferences.set({ key: 'dl_secure_session', value: '1' });
+    else await Preferences.remove({ key: 'dl_secure_session' });
+  } catch {
+    // Best effort.
+  }
+};
+
 export const enablePrivacyScreen = async (): Promise<void> => {
+  if (isNative) void setSessionFlag(true);
   try {
     const plugin = (await getPrivacyScreenPlugin())?.plugin;
     await plugin?.enable();
@@ -36,6 +51,7 @@ export const enablePrivacyScreen = async (): Promise<void> => {
 };
 
 export const disablePrivacyScreen = async (): Promise<void> => {
+  if (isNative) void setSessionFlag(false);
   try {
     const plugin = (await getPrivacyScreenPlugin())?.plugin;
     await plugin?.disable();

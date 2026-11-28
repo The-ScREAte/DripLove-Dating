@@ -1,6 +1,6 @@
 import React, { useEffect, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Lock, MessageCircleHeart } from 'lucide-react';
+import { Check, Lock, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   getCachedStatus,
@@ -19,7 +19,7 @@ interface Props {
   target: IcebreakerTarget;
   isOwnProfile?: boolean;
   className?: string;
-  /** Render even when the backend migration isn't applied yet (the popup then runs in copy mode). */
+  /** Render even when the backend migration isn't applied yet (the popup then shows Send as not available yet). */
   alwaysShow?: boolean;
   /** Smaller, centred pill for use inside a card (instead of a full-width bar). */
   compact?: boolean;
@@ -72,7 +72,7 @@ export const IcebreakerButton: React.FC<Props> = ({ target, isOwnProfile, classN
       ? t('icebreaker.sentLabel', 'Hi sent')
       : action === 'say_hi'
         ? t('icebreaker.sayHi', 'Say hi')
-        : t('icebreaker.sheet.send', 'Say hi first');
+        : t('icebreaker.title', 'Break the ice');
   const d = chancesDisplay(shown);
   const badgeCount = action === 'sent' || action === 'say_hi' ? null : d.kind === 'left' ? d.count : d.kind === 'none' ? 0 : null;
   const badge =
@@ -81,7 +81,7 @@ export const IcebreakerButton: React.FC<Props> = ({ target, isOwnProfile, classN
         {badgeCount}
       </span>
     );
-  const Icon = action === 'sent' ? Check : action === 'upgrade' ? Lock : MessageCircleHeart;
+  const Icon = action === 'sent' ? Check : action === 'renewing' ? Lock : MessageCircle;
 
   return (
     <div className={`ice-cta ${className || ''}`} data-compact={compact ? 'true' : undefined} onPointerDown={stop} onTouchStart={stop}>

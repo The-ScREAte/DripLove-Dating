@@ -1,5 +1,4 @@
 import React from 'react';
-import { isAndroidPlatform } from '@/utils/platformUtils';
 import { getDetailImageUrl } from '@/utils/imageOptimizer';
 
 interface DominantColorImageBgProps {
@@ -10,8 +9,10 @@ interface DominantColorImageBgProps {
 const DominantColorImageBg: React.FC<DominantColorImageBgProps> = ({ imageUrl, children }) => {
   // Use lightweight static background color instead of expensive pixel scanning
   const edgeColor = '#f6f6f6';
-  // ⭐ ANDROID OPTIMIZATION: Reduce blur for Android (CPU intensive on Android WebView)
-  const blurAmount = isAndroidPlatform() ? '3px' : '6px';
+  // Same blur on every platform so the backdrop looks identical on Android and iOS.
+  // It is a static filter on a still image (rasterised once on its own layer), so
+  // the stronger blur costs nothing per frame.
+  const blurAmount = '6px';
   
   return (
     <div className="absolute inset-0 z-0 pointer-events-none">
@@ -32,7 +33,6 @@ const DominantColorImageBg: React.FC<DominantColorImageBgProps> = ({ imageUrl, c
           aria-hidden="true"
           className="absolute inset-0 w-full h-full object-cover"
           style={{
-            // ⭐ ANDROID FIX: Lighter blur for Android performance
             filter: `blur(${blurAmount}) brightness(1.04)`,
             zIndex: 1,
             objectFit: 'cover',
@@ -40,8 +40,8 @@ const DominantColorImageBg: React.FC<DominantColorImageBgProps> = ({ imageUrl, c
             height: '100%',
             transform: 'scale(1.4)',
             imageRendering: 'auto',
-            // ⭐ ANDROID FIX: Force GPU acceleration
-            willChange: isAndroidPlatform() ? 'transform' : 'auto'
+            // Own compositor layer so the blurred image is painted once, not per frame.
+            willChange: 'transform'
           }}
           draggable={false}
           loading="lazy"

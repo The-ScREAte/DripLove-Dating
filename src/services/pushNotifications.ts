@@ -51,6 +51,7 @@ const normalizeNotificationData = (value: unknown): Record<string, unknown> => {
 //   action open_circle_profile -> that person's profile inside Circle
 //   action open_chat / open_liked / open_profile / open_circle -> that tab
 //     (scheduled messages choose where a tap goes - see scheduled_broadcasts.tap_action)
+//   action open_boost -> Discover (+ the boost sheet when a boost can be started)
 //   action open_games -> the Games hub (/games is its own top-level route,
 //     not a tab on "/" like everything else here - see navigateFromNotification
 //     and MainApp's nav handler for how a plain URL change alone isn't enough
@@ -67,6 +68,7 @@ const resolveNotificationRoute = (
   // silently on Discover.
   if (data?.action === 'open_discover' && data?.showStreakBanner) return '/?tab=dripcheck&showStreak=1';
   if (data?.action === 'open_discover') return '/';
+  if (data?.action === 'open_boost') return '/?tab=dripcheck&boost=1';
   if (data?.action === 'open_games') return '/games';
   if (data?.action === 'open_circle_profile' && data?.profileId) {
     return `/?tab=circle&circleUserId=${data.profileId}`;
@@ -466,7 +468,11 @@ class SupabasePushNotificationService {
     // Likes already get the real push notification (sendLikeNotification /
     // sendMultipleLikesNotification) - skip the extra custom in-app popup
     // banner for them so a like doesn't show up twice.
-    if (notification.type !== 'like') {
+    // Boost pushes are for when the app is closed: in the app the launch animation and the top timer already say it,
+    // and an in-app banner would sit on top of that timer.
+    const nData = normalizeNotificationData(notification.data) as Record<string, unknown>;
+    const isBoostPush = nData?.action === 'open_boost' || /^boost/.test(String(nData?.kind ?? ''));
+    if (notification.type !== 'like' && !isBoostPush) {
       this.showInAppNotification({
         title: notification.title,
         body: notification.message,

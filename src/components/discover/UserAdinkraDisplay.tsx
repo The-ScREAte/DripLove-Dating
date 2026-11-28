@@ -164,7 +164,7 @@ const UserAdinkraDisplay: React.FC<UserAdinkraDisplayProps> = React.memo(({ adin
           onTouchStart={stopTouchPropagation}
           onTouchMove={stopTouchPropagation}
           onTouchEnd={stopTouchPropagation}
-          className="inline-flex items-center gap-1 min-h-0 max-w-[110px] shrink-0 rounded-full border border-yellow-400/60 bg-yellow-400/10 px-2 py-0.5 text-[clamp(9px,2.8vw,12px)] font-medium text-white/85 transition-transform duration-150 active:scale-90"
+          className="inline-flex items-center gap-1 min-h-0 max-w-[110px] shrink-0 rounded-full dl-chip px-2.5 py-0.5 text-[clamp(9px,2.8vw,12px)] font-medium text-white/95 transition-transform duration-150 active:scale-90"
           aria-label={`Show meaning of ${name}`}
         >
           {renderSymbolContent(name, symbol, SvgComponent, LABEL_ICON_SIZE)}

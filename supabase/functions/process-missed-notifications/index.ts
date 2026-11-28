@@ -108,7 +108,7 @@ async function sendPush(supabase: SupabaseClient, due: Due, sum: Summary, names:
   if (sum.matches > 0) {
     const name = sum.matches === 1 ? names.get(sum.matchSenders[0] ?? '') : undefined;
     pushes.push({
-      title: "It's a match! 💕",
+      title: "It's a match!",
       body: name ? `You and ${name} liked each other. Say hello!` : `You have ${sum.matches} new matches. Say hello!`,
       type: 'match', kind: 'match', category: 'event',
       data: {
@@ -123,7 +123,7 @@ async function sendPush(supabase: SupabaseClient, due: Due, sum: Summary, names:
     const senders = Array.from(new Set(sum.messageSenders));
     const name = senders.length === 1 ? names.get(senders[0]) : undefined;
     pushes.push({
-      title: name ?? 'New messages 💬',
+      title: name ?? 'New messages',
       body: name ? (sum.messages > 1 ? `Sent you ${sum.messages} messages` : 'Sent you a message') : `You have ${sum.messages} new messages`,
       type: 'message', kind: 'message', category: 'event',
       // All from one conversation: the tap opens it (otherwise the Chat list).
@@ -132,7 +132,7 @@ async function sendPush(supabase: SupabaseClient, due: Due, sum: Summary, names:
   }
   if (sum.likes > 0) {
     pushes.push({
-      title: sum.likes > 1 ? `${sum.likes} people liked you 👀` : 'Someone liked you 👀',
+      title: sum.likes > 1 ? `${sum.likes} people liked you` : 'Someone liked you',
       body: "See who's interested in you",
       type: 'like', kind: 'like', category: 'event',
       data: { catchup: 'true' },

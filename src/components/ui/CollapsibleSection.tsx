@@ -37,13 +37,13 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onCancel,
 }) => {
   return (
-    <Card id={id} className={`w-full bg-black border-pink-500/30 ${className}`}>
+    <Card id={id} className={`w-full bg-white/[0.03] border-white/[0.06] shadow-none ${className}`}>
       <CardHeader
-        className="cursor-pointer hover:bg-pink-500/10 transition-colors duration-200 px-6 py-2.5"
+        className="cursor-pointer hover:bg-white/[0.04] transition-colors duration-200 px-5 py-2.5"
         onClick={onToggle}
       >
         <div className="flex justify-between items-center">
-          <CardTitle className="text-lg font-semibold text-white">
+          <CardTitle className="text-[15px] font-semibold text-white/90">
             {title}
           </CardTitle>
           <div className="flex items-center gap-2 text-white/80">
@@ -78,7 +78,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
                     onClick={(e) => { e.stopPropagation(); onEdit(); }}
                     aria-label="Edit"
                     style={iconButtonStyle}
-                    className="flex items-center justify-center shrink-0 rounded-full border border-pink-500/40 text-pink-300 hover:bg-pink-500/10 transition-colors"
+                    className="flex items-center justify-center shrink-0 rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10 transition-colors"
                   >
                     <Pencil size={13} style={{ width: 13, height: 13 }} />
                   </button>
@@ -95,7 +95,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       </CardHeader>
 
       {isOpen && (
-        <CardContent className="px-6 pb-6 pt-0">
+        <CardContent className="px-5 pb-5 pt-0">
           {children}
         </CardContent>
       )}

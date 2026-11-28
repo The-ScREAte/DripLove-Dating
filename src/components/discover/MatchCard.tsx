@@ -151,6 +151,18 @@ const MatchCard: React.FC<MatchCardProps> = ({
     [stableMatch, currentSlide]
   );
 
+  // "Break the ice" under the info area: who it is for + the personal openers the starter card already worked out.
+  const iceTarget = useMemo(() => {
+    if (!match.id) return null;
+    const starterCard = slides.find((sl) => sl.type === 'card' && sl.card?.kind === 'starter');
+    return {
+      id: String(match.id),
+      name: toTitleCase(match.first_name || ''),
+      photoUrl: memoUserImages?.[0] ?? null,
+      starters: starterCard?.card?.data?.starters,
+    };
+  }, [match.id, match.first_name, slides, memoUserImages]);
+
   // Up to 2 captioned photos (seeded pick, shared with every other profile view).
   const { captionedPhotos, secondPhotoAnchor } = useCaptionedPhotos(
     match.imageCaptions,
@@ -439,6 +451,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
             showAbout={showAbout}
             expanded={showMoreInfo}
             onToggle={onToggleInfo}
+            showBoost={isActiveTab}
           />
 
           <ProfileReportModal report={report} />
@@ -463,6 +476,7 @@ const MatchCard: React.FC<MatchCardProps> = ({
           captionedPhotos={captionedPhotos}
           secondPhotoAnchor={secondPhotoAnchor}
           preferredLanguageName={preferredLanguageName}
+          iceTarget={iceTarget}
           // Clear of the floating undo button so the last section can scroll above it.
           className="pb-24"
         />

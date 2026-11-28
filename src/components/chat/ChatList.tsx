@@ -7,7 +7,8 @@ import { ListSkeleton } from '@/components/ui/LoadingStates';
 import ChatUserAvatar from '@/components/ChatUserAvatar';
 import MatchExpirationAvatar from './MatchExpirationAvatar';
 import { formatListTime, previewText } from './chatFormat';
-import IcebreakerRow from '../icebreaker/IcebreakerRow';
+import { IcebreakerClocksLoader, IcebreakerListClock } from '../icebreaker/IcebreakerListClock';
+import { BoostWinBadge } from '../boost/BoostWinBadge';
 
 // The enter stagger is a first-load nicety - replaying it every time the user
 // comes back from a conversation would just be motion for motion's sake.
@@ -151,9 +152,13 @@ const ChatList: React.FC<ChatListProps> = ({
               {match.is_verified && (
                 <BadgeCheck className="h-4 w-4 shrink-0 text-brand" aria-label={t('chat.verified')} />
               )}
+              <BoostWinBadge userId={pid} variant="row" />
             </h3>
-            <span className={`shrink-0 text-xs ${unread ? 'font-semibold text-brand-ink' : 'text-white/45'}`}>
-              {formatListTime(match.last_message_time, now, i18n.language, yesterdayLabel)}
+            <span className="flex shrink-0 items-center gap-2">
+              <IcebreakerListClock matchId={match.id} />
+              <span className={`shrink-0 text-xs ${unread ? 'font-semibold text-brand-ink' : 'text-white/45'}`}>
+                {formatListTime(match.last_message_time, now, i18n.language, yesterdayLabel)}
+              </span>
             </span>
           </div>
           <div className="mt-0.5 flex items-center justify-between gap-2">
@@ -181,6 +186,7 @@ const ChatList: React.FC<ChatListProps> = ({
 
   return (
     <div className="dl-route mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col bg-black md:border-x md:border-white/10" style={{ paddingTop: `${topCompensation}px`, paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+      <IcebreakerClocksLoader myId={currentUserId} />
       {/* Header */}
       <div
         className="z-30 shrink-0 border-b border-white/10 text-white"
@@ -227,9 +233,6 @@ const ChatList: React.FC<ChatListProps> = ({
         )}
       </div>
 
-      {/* Break the ice requests waiting for an answer (renders nothing when there are none). */}
-      {!q && <IcebreakerRow />}
-
       {/* New matches */}
       {newMatches.length > 0 && !q && (
         <section className="shrink-0 border-b border-white/10 bg-black/60 py-3" aria-label={t('chat.newMatchesAria')}>
@@ -266,6 +269,7 @@ const ChatList: React.FC<ChatListProps> = ({
                     >
                       <Heart className="h-3 w-3 fill-current" />
                     </span>
+                    <BoostWinBadge userId={pid} variant="dot" className="absolute -left-0.5 -top-0.5" />
                   </div>
                   <span className="mt-1.5 w-full truncate text-center text-xs font-medium text-white/85">{match.first_name}</span>
                 </div>

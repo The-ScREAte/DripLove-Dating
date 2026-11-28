@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Lock, MessageCircleHeart, Shuffle } from 'lucide-react';
+import { Check, Lock, Send, Shuffle } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useBackClose } from '@/utils/backStack';
-import { getCachedStatus, loadQuota, sendIcebreaker, useIcebreakerAvailable, useIcebreakerQuota } from '@/services/icebreaker';
-import { copyToClipboard } from '@/utils/copyToClipboard';
+import { loadQuota, sendIcebreaker, useIcebreakerAvailable, useIcebreakerQuota } from '@/services/icebreaker';
+import { formatRenews, msUntil } from '@/utils/icebreaker';
 import { ChancesPill } from './ChancesPill';
 import { useChances } from './useChances';
 import {
@@ -20,7 +20,10 @@ import {
 import { closeIcebreaker, getIcebreakerHandlers, type IcebreakerTarget } from './store';
 import './icebreaker.css';
 
-type Mode = 'compose' | 'sent' | 'upsell' | 'matched';
+type Mode = 'compose' | 'sent' | 'renewing' | 'matched';
+
+/** How long the brief "Sent" confirmation stays before the chat opens. */
+const SENT_TO_CHAT_MS = 900;
 
 const canHover = (): boolean => {
   try {
@@ -50,7 +53,10 @@ interface Props {
   target: IcebreakerTarget;
 }
 
-/** The composer: friendly openers, a short text box, one send button. Opened for one person. */
+/**
+ * The composer: who it's for, a few short ideas, a text box, one Send button. A sent hello IS the first message of a
+ * normal chat, so after a short "Sent" the sheet closes and that chat opens.
+ */
 const IcebreakerSheet: React.FC<Props> = ({ target }) => {
   const { t } = useTranslation();
   const quota = useIcebreakerQuota();
@@ -74,15 +80,15 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const draft = icebreakerDraftState(text);
-  // Backend not applied yet: the popup still works as a message helper - "Copy message" instead of Send.
+  // Backend not reachable as a feature (migration missing): the composer stays readable but Send is switched off with a
+  // calm one-line note. Nothing is copied or faked.
   const unavailable = useIcebreakerAvailable() === false;
-  const [copied, setCopied] = useState(false);
 
   // A fresh quota when the sheet opens; if it is already used up, go straight to the upsell.
   useEffect(() => {
     let alive = true;
     void loadQuota(true).then((q) => {
-      if (alive && q && !q.isPremium && q.remaining !== null && q.remaining <= 0) setMode('upsell');
+      if (alive && q && q.remaining !== null && q.remaining <= 0) setMode('renewing');
     });
     return () => {
       alive = false;
@@ -104,12 +110,18 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
     }
   };
 
-  // After "Sent!" the sheet closes on its own (the button on the card then reads "Icebreaker sent").
+  // The chat the hello opened (null = nothing to open, e.g. a hello that was already waiting).
+  const [chatId, setChatId] = useState<string | null>(null);
+  const openTheChat = (matchId: string | null) => {
+    closeIcebreaker();
+    getIcebreakerHandlers().openChat(matchId);
+  };
+  // After a brief "Sent" the sheet closes on its own and, when there is one, the new chat opens.
   useEffect(() => {
     if (mode !== 'sent') return undefined;
-    const id = window.setTimeout(closeIcebreaker, 1900);
+    const id = window.setTimeout(() => (chatId ? openTheChat(chatId) : closeIcebreaker()), chatId ? SENT_TO_CHAT_MS : 1600);
     return () => window.clearTimeout(id);
-  }, [mode]);
+  }, [mode, chatId]);
 
   useBackClose(true, closeIcebreaker, { escape: false });
 
@@ -127,36 +139,28 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
   };
 
   const send = async () => {
-    if (sending || !draft.canSend) return;
-    if (unavailable) {
-      const ok = await copyToClipboard(sanitizeIcebreaker(text));
-      setCopied(ok);
-      if (ok) window.setTimeout(() => setCopied(false), 2200);
-      return;
-    }
+    if (sending || !draft.canSend || unavailable) return;
     setSending(true);
     setError(null);
     const res = await sendIcebreaker(target.id, sanitizeIcebreaker(text));
     setSending(false);
-    if (res.kind === 'missing') {
-      closeIcebreaker();
-      return;
-    }
+    // missing: `unavailable` flips to true on its own and the button turns into the "not available" state
+    if (res.kind === 'missing') return;
     if (res.kind === 'ok') {
+      setChatId(res.matchId);
       setMode('sent');
       return;
     }
     if (res.kind === 'already_matched') {
-      setMode('matched');
+      // Already talking: go straight to that chat.
+      if (res.matchId) openTheChat(res.matchId);
+      else setMode('matched');
       return;
     }
     const key = sendErrorKey(res.code);
-    if (key === 'quota_exhausted') {
-      setMode('upsell');
-      return;
-    }
-    if (key === 'already_matched') {
-      setMode('matched');
+    if (key === 'quota_exhausted' || key === 'daily_limit') {
+      void loadQuota(true);
+      setMode('renewing');
       return;
     }
     if (key === 'already_sent') {
@@ -169,15 +173,15 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
   const errorText = (key: string): string => {
     switch (key) {
       case 'rate_limited':
-        return t('icebreaker.errors.rateLimited', "You're sending a lot of icebreakers - try again in a little while.");
+        return t('icebreaker.errors.rateLimited', 'Too many at once. Try again shortly.');
       case 'daily_limit':
-        return t('icebreaker.errors.dailyLimit', "You've reached today's icebreaker limit. Try again tomorrow.");
+        return t('icebreaker.errors.dailyLimit', "You've used this week's icebreakers.");
       case 'invalid_message':
         return t('icebreaker.errors.invalid', 'Please write a short message (up to {{max}} characters).', { max: ICEBREAKER_MAX_LEN });
       case 'unavailable':
-        return t('icebreaker.errors.unavailable', "This person can't receive icebreakers right now.");
+        return t('icebreaker.errors.unavailable', "This person can't get hellos right now.");
       default:
-        return t('icebreaker.errors.generic', "Couldn't send that - please try again.");
+        return t('icebreaker.errors.generic', "Couldn't send. Try again.");
     }
   };
 
@@ -192,34 +196,47 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
         <div className="ice-grab" aria-hidden="true" />
         <SheetTitle className="sr-only">{t('icebreaker.title', 'Break the ice')}</SheetTitle>
         <SheetDescription id="ice-sheet-desc" className="sr-only">
-          {t('icebreaker.sheet.title', 'Be the first to say hi')}
+          {t('icebreaker.sheet.title', 'Say hi to {{name}}', { name })}
         </SheetDescription>
 
         {mode === 'compose' && (
-          <div className="ice-body ice-lean">
-            <div className="ice-top">
-              <h2 className="ice-to" dir="auto">
-                {t('icebreaker.sheet.title', 'Be the first to say hi')}
-              </h2>
-              <ChancesPill quota={shownQuota} />
+          <div className="ice-body ice-compose">
+            <div className="ice-head">
+              <Avatar name={name} photoUrl={target.photoUrl} size={44} />
+              <div className="ice-head-text">
+                <h2 className="ice-to" dir="auto">
+                  {t('icebreaker.sheet.title', 'Say hi to {{name}}', { name })}
+                </h2>
+                <p className="ice-head-sub" dir="auto">
+                  {t('icebreaker.sheet.sub', 'It starts a chat. {{name}} has 24 hours to reply.', { name })}
+                </p>
+              </div>
+              {!unavailable && <ChancesPill quota={shownQuota} />}
             </div>
 
-            <div className="ice-openers" role="group" aria-label={t('icebreaker.sheet.ideas', 'Need an idea?')}>
-              {openers.map((line) => (
-                <button
-                  key={line}
-                  type="button"
-                  className="ice-opener dl-focus dl-press"
-                  data-on={picked === line ? 'true' : undefined}
-                  aria-pressed={picked === line}
-                  onClick={() => pick(line)}
-                >
-                  {line}
+            <div className="ice-ideas" role="group" aria-labelledby="ice-ideas-label">
+              <div className="ice-ideas-head">
+                <span id="ice-ideas-label" className="ice-ideas-label">{t('icebreaker.sheet.ideas', 'Ideas')}</span>
+                <button type="button" className="ice-more dl-focus" onClick={() => setRound((r) => r + 1)}>
+                  <Shuffle aria-hidden="true" />
+                  <span>{t('icebreaker.sheet.more', 'More ideas')}</span>
                 </button>
-              ))}
-              <button type="button" className="ice-more dl-focus dl-press" aria-label={t('icebreaker.sheet.more', 'More ideas')} onClick={() => setRound((r) => r + 1)}>
-                <Shuffle aria-hidden="true" />
-              </button>
+              </div>
+              <div className="ice-openers">
+                {openers.map((line) => (
+                  <button
+                    key={line}
+                    type="button"
+                    className="ice-opener dl-focus"
+                    data-on={picked === line ? 'true' : undefined}
+                    aria-pressed={picked === line}
+                    onClick={() => pick(line)}
+                    dir="auto"
+                  >
+                    {line}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="ice-field">
@@ -234,8 +251,8 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
                 }}
                 rows={3}
                 maxLength={ICEBREAKER_MAX_LEN}
-                placeholder={t('icebreaker.sheet.placeholder', 'Say something sweet…')}
-                aria-label={t('icebreaker.sheet.placeholder', 'Say something sweet…')}
+                placeholder={t('icebreaker.sheet.placeholder', 'Write your first message…')}
+                aria-label={t('icebreaker.sheet.placeholder', 'Write your first message…')}
                 aria-invalid={error ? true : undefined}
                 className="ice-textarea"
               />
@@ -244,13 +261,15 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
               </span>
             </div>
 
-            <p className="ice-error" role="alert" aria-live="assertive">
-              {error ? errorText(error) : ''}
-            </p>
+            {(unavailable || error) && (
+              <p className={unavailable ? 'ice-error ice-error-calm' : 'ice-error'} role={unavailable ? 'status' : 'alert'}>
+                {unavailable ? t('icebreaker.notAvailable', 'Not available yet. Try again later.') : errorText(error as string)}
+              </p>
+            )}
 
-            <Button variant="primary" size="lg" className="w-full" loading={sending} disabled={!draft.canSend} onClick={send}>
-              <MessageCircleHeart className="h-5 w-5" aria-hidden="true" />
-              <span>{sending ? t('icebreaker.sheet.sending', 'Sending…') : unavailable && copied ? t('icebreaker.copied', 'Copied') : t('icebreaker.sheet.send', 'Say hi first')}</span>
+            <Button variant="primary" size="lg" className="w-full" loading={sending} disabled={!draft.canSend || unavailable} onClick={send}>
+              <Send className="h-[18px] w-[18px]" aria-hidden="true" />
+              <span>{sending ? t('icebreaker.sheet.sending', 'Sending…') : t('icebreaker.sheet.send', 'Send')}</span>
             </Button>
           </div>
         )}
@@ -260,56 +279,37 @@ const IcebreakerSheet: React.FC<Props> = ({ target }) => {
             <span className="ice-success" aria-hidden="true">
               <Check strokeWidth={3} />
             </span>
-            <h2 className="ice-big">{t('icebreaker.sheet.sentTitle', 'Sent!')}</h2>
-            <p className="ice-sub">{t('icebreaker.sheet.sentBody', "We'll let you know if {{name}} replies.", { name })}</p>
-            <Button variant="line" size="lg" className="w-full text-white" onClick={closeIcebreaker}>
-              {t('icebreaker.sheet.done', 'Done')}
-            </Button>
+            <h2 className="ice-big">{t('icebreaker.sheet.sentTitle', 'Sent')}</h2>
+            <p className="ice-sub" dir="auto">
+              {chatId
+                ? t('icebreaker.sheet.sentBody', 'Opening your chat with {{name}}…', { name })
+                : t('icebreaker.sheet.sentBodyPlain', '{{name}} has 24 hours to reply.', { name })}
+            </p>
           </div>
         )}
 
-        {mode === 'upsell' && (
+        {mode === 'renewing' && (
           <div className="ice-body ice-center">
             <span className="ice-lock" aria-hidden="true">
               <Lock />
             </span>
-            <h2 className="ice-big">
-              {t('icebreaker.upsell.title', "You've used your {{limit}} free icebreakers", { limit: quota?.limit ?? 3 })}
-            </h2>
-            <p className="ice-sub">{t('icebreaker.upsell.body', 'Go Premium to break the ice with as many people as you like.')}</p>
-            <Button
-              variant="premium"
-              size="lg"
-              className="w-full"
-              onClick={() => {
-                closeIcebreaker();
-                getIcebreakerHandlers().openPremium();
-              }}
-            >
-              {t('icebreaker.upsell.cta', 'Go Premium')}
-            </Button>
-            <Button variant="quiet" size="md" className="w-full text-white/70" onClick={closeIcebreaker}>
-              {t('icebreaker.upsell.later', 'Not now')}
+            <h2 className="ice-big">{t('icebreaker.renewing.title', 'All {{limit}} used this week', { limit: quota?.limit ?? 10 })}</h2>
+            <p className="ice-sub">
+              {quota?.resetsAt && msUntil(quota.resetsAt) > 0
+                ? t('icebreaker.renewing.body', '{{limit}} new hellos in {{time}}.', { limit: quota?.limit ?? 10, time: formatRenews(msUntil(quota.resetsAt)) })
+                : t('icebreaker.renewing.bodyNoTime', '{{limit}} new hellos every 7 days.', { limit: quota?.limit ?? 10 })}
+            </p>
+            <Button variant="primary" size="lg" className="w-full" onClick={closeIcebreaker}>
+              {t('icebreaker.renewing.ok', 'Got it')}
             </Button>
           </div>
         )}
 
         {mode === 'matched' && (
           <div className="ice-body ice-center">
-            <span className="ice-success" aria-hidden="true">
-              <MessageCircleHeart />
-            </span>
-            <h2 className="ice-big">{t('icebreaker.matched.title', "You're already matched")}</h2>
+            <h2 className="ice-big">{t('icebreaker.matched.title', "You're already chatting")}</h2>
             <p className="ice-sub">{t('icebreaker.matched.body', 'Say hi in your chat.')}</p>
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              onClick={() => {
-                closeIcebreaker();
-                getIcebreakerHandlers().openChat(getCachedStatus(target.id)?.matchId);
-              }}
-            >
+            <Button variant="primary" size="lg" className="w-full" onClick={() => openTheChat(null)}>
               {t('icebreaker.matched.cta', 'Open chat')}
             </Button>
           </div>

@@ -41,7 +41,8 @@
 
 /* text */
 .mx-title {
-  margin: 0; font-family: 'Caveat', cursive; font-weight: 700; font-size: clamp(52px, 15vw, 66px); line-height: 1; letter-spacing: 0;
+  margin: 0; padding: 0 0.18em 0.06em; font-family: 'Caveat', cursive; font-weight: 700; font-size: clamp(52px, 15vw, 66px); line-height: 1; letter-spacing: 0;
+  /* the padding gives the slanted script room: background-clip text otherwise cuts off the final "!" */
   background: linear-gradient(180deg, #ffffff 25%, #fbcfe8 100%); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
   animation: mx-rise 520ms ease-out 640ms both;
 }

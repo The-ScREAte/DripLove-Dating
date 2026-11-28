@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Crown, Heart, RefreshCw, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import HoppingLogo from '@/components/HoppingLogo';
+import BoostButton from '@/components/boost/BoostButton';
 
 /**
  * Card-shaped skeleton shown while Discover loads its first deck (or refills
@@ -89,6 +90,9 @@ export const DiscoverEmptyState: React.FC<DiscoverEmptyStateProps> = ({
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
           {t('discover.refresh')}
         </Button>
+
+        {/* Nobody left to swipe is the best moment to get seen: Boost puts them in front of other people's decks. */}
+        <BoostButton variant="inline" />
 
         <div className="flex items-center gap-4 pt-1 text-sm">
           <Button variant="quiet" size="sm" className="text-white/70" onClick={onAdjustFilters}>

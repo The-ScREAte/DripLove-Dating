@@ -382,7 +382,7 @@ serve(async (req) => {
         .from('likes').select('id', { count: 'exact', head: true })
         .eq('liked_id', userId).gt('created_at', since)
       if ((count ?? 0) > 1) {
-        title = `${count} people liked you 👀`
+        title = `${count} people liked you`
         body = "See who's interested in you"
       }
     }

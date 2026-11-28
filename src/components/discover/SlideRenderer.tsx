@@ -7,7 +7,6 @@ import styles from './MatchCard.module.css';
 import { getCachedObjectUrl, warmImageCache } from '@/utils/persistentImageCache';
 import { optimizeImageUrl } from '@/utils/imageOptimizer';
 import { dropBlobUrl } from '@/utils/imageCache';
-import { isAndroidPlatform } from '@/utils/platformUtils';
 
 interface SlideRendererProps {
   slide: SlideContent;
@@ -36,6 +35,14 @@ const areBlobMapsEqual = (
 };
 
 // Image Slide Component
+/** Natural aspect ratio of photos already shown, by source URL (small, most recent kept). */
+const photoAspectByUrl = new Map<string, number>();
+function rememberPhotoAspect(url: string, aspect: number) {
+  photoAspectByUrl.delete(url);
+  photoAspectByUrl.set(url, aspect);
+  if (photoAspectByUrl.size > 200) photoAspectByUrl.delete(photoAspectByUrl.keys().next().value as string);
+}
+
 // ⭐ FIX: Show image immediately (opacity 1) - no more blank flash on swipe
 // Only use opacity transition for blob URLs where we know loading is instant
 const ImageSlide = React.memo<{
@@ -47,8 +54,9 @@ const ImageSlide = React.memo<{
   showLoader: boolean;
 }>(({ imageSrc, originalUrl, matchFirstName, matchLastName, usingBlob, showLoader }) => {
   const [hasError, setHasError] = React.useState(false);
-  // Photo's natural width/height, set on load - sizes the reflection box.
-  const [photoAspect, setPhotoAspect] = React.useState<number | null>(null);
+  // Photo's natural width/height, set on load - sizes the reflection box. Seeded from photoAspectByUrl so a card that
+  // takes over from the preview behind it (same photo, already measured) has the right layout on its first frame.
+  const [photoAspect, setPhotoAspect] = React.useState<number | null>(() => photoAspectByUrl.get(originalUrl) ?? null);
   // Size of the card frame: tells us whether the photo is letterboxed (shorter than the frame) and where its top and
   // bottom edges sit, so the reflection can be blended into them.
   const frameRef = React.useRef<HTMLDivElement>(null);
@@ -93,6 +101,8 @@ const ImageSlide = React.memo<{
   const [prevImageSrc, setPrevImageSrc] = React.useState(imageSrc);
   if (prevImageSrc !== imageSrc) {
     setPrevImageSrc(imageSrc);
+    // Never keep the previous person's aspect: for one frame the reflection and edge fade were sized for the old photo.
+    setPhotoAspect(photoAspectByUrl.get(originalUrl) ?? null);
     setHasError(false);
     setFallbackSrc(null);
     setTransformSrc(null);
@@ -226,7 +236,7 @@ const ImageSlide = React.memo<{
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
         style={{
-          filter: 'blur(10px) brightness(0.6)',
+          filter: 'blur(8px) brightness(0.8)',
           transform: 'scale(1.1)',
         }}
         draggable={false}
@@ -243,7 +253,7 @@ const ImageSlide = React.memo<{
         >
           <div
             className="absolute left-0 w-full"
-            style={{ top: '-100%', height: '300%', filter: `blur(${isAndroidPlatform() ? 4 : 7}px)` }}
+            style={{ top: '-100%', height: '300%', filter: 'blur(5px) brightness(1.08) saturate(1.05)' }}
           >
             {([
               { top: '0%', flip: true },
@@ -268,7 +278,7 @@ const ImageSlide = React.memo<{
               style={{
                 height: '100%',
                 ...(side === 'top' ? { bottom: '100%' } : { top: '100%' }),
-                background: `linear-gradient(to ${side === 'top' ? 'top' : 'bottom'}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.12) 8%, rgba(0,0,0,0.3) 20%, rgba(0,0,0,0.5) 34%, rgba(0,0,0,0.7) 52%, rgba(0,0,0,0.85) 72%, rgba(0,0,0,0.94) 100%)`,
+                background: `linear-gradient(to ${side === 'top' ? 'top' : 'bottom'}, rgba(0,0,0,0) 0%, rgba(0,0,0,0.06) 10%, rgba(0,0,0,0.16) 24%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.46) 58%, rgba(0,0,0,0.62) 78%, rgba(0,0,0,0.78) 100%)`,
               }}
             />
           ))}
@@ -291,7 +301,11 @@ const ImageSlide = React.memo<{
         draggable={false}
         onLoad={(e) => {
           const { naturalWidth, naturalHeight } = e.currentTarget;
-          if (naturalWidth && naturalHeight) setPhotoAspect(naturalWidth / naturalHeight);
+          if (naturalWidth && naturalHeight) {
+            const aspect = naturalWidth / naturalHeight;
+            rememberPhotoAspect(originalUrl, aspect);
+            setPhotoAspect(aspect);
+          }
           handleLoad();
         }}
         onError={handleError}

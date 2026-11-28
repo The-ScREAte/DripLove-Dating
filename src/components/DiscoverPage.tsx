@@ -70,6 +70,9 @@ import { NextCardPreview } from './discover/NextCardPreview';
 import { DiscoverSkeleton, DiscoverEmptyState } from './discover/DiscoverStates';
 import { useBackClose } from '@/utils/backStack';
 import { buildSlides } from './discover/MatchCardHelpers';
+import { getPendingTargetIds, loadPendingTargets } from '@/services/icebreaker';
+import { getBoostedProfilesForMe } from '@/services/boost';
+import { insertBoostedIntoDeck } from '@/utils/boost';
 import { useCardSwipe, CARD_EXIT_MS, CARD_EXIT_EASE, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
 import AdCard from './discover/AdCard';
 import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar';
@@ -1469,7 +1472,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     // A refill also leaves out the cards already waiting in the deck: the feed
     // order is a stable nightly shuffle, so otherwise every refill spent most
     // of its limit re-returning those same cards and added few or none.
-    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, ...circleReservedIds, ...(opts?.excludeIds || []), userId]);
+    // People I just broke the ice with stay out of my queue while their hello waits (24h) - and for good if they said
+    // no. When the 24 hours pass without an answer they are simply no longer listed, so they come back.
+    const icebreakerWaitingIds = uniqUuids(await loadPendingTargets().catch(() => getPendingTargetIds()));
+    const excludedIds = uniqUuids([...likedUserIds, ...matchedUserIds, ...blockedUserIds, ...passedUserIds, ...cooldownUserIds, ...locallySwipedIds, ...circleReservedIds, ...icebreakerWaitingIds, ...(opts?.excludeIds || []), userId]);
     
     const userMaxDistanceRaw = currentUserData?.max_distance ?? currentUserData?.distance_preference ?? DEFAULT_MAX_DISTANCE_KM;
     const userMaxDistance = Number(userMaxDistanceRaw);
@@ -3807,6 +3813,175 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
     settleSwipedCard();
   }, [currentCardId, settleSwipedCard]);
 
+  // A hello was just sent to someone: take them out of the deck right away (they come back if no one answers in 24h).
+  useEffect(() => {
+    const onSent = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (!id) return;
+      setPotentialMatches((prev) => (prev.some((m) => !isAd(m) && m.id === id) ? prev.filter((m) => isAd(m) || m.id !== id) : prev));
+    };
+    window.addEventListener('dl:icebreaker-sent', onSent);
+    return () => window.removeEventListener('dl:icebreaker-sent', onSent);
+  }, []);
+
+  // BOOST: people who are boosted right now go to the front of MY queue - even when my deck is already loaded.
+  // Every ~75s while Discover is open (and on resume) ask the server who is boosted for me, load those profiles
+  // through the same profile + photo path as the other deck sources, and slot them in two cards after the one I'm
+  // looking at (never the current card, never a duplicate, never someone I swiped / am waiting on). Nothing happens
+  // until the backend has the RPC (getBoostedProfilesForMe returns []).
+  const boostInjectDepsRef = useRef({ currentUser, premiumActive, allowedGenders, loadAllImagesForProfile, preloadImages, isArchivedFallback });
+  boostInjectDepsRef.current = { currentUser, premiumActive, allowedGenders, loadAllImagesForProfile, preloadImages, isArchivedFallback };
+  const cardSwipeRef = useRef(cardSwipe);
+  cardSwipeRef.current = cardSwipe;
+  useEffect(() => {
+    if (!isActiveTab || !hasCompletedInitialFetch || !currentUser?.id) return undefined;
+    let cancelled = false;
+    let running = false;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+
+    const run = async () => {
+      if (cancelled || running) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const deps = boostInjectDepsRef.current;
+      const me = deps.currentUser;
+      // Also for a deck running on the archived fallback: a thin pool is exactly where a live boosted person helps most.
+      if (!me?.id) return;
+      running = true;
+      try {
+        const rows = await getBoostedProfilesForMe(5);
+        if (cancelled || rows.length === 0) return;
+
+        const nowTs = Date.now();
+        const excluded = new Set<string>([me.id, ...getPendingTargetIds()]);
+        for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+          if (data.action === 'like' || nowTs - data.timestamp < PASS_EXPIRY_MS) excluded.add(id);
+        }
+        const deckNow = potentialMatchesRef.current;
+        const idxNow = currentIndexRef.current;
+        const upcoming = new Map<string, number>();
+        deckNow.forEach((m, i) => {
+          if (!isAd(m)) upcoming.set(m.id, i);
+        });
+        // Already waiting in the deck at most 2 cards ahead -> nothing to do for them.
+        const wanted = uniqUuids(rows.map((r) => r.profileId)).filter((id) => {
+          if (excluded.has(id)) return false;
+          const at = upcoming.get(id);
+          return at === undefined || at > idxNow + 2;
+        });
+        if (wanted.length === 0) return;
+
+        // Same country / distance / preference rules as every other candidate source in this file.
+        const baseCountryCode = getTrustedBaseCountryCode(me.country_code, me.country);
+        const allowedCountryCodes = Array.from(new Set([
+          ...(baseCountryCode ? [baseCountryCode] : []),
+          ...(deps.premiumActive ? normalizeCountryCodeList(me.unlocked_countries, baseCountryCode) : []),
+        ])).filter(Boolean);
+        if (allowedCountryCodes.length === 0) return;
+        const maxDistanceRaw = Number(me.max_distance ?? me.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
+        const maxDistance = Math.min(
+          Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? maxDistanceRaw : DEFAULT_MAX_DISTANCE_KM,
+          deps.premiumActive ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
+        );
+        const minAge = Number(me.min_age ?? DEFAULT_MIN_AGE);
+        const maxAge = Number(me.max_age ?? DEFAULT_MAX_AGE);
+
+        const { data: freshRows } = await Promise.race([
+          supabase
+            .from('profiles')
+            .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, max_distance, distance_preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at, is_verified, height_cm, languages, family_plans, communication_style, love_style, pets, social_media')
+            .in('id', wanted.slice(0, 10))
+            .in('country_code', allowedCountryCodes)
+            .eq('account_status', 'active')
+            .eq('is_admin', false)
+            .eq('is_archived', false),
+          new Promise<{ data: null }>((_, reject) => setTimeout(() => reject(new Error('boost fetch timeout')), 6000)),
+        ]);
+        if (cancelled) return;
+
+        const order = new Map(wanted.map((id, i) => [id, i]));
+        const candidates = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
+          .filter((p) => {
+            const cc = normalizeCountryCode(p.country_code || '');
+            if (!cc || !allowedCountryCodes.includes(cc)) return false;
+            if (p.gender && deps.allowedGenders.length > 0 && !deps.allowedGenders.includes(String(p.gender))) return false;
+            if (!matchesReciprocalPreference(me.gender, p.preference)) return false;
+            if (p.date_of_birth) {
+              const age = calculateAge(p.date_of_birth);
+              if (Number.isFinite(age) && (age < minAge || age > maxAge)) return false;
+            }
+            const isHome = !baseCountryCode || cc === baseCountryCode;
+            if (isHome && me.latitude && me.longitude && p.latitude && p.longitude) {
+              if (calculateDistance(me.latitude, me.longitude, p.latitude, p.longitude) > maxDistance) return false;
+            }
+            return true;
+          })
+          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+          .slice(0, 3);
+        if (candidates.length === 0) return;
+
+        // Photos first, so the card is ready (and decoded) by the time it comes up - like every other deck card.
+        const withImages = await Promise.all(
+          candidates.map(async (p) => {
+            const imgs = await deps.loadAllImagesForProfile(p.id).catch(() => [] as string[]);
+            const dist = me.latitude && me.longitude && p.latitude && p.longitude
+              ? calculateDistance(me.latitude, me.longitude, p.latitude, p.longitude)
+              : undefined;
+            return { match: toPotentialMatch(p, { images: [], distance: dist }), imgs };
+          })
+        );
+        if (cancelled) return;
+
+        // Never change the deck while a card is being dragged or flying out: try again in a moment.
+        const insert = (attempt: number) => {
+          if (cancelled) return;
+          const busy = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-dl-swiping')) || cardSwipeRef.current?.isExiting();
+          if (busy && attempt < 10) {
+            retry = setTimeout(() => insert(attempt + 1), 400);
+            return;
+          }
+          const imageUpdates: { [key: string]: string[] } = {};
+          withImages.forEach(({ match, imgs }) => {
+            if (imgs.length > 0 && !(userImagesRef.current[match.id]?.length)) imageUpdates[match.id] = imgs;
+          });
+          if (Object.keys(imageUpdates).length > 0) setUserImages((prev) => ({ ...prev, ...imageUpdates }));
+          const firstPhotos = withImages.map(({ imgs }) => imgs[0]).filter(Boolean);
+          if (firstPhotos.length > 0) deps.preloadImages(firstPhotos, 'high');
+          setPotentialMatches((prev) => {
+            const { deck, inserted } = insertBoostedIntoDeck(prev, currentIndexRef.current, withImages.map((w) => w.match), {
+              excludedIds: excluded,
+              isAd,
+              offset: 2,
+              maxInsert: 3,
+            });
+            if (inserted.length > 0) {
+              swipeDebug('boost: injected', { inserted, at: currentIndexRef.current + 2, deckLen: deck.length });
+            }
+            return deck;
+          });
+        };
+        insert(0);
+      } catch {
+        // A bonus on top of a valid deck - never worth an error.
+      } finally {
+        running = false;
+      }
+    };
+
+    const first = setTimeout(() => void run(), 4000);
+    const interval = setInterval(() => void run(), 75_000);
+    const onVisible = () => {
+      if (!document.hidden) void run();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+      clearInterval(interval);
+      if (retry) clearTimeout(retry);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isActiveTab, hasCompletedInitialFetch, currentUser?.id]);
+
   // Keyboard parity for desktop / switch-control users: Left = pass, Right = like, with the
   // exact same fly-away as a gesture. Never fires while typing or while any dialog is open.
   useEffect(() => {
@@ -5963,15 +6138,15 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
             // barely visible anyway.
           }}
         >
-          {/* Pink outline — a subtle version always shows at rest (matching the nav pill's
-              border below), and brightens to full strength while dragging. */}
+          {/* Outline — a soft pink hairline at rest (light brand tint, keeps the card calm),
+              turning full pink only while dragging. */}
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none transition-opacity duration-200"
             style={{
               border: swipeUI.isDragging
                 ? '1.5px solid rgba(236,72,153,0.95)'
-                : '1px solid rgba(236,72,153,0.55)',
+                : '1px solid rgba(244,114,182,0.3)',
               borderRadius: cardCornerRadius,
               zIndex: 30,
               // Own GPU layer: changing this outline mid-drag must not repaint the photo.

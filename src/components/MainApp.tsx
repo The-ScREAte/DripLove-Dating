@@ -10,8 +10,8 @@ import DripCoupleIcon from '@/components/DripCoupleIcon';
 import { useAppUpdateCheck } from '@/components/AppUpdatePopup';
 import PopupHost from '@/popups/PopupHost';
 import IcebreakerHost from '@/components/icebreaker/IcebreakerHost';
-import { openIcebreakerInbox } from '@/components/icebreaker/store';
-import { useIcebreakerInbox } from '@/services/icebreaker';
+import BoostHost from '@/components/boost/BoostHost';
+import { loadBoost, requestBoostFocus } from '@/services/boost';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
 import { usePopupEnvSync, usePopupBusy, requestPopup, cancelPopup, closePopup, setPopupBusy } from '@/popups';
 import { useFreeTrialPopupRequests, useFestivePopupRequest } from '@/popups/auto';
@@ -31,7 +31,7 @@ import { fetchCirclePool, CIRCLE_CACHE_TTL_MS, writeCirclePoolCache } from '@/ut
 import { calculateProfileCompletion } from '@/utils/profileCompletion';
 import { readCachedPremiumStatus, writeCachedPremiumStatus } from '@/utils/premiumStatusCache';
 import { reconcileStuckPendingImages } from '@/utils/invokeImageModeration';
-import { enablePrivacyScreen, disablePrivacyScreen } from '@/utils/privacyScreenBridge';
+import { enablePrivacyScreen } from '@/utils/privacyScreenBridge';
 import { useBackClose } from '@/utils/backStack';
 import { setNotificationNavHandler } from '@/services/pushNotifications';
 
@@ -260,9 +260,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const url = new URL(window.location.href);
-      if (url.searchParams.has('tab') || url.searchParams.has('showStreak')) {
+      if (url.searchParams.has('tab') || url.searchParams.has('showStreak') || url.searchParams.has('boost')) {
         url.searchParams.delete('tab');
         url.searchParams.delete('showStreak');
+        url.searchParams.delete('boost');
         window.history.replaceState({}, '', url.pathname + url.search + url.hash);
       }
     }, 3000);
@@ -293,11 +294,13 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   // faster, since it doesn't wait on MainApp's own lazy-chunk load. This is
   // now just a defensive backup (calling enable()/disable() again is a
   // harmless no-op if already in that state).
+  //
+  // No disable on unmount: MainApp also unmounts when a logged-in user opens
+  // another route (Circle Up call, face verification, safety tips...), and
+  // turning protection off there left those screens capturable. Logout is
+  // handled by the auth-state effects (Index.tsx, ScreenCaptureBlockedOverlay).
   useEffect(() => {
     void enablePrivacyScreen();
-    return () => {
-      void disablePrivacyScreen();
-    };
   }, []);
 
   // Measure the real rendered height of the fixed header and bottom nav (both
@@ -1250,7 +1253,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     if (!userId) return;
     void fetchUserProfile();
 
-    const unreadDelayMs = isAndroidPlatform() ? 1300 : 700;
+    // Same delay everywhere so the unread badge appears at the same moment on Android and iOS
+    // (it is one small count query, cheap enough not to need extra deferral on Android).
+    const unreadDelayMs = 700;
     const unreadTimer = window.setTimeout(() => {
       void fetchUnreadCount();
     }, unreadDelayMs);
@@ -1412,7 +1417,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
     setActiveTab('chat');
   }, []);
 
-  // Break the ice: open a specific conversation (after accepting) or just the Chat tab.
+  // Break the ice: open the conversation a hello created (or just the Chat tab).
   const openChatForIcebreaker = useCallback((matchId?: string | null) => {
     if (matchId) setChatDeepLinkMatchId(matchId);
     else setChatListSignal((n) => n + 1);
@@ -1421,7 +1426,6 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
   const openPremiumForIcebreaker = useCallback(() => {
     requestPopup('premium-upgrade', { preselectedPlan: 'premium' });
   }, []);
-  const icebreakerWaiting = useIcebreakerInbox().items.length;
 
   const handleShowTerms = useCallback(() => {
     setShowTerms(true);
@@ -1483,6 +1487,14 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         if (showStreakBanner) setShowStreakBannerFromTap(true);
         return;
       }
+      // Boost pushes ("Boost is on", "Your boost has ended", "Good time to boost"): Discover, plus the boost sheet
+      // when a boost can be started (a running one shows in the header timer).
+      if (action === 'open_boost') {
+        handleTabChange('dripcheck');
+        void loadBoost(true);
+        requestBoostFocus();
+        return;
+      }
       if (action === 'open_games') {
         // /games is its own top-level route, not a tab on "/" - a tab switch
         // here would do nothing, since the app isn't even on "/" once this
@@ -1501,10 +1513,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
         handleTabChange('chat');
         return;
       }
+      // Older pushes for a hello: hellos are normal chats now, so this just opens the Chat list.
       if (action === 'open_icebreakers') {
         setChatListSignal((n) => n + 1);
         handleTabChange('chat');
-        openIcebreakerInbox();
         return;
       }
       // Scheduled messages pick the screen a tap opens (tap_action).
@@ -1700,32 +1712,24 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 </div>
               </div>
 
-              {/* Small unbordered feather tail for Discover/DripCheck only -
-                  positioned right below the border box via top: 100%, so it
-                  can never affect the border box's own size/position. */}
+              {/* Discover: black fill behind the header's rounded bottom corners (and 2px past its edge), so the photo
+                  never peeks out beside the curve or through a sub-pixel gap. The pink border below is painted on top
+                  of it, and DiscoverTopBar's dark feather starts right under that border. */}
               {activeTab === 'dripcheck' && (
-                <div
-                  aria-hidden="true"
-                  className="absolute left-0 right-0"
-                  style={{
-                    top: 'calc(100% - 10px)',
-                    height: '44px',
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.95), transparent)',
-                  }}
-                />
+                <div aria-hidden="true" className="absolute left-0 right-0" style={{ bottom: -2, height: 22, background: '#000', zIndex: -1 }} />
               )}
 
               {/* Border overlay - painted last (on top of the background AND
                   the feather tail above), so it's always visible instead of
                   getting covered where the feather starts right at this same
-                  bottom edge. */}
+                  bottom edge. On Discover the dark feather starts right under it. */}
               <div
                 aria-hidden="true"
                 className="absolute inset-0"
                 style={{
-                  borderLeft: '1px solid rgba(236,72,153,0.55)',
-                  borderRight: '1px solid rgba(236,72,153,0.55)',
-                  borderBottom: '1px solid rgba(236,72,153,0.55)',
+                  borderLeft: '1px solid rgba(236,72,153,0.22)',
+                  borderRight: '1px solid rgba(236,72,153,0.22)',
+                  borderBottom: '1px solid rgba(236,72,153,0.22)',
                   borderBottomLeftRadius: '20px',
                   borderBottomRightRadius: '20px',
                 }}
@@ -1916,7 +1920,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
               // sibling, not an overlay), so there's nothing behind this bar that
               // would ever need to show through it.
               background: 'linear-gradient(180deg, #0a0d16, #05060b)',
-              border: '1px solid rgba(236,72,153,0.55)',
+              border: '1px solid rgba(236,72,153,0.22)',
               boxShadow: '0 10px 30px -8px rgba(236, 72, 153, 0.35), 0 2px 8px rgba(0,0,0,0.2)',
               // Without this, the border-radius above only paints a rounded
               // background/border - it doesn't clip content. The active tab's
@@ -2003,10 +2007,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
                 >
                   <Icon style={{ width: 'clamp(15px, 4.2vw, 18px)', height: 'clamp(15px, 4.2vw, 18px)' }} className={`shrink-0 ${activeTab === value ? 'dl-nav-pop' : ''}`} />
                   <span className="font-medium" style={{ fontSize: 'clamp(9px, 2.6vw, 10px)' }}>{label}</span>
-                   {value === 'chat' && (unreadCount + icebreakerWaiting) > 0 && (
+                   {value === 'chat' && unreadCount > 0 && (
                      <div className="absolute top-0 right-0.5 h-4 w-4 rounded-full bg-red-500 border border-white z-10 flex items-center justify-center">
                        <span className="text-[9px] text-white font-bold leading-none">
-                         {(unreadCount + icebreakerWaiting) > 9 ? '9+' : (unreadCount + icebreakerWaiting)}
+                         {unreadCount > 9 ? '9+' : unreadCount}
                        </span>
                      </div>
                    )}
@@ -2035,6 +2039,9 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       {/* Break the ice: composer sheet, inbox, realtime + popup request. Renders nothing until the backend exists. */}
       <TabErrorBoundary tab="icebreaker" silent><IcebreakerHost userId={userId} openChat={openChatForIcebreaker} openPremium={openPremiumForIcebreaker} isPremium={isPremium === true} /></TabErrorBoundary>
+
+      {/* Boost: header countdown, launch animation, boost sheet and "Boost got you this" toasts. Renders nothing until the backend exists. */}
+      <TabErrorBoundary tab="boost" silent><BoostHost userId={userId} openPremium={openPremiumForIcebreaker} openTab={handleTabChange} timerHidden={showTerms || showPrivacy || (isChatDetailOpen && activeTab === 'chat')} /></TabErrorBoundary>
 
       {/* Store-review engine (renders nothing): waits for a real happy moment, then calls
           the NATIVE review API - no custom prompt, no reward (store rules). */}
