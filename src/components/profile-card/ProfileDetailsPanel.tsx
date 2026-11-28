@@ -28,7 +28,7 @@ import { formatHeightLabel } from '@/utils/profileFormat';
 import MusicLinkBadge from '../discover/MusicLinkBadge';
 import { CaptionPhotoCard } from './CaptionPhotoCard';
 import { SharedWithYou, VibeProfileSections } from './VibeSections';
-import { FactRow, LabelValueRow, PersonalityBar, ProfileSection, TraitChips } from './ProfileSection';
+import { FactRow, LabelValueRow, PersonalityBar, ProfileSection, RowList, TraitChips } from './ProfileSection';
 import { asList, displayValue, formatLocationLabel, isLongText, isSpecified, relationshipIntentLabel, traitText } from './profileCardUtils';
 import type { CaptionedPhoto, PhotoAnchor, ProfileCardData } from './types';
 import IcebreakerInline from '../icebreaker/IcebreakerInline';
@@ -57,7 +57,7 @@ const BioText: React.FC<{ text: string }> = ({ text }) => {
       <p
         dir="auto"
         className={cn(
-          'whitespace-pre-line break-words text-[15px] leading-relaxed text-white/90',
+          'whitespace-pre-line break-words text-[15px] leading-relaxed text-white/[0.88]',
           long && !open && 'line-clamp-4'
         )}
       >
@@ -68,7 +68,7 @@ const BioText: React.FC<{ text: string }> = ({ text }) => {
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="-mb-2 -mt-1 inline-flex min-h-touch items-center text-sm font-semibold text-brand-ink underline-offset-4 hover:underline dl-focus"
+          className="-mb-2 -mt-1 inline-flex min-h-touch items-center text-sm font-medium text-[#f9a8d4] underline-offset-4 hover:underline dl-focus"
         >
           {open ? t('discover.matchCard.showLess', 'Show less') : t('discover.matchCard.readMore', 'Read more')}
         </button>
@@ -134,9 +134,9 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
     secondPhotoAnchor === anchor && captionedPhotos[1] ? <CaptionPhotoCard photo={captionedPhotos[1]} /> : null;
 
   return (
-    <div className={cn('mx-auto w-full max-w-2xl space-y-3 px-4 pb-6 pt-3 text-white', className)}>
+    <div className={cn('mx-auto w-full max-w-2xl space-y-3.5 px-4 pb-6 pt-3 text-white', className)}>
       {iceTarget ? (
-        <div className="flex justify-start">
+        <div className="flex justify-center pb-0.5">
           <IcebreakerInline target={iceTarget} className="!mt-0" />
         </div>
       ) : null}
@@ -153,7 +153,7 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
 
       {hasGlance && (
         <ProfileSection title={label('atAGlance', 'At a glance')}>
-          <div className="space-y-2.5">
+          <RowList>
             {locationLabel && <FactRow icon={<MapPin />}>{locationLabel}</FactRow>}
             {intent && <FactRow icon={<Heart />}>{intent}</FactRow>}
             {hasHeight && <FactRow icon={<Ruler />}>{formatHeightLabel(profile.height_cm as number)}</FactRow>}
@@ -163,7 +163,7 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
             {profile.occupation?.trim() && <FactRow icon={<Briefcase />}>{profile.occupation}</FactRow>}
             {profile.industry?.trim() && <FactRow icon={<Building2 />}>{profile.industry}</FactRow>}
             {profile.education_level?.trim() && <FactRow icon={<GraduationCap />}>{profile.education_level}</FactRow>}
-          </div>
+          </RowList>
         </ProfileSection>
       )}
 
@@ -171,11 +171,11 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
 
       {lifestyleRows.length > 0 && (
         <ProfileSection title={label('lifestyle', 'Lifestyle')}>
-          <div className="space-y-2.5">
+          <RowList>
             {lifestyleRows.map((row) => (
               <LabelValueRow key={row.label} emoji={row.emoji} label={row.label} value={displayValue(row.value as string)} />
             ))}
-          </div>
+          </RowList>
         </ProfileSection>
       )}
 
@@ -183,7 +183,7 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
 
       {personalityRows.length > 0 && (
         <ProfileSection title={label('personality', 'Personality')}>
-          <div className="space-y-4">
+          <div className="space-y-[18px] pb-0.5">
             {personalityRows.map((row) => (
               <PersonalityBar key={row.left} value={row.value} leftLabel={row.left} rightLabel={row.right} />
             ))}
@@ -198,8 +198,8 @@ export const ProfileDetailsPanel: React.FC<ProfileDetailsPanelProps> = ({
           <div className="space-y-3">
             {funQuestions.map((q) => (
               <div key={q.key}>
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/55">{label(q.key, q.fallback)}</p>
-                <p dir="auto" className="mt-0.5 whitespace-pre-line break-words text-[15px] leading-snug text-white/90">{q.value}</p>
+                <p className="text-[11.5px] font-medium uppercase tracking-[0.1em] text-white/50">{label(q.key, q.fallback)}</p>
+                <p dir="auto" className="mt-1 whitespace-pre-line break-words text-[15px] leading-snug text-white/[0.88]">{q.value}</p>
               </div>
             ))}
           </div>

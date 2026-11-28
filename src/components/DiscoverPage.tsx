@@ -71,8 +71,9 @@ import { DiscoverSkeleton, DiscoverEmptyState } from './discover/DiscoverStates'
 import { useBackClose } from '@/utils/backStack';
 import { buildSlides } from './discover/MatchCardHelpers';
 import { getPendingTargetIds, loadPendingTargets } from '@/services/icebreaker';
-import { getBoostedProfilesForMe } from '@/services/boost';
-import { insertBoostedIntoDeck } from '@/utils/boost';
+import { fetchBoostedProfilesForMe, BOOSTED_FOR_ME_MAX } from '@/services/boost';
+import { layoutBoostedDeck, emptyBoostDeckState, type BoostDeckState, type BoostedEntry } from '@/utils/boost';
+import { noteBoostSwipe } from '@/components/boost/boostAttention';
 import { useCardSwipe, CARD_EXIT_MS, CARD_EXIT_EASE, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from './discover/useCardSwipe';
 import AdCard from './discover/AdCard';
 import DiscoverTopBar, { type DiscoverCategory } from './discover/DiscoverTopBar';
@@ -3799,6 +3800,7 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       setExitDirection(null);
     },
     onCommit: (dir) => {
+      noteBoostSwipe(); // the card's Boost button shows after a few swipes (boostAttention.ts)
       if (dir === 'right') handleLike(); else handlePass();
     },
     // Keep the old card off-screen after the swipe and put the (reused) card element back only once the NEXT
@@ -3825,19 +3827,93 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
   }, []);
 
   // BOOST: people who are boosted right now go to the front of MY queue - even when my deck is already loaded.
-  // Every ~75s while Discover is open (and on resume) ask the server who is boosted for me, load those profiles
-  // through the same profile + photo path as the other deck sources, and slot them in two cards after the one I'm
-  // looking at (never the current card, never a duplicate, never someone I swiped / am waiting on). Nothing happens
-  // until the backend has the RPC (getBoostedProfilesForMe returns []).
+  // Every ~75s while Discover is open (and on resume) ask the server who is boosted for me (up to 20), load the ones
+  // not in my deck yet through the same profile + photo path as the other deck sources, and lay them all out with
+  // layoutBoostedDeck (src/utils/boost.ts): +1 / +3 / +5 after the current card alternate with normal cards, the rest
+  // every 3rd card after that, and who gets the front rotates fairly on every poll. The current card never changes,
+  // nobody is duplicated, nobody I swiped / am waiting on / blocked comes back. When a boost ends (its end time passes
+  // - a local timer - or the server stops listing them) the person goes back to their normal spot, or leaves the deck
+  // if they were only in it because of the boost. Nothing happens until the backend has the RPC.
   const boostInjectDepsRef = useRef({ currentUser, premiumActive, allowedGenders, loadAllImagesForProfile, preloadImages, isArchivedFallback });
   boostInjectDepsRef.current = { currentUser, premiumActive, allowedGenders, loadAllImagesForProfile, preloadImages, isArchivedFallback };
   const cardSwipeRef = useRef(cardSwipe);
   cardSwipeRef.current = cardSwipe;
+  // Per Discover category: each category keeps its own deck (restored from a snapshot when switching back).
+  const boostLayoutRef = useRef<Record<string, BoostDeckState<MatchOrAd>>>({});
+  const boostEntriesRef = useRef<BoostedEntry[]>([]);
+  // Boosted people not in my deck: their deck-ready card (null = doesn't fit my filters), refreshed every 10 min.
+  const boostProfileCacheRef = useRef(new Map<string, { match: PotentialMatch | null; at: number }>());
+  const boostApplyMemoRef = useRef<{ token: object; prev: MatchOrAd[]; deck: MatchOrAd[] } | null>(null);
+  const boostOwnerRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isActiveTab || !hasCompletedInitialFetch || !currentUser?.id) return undefined;
+    if (boostOwnerRef.current !== currentUser.id) {
+      boostOwnerRef.current = currentUser.id;
+      boostLayoutRef.current = {};
+      boostEntriesRef.current = [];
+      boostProfileCacheRef.current = new Map();
+    }
     let cancelled = false;
     let running = false;
     let retry: ReturnType<typeof setTimeout> | null = null;
+    let expiry: ReturnType<typeof setTimeout> | null = null;
+    const PROFILE_CACHE_MS = 10 * 60_000;
+
+    const excludedNow = (): Set<string> => {
+      const me = boostInjectDepsRef.current.currentUser;
+      const nowTs = Date.now();
+      const excluded = new Set<string>([...(me?.id ? [me.id] : []), ...getPendingTargetIds()]);
+      for (const [id, data] of locallySwipedProfileIds.current.entries()) {
+        if (data.action === 'like' || nowTs - data.timestamp < PASS_EXPIRY_MS) excluded.add(id);
+      }
+      return excluded;
+    };
+    const profileFor = (id: string): MatchOrAd | undefined => boostProfileCacheRef.current.get(id)?.match ?? undefined;
+    const layoutOpts = (rotate: boolean) => ({ excludedIds: excludedNow(), isAd, now: Date.now(), rotate });
+    const layoutState = () => boostLayoutRef.current[discoverCategoryRef.current] ?? emptyBoostDeckState<MatchOrAd>();
+
+    // A boost ending is handled on time, not at the next poll.
+    const scheduleExpiry = () => {
+      if (expiry) clearTimeout(expiry);
+      expiry = null;
+      const nowTs = Date.now();
+      const ends = boostEntriesRef.current.map((e) => e.endsAt).filter((t): t is number => t !== null && t > nowTs);
+      if (!ends.length) return;
+      const wait = Math.min(Math.min(...ends) - nowTs + 300, 30 * 60_000);
+      expiry = setTimeout(() => {
+        expiry = null;
+        boostEntriesRef.current = boostEntriesRef.current.filter((e) => e.endsAt === null || e.endsAt > Date.now());
+        apply(false, 0);
+      }, Math.max(250, wait));
+    };
+
+    // Never change the deck while a card is being dragged or flying out: try again in a moment.
+    const apply = (rotate: boolean, attempt: number) => {
+      if (cancelled) return;
+      const busy = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-dl-swiping')) || cardSwipeRef.current?.isExiting();
+      if (busy && attempt < 10) {
+        if (retry) clearTimeout(retry);
+        retry = setTimeout(() => apply(rotate, attempt + 1), 400);
+        return;
+      }
+      const entries = boostEntriesRef.current;
+      const opts = layoutOpts(rotate);
+      const token = {};
+      const category = discoverCategoryRef.current;
+      setPotentialMatches((prev) => {
+        // A state updater may run twice: the second run returns the first one's answer.
+        const memo = boostApplyMemoRef.current;
+        if (memo && memo.token === token && memo.prev === prev) return memo.deck;
+        const r = layoutBoostedDeck(prev, currentIndexRef.current, entries, profileFor, boostLayoutRef.current[category] ?? emptyBoostDeckState<MatchOrAd>(), opts);
+        boostLayoutRef.current[category] = r.state;
+        boostApplyMemoRef.current = { token, prev, deck: r.deck };
+        if (r.deck !== prev) {
+          swipeDebug('boost: layout', { rotate, fronted: r.fronted, placed: r.placed, restored: r.restored, removed: r.removed, deckLen: r.deck.length, head: r.deck.slice(0, 12).map((m) => (isAd(m) ? 'ad' : m.id)), before: prev.slice(0, 12).map((m) => (isAd(m) ? 'ad' : m.id)) });
+        }
+        return r.deck;
+      });
+      scheduleExpiry();
+    };
 
     const run = async () => {
       if (cancelled || running) return;
@@ -3848,27 +3924,43 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       if (!me?.id) return;
       running = true;
       try {
-        const rows = await getBoostedProfilesForMe(5);
-        if (cancelled || rows.length === 0) return;
-
+        const res = await fetchBoostedProfilesForMe(BOOSTED_FOR_ME_MAX);
+        if (cancelled) return;
         const nowTs = Date.now();
-        const excluded = new Set<string>([me.id, ...getPendingTargetIds()]);
-        for (const [id, data] of locallySwipedProfileIds.current.entries()) {
-          if (data.action === 'like' || nowTs - data.timestamp < PASS_EXPIRY_MS) excluded.add(id);
+        if (!res) {
+          // The call failed: keep who we knew about (their own end times still apply), no new round.
+          boostEntriesRef.current = boostEntriesRef.current.filter((e) => e.endsAt === null || e.endsAt > nowTs);
+          apply(false, 0);
+          return;
         }
-        const deckNow = potentialMatchesRef.current;
-        const idxNow = currentIndexRef.current;
-        const upcoming = new Map<string, number>();
-        deckNow.forEach((m, i) => {
-          if (!isAd(m)) upcoming.set(m.id, i);
+        const fresh: BoostedEntry[] = uniqUuids(res.rows.map((r) => r.profileId)).map((id) => ({
+          id,
+          endsAt: res.rows.find((r) => r.profileId === id)?.endsAt ?? null,
+        }));
+        // A full page may leave boosted people out: keep the ones we knew until their own end time.
+        const freshIds = new Set(fresh.map((e) => e.id));
+        const carried = res.complete ? [] : boostEntriesRef.current.filter((e) => !freshIds.has(e.id) && (e.endsAt === null || e.endsAt > nowTs));
+        const live = [...fresh, ...carried];
+        if (live.length === 0 && Object.keys(layoutState().placements).length === 0) {
+          boostEntriesRef.current = [];
+          return;
+        }
+
+        // Load the boosted people who are not in my deck yet (and not known from an earlier poll).
+        const excluded = excludedNow();
+        const inDeck = new Set<string>();
+        potentialMatchesRef.current.forEach((m) => {
+          if (!isAd(m)) inDeck.add(m.id);
         });
-        // Already waiting in the deck at most 2 cards ahead -> nothing to do for them.
-        const wanted = uniqUuids(rows.map((r) => r.profileId)).filter((id) => {
-          if (excluded.has(id)) return false;
-          const at = upcoming.get(id);
-          return at === undefined || at > idxNow + 2;
-        });
-        if (wanted.length === 0) return;
+        const cache = boostProfileCacheRef.current;
+        const toFetch = live
+          .map((e) => e.id)
+          .filter((id) => !excluded.has(id) && !inDeck.has(id))
+          .filter((id) => {
+            const c = cache.get(id);
+            return !c || nowTs - c.at > PROFILE_CACHE_MS;
+          })
+          .slice(0, BOOSTED_FOR_ME_MAX);
 
         // Same country / distance / preference rules as every other candidate source in this file.
         const baseCountryCode = getTrustedBaseCountryCode(me.country_code, me.country);
@@ -3876,31 +3968,30 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
           ...(baseCountryCode ? [baseCountryCode] : []),
           ...(deps.premiumActive ? normalizeCountryCodeList(me.unlocked_countries, baseCountryCode) : []),
         ])).filter(Boolean);
-        if (allowedCountryCodes.length === 0) return;
-        const maxDistanceRaw = Number(me.max_distance ?? me.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
-        const maxDistance = Math.min(
-          Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? maxDistanceRaw : DEFAULT_MAX_DISTANCE_KM,
-          deps.premiumActive ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
-        );
-        const minAge = Number(me.min_age ?? DEFAULT_MIN_AGE);
-        const maxAge = Number(me.max_age ?? DEFAULT_MAX_AGE);
+        const newlyLoaded: PotentialMatch[] = [];
+        if (toFetch.length > 0 && allowedCountryCodes.length > 0) {
+          const maxDistanceRaw = Number(me.max_distance ?? me.distance_preference ?? DEFAULT_MAX_DISTANCE_KM);
+          const maxDistance = Math.min(
+            Number.isFinite(maxDistanceRaw) && maxDistanceRaw > 0 ? maxDistanceRaw : DEFAULT_MAX_DISTANCE_KM,
+            deps.premiumActive ? PREMIUM_USER_MAX_DISTANCE_KM : FREE_USER_MAX_DISTANCE_KM
+          );
+          const minAge = Number(me.min_age ?? DEFAULT_MIN_AGE);
+          const maxAge = Number(me.max_age ?? DEFAULT_MAX_AGE);
 
-        const { data: freshRows } = await Promise.race([
-          supabase
-            .from('profiles')
-            .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, max_distance, distance_preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at, is_verified, height_cm, languages, family_plans, communication_style, love_style, pets, social_media')
-            .in('id', wanted.slice(0, 10))
-            .in('country_code', allowedCountryCodes)
-            .eq('account_status', 'active')
-            .eq('is_admin', false)
-            .eq('is_archived', false),
-          new Promise<{ data: null }>((_, reject) => setTimeout(() => reject(new Error('boost fetch timeout')), 6000)),
-        ]);
-        if (cancelled) return;
+          const { data: freshRows } = await Promise.race([
+            supabase
+              .from('profiles')
+              .select('id, first_name, last_name, bio, city, country, country_code, occupation, education_level, date_of_birth, interests, favorites, gender, preference, max_distance, distance_preference, latitude, longitude, fun_fact, perfect_first_date, last_googled, relationship_intent, smoking, drinking, exercise_level, sleeping_schedule, introvert_extrovert, spontaneous_planner, messy_organized, adinkra_symbols, created_at, last_login_at, is_verified, height_cm, languages, family_plans, communication_style, love_style, pets, social_media')
+              .in('id', toFetch)
+              .in('country_code', allowedCountryCodes)
+              .eq('account_status', 'active')
+              .eq('is_admin', false)
+              .eq('is_archived', false),
+            new Promise<{ data: null }>((_, reject) => setTimeout(() => reject(new Error('boost fetch timeout')), 6000)),
+          ]);
+          if (cancelled) return;
 
-        const order = new Map(wanted.map((id, i) => [id, i]));
-        const candidates = (Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : [])
-          .filter((p) => {
+          const fits = (p: ProfileRow) => {
             const cc = normalizeCountryCode(p.country_code || '');
             if (!cc || !allowedCountryCodes.includes(cc)) return false;
             if (p.gender && deps.allowedGenders.length > 0 && !deps.allowedGenders.includes(String(p.gender))) return false;
@@ -3914,52 +4005,44 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
               if (calculateDistance(me.latitude, me.longitude, p.latitude, p.longitude) > maxDistance) return false;
             }
             return true;
-          })
-          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
-          .slice(0, 3);
-        if (candidates.length === 0) return;
-
-        // Photos first, so the card is ready (and decoded) by the time it comes up - like every other deck card.
-        const withImages = await Promise.all(
-          candidates.map(async (p) => {
-            const imgs = await deps.loadAllImagesForProfile(p.id).catch(() => [] as string[]);
+          };
+          const byId = new Map((Array.isArray(freshRows) ? (freshRows as unknown as ProfileRow[]) : []).map((p) => [p.id, p]));
+          for (const id of toFetch) {
+            const p = byId.get(id);
+            if (!p || !fits(p)) {
+              cache.set(id, { match: null, at: nowTs });
+              swipeDebug('boost: does not fit my filters', { id, found: !!p });
+              continue;
+            }
             const dist = me.latitude && me.longitude && p.latitude && p.longitude
               ? calculateDistance(me.latitude, me.longitude, p.latitude, p.longitude)
               : undefined;
-            return { match: toPotentialMatch(p, { images: [], distance: dist }), imgs };
-          })
-        );
-        if (cancelled) return;
-
-        // Never change the deck while a card is being dragged or flying out: try again in a moment.
-        const insert = (attempt: number) => {
-          if (cancelled) return;
-          const busy = (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-dl-swiping')) || cardSwipeRef.current?.isExiting();
-          if (busy && attempt < 10) {
-            retry = setTimeout(() => insert(attempt + 1), 400);
-            return;
+            const match = toPotentialMatch(p, { images: [], distance: dist });
+            cache.set(id, { match, at: nowTs });
+            newlyLoaded.push(match);
           }
+        }
+        // Only people I can actually show: already in my deck, or loaded and fitting my filters.
+        boostEntriesRef.current = live.filter((e) => inDeck.has(e.id) || !!cache.get(e.id)?.match);
+
+        // Photos first for whoever will be up front, so the card is ready (and decoded) by the time it comes up.
+        const preview = layoutBoostedDeck(potentialMatchesRef.current, currentIndexRef.current, boostEntriesRef.current, profileFor, layoutState(), layoutOpts(true));
+        const soon = preview.deck
+          .slice(currentIndexRef.current, currentIndexRef.current + 7)
+          .filter((m) => !isAd(m) && boostEntriesRef.current.some((e) => e.id === m.id) && !(userImagesRef.current[m.id]?.length));
+        if (soon.length > 0) {
+          const withImages = await Promise.all(soon.map(async (m) => ({ id: m.id, imgs: await deps.loadAllImagesForProfile(m.id).catch(() => [] as string[]) })));
+          if (cancelled) return;
           const imageUpdates: { [key: string]: string[] } = {};
-          withImages.forEach(({ match, imgs }) => {
-            if (imgs.length > 0 && !(userImagesRef.current[match.id]?.length)) imageUpdates[match.id] = imgs;
+          withImages.forEach(({ id, imgs }) => {
+            if (imgs.length > 0 && !(userImagesRef.current[id]?.length)) imageUpdates[id] = imgs;
           });
           if (Object.keys(imageUpdates).length > 0) setUserImages((prev) => ({ ...prev, ...imageUpdates }));
           const firstPhotos = withImages.map(({ imgs }) => imgs[0]).filter(Boolean);
           if (firstPhotos.length > 0) deps.preloadImages(firstPhotos, 'high');
-          setPotentialMatches((prev) => {
-            const { deck, inserted } = insertBoostedIntoDeck(prev, currentIndexRef.current, withImages.map((w) => w.match), {
-              excludedIds: excluded,
-              isAd,
-              offset: 2,
-              maxInsert: 3,
-            });
-            if (inserted.length > 0) {
-              swipeDebug('boost: injected', { inserted, at: currentIndexRef.current + 2, deckLen: deck.length });
-            }
-            return deck;
-          });
-        };
-        insert(0);
+        }
+        if (newlyLoaded.length > 0) swipeDebug('boost: loaded', { ids: newlyLoaded.map((m) => m.id) });
+        apply(true, 0);
       } catch {
         // A bonus on top of a valid deck - never worth an error.
       } finally {
@@ -3978,9 +4061,10 @@ const DiscoverPage = ({ currentUser, onNavigateToChat, onNavigateToProfile, onNa
       clearTimeout(first);
       clearInterval(interval);
       if (retry) clearTimeout(retry);
+      if (expiry) clearTimeout(expiry);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [isActiveTab, hasCompletedInitialFetch, currentUser?.id]);
+  }, [isActiveTab, hasCompletedInitialFetch, currentUser?.id, discoverCategory]);
 
   // Keyboard parity for desktop / switch-control users: Left = pass, Right = like, with the
   // exact same fly-away as a gesture. Never fires while typing or while any dialog is open.

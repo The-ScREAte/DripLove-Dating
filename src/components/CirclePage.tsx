@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { placeShort } from '@/utils/countryShort';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { PotentialMatch, CurrentUser } from '@/types';
@@ -657,7 +658,7 @@ const PeopleRow = ({
               </p>
               {(p.city || p.country) && (
                 <p className="text-white/50 text-xs truncate">
-                  {[p.city, p.country].filter(Boolean).join(', ')}
+                  {placeShort(p.city, p.country)}
                 </p>
               )}
             </div>

@@ -8,7 +8,7 @@
 // the whole feature hides itself - no errors, no toasts.
 //
 // QA PREVIEW: localStorage dl_boost_preview = '1' mocks every call (nothing touches the network), so the button,
-// launch animation, top timer, sheet, toasts and badges can be reviewed before the backend exists.
+// launch animation, sheet, toasts and badges can be reviewed before the backend exists.
 //   dl_boost_preview_case    = 'premium' | 'free_used' | 'missing'   (default: free user with a boost available)
 //   dl_boost_preview_seconds = '20'  -> boosts last 20 seconds instead of 15/20 minutes (to see the end state)
 
@@ -242,17 +242,65 @@ export async function loadBoost(force = false): Promise<BoostStatus | null> {
   return statusInFlight;
 }
 
-/* ------------------------------ ending on time ------------------------------ */
-// The clock runs locally: the moment ends_at passes the boost is over (top timer leaves, button comes back / shows the
-// wait), then the server is asked again for the real next state.
-let endTimer: ReturnType<typeof setTimeout> | null = null;
-const endedListeners = new Set<(s: BoostStatus) => void>();
-export const onBoostEnded = (cb: (s: BoostStatus) => void) => {
+/* ------------------------------ started / ended events ------------------------------ */
+// For anything outside the React tree that mirrors the running boost (e.g. the native Live Activity / ongoing
+// notification). Derived from the status store, so every path is covered: a successful activate, a running boost
+// loaded on app start / resume, the local clock running out, the server reporting it over, and signing out.
+export interface BoostStartedInfo {
+  boostId: string;
+  /** ms epoch */
+  endsAt: number;
+  kind: BoostKind;
+}
+export type BoostEndReason = 'expired' | 'stopped' | 'signed_out';
+const startedListeners = new Set<(b: BoostStartedInfo) => void>();
+const endedListeners = new Set<(s: BoostStatus, reason: BoostEndReason) => void>();
+let live: BoostStatus | null = null;
+const liveInfo = (s: BoostStatus): BoostStartedInfo => ({
+  boostId: s.boostId ?? `boost-${s.endsAt}`,
+  endsAt: s.endsAt as number,
+  kind: s.kind ?? (s.isPremium ? 'premium' : 'free'),
+});
+const isLive = (s: BoostStatus | null): s is BoostStatus => !!s && s.active && !!s.endsAt;
+
+/** A boost started (or is found running). A boost already running when you subscribe is reported right away. */
+export const onBoostStarted = (cb: (b: BoostStartedInfo) => void) => {
+  startedListeners.add(cb);
+  if (live) cb(liveInfo(live));
+  return () => {
+    startedListeners.delete(cb);
+  };
+};
+/** The running boost is over: its time ran out ('expired'), the server says it is no longer on ('stopped'), or the
+ *  user signed out / switched account ('signed_out'). Gets the status the boost had while it ran. */
+export const onBoostEnded = (cb: (s: BoostStatus, reason: BoostEndReason) => void) => {
   endedListeners.add(cb);
   return () => {
     endedListeners.delete(cb);
   };
 };
+statusStore.subscribe(() => {
+  const next = statusStore.get();
+  const prev = live;
+  const now = isLive(next) ? next : null;
+  const sameId = !!prev && !!now && (prev.boostId ?? null) === (now.boostId ?? null);
+  live = now;
+  if (prev && now && sameId && prev.endsAt === now.endsAt) return;
+  // same boost with a corrected end time -> just a fresh "started" with the new end; otherwise the old one ended
+  if (prev && !sameId) {
+    const reason: BoostEndReason = next === null ? 'signed_out' : (prev.endsAt as number) <= Date.now() + 1000 ? 'expired' : 'stopped';
+    endedListeners.forEach((l) => l(prev, reason));
+  }
+  if (now) {
+    const info = liveInfo(now);
+    startedListeners.forEach((l) => l(info));
+  }
+});
+
+/* ------------------------------ ending on time ------------------------------ */
+// The clock runs locally: the moment ends_at passes the boost is over (the card button comes back / shows the wait),
+// then the server is asked again for the real next state.
+let endTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleEnd() {
   if (endTimer) clearTimeout(endTimer);
   endTimer = null;
@@ -267,7 +315,7 @@ function scheduleEnd() {
       scheduleEnd();
       return;
     }
-    const ended = cur;
+    lastEndedAt = Date.now();
     statusStore.set({
       ...cur,
       active: false,
@@ -275,8 +323,6 @@ function scheduleEnd() {
       canActivate: cur.isPremium,
       nextFreeAt: cur.isPremium ? null : cur.nextFreeAt,
     });
-    lastEndedAt = Date.now();
-    endedListeners.forEach((l) => l(ended));
     setTimeout(() => void loadBoost(true), 1500);
   }, Math.min(wait, 2_000_000_000));
 }
@@ -303,7 +349,7 @@ interface ActivateRow {
 }
 
 /** `launchFrom`: where the tapped control is - the launch animation is started BEFORE the boost turns active, so the
- *  header timer waits for the bolt to land instead of flashing in first. */
+ *  card button's seal waits for the bolt to land on it instead of flashing in first. */
 export async function activateBoost(opts: { launchFrom?: BoostLaunch['from'] } = {}): Promise<ActivateResult> {
   const { data, missing, error } = await call<ActivateRow | ActivateRow[]>('activate_boost');
   if (missing) return { kind: 'missing' };
@@ -356,6 +402,27 @@ export async function getBoostedProfilesForMe(limit = 5): Promise<BoostedProfile
   return data
     .map((r) => ({ profileId: String(r?.profile_id || ''), endsAt: toMs(r?.ends_at) }))
     .filter((r) => r.profileId && (r.endsAt === null || r.endsAt > now));
+}
+
+/** The server's cap for get_boosted_profiles_for_me. */
+export const BOOSTED_FOR_ME_MAX = 20;
+export interface BoostedForMe {
+  rows: BoostedProfileRow[];
+  /** false = the server hit the limit, so someone missing from `rows` may still be boosted. */
+  complete: boolean;
+}
+/** Like getBoostedProfilesForMe, but null when the call failed (so "nobody is boosted" is never confused with "the
+ *  network dropped" - Discover only puts boosted people back to their normal spot on a real answer). */
+export async function fetchBoostedProfilesForMe(limit = BOOSTED_FOR_ME_MAX): Promise<BoostedForMe | null> {
+  const lim = Math.max(1, Math.min(BOOSTED_FOR_ME_MAX, Math.floor(limit)));
+  const { data, error, missing } = await call<Array<{ profile_id?: string; ends_at?: string | null }>>('get_boosted_profiles_for_me', { p_limit: lim }, { probe: false });
+  if (missing) return { rows: [], complete: true };
+  if (error || !Array.isArray(data)) return null;
+  const now = Date.now();
+  const rows = data
+    .map((r) => ({ profileId: String(r?.profile_id || ''), endsAt: toMs(r?.ends_at) }))
+    .filter((r) => r.profileId && (r.endsAt === null || r.endsAt > now));
+  return { rows, complete: data.length < lim };
 }
 
 /* ------------------------------ "Boost got you this" ------------------------------ */
@@ -464,7 +531,7 @@ export interface BoostLaunch {
   id: number;
   /** Where the tapped button is (viewport px), so the bolt starts there. */
   from: { x: number; y: number; size: number };
-  /** The bolt has reached the top: the timer pill takes over (the animation still finishes its flash). */
+  /** The bolt has landed on the card's Boost button: it pops back in (the animation still finishes its flash). */
   arrived: boolean;
 }
 const launchStore = createStore<BoostLaunch | null>(null);
@@ -478,7 +545,7 @@ export const markBoostLaunchArrived = () => {
 export const endBoostLaunch = () => launchStore.set(null);
 
 /** A tapped boost push ("Boost is on", "Your boost has ended", "Good time to boost"): once my state is known, open
- *  the sheet if a boost can be started; a running boost already shows in the header timer. */
+ *  the sheet if a boost can be started; a running boost already shows on the card button (and natively). */
 const focusStore = createStore<number>(0);
 export const useBoostFocusRequest = () => useStore(focusStore, 0);
 export const requestBoostFocus = () => focusStore.set(focusStore.get() + 1);

@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { placeShort } from '@/utils/countryShort';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
@@ -211,7 +212,7 @@ export const InfoCardSlide: React.FC<InfoCardSlideProps> = React.memo(({ card })
       Watermark = Heart;
       center = true;
       title = tr('cards.heroMeet', 'Meet {{name}}', { name });
-      const where = [data.city, data.country].filter(Boolean).join(', ');
+      const where = placeShort(data.city, data.country);
       const meta = [typeof data.age === 'number' ? String(data.age) : '', where].filter(Boolean).join(' · ');
       body = (
         <>

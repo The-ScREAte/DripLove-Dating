@@ -1,4 +1,5 @@
 import React from 'react';
+import { placeShort } from '@/utils/countryShort';
 import { useTranslation } from 'react-i18next';
 import { Heart, MapPin } from 'lucide-react';
 import { formatFavoriteLabel, type FavoriteEntry } from '@/constants/favorites';
@@ -122,7 +123,7 @@ export const ProfileCaption: React.FC<ProfileCaptionProps> = ({
             <div className="flex items-start text-[clamp(12px,3.4vw,14px)] text-white/85">
               <MapPin className="mr-1 mt-[2px] h-[clamp(13px,3.6vw,16px)] w-[clamp(13px,3.6vw,16px)] shrink-0" />
               <span dir="auto" className="min-w-0 break-words">
-                {[city, country].filter(Boolean).join(', ')}
+                {placeShort(city, country)}
                 {distanceLabel ? <span className="ml-2">• {distanceLabel}</span> : null}
                 {hasHeight ? <span className="ml-2 whitespace-nowrap">• {formatHeightShort(heightCm as number)}</span> : null}
               </span>

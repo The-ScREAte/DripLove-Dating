@@ -120,7 +120,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Block user
     if (msg.includes('block')) {
-      return "🚫 BLOCKING USERS\n\n📱 TO BLOCK SOMEONE:\n1. Go to their profile\n2. Tap the Block button\n3. Confirm your choice\n\n✅ WHAT HAPPENS:\n• They can't see your profile\n• They can't message you\n• You won't see them in discover\n• Your existing chat is hidden\n\n💡 Blocked users are NOT notified. You can unblock from Settings if needed.";
+      return "🚫 BLOCKING USERS\n\n📱 TO BLOCK SOMEONE:\n1. Go to their profile\n2. Tap the Block button\n3. Confirm your choice\n\n✅ WHAT HAPPENS:\n• They can't see your profile\n• They can't message you\n• You won't see them in DripCheck\n• Your existing chat is hidden\n\n💡 Blocked users are NOT notified. You can unblock from Settings if needed.";
     }
 
     // Advertising
@@ -195,7 +195,7 @@ const LiveChat: React.FC<LiveChatProps> = ({ open, onOpenChange }) => {
 
     // Super Like or special features
     if (msg.includes('super') || msg.includes('boost') || msg.includes('spotlight')) {
-      return "⭐ SPECIAL FEATURES\n\n💎 PREMIUM PERKS:\n• Priority placement in discover feed\n• Your profile shown to more people\n• Stand out from the crowd\n• Increased visibility\n\n🚀 TO GET NOTICED:\n• Upgrade to Premium\n• Complete your profile 100%\n• Add quality photos\n• Be active daily\n\n👉 Upgrade: Profile → Upgrade to Premium";
+      return "⭐ SPECIAL FEATURES\n\n💎 PREMIUM PERKS:\n• Priority placement in DripCheck\n• Your profile shown to more people\n• Stand out from the crowd\n• Increased visibility\n\n🚀 TO GET NOTICED:\n• Upgrade to Premium\n• Complete your profile 100%\n• Add quality photos\n• Be active daily\n\n👉 Upgrade: Profile → Upgrade to Premium";
     }
 
     // Age/Preferences

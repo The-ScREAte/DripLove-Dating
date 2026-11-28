@@ -296,7 +296,7 @@
     "manageCountries": "Manage Countries",
     "selectCountries": "Select Countries",
     "countriesUnlocked": "Countries Unlocked!",
-    "countriesUnlockedDescription": "Your discover feed will now include people from the selected countries.",
+    "countriesUnlockedDescription": "Your DripCheck feed will now include people from the selected countries.",
     "errorSavingCountries": "Failed to save country preferences. Please try again.",
     "approximateLocation": "Approximate Location",
     "approximateLocationDescription": "Your city isn't in our database. You'll still get matches based on country/region.",
@@ -313,7 +313,7 @@
   },
   "discover": {
     "title": "DripCheck",
-    "discover": "Discover",
+    "discover": "DripCheck",
     "noMoreProfiles": "No more profiles",
     "checkBackLater": "Check back later for new matches",
     "like": "Like",
@@ -413,7 +413,7 @@
     "modeForYou": "For You",
     "modeSignMatch": "Sign Match",
     "signMatchHint": "People whose signs fit yours",
-    "filtersAria": "Discover filters",
+    "filtersAria": "DripCheck filters",
     "emptySignMatchTitle": "No sign matches right now",
     "emptySignMatchDesc": "Check back soon, or switch to For You.",
     "refreshFailedTitle": "Couldn't refresh",
@@ -792,7 +792,7 @@
   },
   "block": {
     "title": "Block {{name}}?",
-    "description": "This user will no longer be able to see your profile or contact you. You won't see them in your discover feed either.",
+    "description": "This user will no longer be able to see your profile or contact you. You won't see them in your DripCheck feed either.",
     "reasonOptional": "Reason (optional)",
     "placeholder": "Tell us why you're blocking this user...",
     "blockUser": "Block User",
@@ -833,7 +833,7 @@
     "success": "Report sent. Thank you.",
     "blockSuccess": {
       "title": "User blocked",
-      "message": "They will no longer appear in your Discover feed.",
+      "message": "They will no longer appear in your DripCheck feed.",
       "undo": "Undo",
       "undoing": "Undoing..."
     }
@@ -1662,33 +1662,34 @@
     "button": {
       "ready": "Boost your profile",
       "active": "Boost is on",
-      "waiting": "Next free boost in {{time}}",
-      "upsell": "Premium boosts any time"
+      "waiting": "Next free Boost in {{time}}",
+      "upsell": "Boost any time with Premium",
+      "activeLeft": "Boost on, {{time}} left",
+      "minutes_one": "{{count}} minute",
+      "minutes_other": "{{count}} minutes",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours"
     },
     "launch": {
       "title": "Boost activated",
       "sub": "Let's go for a ride",
       "working": "Putting you in front of people nearby"
     },
-    "timer": {
-      "label": "Boost",
-      "aria": "Boost on, {{time}} left"
-    },
     "sheet": {
       "activeTitle": "You're boosted",
-      "activeBody": "People see you first in Discover until the timer runs out.",
-      "premiumAgain": "Boost again when it ends.",
-      "freeNext": "Your next free boost is tomorrow. Premium boosts any time.",
+      "activeBody": "You appear first in DripCheck until the timer ends.",
+      "premiumAgain": "You can Boost again when it ends.",
+      "freeNext": "Your next free Boost is tomorrow. With Premium, Boost any time.",
       "ok": "Got it",
       "getPremium": "Get Premium",
       "readyTitle": "Boost your profile",
-      "readyBody": "Be one of the first people others see in Discover for {{minutes}} minutes.",
-      "tip": "Tip: evenings are when most people swipe.",
+      "readyBody": "Appear first in DripCheck for {{minutes}} minutes.",
+      "tip": "Tip: most people swipe in the evening.",
       "boostNow": "Boost now",
-      "error": "Couldn't start your boost. Try again.",
-      "waitTitle": "Next free boost in {{time}}",
-      "waitTitleSoon": "Your free boost is almost back",
-      "waitBody": "Free members get one {{free}}-minute boost a day. With Premium you can boost for {{premium}} minutes whenever you like.",
+      "error": "Couldn't start your Boost. Please try again.",
+      "waitTitle": "Next free Boost in {{time}}",
+      "waitTitleSoon": "Your free Boost is almost ready",
+      "waitBody": "Free members get one {{free}}-minute Boost a day. Premium members can Boost for {{premium}} minutes any time.",
       "notNow": "Not now",
       "likes_one": "{{count}} like",
       "likes_other": "{{count}} likes",
@@ -1698,23 +1699,23 @@
       "resultsOne": "{{what}} so far"
     },
     "win": {
-      "badge": "Boost got you this",
+      "badge": "From your Boost",
       "short": "Boost"
     },
     "toast": {
-      "likes_one": "Someone liked you while you were boosted",
-      "likes_other": "{{count}} new likes while you were boosted",
-      "messages_one": "New message while you were boosted",
-      "messages_other": "{{count}} new messages while you were boosted",
-      "both": "New likes and messages while you were boosted",
-      "ended": "Your boost has ended",
-      "endedBoth": "It brought you new likes and messages.",
-      "endedLikes_one": "It brought you 1 like.",
-      "endedLikes_other": "It brought you {{count}} likes.",
-      "endedMessages_one": "It brought you 1 message.",
-      "endedMessages_other": "It brought you {{count}} messages.",
-      "endedPremium": "Boost again whenever you like.",
-      "endedFree": "Your next free boost is tomorrow."
+      "likes_one": "New like during your Boost",
+      "likes_other": "{{count}} new likes during your Boost",
+      "messages_one": "New message during your Boost",
+      "messages_other": "{{count}} new messages during your Boost",
+      "both": "New likes and messages during your Boost",
+      "ended": "Your Boost has ended",
+      "endedBoth": "You got new likes and messages.",
+      "endedLikes_one": "You got 1 like.",
+      "endedLikes_other": "You got {{count}} likes.",
+      "endedMessages_one": "You got 1 message.",
+      "endedMessages_other": "You got {{count}} messages.",
+      "endedPremium": "Boost again any time.",
+      "endedFree": "Your next free Boost is tomorrow."
     }
   }
 }

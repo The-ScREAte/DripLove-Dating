@@ -1,6 +1,6 @@
 import React, { useEffect, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Lock, MessageCircle } from 'lucide-react';
+import { Check, Heart, Lock, MessageCircle } from 'lucide-react';
 import { getCachedStatus, loadQuota, loadStatus, subscribeStatus, useIcebreakerQuota } from '@/services/icebreaker';
 import { chancesDisplay, formatRenews, icebreakerAction, msUntil } from '@/utils/icebreaker';
 import { useChances } from './useChances';
@@ -42,7 +42,7 @@ export const IcebreakerInline: React.FC<{ target: IcebreakerTarget; isOwnProfile
           getIcebreakerHandlers().openChat(status?.matchId ?? null);
         }}
       >
-        <MessageCircle aria-hidden="true" />
+        <span className="ice-pill-icon" aria-hidden="true"><MessageCircle /></span>
         <span>{t('icebreaker.inline.openChat', 'Open chat')}</span>
       </button>
     );
@@ -52,7 +52,7 @@ export const IcebreakerInline: React.FC<{ target: IcebreakerTarget; isOwnProfile
   if (action === 'sent') {
     return (
       <span className={`ice-pill is-quiet ${className}`.trim()} role="status" {...guard}>
-        <Check aria-hidden="true" />
+        <span className="ice-pill-icon" aria-hidden="true"><Check /></span>
         <span>{t('icebreaker.inline.sent', 'Hi sent')}</span>
       </span>
     );
@@ -88,6 +88,7 @@ export const IcebreakerInline: React.FC<{ target: IcebreakerTarget; isOwnProfile
       </span>
       {count !== null && (
         <span className="ice-bubble-count" aria-hidden="true">
+          <Heart />
           {count}
         </span>
       )}

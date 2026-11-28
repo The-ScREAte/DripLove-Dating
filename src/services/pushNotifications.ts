@@ -162,6 +162,11 @@ const navigateFromNotification = (
   pendingNavigation = { type: resolvedType, data: normalized };
 };
 
+/** Route a tap on something that is not a push but should land in the same place as one (e.g. the Boost Live
+ *  Activity on iOS -> { action: 'open_boost' }). Same table, same duplicate-tap guard. */
+export const openFromNotificationTap = (type: string | undefined, data: Record<string, unknown>): void =>
+  navigateFromNotification(type, data);
+
 // Registers the native OS-tap listener exactly once, permanently, for the
 // life of the app - call this at boot (see main.tsx), before React even
 // renders. Deliberately NOT owned by SupabasePushNotificationService's own

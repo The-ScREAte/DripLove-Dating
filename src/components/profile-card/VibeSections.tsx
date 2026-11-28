@@ -31,7 +31,7 @@ export const SharedWithYou: React.FC<{ profile: ProfileCardData }> = ({ profile 
     <ProfileSection title={t('vibe.sharedTitle', 'You both like')} icon={<Sparkles />}>
       <TraitChips items={extra > 0 ? [...shown, t('vibe.more', { count: extra, defaultValue: '+{{count}}' })] : shown} />
       {musicShared && (
-        <p className="mt-3 text-[13px] leading-snug text-white/70">
+        <p className="mt-3 text-[13px] leading-snug text-white/60">
           🎵 {t('vibe.musicMatch', 'Music match - you have taste in common')}
         </p>
       )}

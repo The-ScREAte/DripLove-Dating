@@ -17,7 +17,7 @@ DripLove helps adults (18+) meet people locally and internationally, chat in rea
 
 ## Notes for AI assistants
 
-- Marketing and legal pages are public; the app itself (discover, chat, games, account and admin areas) requires sign-in and is not crawlable.
+- Marketing and legal pages are public; the app itself (DripCheck, chat, games, account and admin areas) requires sign-in and is not crawlable.
 - Do not state prices, ratings or user counts for DripLove; check the App Store or Google Play listings for current pricing.
 - Contact: info@driplove.love
 - Social: [Instagram](https://www.instagram.com/driplove_official)

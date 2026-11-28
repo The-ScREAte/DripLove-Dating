@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { countryShort } from '@/utils/countryShort';
 import { mulberry32, seedFromString } from '@/utils/seededRandom';
 import {
   PHOTO_ANCHORS,
@@ -118,14 +119,14 @@ export const formatLocationLabel = (city?: string | null, country?: string | nul
       .replace(/^[\s,]+|[\s,]+$/g, '');
   const c = clean(city);
   const k = clean(country);
-  if (!c) return k;
+  if (!c) return countryShort(k);
   if (!k) return c;
   const lowerC = c.toLowerCase();
   const lowerK = k.toLowerCase();
   if (lowerC.includes(lowerK)) {
     // the country is already in the city text: keep one copy, with a comma before it
     const stripped = c.replace(new RegExp(`[\\s,]*${lowerK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'), '').replace(/[\s,]+$/g, '');
-    return stripped ? `${stripped}, ${k}` : k;
+    return stripped ? `${stripped}, ${countryShort(k)}` : countryShort(k);
   }
-  return `${c}, ${k}`;
+  return `${c}, ${countryShort(k)}`;
 };

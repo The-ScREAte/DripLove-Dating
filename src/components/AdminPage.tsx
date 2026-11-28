@@ -1973,7 +1973,7 @@ const AdminPageComponent = ({ currentUser, onLogout }: AdminPageProps) => {
                         </Select>
                       </div>
                       <p className="text-[10px] text-gray-500">
-                        "Seen" means someone liked or passed them. Boosted profiles show first in Discover and Circle for people whose own filters already include them (at most half of anyone's batch). Every Monday everyone with photos nobody has seen in 30 days is boosted for a week automatically.
+                        "Seen" means someone liked or passed them. Boosted profiles show first in DripCheck and Circle for people whose own filters already include them (at most half of anyone's batch). Every Monday everyone with photos nobody has seen in 30 days is boosted for a week automatically.
                       </p>
                     </div>
                   </div>

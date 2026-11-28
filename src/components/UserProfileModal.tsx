@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { placeShort } from '@/utils/countryShort';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -426,7 +427,7 @@ const UserProfileModal = ({ isOpen, onClose, userId, isAdmin = false }: UserProf
                   <div className="flex items-center justify-center text-gray-300 mb-4">
                     <MapPin className="w-4 h-4 mr-1" />
                     <span>
-                      {profile?.city}{profile?.city && profile?.country && ', '}{profile?.country}
+                      {placeShort(profile?.city, profile?.country)}
                       {typeof profile?.height_cm === 'number' && profile.height_cm > 0 && (
                         <span className="ml-2">• {formatHeightLabel(profile.height_cm)}</span>
                       )}

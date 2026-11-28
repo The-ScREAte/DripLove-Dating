@@ -139,39 +139,113 @@
 .ice-cta[data-compact='true'] .ice-badge { top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; border-width: 1.5px; }
 
 /* ------------------- Break the ice in a profile's expanded info: ONE bubble ------------------- */
-.ice-bubble {
-  display: inline-flex; align-items: center; gap: 10px; max-width: 100%; min-height: 52px; padding: 7px 10px 7px 7px;
-  border-radius: 9999px; border: 1px solid rgba(244, 114, 182, 0.45); background: rgba(24, 10, 34, 0.6);
-  color: #fff; font: inherit; text-align: start; cursor: pointer;
-  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-  transition: transform var(--dl-dur-fast, 140ms) var(--dl-ease-out, ease-out), background-color var(--dl-dur-fast, 140ms);
+/* Gradient hairline (border-box layer) over a softly tinted, near-opaque fill (no blur: same on iOS and Android).
+   Idle motion is transform/opacity only: a pulse ring + small wiggle on the icon, a shimmer sweep every ~6.4s.
+   Paused while a card is being swiped, off under reduced motion. */
+.ice-bubble, .ice-pill {
+  --ice-fill: #160b1f;
+  --ice-tint: linear-gradient(135deg, rgba(236, 72, 153, 0.16), rgba(168, 85, 247, 0.1));
+  --ice-edge: linear-gradient(135deg, rgba(244, 114, 182, 0.85), rgba(192, 132, 252, 0.6));
+  position: relative; isolation: isolate; overflow: hidden;
+  border: 1px solid transparent;
+  background: var(--ice-tint) padding-box, linear-gradient(var(--ice-fill), var(--ice-fill)) padding-box, var(--ice-edge) border-box;
+  box-shadow: 0 8px 24px -12px rgba(236, 72, 153, 0.55);
+  color: #fff; font: inherit; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform var(--dl-dur-fast, 140ms) var(--dl-ease-out, ease-out);
 }
-.ice-bubble:active { transform: scale(0.98); background: rgba(40, 16, 54, 0.7); }
-.ice-bubble-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; background: var(--ice-grad); }
-.ice-bubble-icon svg { width: 18px; height: 18px; }
-.ice-bubble-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ice-bubble-title { font-size: 14.5px; font-weight: 700; line-height: 1.2; }
-.ice-bubble-sub { font-size: 12px; font-weight: 500; line-height: 1.25; color: rgba(255, 255, 255, 0.66); }
+.ice-bubble {
+  display: inline-flex; align-items: center; gap: 11px; max-width: 100%; min-height: 54px; padding: 7px 8px 7px 7px;
+  border-radius: 9999px; text-align: start; cursor: pointer;
+}
+.ice-bubble:active, .ice-pill:active { transform: scale(0.975); }
+/* shimmer sweep */
+.ice-bubble::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 46%; z-index: -1; pointer-events: none;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.08) 40%, rgba(255, 220, 240, 0.16) 50%, rgba(255, 255, 255, 0.08) 60%, transparent 100%);
+  transform: translate3d(-110%, 0, 0) skewX(-18deg); opacity: 0;
+  animation: ice-shimmer 6.4s 1.2s ease-in-out infinite;
+}
+.ice-bubble-icon {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 40px; height: 40px; border-radius: 50%; background: var(--ice-grad);
+  box-shadow: 0 2px 10px -2px rgba(236, 72, 153, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+/* soft pulse ring */
+.ice-bubble-icon::before {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid rgba(249, 168, 212, 0.7); opacity: 0;
+  animation: ice-ring 3.2s 0.6s ease-out infinite;
+}
+.ice-bubble-icon svg { width: 19px; height: 19px; transform-origin: 50% 60%; animation: ice-wiggle 6.4s 1.8s ease-in-out infinite; }
+.ice-bubble-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-right: 2px; }
+.ice-bubble-title { font-size: 15px; font-weight: 650; line-height: 1.2; letter-spacing: -0.005em; color: #fff; }
+.ice-bubble-sub { font-size: 12.5px; font-weight: 400; line-height: 1.25; color: rgba(255, 255, 255, 0.62); }
 .ice-bubble-title, .ice-bubble-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ice-bubble-count {
-  flex: 0 0 auto; min-width: 24px; height: 24px; margin-left: 4px; padding: 0 7px; border-radius: 12px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; color: #be185d; background: #fce7f3;
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 28px; min-width: 28px; margin-left: 6px; padding: 0 10px 0 9px; border-radius: 9999px;
+  font-size: 13px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+  color: #fce7f3; background: rgba(244, 114, 182, 0.16); box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.38);
 }
-.ice-bubble[data-empty='true'] { border-color: rgba(255, 255, 255, 0.2); }
-.ice-bubble[data-empty='true'] .ice-bubble-icon { background: rgba(255, 255, 255, 0.14); }
-.ice-bubble[data-empty='true'] .ice-bubble-count { color: rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.14); }
+.ice-bubble-count svg { width: 12px; height: 12px; fill: #f472b6; color: #f472b6; }
+/* used up: calm and still */
+.ice-bubble[data-empty='true'] {
+  --ice-tint: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  --ice-edge: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.12));
+  box-shadow: none;
+}
+.ice-bubble[data-empty='true'] .ice-bubble-icon { background: rgba(255, 255, 255, 0.1); box-shadow: none; color: rgba(255, 255, 255, 0.8); }
+.ice-bubble[data-empty='true'] .ice-bubble-title { color: rgba(255, 255, 255, 0.85); }
+.ice-bubble[data-empty='true'] .ice-bubble-count { color: rgba(255, 255, 255, 0.75); background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.ice-bubble[data-empty='true'] .ice-bubble-count svg { fill: rgba(255, 255, 255, 0.45); color: rgba(255, 255, 255, 0.45); }
+.ice-bubble[data-empty='true']::after,
+.ice-bubble[data-empty='true'] .ice-bubble-icon::before,
+.ice-bubble[data-empty='true'] .ice-bubble-icon svg { animation: none; }
 
-/* already chatting: a small "Open chat" pill */
+/* already chatting: a small "Open chat" pill; hello sent (waiting): a quiet one */
 .ice-pill {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 16px 0 13px; border-radius: 9999px;
-  border: 1px solid rgba(244, 114, 182, 0.45); background: rgba(24, 10, 34, 0.6); color: #fff; font: inherit;
-  font-size: 14px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  display: inline-flex; align-items: center; gap: 9px; min-height: 42px; padding: 0 16px 0 5px; border-radius: 9999px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
 }
-.ice-pill svg { width: 17px; height: 17px; color: #f9a8d4; }
-.ice-pill:active { transform: scale(0.98); }
-.ice-pill.is-quiet { cursor: default; border-color: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.8); }
+.ice-pill-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 30px; height: 30px; border-radius: 50%; background: var(--ice-grad); color: #fff;
+}
+.ice-pill-icon svg { width: 15px; height: 15px; }
+.ice-pill.is-quiet {
+  cursor: default; color: rgba(255, 255, 255, 0.82); box-shadow: none;
+  --ice-tint: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  --ice-edge: linear-gradient(135deg, rgba(244, 114, 182, 0.4), rgba(255, 255, 255, 0.14));
+}
+.ice-pill.is-quiet .ice-pill-icon { background: rgba(244, 114, 182, 0.16); color: #f9a8d4; }
 .ice-pill.is-quiet:active { transform: none; }
+
+@keyframes ice-shimmer {
+  0% { transform: translate3d(-110%, 0, 0) skewX(-18deg); opacity: 0; }
+  3% { opacity: 1; }
+  20% { transform: translate3d(260%, 0, 0) skewX(-18deg); opacity: 1; }
+  23%, 100% { transform: translate3d(260%, 0, 0) skewX(-18deg); opacity: 0; }
+}
+@keyframes ice-ring {
+  0% { transform: scale(1); opacity: 0.75; }
+  45%, 100% { transform: scale(1.3); opacity: 0; }
+}
+@keyframes ice-wiggle {
+  0%, 10%, 100% { transform: rotate(0deg) scale(1); }
+  2% { transform: rotate(-12deg) scale(1.06); }
+  4% { transform: rotate(9deg) scale(1.06); }
+  6% { transform: rotate(-6deg) scale(1.03); }
+  8% { transform: rotate(3deg) scale(1); }
+}
+html[data-dl-swiping] .ice-bubble::after,
+html[data-dl-swiping] .ice-bubble-icon::before,
+html[data-dl-swiping] .ice-bubble-icon svg { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ice-bubble::after, .ice-bubble-icon::before, .ice-bubble-icon svg { animation: none; }
+}
+html[data-motion='reduced'] .ice-bubble::after,
+html[data-motion='reduced'] .ice-bubble-icon::before,
+html[data-motion='reduced'] .ice-bubble-icon svg { animation: none; }
 
 /* ------------------- the 24h clock in a chat: one small centred pill under the header ------------------- */
 .ice-chat-timer-row { flex: 0 0 auto; display: flex; justify-content: center; padding: 8px 12px 2px; background: #000; }

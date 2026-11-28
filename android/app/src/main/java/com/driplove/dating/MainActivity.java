@@ -32,6 +32,10 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {
         }
 
+        // The app's own (local) Capacitor plugins must be registered before super.onCreate.
+        // BoostLiveActivity = the running Boost's countdown as an ongoing status-bar notification.
+        registerPlugin(BoostLiveActivityPlugin.class);
+
         super.onCreate(savedInstanceState);
 
         // Edge-to-edge: allow content to draw behind system bars.
@@ -77,7 +81,7 @@ public class MainActivity extends BridgeActivity {
     // "/" - the replaceState+popstate dispatch below is what makes
     // BrowserRouter itself switch which route renders, same mechanism as
     // every tab-query-param case), open_circle_profile -> that one Circle
-    // profile, open_chat/open_liked/open_profile/open_circle -> that tab
+    // profile, open_boost -> Discover (+ boost sheet), open_chat/open_liked/open_profile/open_circle -> that tab
     // (scheduled messages choose it), message -> the specific conversation,
     // match -> the chat list, like -> Liked Me, image_rejected -> Profile,
     // everything else -> Discover (default).
@@ -94,6 +98,9 @@ public class MainActivity extends BridgeActivity {
         // is the one that says where a tap should actually go.
         if ("open_discover".equals(action)) {
             return;
+        } else if ("open_boost".equals(action)) {
+            // Boost pushes and the ongoing Boost-timer notification (BoostLiveActivityPlugin).
+            route = "/?tab=dripcheck&boost=1";
         } else if ("open_games".equals(action)) {
             route = "/games";
         } else if ("open_circle_profile".equals(action) && profileId != null) {

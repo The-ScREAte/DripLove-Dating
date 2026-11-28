@@ -283,7 +283,7 @@
     }
   },
   "discover": {
-    "discover": "اكتشف",
+    "discover": "DripCheck",
     "noMoreProfiles": "لا مزيد من الملفات الشخصية",
     "checkBackLater": "تحقق لاحقًا للحصول على تطابقات جديدة",
     "like": "إعجاب",
@@ -381,7 +381,7 @@
     "modeForYou": "لك",
     "modeSignMatch": "Sign Match",
     "signMatchHint": "أشخاص تتوافق علاماتهم مع علاماتك",
-    "filtersAria": "عوامل تصفية Discover",
+    "filtersAria": "عوامل تصفية DripCheck",
     "emptySignMatchTitle": "لا توجد تطابقات علامات الآن",
     "emptySignMatchDesc": "عد قريبًا أو انتقل إلى «لك».",
     "refreshFailedTitle": "تعذّر التحديث",
@@ -727,7 +727,7 @@
   },
   "block": {
     "title": "حظر {{name}}؟",
-    "description": "لن يتمكن هذا المستخدم بعد الآن من رؤية ملفك الشخصي أو الاتصال بك. لن تراهم أيضًا في خلاصة الاكتشاف الخاصة بك.",
+    "description": "لن يتمكن هذا المستخدم بعد الآن من رؤية ملفك الشخصي أو الاتصال بك. لن تراهم أيضًا في DripCheck.",
     "reasonOptional": "السبب (اختياري)",
     "placeholder": "أخبرنا لماذا تحظر هذا المستخدم...",
     "blockUser": "حظر المستخدم",

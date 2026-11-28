@@ -288,7 +288,7 @@
   },
   "discover": {
     "title": "DripCheck",
-    "discover": "Découvrir",
+    "discover": "DripCheck",
     "noMoreProfiles": "Plus de profils",
     "checkBackLater": "Revenez plus tard pour de nouvelles correspondances",
     "like": "J'aime",
@@ -385,7 +385,7 @@
     "modeForYou": "Pour vous",
     "modeSignMatch": "Sign Match",
     "signMatchHint": "Des personnes dont les signes vont avec les vôtres",
-    "filtersAria": "Filtres Discover",
+    "filtersAria": "Filtres DripCheck",
     "emptySignMatchTitle": "Aucun Sign Match pour le moment",
     "emptySignMatchDesc": "Revenez bientôt ou passez à Pour vous.",
     "refreshFailedTitle": "Actualisation impossible",
@@ -730,7 +730,7 @@
   },
   "block": {
     "title": "Bloquer {{name}} ?",
-    "description": "Cet utilisateur ne pourra plus voir votre profil ni vous contacter. Vous ne le verrez pas non plus dans votre fil de découverte.",
+    "description": "Cet utilisateur ne pourra plus voir votre profil ni vous contacter. Vous ne le verrez pas non plus dans votre fil DripCheck.",
     "reasonOptional": "Raison (facultatif)",
     "placeholder": "Dites-nous pourquoi vous bloquez cet utilisateur...",
     "blockUser": "Bloquer l'utilisateur",

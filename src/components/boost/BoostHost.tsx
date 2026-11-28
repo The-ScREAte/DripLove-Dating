@@ -23,7 +23,6 @@ import {
   type BoostWin,
 } from '@/services/boost';
 import { BoostBolt } from './BoostBolt';
-import BoostTopTimer from './BoostTopTimer';
 import './boost.css';
 
 const BoostLaunchAnimation = lazy(() => import('./BoostLaunchAnimation'));
@@ -43,15 +42,13 @@ interface Props {
   userId?: string | null;
   openPremium: () => void;
   openTab: (tab: 'liked' | 'chat') => void;
-  /** Hide the header timer (terms / privacy screens, an open conversation). */
-  timerHidden?: boolean;
 }
 
 /**
- * Mounted ONCE in MainApp. Keeps my boost state fresh, draws the launch animation, the header timer, the boost sheet
- * and the light "Boost got you this" toasts. Renders nothing until the backend answers (and for good without it).
+ * Mounted ONCE in MainApp. Keeps my boost state fresh, draws the launch animation, the boost sheet
+ * and the light "From your Boost" toasts. Renders nothing until the backend answers (and for good without it).
  */
-const BoostHost: React.FC<Props> = ({ userId, openPremium, openTab, timerHidden }) => {
+const BoostHost: React.FC<Props> = ({ userId, openPremium, openTab }) => {
   const { t } = useTranslation();
   const available = useBoostAvailable();
   const launch = useBoostLaunch();
@@ -73,7 +70,7 @@ const BoostHost: React.FC<Props> = ({ userId, openPremium, openTab, timerHidden 
   }, []);
 
   // A boost push was tapped: when my state is known, offer the sheet if a boost can start (a running one already
-  // shows the header timer; a used free boost just lands on Discover).
+  // shows on the card button; a used free boost just lands on DripCheck).
   const focus = useBoostFocusRequest();
   const statusNow = useBoostStatus();
   useEffect(() => {
@@ -123,25 +120,26 @@ const BoostHost: React.FC<Props> = ({ userId, openPremium, openTab, timerHidden 
       const messages = fresh.length - likes;
       const body =
         likes && messages
-          ? t('boost.toast.both', 'New likes and messages while you were boosted')
+          ? t('boost.toast.both', 'New likes and messages during your Boost')
           : messages
-            ? t('boost.toast.messages', { count: messages, defaultValue: '{{count}} new messages while you were boosted' })
-            : t('boost.toast.likes', { count: likes, defaultValue: '{{count}} new likes while you were boosted' });
-      show({ title: t('boost.win.badge', 'Boost got you this'), body, tab: messages && !likes ? 'chat' : 'liked' });
+            ? t('boost.toast.messages', { count: messages, defaultValue: '{{count}} new messages during your Boost' })
+            : t('boost.toast.likes', { count: likes, defaultValue: '{{count}} new likes during your Boost' });
+      show({ title: t('boost.win.badge', 'From your Boost'), body, tab: messages && !likes ? 'chat' : 'liked' });
     });
-    const offEnded = onBoostEnded((ended) => {
+    const offEnded = onBoostEnded((ended, reason) => {
+      if (reason === 'signed_out') return;
       const c = countWinsForBoost(ended.boostId);
       const got =
         c.likes && c.messages
-          ? t('boost.toast.endedBoth', 'It brought you new likes and messages.')
+          ? t('boost.toast.endedBoth', 'You got new likes and messages.')
           : c.likes
-            ? t('boost.toast.endedLikes', { count: c.likes, defaultValue: 'It brought you {{count}} likes.' })
+            ? t('boost.toast.endedLikes', { count: c.likes, defaultValue: 'You got {{count}} likes.' })
             : c.messages
-              ? t('boost.toast.endedMessages', { count: c.messages, defaultValue: 'It brought you {{count}} messages.' })
+              ? t('boost.toast.endedMessages', { count: c.messages, defaultValue: 'You got {{count}} messages.' })
               : ended.isPremium
-            ? t('boost.toast.endedPremium', 'Boost again whenever you like.')
-            : t('boost.toast.endedFree', 'Your next free boost is tomorrow.');
-      show({ title: t('boost.toast.ended', 'Your boost has ended'), body: got, tab: c.likes ? 'liked' : c.messages ? 'chat' : undefined });
+            ? t('boost.toast.endedPremium', 'Boost again any time.')
+            : t('boost.toast.endedFree', 'Your next free Boost is tomorrow.');
+      show({ title: t('boost.toast.ended', 'Your Boost has ended'), body: got, tab: c.likes ? 'liked' : c.messages ? 'chat' : undefined });
     });
     return () => {
       offWins();
@@ -159,7 +157,6 @@ const BoostHost: React.FC<Props> = ({ userId, openPremium, openTab, timerHidden 
 
   return (
     <>
-      <BoostTopTimer hidden={timerHidden} />
       {launch && (
         <Suspense fallback={null}>
           <BoostLaunchAnimation key={launch.id} launch={launch} />

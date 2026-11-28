@@ -55,7 +55,7 @@ const BoostSheet: React.FC = () => {
       if (res.kind === 'ok') {
         closeBoostSheet();
       } else if (res.kind === 'error') {
-        setNote(t('boost.sheet.error', "Couldn't start your boost. Try again."));
+        setNote(t('boost.sheet.error', "Couldn't start your Boost. Please try again."));
       }
     } finally {
       setBusy(false);
@@ -86,13 +86,13 @@ const BoostSheet: React.FC = () => {
                 {formatBoostClock(left)}
               </div>
               <SheetDescription id="boost-sheet-desc" className="boost-sub">
-                {t('boost.sheet.activeBody', 'People see you first in Discover until the timer runs out.')}
+                {t('boost.sheet.activeBody', 'You appear first in DripCheck until the timer ends.')}
               </SheetDescription>
               {resultLine() && <p className="boost-results">{resultLine()}</p>}
               <p className="boost-note">
                 {status.isPremium
-                  ? t('boost.sheet.premiumAgain', 'Boost again when it ends.')
-                  : t('boost.sheet.freeNext', 'Your next free boost is tomorrow. Premium boosts any time.')}
+                  ? t('boost.sheet.premiumAgain', 'You can Boost again when it ends.')
+                  : t('boost.sheet.freeNext', 'Your next free Boost is tomorrow. With Premium, Boost any time.')}
               </p>
               <Button variant="primary" size="lg" className="w-full" onClick={closeBoostSheet}>
                 {t('boost.sheet.ok', 'Got it')}
@@ -109,9 +109,9 @@ const BoostSheet: React.FC = () => {
             <>
               <SheetTitle className="boost-title">{t('boost.sheet.readyTitle', 'Boost your profile')}</SheetTitle>
               <SheetDescription id="boost-sheet-desc" className="boost-sub">
-                {t('boost.sheet.readyBody', 'Be one of the first people others see in Discover for {{minutes}} minutes.', { minutes })}
+                {t('boost.sheet.readyBody', 'Appear first in DripCheck for {{minutes}} minutes.', { minutes })}
               </SheetDescription>
-              <p className="boost-note">{t('boost.sheet.tip', 'Tip: evenings are when most people swipe.')}</p>
+              <p className="boost-note">{t('boost.sheet.tip', 'Tip: most people swipe in the evening.')}</p>
               {note && (
                 <p className="boost-error" role="alert">
                   {note}
@@ -128,11 +128,11 @@ const BoostSheet: React.FC = () => {
             <>
               <SheetTitle className="boost-title">
                 {waitMs > 0
-                  ? t('boost.sheet.waitTitle', 'Next free boost in {{time}}', { time: formatBoostWait(waitMs) })
-                  : t('boost.sheet.waitTitleSoon', 'Your free boost is almost back')}
+                  ? t('boost.sheet.waitTitle', 'Next free Boost in {{time}}', { time: formatBoostWait(waitMs) })
+                  : t('boost.sheet.waitTitleSoon', 'Your free Boost is almost ready')}
               </SheetTitle>
               <SheetDescription id="boost-sheet-desc" className="boost-sub">
-                {t('boost.sheet.waitBody', 'Free members get one {{free}}-minute boost a day. With Premium you can boost for {{premium}} minutes whenever you like.', {
+                {t('boost.sheet.waitBody', 'Free members get one {{free}}-minute Boost a day. Premium members can Boost for {{premium}} minutes any time.', {
                   free: FREE_BOOST_MINUTES,
                   premium: PREMIUM_BOOST_MINUTES,
                 })}

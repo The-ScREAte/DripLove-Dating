@@ -22,7 +22,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // camera-preview transparency it was originally added for.
         self.window?.backgroundColor = UIColor.black
 
-        let bridgeVC = CAPBridgeViewController()
+        // DripBridgeViewController = CAPBridgeViewController + the app's own local plugins (BoostLiveActivity).
+        let bridgeVC = DripBridgeViewController()
         self.window?.rootViewController = bridgeVC
 
         // Enable transparent WebView for camera preview
@@ -40,10 +41,16 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         // Handle deep links on cold start
         if let urlContext = connectionOptions.urlContexts.first {
-            print("[SceneDelegate] Cold start openURL: \(urlContext.url.absoluteString)")
-            _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
-                                                           open: urlContext.url,
-                                                           options: [:])
+            // Boost Live Activity tapped while the app was closed: route it to Boost, not the OAuth URL handler.
+            if BoostLiveActivityPlugin.isTapURL(urlContext.url) {
+                BoostLiveActivityPlugin.pendingTap = true
+                NotificationCenter.default.post(name: .boostLiveActivityTapped, object: nil)
+            } else {
+                print("[SceneDelegate] Cold start openURL: \(urlContext.url.absoluteString)")
+                _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
+                                                               open: urlContext.url,
+                                                               options: [:])
+            }
         }
 
         // Handle universal links on cold start
@@ -57,6 +64,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // Handle deep links while app is running / in background
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         for context in URLContexts {
+            // Boost Live Activity / Dynamic Island tapped: open Boost (see BoostLiveActivityPlugin).
+            if BoostLiveActivityPlugin.isTapURL(context.url) {
+                NotificationCenter.default.post(name: .boostLiveActivityTapped, object: nil)
+                continue
+            }
             print("[SceneDelegate] openURLContexts: \(context.url.absoluteString)")
             _ = ApplicationDelegateProxy.shared.application(UIApplication.shared,
                                                            open: context.url,

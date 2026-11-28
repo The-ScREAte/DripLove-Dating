@@ -2041,7 +2041,7 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
       <TabErrorBoundary tab="icebreaker" silent><IcebreakerHost userId={userId} openChat={openChatForIcebreaker} openPremium={openPremiumForIcebreaker} isPremium={isPremium === true} /></TabErrorBoundary>
 
       {/* Boost: header countdown, launch animation, boost sheet and "Boost got you this" toasts. Renders nothing until the backend exists. */}
-      <TabErrorBoundary tab="boost" silent><BoostHost userId={userId} openPremium={openPremiumForIcebreaker} openTab={handleTabChange} timerHidden={showTerms || showPrivacy || (isChatDetailOpen && activeTab === 'chat')} /></TabErrorBoundary>
+      <TabErrorBoundary tab="boost" silent><BoostHost userId={userId} openPremium={openPremiumForIcebreaker} openTab={handleTabChange} /></TabErrorBoundary>
 
       {/* Store-review engine (renders nothing): waits for a real happy moment, then calls
           the NATIVE review API - no custom prompt, no reward (store rules). */}

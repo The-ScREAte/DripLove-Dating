@@ -23,6 +23,14 @@
 		91FE0EAF2E83BFD600645BA8 /* DripLove.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 91FE0EAE2E83BFD600645BA8 /* DripLove.storekit */; };
 		9A0C1D2E3F4A5B6C7D8E9F02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9A0C1D2E3F4A5B6C7D8E9F01 /* PrivacyInfo.xcprivacy */; };
 		AA11BB22CC33DD44EE55FF66 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF67 /* SceneDelegate.swift */; };
+		B0057A110000000000000009 /* BoostLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000001 /* BoostLiveActivityPlugin.swift */; };
+		B0057A11000000000000000A /* DripBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000002 /* DripBridgeViewController.swift */; };
+		B0057A11000000000000000B /* BoostActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000003 /* BoostActivityAttributes.swift */; };
+		B0057A11000000000000000C /* BoostActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000003 /* BoostActivityAttributes.swift */; };
+		B0057A11000000000000000D /* BoostLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000004 /* BoostLiveActivityWidget.swift */; };
+		B0057A11000000000000000E /* BoostLiveActivityWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000006 /* BoostLiveActivityWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B0057A11000000000000000F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000007 /* WidgetKit.framework */; };
+		B0057A110000000000000010 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B0057A110000000000000008 /* SwiftUI.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +40,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 5333A1253B24A9B27E7E9C03;
 			remoteInfo = NotificationService;
+		};
+		B0057A110000000000000016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B0057A110000000000000012;
+			remoteInfo = BoostLiveActivityWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -43,6 +58,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				71586C37D39245593E22B0EF /* NotificationService.appex in Embed App Extensions */,
+				B0057A11000000000000000E /* BoostLiveActivityWidget.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -72,6 +88,14 @@
 		9AB7453D484B5D5A9862FFD3 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA11BB22CC33DD44EE55FF67 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		ACF88E1E997C8035D66C9E6B /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		B0057A110000000000000001 /* BoostLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoostLiveActivityPlugin.swift; sourceTree = "<group>"; };
+		B0057A110000000000000002 /* DripBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DripBridgeViewController.swift; sourceTree = "<group>"; };
+		B0057A110000000000000003 /* BoostActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoostActivityAttributes.swift; sourceTree = "<group>"; };
+		B0057A110000000000000004 /* BoostLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoostLiveActivityWidget.swift; sourceTree = "<group>"; };
+		B0057A110000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B0057A110000000000000006 /* BoostLiveActivityWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BoostLiveActivityWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0057A110000000000000007 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		B0057A110000000000000008 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +115,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B0057A110000000000000014 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0057A11000000000000000F /* WidgetKit.framework in Frameworks */,
+				B0057A110000000000000010 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -99,8 +132,20 @@
 			children = (
 				91FE0EAC2E83BA0900645BA8 /* StoreKit.framework */,
 				50050F96432E58CB8E3E3B5F /* Pods_App.framework */,
+				B0057A110000000000000007 /* WidgetKit.framework */,
+				B0057A110000000000000008 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B0057A110000000000000011 /* BoostLiveActivityWidget */ = {
+			isa = PBXGroup;
+			children = (
+				B0057A110000000000000003 /* BoostActivityAttributes.swift */,
+				B0057A110000000000000004 /* BoostLiveActivityWidget.swift */,
+				B0057A110000000000000005 /* Info.plist */,
+			);
+			path = BoostLiveActivityWidget;
 			sourceTree = "<group>";
 		};
 		4E93FAEAECF7547360F811D4 /* NotificationService */ = {
@@ -117,6 +162,7 @@
 			children = (
 				504EC3061FED79650016851F /* App */,
 				4E93FAEAECF7547360F811D4 /* NotificationService */,
+				B0057A110000000000000011 /* BoostLiveActivityWidget */,
 				504EC3051FED79650016851F /* Products */,
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
 				D10ECBE2D058155D12BAE268 /* Pods */,
@@ -128,6 +174,7 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				9AB7453D484B5D5A9862FFD3 /* NotificationService.appex */,
+				B0057A110000000000000006 /* BoostLiveActivityWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,6 +188,8 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				AA11BB22CC33DD44EE55FF67 /* SceneDelegate.swift */,
+				B0057A110000000000000002 /* DripBridgeViewController.swift */,
+				B0057A110000000000000001 /* BoostLiveActivityPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -180,6 +229,7 @@
 			);
 			dependencies = (
 				3FC527568E4F668E939BD6A7 /* PBXTargetDependency */,
+				B0057A110000000000000017 /* PBXTargetDependency */,
 			);
 			name = App;
 			productName = App;
@@ -203,6 +253,23 @@
 			productReference = 9AB7453D484B5D5A9862FFD3 /* NotificationService.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		B0057A110000000000000012 /* BoostLiveActivityWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B0057A11000000000000001A /* Build configuration list for PBXNativeTarget "BoostLiveActivityWidget" */;
+			buildPhases = (
+				B0057A110000000000000013 /* Sources */,
+				B0057A110000000000000014 /* Frameworks */,
+				B0057A110000000000000015 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BoostLiveActivityWidget;
+			productName = BoostLiveActivityWidget;
+			productReference = B0057A110000000000000006 /* BoostLiveActivityWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -222,6 +289,10 @@
 						CreatedOnToolsVersion = 15.0;
 						ProvisioningStyle = Automatic;
 					};
+					B0057A110000000000000012 = {
+						CreatedOnToolsVersion = 26.0;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -239,6 +310,7 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				5333A1253B24A9B27E7E9C03 /* NotificationService */,
+				B0057A110000000000000012 /* BoostLiveActivityWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -265,6 +337,13 @@
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				9A0C1D2E3F4A5B6C7D8E9F02 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B0057A110000000000000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -326,6 +405,18 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				AA11BB22CC33DD44EE55FF66 /* SceneDelegate.swift in Sources */,
+				B0057A11000000000000000A /* DripBridgeViewController.swift in Sources */,
+				B0057A110000000000000009 /* BoostLiveActivityPlugin.swift in Sources */,
+				B0057A11000000000000000B /* BoostActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B0057A110000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0057A11000000000000000C /* BoostActivityAttributes.swift in Sources */,
+				B0057A11000000000000000D /* BoostLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -336,6 +427,11 @@
 			isa = PBXTargetDependency;
 			target = 5333A1253B24A9B27E7E9C03 /* NotificationService */;
 			targetProxy = 5463829AA4638E97D7D9497E /* PBXContainerItemProxy */;
+		};
+		B0057A110000000000000017 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B0057A110000000000000012 /* BoostLiveActivityWidget */;
+			targetProxy = B0057A110000000000000016 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -517,7 +613,12 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.0.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					ActivityKit,
+				);
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.driplove.dating;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -542,7 +643,12 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.0;
+				MARKETING_VERSION = 2.0.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-weak_framework",
+					ActivityKit,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.driplove.dating;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
@@ -575,6 +681,57 @@
 			};
 			name = Debug;
 		};
+		B0057A110000000000000018 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_WARN_DEPRECATED_DECLARATIONS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BoostLiveActivityWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.driplove.dating.BoostLiveActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B0057A110000000000000019 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_WARN_DEPRECATED_DECLARATIONS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BoostLiveActivityWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.driplove.dating.BoostLiveActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -601,6 +758,15 @@
 			buildConfigurations = (
 				6136312D2A1146F3AD0CCB2A /* Debug */,
 				0F74D1343E3478C52F48E51F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B0057A11000000000000001A /* Build configuration list for PBXNativeTarget "BoostLiveActivityWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B0057A110000000000000018 /* Debug */,
+				B0057A110000000000000019 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

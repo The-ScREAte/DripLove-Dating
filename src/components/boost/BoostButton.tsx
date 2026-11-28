@@ -1,30 +1,64 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Lock } from 'lucide-react';
-import { activateBoost, getBoostHandlers, openBoostSheet, useBoostAvailable, useBoostStatus } from '@/services/boost';
+import { activateBoost, getBoostHandlers, openBoostSheet, useBoostAvailable, useBoostLaunch, useBoostStatus } from '@/services/boost';
 import { boostProgress, formatBoostWait } from '@/utils/boost';
-import { BoostBolt, useBoostNow } from './BoostBolt';
+import { BoostSeal, useBoostNow } from './BoostBolt';
+import { DROP_MS, RISE_MS, boostButtonToRest, setBoostDetailsOpen, setBoostShowcase, setBoostShowOffAllowed, useBoostPhase } from './boostAttention';
 import './boost.css';
 
+/** Size of the seal at its rest spot (boost.css .dl-boost-size). */
+export const BOOST_REST_SCALE = 0.6;
+
 /**
- * The Boost control on the Discover card, pinned right above the expand button.
- *  ready   -> pink/purple disc; a tap boosts at once and plays the launch animation
- *  active  -> glass disc with a ring filling up as the boost runs; a tap opens the boost sheet
- *  waiting -> (free, today's boost used) dimmed bolt + lock + "5h"; a tap opens the Premium upgrade
- * Hidden entirely until the backend answers (and for good if it is missing).
+ * The Boost control on the DripCheck card: a zigzag "seal" (only its edge turns; the bolt stays upright).
+ * It rests small and still under the report button at the top right of the card, and now and then "shows off":
+ * drops to the showcase spot above the expand button, turns with its glow, waits, and glides back up
+ * (boostAttention.ts decides when; the motion is CSS only).
+ *  ready   -> colour; a tap boosts at once and plays the launch animation from wherever the seal is
+ *  active  -> colour + a white ring of the time left (stays at the rest spot); a tap opens the boost sheet
+ *  waiting -> (free, today's boost used) grey with a small "16h" tag (stays at the rest spot); a tap opens Premium
+ * Rendered from the card caption (so it only exists while there is a card on the DripCheck tab), drawn in a fixed
+ * layer next to the report button. Hidden entirely until the backend answers (and for good without it).
  */
-export const BoostButton: React.FC<{ hidden?: boolean; variant?: 'card' | 'inline' }> = ({ hidden = false, variant = 'card' }) => {
+export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) => {
   const { t } = useTranslation();
   const available = useBoostAvailable();
   const status = useBoostStatus();
+  // While the launch animation's bolt is out, the seal waits empty and pops back in as the bolt lands on it.
+  const launch = useBoostLaunch();
+  const landing = !!launch && !launch.arrived;
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLButtonElement | null>(null);
+  const discRef = useRef<HTMLSpanElement | null>(null);
+  const showcaseRef = useRef<HTMLSpanElement | null>(null);
   const active = !!status?.active;
   const now = useBoostNow(active || (!!status && !status.canActivate && !!status.nextFreeAt));
+  const { phase, phaseAt, offset } = useBoostPhase();
+  const state: 'ready' | 'active' | 'waiting' | null = !status ? null : active ? 'active' : status.canActivate ? 'ready' : 'waiting';
+  const live = available === true && !!state;
 
-  if (available !== true || !status) return null;
+  // Show-offs only while a boost can be started.
+  useEffect(() => {
+    setBoostShowOffAllowed(live && state === 'ready');
+  }, [live, state]);
+  useEffect(() => {
+    setBoostDetailsOpen(hidden);
+  }, [hidden]);
+  // Where the showcase spot is, relative to the rest spot (measured when a show-off starts).
+  useLayoutEffect(() => {
+    if (!live) return undefined;
+    setBoostShowcase(() => {
+      const a = showcaseRef.current?.getBoundingClientRect();
+      const b = ref.current?.getBoundingClientRect();
+      if (!a || !b || !a.width || !b.width) return null;
+      return { x: Math.round(a.left + a.width / 2 - (b.left + b.width / 2)), y: Math.round(a.top + a.height / 2 - (b.top + b.height / 2)) };
+    });
+    return () => setBoostShowcase(null);
+  }, [live]);
 
-  const state: 'ready' | 'active' | 'waiting' = active ? 'active' : status.canActivate ? 'ready' : 'waiting';
+  if (!live || !status || !state) return null;
+
   const progress = active && status.endsAt ? boostProgress(status.endsAt, status.durationMinutes, now) : 0;
   const waitMs = status.nextFreeAt ? status.nextFreeAt - now : 0;
 
@@ -43,11 +77,13 @@ export const BoostButton: React.FC<{ hidden?: boolean; variant?: 'card' | 'inlin
       return;
     }
     setBusy(true);
-    const rect = ref.current?.getBoundingClientRect();
+    // The launch starts from wherever the seal is right now (rest spot or showcase spot), at its current size.
+    const rect = discRef.current?.getBoundingClientRect();
+    boostButtonToRest();
     try {
       const launchFrom = rect
-        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, size: 34 }
-        : { x: window.innerWidth - 40, y: window.innerHeight * 0.6, size: 34 };
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, size: rect.width }
+        : { x: window.innerWidth - 40, y: 120, size: 30 };
       const res = await activateBoost({ launchFrom });
       if (res.kind !== 'ok' && res.kind !== 'missing') {
         openBoostSheet();
@@ -57,58 +93,69 @@ export const BoostButton: React.FC<{ hidden?: boolean; variant?: 'card' | 'inlin
     }
   };
 
+  // Spoken durations for screen readers ("12 minutes", "16 hours"); the badge itself shows "12m" / "16h".
+  const spoken = (ms: number) => {
+    const minutes = Math.max(1, Math.ceil(ms / 60_000));
+    if (minutes < 60) return t('boost.button.minutes', { count: minutes, defaultValue: '{{count}} minutes' });
+    const hours = Math.max(1, Math.round(minutes / 60));
+    return t('boost.button.hours', { count: hours, defaultValue: '{{count}} hours' });
+  };
+  const leftMs = active && status.endsAt ? status.endsAt - now : 0;
+  const waitText = waitMs > 0 ? formatBoostWait(waitMs) : '';
+
   const label =
     state === 'active'
-      ? t('boost.button.active', 'Boost is on')
+      ? leftMs > 0
+        ? t('boost.button.activeLeft', 'Boost on, {{time}} left', { time: spoken(leftMs) })
+        : t('boost.button.active', 'Boost is on')
       : state === 'waiting'
-        ? t('boost.button.waiting', 'Next free boost in {{time}}', { time: formatBoostWait(waitMs) })
+        ? t('boost.button.waiting', 'Next free Boost in {{time}}', { time: spoken(waitMs) })
         : t('boost.button.ready', 'Boost your profile');
-  const fullLabel = state === 'waiting' && !status.isPremium ? `${label}. ${t('boost.button.upsell', 'Premium boosts any time')}` : label;
+  const fullLabel = state === 'waiting' && !status.isPremium ? `${label}. ${t('boost.button.upsell', 'Boost any time with Premium')}` : label;
 
-  // Inline pill (e.g. the empty Discover deck): same states and actions, with a text label.
-  if (variant === 'inline') {
-    return (
-      <button ref={ref} type="button" onClick={onClick} aria-busy={busy || undefined} className="dl-boost-inline dl-focus" data-state={state}>
-        <BoostBolt size={16} tone={state === 'ready' ? 'white' : 'gradient'} />
-        <span>{state === 'ready' ? t('boost.inline.ready', 'Boost your profile') : label}</span>
-        {state === 'waiting' && !status.isPremium && <Lock size={12} strokeWidth={2.5} aria-hidden="true" />}
-      </button>
-    );
-  }
+  // A drop / rise already under way when this card mounted continues where it is.
+  const since = Date.now() - phaseAt;
+  const moveStyle = {
+    '--dl-boost-dx': `${offset.x}px`,
+    '--dl-boost-dy': `${offset.y}px`,
+    animationDelay: phase === 'drop' ? `${-Math.min(DROP_MS, since)}ms` : phase === 'rise' ? `${-Math.min(RISE_MS, since)}ms` : undefined,
+  } as React.CSSProperties;
 
-  // ring: r=15.5 -> circumference ~97.4
-  const C = 97.4;
   return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={onClick}
-      aria-label={fullLabel}
-      title={fullLabel}
-      aria-busy={busy || undefined}
-      className="dl-boost-btn absolute z-10 flex h-14 w-14 items-center justify-center rounded-full dl-focus"
-      data-state={state}
-      data-hidden={hidden ? 'true' : 'false'}
-      data-busy={busy ? 'true' : undefined}
-      tabIndex={hidden ? -1 : 0}
-      aria-hidden={hidden || undefined}
-    >
-      <span className="dl-boost-disc">
-        {state === 'active' && (
-          <svg className="dl-boost-ring" viewBox="0 0 34 34" aria-hidden="true">
-            <circle cx="17" cy="17" r="15.5" className="dl-boost-ring-track" />
-            <circle cx="17" cy="17" r="15.5" className="dl-boost-ring-fill" strokeDasharray={C} strokeDashoffset={C * progress} />
-          </svg>
-        )}
-        <BoostBolt size={state === 'ready' ? 24 : 22} tone={state === 'ready' ? 'white' : 'gradient'} className="dl-boost-glyph" />
-      </span>
-      {state === 'waiting' && (
-        <span className="dl-boost-lock" aria-hidden="true">
-          <Lock size={8} strokeWidth={3} />
-        </span>
+    <>
+      {/* the showcase spot above the expand button (never visible; only measured) */}
+      <span ref={showcaseRef} className="dl-boost-showcase" aria-hidden="true" />
+      {createPortal(
+        <button
+          ref={ref}
+          type="button"
+          onClick={onClick}
+          aria-label={fullLabel}
+          title={fullLabel}
+          aria-busy={busy || undefined}
+          className="dl-under-popup dl-boost-btn dl-focus"
+          data-state={state}
+          data-busy={busy ? 'true' : undefined}
+          data-landing={landing ? 'true' : undefined}
+          data-phase={phase}
+        >
+          <span className="dl-boost-move" style={moveStyle}>
+            <span className="dl-boost-size">
+              <span ref={discRef} className="dl-boost-disc">
+                <BoostSeal
+                  size={48}
+                  boltSize={state === 'active' ? 20 : 22}
+                  tone={state === 'waiting' ? 'gray' : 'color'}
+                  progress={state === 'active' ? progress : null}
+                />
+              </span>
+            </span>
+            {state === 'waiting' && waitText && <span className="dl-boost-wait">{waitText}</span>}
+          </span>
+        </button>,
+        document.body
       )}
-      {state === 'waiting' && status.nextFreeAt && waitMs > 0 && <span className="dl-boost-wait">{formatBoostWait(waitMs)}</span>}
-    </button>
+    </>
   );
 };
 

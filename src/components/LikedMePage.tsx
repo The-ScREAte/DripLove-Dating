@@ -1,4 +1,5 @@
 import SlideDots from './discover/SlideDots';
+import { placeShort } from '@/utils/countryShort';
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from 'react';
 import { CardGridSkeleton } from '@/components/ui/LoadingStates';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -1673,7 +1674,7 @@ const LikedMePage = ({ currentUser, isPremium = false, isActiveTab = true, onNav
                       )}
                     </h3>
                     <p className="text-xs text-white/50 truncate">
-                      {liker.country}, {liker.city}
+                      {placeShort(liker.city, liker.country)}
                     </p>
                   </CardContent>
                 </Card>

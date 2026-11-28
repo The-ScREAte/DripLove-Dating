@@ -283,7 +283,7 @@
     }
   },
   "discover": {
-    "discover": "Gundua",
+    "discover": "DripCheck",
     "noMoreProfiles": "Hakuna wasifu zaidi",
     "checkBackLater": "Angalia tena baadaye kwa mechi mpya",
     "like": "Penda",
@@ -381,7 +381,7 @@
     "modeForYou": "Kwako",
     "modeSignMatch": "Sign Match",
     "signMatchHint": "Watu ambao ishara zao zinaendana na zako",
-    "filtersAria": "Vichujio vya Discover",
+    "filtersAria": "Vichujio vya DripCheck",
     "emptySignMatchTitle": "Hakuna Sign Match kwa sasa",
     "emptySignMatchDesc": "Rudi hivi karibuni, au badili kwenda Kwako.",
     "refreshFailedTitle": "Imeshindwa kusasisha",
@@ -727,7 +727,7 @@
   },
   "block": {
     "title": "Zuia {{name}}?",
-    "description": "Mtumiaji huyu hataweza tena kuona wasifu wako au kuwasiliana nawe. Hutaweza kumwona katika ukurasa wako wa kugundua.",
+    "description": "Mtumiaji huyu hataweza tena kuona wasifu wako au kuwasiliana nawe. Hutaweza kumwona katika ukurasa wako wa DripCheck.",
     "reasonOptional": "Sababu (si lazima)",
     "placeholder": "Tuambie kwa nini unazuia mtumiaji huyu...",
     "blockUser": "Zuia Mtumiaji",

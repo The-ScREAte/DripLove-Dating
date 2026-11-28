@@ -893,7 +893,7 @@ const AdsManagement = () => {
           imageUrl={croppingFileUrl}
           aspect={AD_IMAGE_ASPECT}
           title="Crop Ad Image"
-          helperText="This frame matches how the ad appears on Discover."
+          helperText="This frame matches how the ad appears in DripCheck."
           onCancel={() => {
             URL.revokeObjectURL(croppingFileUrl);
             setCroppingFileUrl(null);

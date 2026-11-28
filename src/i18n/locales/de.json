@@ -288,7 +288,7 @@
   },
   "discover": {
     "title": "DripCheck",
-    "discover": "Entdecken",
+    "discover": "DripCheck",
     "noMoreProfiles": "Keine weiteren Profile",
     "checkBackLater": "Schau später für neue Übereinstimmungen vorbei",
     "like": "Mögen",
@@ -385,7 +385,7 @@
     "modeForYou": "Für dich",
     "modeSignMatch": "Sign Match",
     "signMatchHint": "Menschen, deren Zeichen zu deinen passen",
-    "filtersAria": "Discover-Filter",
+    "filtersAria": "DripCheck-Filter",
     "emptySignMatchTitle": "Gerade keine Sign Matches",
     "emptySignMatchDesc": "Schau bald wieder vorbei oder wechsle zu Für dich.",
     "refreshFailedTitle": "Aktualisierung fehlgeschlagen",
@@ -731,7 +731,7 @@
   },
   "block": {
     "title": "{{name}} blockieren?",
-    "description": "Dieser Benutzer kann Ihr Profil nicht mehr sehen oder Sie kontaktieren. Sie werden ihn auch nicht in Ihrem Discover-Feed sehen.",
+    "description": "Dieser Benutzer kann Ihr Profil nicht mehr sehen oder Sie kontaktieren. Sie werden ihn auch nicht in Ihrem DripCheck-Feed sehen.",
     "reasonOptional": "Grund (optional)",
     "placeholder": "Sagen Sie uns, warum Sie diesen Benutzer blockieren...",
     "blockUser": "Benutzer blockieren",

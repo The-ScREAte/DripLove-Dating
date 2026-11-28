@@ -283,7 +283,7 @@
     }
   },
   "discover": {
-    "discover": "发现",
+    "discover": "DripCheck",
     "noMoreProfiles": "没有更多个人资料",
     "checkBackLater": "稍后再查看新的匹配",
     "like": "喜欢",
@@ -381,7 +381,7 @@
     "modeForYou": "为你推荐",
     "modeSignMatch": "Sign Match",
     "signMatchHint": "与你的星符相配的人",
-    "filtersAria": "Discover 筛选",
+    "filtersAria": "DripCheck 筛选",
     "emptySignMatchTitle": "暂时没有星符匹配",
     "emptySignMatchDesc": "稍后再来看看，或切换到“为你推荐”。",
     "refreshFailedTitle": "刷新失败",
@@ -727,7 +727,7 @@
   },
   "block": {
     "title": "屏蔽{{name}}？",
-    "description": "此用户将无法再查看您的个人资料或联系您。您也不会在发现页面中看到他们。",
+    "description": "此用户将无法再查看您的个人资料或联系您。您也不会在 DripCheck 中看到他们。",
     "reasonOptional": "原因（可选）",
     "placeholder": "告诉我们您为什么要屏蔽此用户...",
     "blockUser": "屏蔽用户",

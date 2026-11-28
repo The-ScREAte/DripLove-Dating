@@ -131,7 +131,7 @@ const DiscoverFiltersModal: React.FC<DiscoverFiltersModalProps> = ({
         style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 150px)' }}
       >
         <SheetHeader className="text-left mb-1.5">
-          <SheetTitle className="text-white text-base">Discover Filters</SheetTitle>
+          <SheetTitle className="text-white text-base">DripCheck Filters</SheetTitle>
         </SheetHeader>
 
         {/* Quick-glance profile summary - tapping any chip jumps straight to

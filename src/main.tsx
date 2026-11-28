@@ -12,6 +12,7 @@ import { reloadForStaleChunk } from "./utils/chunkReload";
 import HoppingLogo from "./components/HoppingLogo";
 import { getPlatformSync } from "./utils/platformUtils";
 import { ensureNotificationTapListener } from "./services/pushNotifications";
+import { initBoostLiveActivityBridge } from "./native/boostLiveActivityBridge";
 
 // QA aid for "Break the ice": ?icebreakerPreview=1 turns on a mocked, network-free preview of the send
 // popup (quota of 3 chances, fake successful send) and remembers it; ?icebreakerPreview=0 turns it off.
@@ -35,6 +36,10 @@ try {
 // rest of the session - see ensureNotificationTapListener's own comment in
 // pushNotifications.ts for the exact mechanics. No-ops on web.
 ensureNotificationTapListener();
+
+// The running Boost's countdown lives at the top of the device (iOS Live Activity in the Dynamic Island / Lock
+// Screen, Android ongoing notification) - see src/native/boostLiveActivityBridge.ts. No-ops on web.
+initBoostLiveActivityBridge();
 
 // Mark web (browser) sessions before first paint so index.css can center the app in a
 // phone-width column on wide viewports. Runs synchronously off the capacitor:/file: URL
