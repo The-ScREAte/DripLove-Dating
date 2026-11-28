@@ -50,7 +50,6 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
   restRadius = `${REST_RADIUS_PX}px`,
   revealedRadius = '0px',
 }) => {
-  const t = (prop: string) => (dragging ? 'none' : `${prop} ${durationMs}ms ${EASE}`);
   const slide = React.useMemo(
     () => ({ type: imageUrl ? ('image' as const) : ('placeholder' as const), content: imageUrl ?? '', index: 0 }),
     [imageUrl]
@@ -62,14 +61,18 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
       style={{
         transform: `scale(${revealed ? 1 : REST_SCALE})`,
         borderRadius: revealed ? revealedRadius : restRadius,
-        transition: dragging ? 'none' : `transform ${durationMs}ms ${EASE}, border-radius ${durationMs}ms ${EASE}`,
+        // No transition: the card in front is replaced within a few frames now (the falling copy is separate), so the
+        // preview has to already be at full size when the live card takes its place, not still growing.
+        transition: 'none',
         transformOrigin: 'center center',
         willChange: 'transform',
       }}
     >
       <div
         className="absolute inset-0"
-        style={{ filter: `blur(${blurPx}px)`, transition: t('filter'), willChange: 'filter' }}
+        // The blur clears in one step (not animated): animating a blur over a full-screen photo re-draws it every frame,
+        // the most expensive thing in a swipe on mid-range Android. The falling card covers the change anyway.
+        style={{ filter: blurPx > 0 ? `blur(${blurPx}px)` : 'none' }}
       >
         <SlideRenderer
           slide={slide as never}
@@ -83,7 +86,7 @@ export const NextCardPreview: React.FC<NextCardPreviewProps> = React.memo(({
       {/* dark tint over the blur, fading out in step with it */}
       <div
         className="pointer-events-none absolute inset-0 bg-black"
-        style={{ opacity: darkOpacity, transition: dragging ? 'none' : `opacity ${durationMs}ms ease` }}
+        style={{ opacity: darkOpacity }}
       />
       {/* same bottom shading the front card's caption puts under the name, so the hand-over doesn't brighten the foot of the photo */}
       <div

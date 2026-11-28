@@ -135,6 +135,38 @@ function setSwiping(on: boolean) {
  * is in place immediately and can be swiped straight away while earlier cards are still dropping off-screen.
  * Returns null when a copy cannot be made (the caller then falls back to animating the live card itself).
  */
+let ghostStyleAdded = false;
+/**
+ * Keep the falling copy cheap: it only has to LOOK like the card for half a second. Images that are not on screen
+ * (other photos in the carousel) are dropped so they are not decoded/painted again, and blur / animation effects are
+ * switched off so the copy is a flat layer the GPU just moves.
+ */
+function slimGhost(card: HTMLElement, ghost: HTMLElement) {
+  if (!ghostStyleAdded) {
+    ghostStyleAdded = true;
+    const st = document.createElement('style');
+    st.textContent =
+      '.dl-card-ghost,.dl-card-ghost *{animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important}' +
+      '.dl-card-ghost video,.dl-card-ghost canvas{display:none!important}';
+    document.head.appendChild(st);
+  }
+  ghost.classList.add('dl-card-ghost');
+  try {
+    const bounds = card.getBoundingClientRect();
+    const src = card.querySelectorAll('img');
+    const dst = ghost.querySelectorAll('img');
+    if (src.length === dst.length) {
+      src.forEach((img, i) => {
+        const r = img.getBoundingClientRect();
+        const visible = r.right > bounds.left + 4 && r.left < bounds.right - 4 && r.bottom > bounds.top + 4 && r.top < bounds.bottom - 4;
+        if (!visible) dst[i].remove();
+      });
+    }
+  } catch {
+    /* cosmetic only */
+  }
+}
+
 function launchGhost(card: HTMLElement, from: string, to: string, ms: number, ghosts: Set<HTMLElement>, detach: boolean): HTMLElement | null {
   const parent = detach ? document.body : card.parentElement;
   if (!parent || typeof card.cloneNode !== 'function') return null;
@@ -143,6 +175,7 @@ function launchGhost(card: HTMLElement, from: string, to: string, ms: number, gh
   ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
   ghost.setAttribute('aria-hidden', 'true');
   ghost.setAttribute('inert', '');
+  slimGhost(card, ghost);
   const st = ghost.style;
   if (detach) {
     // Lives on <body> so it survives the page replacing the card (e.g. a re-keyed component). Measure the card
@@ -175,7 +208,7 @@ function launchGhost(card: HTMLElement, from: string, to: string, ms: number, gh
   else parent.insertBefore(ghost, card.nextSibling);
   ghosts.add(ghost);
   const remove = () => {
-    if (!ghosts.delete(ghost)) return;
+    ghosts.delete(ghost);
     ghost.remove();
   };
   // Web Animations drive the fall: runs on the compositor and starts on the very next frame, with no reliance on a
@@ -376,13 +409,19 @@ export function useCardSwipe(options: Options) {
         card.style.transition = 'none';
         card.style.transform = CARD_REST_TRANSFORM;
         resetStamps(); // the live card's heart / X start clean for the next profile
-        const cur = opts.current;
-        cur.onCommit(dir);
-        // The parent swaps in the next card (settle()); if it never does (limit reached, error) bring the card back.
-        settleTimer.current = window.setTimeout(() => {
-          settleTimer.current = null;
-          if (exiting.current) restoreRef.current?.();
-        }, HOLD_SAFETY_MS);
+        // Let the first frame of the fall paint BEFORE the page does its (heavy) re-render for the next profile,
+        // so the drop starts instantly and the main thread is free for the next touch as soon as possible.
+        requestAnimationFrame(() => {
+          exitTimer.current = window.setTimeout(() => {
+            exitTimer.current = null;
+            opts.current.onCommit(dir);
+            // The parent swaps in the next card (settle()); if it never does (limit reached, error) bring the card back.
+            settleTimer.current = window.setTimeout(() => {
+              settleTimer.current = null;
+              if (exiting.current) restoreRef.current?.();
+            }, HOLD_SAFETY_MS);
+          }, 0);
+        });
         return;
       }
     }
@@ -432,19 +471,10 @@ export function useCardSwipe(options: Options) {
       c.style.transition = 'none';
       c.style.transform = CARD_REST_TRANSFORM;
       c.style.opacity = '';
-      const wasHidden = c.style.visibility === 'hidden';
       c.style.visibility = '';
       // Make the browser register this jump BEFORE onExitEnd lets React put the card's transition back; otherwise
       // both land in one style recalc and the card slides in from off-screen instead of appearing in place.
       void c.offsetWidth;
-      // The next profile arrives with a quick fade so it never "pops" while the old card is still falling.
-      if (wasHidden && typeof c.animate === 'function') {
-        try {
-          c.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' });
-        } catch {
-          /* cosmetic */
-        }
-      }
     }
     cur.onExitEnd();
     exiting.current = false;
