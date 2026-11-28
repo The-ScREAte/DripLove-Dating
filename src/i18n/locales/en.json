@@ -1601,6 +1601,7 @@
     "inline": {
       "label": "Break the ice",
       "hint": "Be the first to say hi",
+      "hints": ["You never know", "Shoot your shot", "Make the first move", "One hello can change everything", "Go on, say hi"],
       "openChat": "Open chat",
       "sent": "Hi sent",
       "renews": "New chances in {{time}}",

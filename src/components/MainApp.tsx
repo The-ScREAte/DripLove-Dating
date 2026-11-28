@@ -11,6 +11,7 @@ import { useAppUpdateCheck } from '@/components/AppUpdatePopup';
 import PopupHost from '@/popups/PopupHost';
 import IcebreakerHost from '@/components/icebreaker/IcebreakerHost';
 import BoostHost from '@/components/boost/BoostHost';
+import BoostButton from '@/components/boost/BoostButton';
 import { loadBoost, requestBoostFocus } from '@/services/boost';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
 import { usePopupEnvSync, usePopupBusy, requestPopup, cancelPopup, closePopup, setPopupBusy } from '@/popups';
@@ -2042,6 +2043,10 @@ const MainApp = ({ user, onLogout }: MainAppProps) => {
 
       {/* Boost: header countdown, launch animation, boost sheet and "Boost got you this" toasts. Renders nothing until the backend exists. */}
       <TabErrorBoundary tab="boost" silent><BoostHost userId={userId} openPremium={openPremiumForIcebreaker} openTab={handleTabChange} /></TabErrorBoundary>
+      {/* Boost floats low on the right of Circle and the Chat list (DripCheck has its own on the card). */}
+      {!showTerms && !showPrivacy && (activeTab === 'circle' || (activeTab === 'chat' && !isChatDetailOpen)) && (
+        <TabErrorBoundary tab="boost-float" silent><BoostButton placement="float" /></TabErrorBoundary>
+      )}
 
       {/* Store-review engine (renders nothing): waits for a real happy moment, then calls
           the NATIVE review API - no custom prompt, no reward (store rules). */}

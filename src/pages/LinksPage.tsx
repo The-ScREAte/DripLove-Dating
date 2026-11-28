@@ -20,7 +20,7 @@ import { ChevronLeft, Heart } from 'lucide-react';
 
 const APP_LINK = 'https://driplove.love/r/o5f15uwE';
 const PAGE_URL = 'https://www.driplove.love/links';
-const OG_IMAGE = 'https://www.driplove.love/driplove-logo.png';
+const OG_IMAGE = 'https://www.driplove.love/driplove-icon.png';
 const PAGE_TITLE = 'DripLove — Slide into real love here. 💕';
 const PAGE_DESCRIPTION =
   'Slide into real love here. Connect with DripLove, get the app, and follow us on social media.';

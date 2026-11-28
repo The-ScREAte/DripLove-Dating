@@ -7,6 +7,16 @@ import { useChances } from './useChances';
 import { getIcebreakerHandlers, openIcebreaker, type IcebreakerTarget } from './store';
 import './icebreaker.css';
 
+
+// The small line under "Break the ice" - a few light, playful nudges instead of one fixed sentence. Picked per person so
+// the same profile always shows the same line, and different profiles feel different.
+const INLINE_HINTS = ['You never know', 'Shoot your shot', 'Make the first move', 'One hello can change everything', 'Go on, say hi'];
+const hintIndex = (id: string): number => {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h % INLINE_HINTS.length;
+};
+
 /**
  * "Break the ice" at the top of a profile's expanded info: ONE bubble with the chat icon, "Break the ice" and, as a
  * smaller second line inside it, "Be the first to say hi", plus the chances left. Once you're talking (a match, or a
@@ -66,7 +76,7 @@ export const IcebreakerInline: React.FC<{ target: IcebreakerTarget; isOwnProfile
     ? quota?.resetsAt && msUntil(quota.resetsAt) > 0
       ? t('icebreaker.inline.renews', 'New chances in {{time}}', { time: formatRenews(msUntil(quota.resetsAt)) })
       : t('icebreaker.inline.usedUp', 'All used this week')
-    : t('icebreaker.inline.hint', 'Be the first to say hi');
+    : t(`icebreaker.inline.hints.${hintIndex(target.id)}`, INLINE_HINTS[hintIndex(target.id)]);
   const chances = count === null ? '' : t('icebreaker.chances.left', { count, defaultValue_one: '{{count}} chance left', defaultValue_other: '{{count}} chances left' });
 
   return (

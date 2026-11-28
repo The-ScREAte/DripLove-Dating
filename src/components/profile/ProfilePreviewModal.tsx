@@ -21,6 +21,7 @@ import { isRecentlyOnline, SWIPE_ONLINE_WINDOW_MS } from '@/utils/onlineStatus';
 import { SlideRenderer } from '../discover/SlideRenderer';
 import SwipeButtons from '../discover/SwipeButtons';
 import { NextCardPreview } from '../discover/NextCardPreview';
+import BoostButton from '../boost/BoostButton';
 import { useCardSwipe, CARD_EXIT_MS, CARD_EXIT_EASE, CARD_REST_TRANSFORM, exitTransform, type SwipeDir } from '../discover/useCardSwipe';
 import PhotoCropModal, { uploadCroppedPhoto } from './PhotoCropModal';
 import { Button } from '@/components/ui/button';
@@ -347,6 +348,8 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
           the draggable card below (not nested inside it) so it stays put
           while the card on top slides away - it's what's being revealed,
           not something that should move with the drag. */}
+      {/* Swiping here (Circle): Boost sits at the top under the report button, like on DripCheck. */}
+      {swipeEnabled && <BoostButton placement="top" />}
       {swipeEnabled && nextPreviewImageUrl && (
         <NextCardPreview
           imageUrl={nextPreviewImageUrl}

@@ -415,3 +415,23 @@ html[data-motion="reduced"] .dl-boost-btn .dl-boost-disc::before,
 html[data-motion="reduced"] .dl-boost-btn[data-busy="true"] .dl-boost-disc,
 html[data-motion="reduced"] .boost-emblem[data-state="active"] { animation: none !important; }
 html[data-motion="reduced"] .dl-boost-pop { animation-duration: 0.01ms !important; }
+
+/* floating Boost on Circle and the Chat list: low on the right, above the bottom nav */
+.dl-boost-btn[data-placement="float"] {
+  top: auto;
+  right: 10px;
+  bottom: calc(var(--app-bottom-nav-height, 92px) + 16px);
+}
+
+.dl-boost-btn[data-placement="float"] { width: 74px; height: 74px; }
+/* Circle's swipe preview has its likes pill under the report button: Boost sits just below that pill */
+.dl-boost-btn[data-placement="top"] { top: calc(var(--app-header-height, 72px) + 84px); }
+
+/* a little larger everywhere (owner, 2026-11-28) */
+.dl-boost-btn { width: 62px; height: 62px; }
+.dl-boost-btn[data-placement="float"] { width: 74px; height: 74px; }
+/* sizes: a touch larger at rest everywhere, larger still where it floats (Chat list, Circle) */
+.dl-boost-disc { width: 54px; height: 54px; }
+.dl-boost-size { transform: scale(0.7); }
+.dl-boost-btn[data-placement="float"] .dl-boost-disc { width: 64px; height: 64px; }
+.dl-boost-btn[data-placement="float"] .dl-boost-size { transform: scale(0.95); }

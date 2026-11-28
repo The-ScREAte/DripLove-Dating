@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useSyncExternalStore, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { activateBoost, getBoostHandlers, openBoostSheet, useBoostAvailable, useBoostLaunch, useBoostStatus } from '@/services/boost';
@@ -21,7 +21,31 @@ export const BOOST_REST_SCALE = 0.6;
  * Rendered from the card caption (so it only exists while there is a card on the DripCheck tab), drawn in a fixed
  * layer next to the report button. Hidden entirely until the backend answers (and for good without it).
  */
-export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) => {
+/**
+ * placement 'card' (default): rests under the report button on the DripCheck card and does the periodic show-off.
+ * placement 'float': a quiet floating button low on the right of other screens (Circle, the Chat list) - same states and
+ * actions, no show-off.
+ */
+// While a swipe screen other than DripCheck (Circle's profile preview) shows Boost at the top, the floating one hides.
+let topCount = 0;
+const topListeners = new Set<() => void>();
+const subscribeTop = (cb: () => void) => {
+  topListeners.add(cb);
+  return () => topListeners.delete(cb);
+};
+
+export const BoostButton: React.FC<{ hidden?: boolean; placement?: 'card' | 'float' | 'top' }> = ({ hidden = false, placement = 'card' }) => {
+  const isCard = placement === 'card';
+  const topShown = useSyncExternalStore(subscribeTop, () => topCount > 0, () => false);
+  useEffect(() => {
+    if (placement !== 'top') return undefined;
+    topCount += 1;
+    topListeners.forEach((l) => l());
+    return () => {
+      topCount -= 1;
+      topListeners.forEach((l) => l());
+    };
+  }, [placement]);
   const { t } = useTranslation();
   const available = useBoostAvailable();
   const status = useBoostStatus();
@@ -40,14 +64,16 @@ export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) 
 
   // Show-offs only while a boost can be started.
   useEffect(() => {
+    if (!isCard) return;
     setBoostShowOffAllowed(live && state === 'ready');
-  }, [live, state]);
+  }, [live, state, isCard]);
   useEffect(() => {
+    if (!isCard) return;
     setBoostDetailsOpen(hidden);
-  }, [hidden]);
+  }, [hidden, isCard]);
   // Where the showcase spot is, relative to the rest spot (measured when a show-off starts).
   useLayoutEffect(() => {
-    if (!live) return undefined;
+    if (!live || !isCard) return undefined;
     setBoostShowcase(() => {
       const a = showcaseRef.current?.getBoundingClientRect();
       const b = ref.current?.getBoundingClientRect();
@@ -55,9 +81,10 @@ export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) 
       return { x: Math.round(a.left + a.width / 2 - (b.left + b.width / 2)), y: Math.round(a.top + a.height / 2 - (b.top + b.height / 2)) };
     });
     return () => setBoostShowcase(null);
-  }, [live]);
+  }, [live, isCard]);
 
   if (!live || !status || !state) return null;
+  if (placement === 'float' && topShown) return null;
 
   const progress = active && status.endsAt ? boostProgress(status.endsAt, status.durationMinutes, now) : 0;
   const waitMs = status.nextFreeAt ? status.nextFreeAt - now : 0;
@@ -79,7 +106,7 @@ export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) 
     setBusy(true);
     // The launch starts from wherever the seal is right now (rest spot or showcase spot), at its current size.
     const rect = discRef.current?.getBoundingClientRect();
-    boostButtonToRest();
+    if (isCard) boostButtonToRest();
     try {
       const launchFrom = rect
         ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, size: rect.width }
@@ -124,7 +151,7 @@ export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) 
   return (
     <>
       {/* the showcase spot above the expand button (never visible; only measured) */}
-      <span ref={showcaseRef} className="dl-boost-showcase" aria-hidden="true" />
+      {isCard && <span ref={showcaseRef} className="dl-boost-showcase" aria-hidden="true" />}
       {createPortal(
         <button
           ref={ref}
@@ -137,14 +164,15 @@ export const BoostButton: React.FC<{ hidden?: boolean }> = ({ hidden = false }) 
           data-state={state}
           data-busy={busy ? 'true' : undefined}
           data-landing={landing ? 'true' : undefined}
-          data-phase={phase}
+          data-phase={isCard ? phase : 'rest'}
+          data-placement={placement}
         >
-          <span className="dl-boost-move" style={moveStyle}>
+          <span className="dl-boost-move" style={isCard ? moveStyle : undefined}>
             <span className="dl-boost-size">
               <span ref={discRef} className="dl-boost-disc">
                 <BoostSeal
-                  size={48}
-                  boltSize={state === 'active' ? 20 : 22}
+                  size={placement === 'float' ? 64 : 54}
+                  boltSize={placement === 'float' ? (state === 'active' ? 26 : 28) : state === 'active' ? 22 : 25}
                   tone={state === 'waiting' ? 'gray' : 'color'}
                   progress={state === 'active' ? progress : null}
                 />
