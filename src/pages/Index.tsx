@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useLayoutEffect, Suspense, lazy } from 'react';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AuthDialog from '@/components/AuthDialog';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -215,7 +215,7 @@ const Index = ({
   // a real, user-visible stretch in that gap - this closes it as tight as
   // the JS side can. MainApp keeps its own enable/disable-on-mount/unmount
   // effect too, as a harmless (idempotent) defensive backup.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isAuthenticated && user) {
       void enablePrivacyScreen();
     } else {

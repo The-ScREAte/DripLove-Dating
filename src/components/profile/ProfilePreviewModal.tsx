@@ -281,6 +281,7 @@ const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({ profile, imag
     passStampRef,
     isBlocked: () => !swipeEnabled,
     holdAfterCommit: true,
+    detachGhost: true,
     onUiChange: (patch) => {
       if (patch.isDragging !== undefined) setIsSwipeDragging(patch.isDragging);
     },

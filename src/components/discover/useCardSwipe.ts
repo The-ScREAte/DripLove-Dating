@@ -26,7 +26,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 export type SwipeDir = 'left' | 'right';
 
-export const CARD_EXIT_MS = 700;
+export const CARD_EXIT_MS = 620;
 /**
  * The throw: a short push in the swipe direction, then gravity takes over and the card tips over and falls completely
  * out of view. Starts with momentum (not a standing start) and accelerates - the opposite of the old ease-out, which
@@ -38,7 +38,7 @@ const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const SNAP_BACK = `transform 0.35s ${EASE_OUT}`;
 const EDGE_GUARD = 16; // px - screen-edge strip left to the OS back gesture
 const CAPTURE_SLOP = 6; // px of movement before the pointer is captured
-const HOLD_SAFETY_MS = 2500; // longest a committed card waits for the parent to swap in the next one
+const HOLD_SAFETY_MS = 1200; // longest a committed card waits for the parent to swap in the next one
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit tested)
@@ -130,6 +130,70 @@ function setSwiping(on: boolean) {
   else document.documentElement.removeAttribute('data-dl-swiping');
 }
 
+/**
+ * The falling card is a throwaway copy ("ghost") of the live card, so the live card is free at once: the next profile
+ * is in place immediately and can be swiped straight away while earlier cards are still dropping off-screen.
+ * Returns null when a copy cannot be made (the caller then falls back to animating the live card itself).
+ */
+function launchGhost(card: HTMLElement, from: string, to: string, ms: number, ghosts: Set<HTMLElement>, detach: boolean): HTMLElement | null {
+  const parent = detach ? document.body : card.parentElement;
+  if (!parent || typeof card.cloneNode !== 'function') return null;
+  const ghost = card.cloneNode(true) as HTMLElement;
+  ghost.removeAttribute('id');
+  ghost.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.setAttribute('inert', '');
+  const st = ghost.style;
+  if (detach) {
+    // Lives on <body> so it survives the page replacing the card (e.g. a re-keyed component). Measure the card
+    // where it rests (transform off) so the ghost lines up exactly.
+    const live = card.style.transform;
+    card.style.transform = 'none';
+    const r = card.getBoundingClientRect();
+    card.style.transform = live;
+    st.position = 'fixed';
+    st.left = `${r.left}px`;
+    st.top = `${r.top}px`;
+    st.width = `${r.width}px`;
+    st.height = `${r.height}px`;
+    st.zIndex = '9999';
+  } else {
+    st.position = 'absolute';
+    st.left = `${card.offsetLeft}px`;
+    st.top = `${card.offsetTop}px`;
+    st.width = `${card.offsetWidth}px`;
+    st.height = `${card.offsetHeight}px`;
+    st.zIndex = '12';
+  }
+  st.margin = '0';
+  st.pointerEvents = 'none';
+  st.visibility = 'visible';
+  st.opacity = '';
+  st.transition = 'none';
+  st.transform = from;
+  if (detach) parent.appendChild(ghost);
+  else parent.insertBefore(ghost, card.nextSibling);
+  ghosts.add(ghost);
+  const remove = () => {
+    if (!ghosts.delete(ghost)) return;
+    ghost.remove();
+  };
+  // Web Animations drive the fall: runs on the compositor and starts on the very next frame, with no reliance on a
+  // forced reflow to separate "start" from "end" the way a CSS transition needs.
+  if (typeof ghost.animate === 'function') {
+    try {
+      const anim = ghost.animate([{ transform: from }, { transform: to }], { duration: ms, easing: CARD_EXIT_EASE, fill: 'forwards' });
+      anim.onfinish = remove;
+    } catch {
+      st.transform = to;
+    }
+  } else {
+    st.transform = to;
+  }
+  window.setTimeout(remove, ms + 80);
+  return ghost;
+}
+
 function prefersReducedMotion(): boolean {
   if (typeof document === 'undefined') return false;
   if (document.documentElement.dataset.motion === 'reduced') return true;
@@ -172,6 +236,8 @@ interface Options {
    * advances (limit reached, error) call `restore()` to bring the card back.
    */
   holdAfterCommit?: boolean;
+  /** The page replaces the card element when the next profile arrives: let the falling copy live on <body>. */
+  detachGhost?: boolean;
 }
 
 export function useCardSwipe(options: Options) {
@@ -195,6 +261,7 @@ export function useCardSwipe(options: Options) {
   const sourceRef = useRef<'touch' | 'mouse'>('touch');
   const pointerId = useRef<number | null>(null);
   const captured = useRef(false);
+  const ghosts = useRef<Set<HTMLElement>>(new Set());
 
   const cancelFrame = () => {
     if (rafId.current !== null) {
@@ -288,6 +355,7 @@ export function useCardSwipe(options: Options) {
     const reduced = prefersReducedMotion();
     const ms = reduced ? 140 : CARD_EXIT_MS;
     const card = o.cardRef.current;
+    const liveTransform = card?.style.transform || CARD_REST_TRANSFORM; // where the finger left the card
     if (card) {
       // Written directly: the live transform was set imperatively, so React's
       // own style update alone can land a frame late and the card would spring
@@ -298,6 +366,27 @@ export function useCardSwipe(options: Options) {
     }
     lockStamp(dir);
     o.onExitStart(dir);
+
+    // Fast path: drop a copy of the card and hand the decision on straight away.
+    if (card && !reduced) {
+      const from = liveTransform;
+      const ghost = launchGhost(card, from, exitTransform(dir, window.innerWidth, window.innerHeight), ms, ghosts.current, !!o.detachGhost);
+      if (ghost) {
+        card.style.visibility = 'hidden';
+        card.style.transition = 'none';
+        card.style.transform = CARD_REST_TRANSFORM;
+        resetStamps(); // the live card's heart / X start clean for the next profile
+        const cur = opts.current;
+        cur.onCommit(dir);
+        // The parent swaps in the next card (settle()); if it never does (limit reached, error) bring the card back.
+        settleTimer.current = window.setTimeout(() => {
+          settleTimer.current = null;
+          if (exiting.current) restoreRef.current?.();
+        }, HOLD_SAFETY_MS);
+        return;
+      }
+    }
+
     exitTimer.current = window.setTimeout(() => {
       exitTimer.current = null;
       const cur = opts.current;
@@ -343,9 +432,19 @@ export function useCardSwipe(options: Options) {
       c.style.transition = 'none';
       c.style.transform = CARD_REST_TRANSFORM;
       c.style.opacity = '';
+      const wasHidden = c.style.visibility === 'hidden';
+      c.style.visibility = '';
       // Make the browser register this jump BEFORE onExitEnd lets React put the card's transition back; otherwise
       // both land in one style recalc and the card slides in from off-screen instead of appearing in place.
       void c.offsetWidth;
+      // The next profile arrives with a quick fade so it never "pops" while the old card is still falling.
+      if (wasHidden && typeof c.animate === 'function') {
+        try {
+          c.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' });
+        } catch {
+          /* cosmetic */
+        }
+      }
     }
     cur.onExitEnd();
     exiting.current = false;
@@ -364,6 +463,7 @@ export function useCardSwipe(options: Options) {
       c.style.transition = `transform 0.35s ${EASE_OUT}, opacity 0.2s ease-out`;
       c.style.transform = CARD_REST_TRANSFORM;
       c.style.opacity = '';
+      c.style.visibility = '';
     }
     o.onExitEnd();
     exiting.current = false;
@@ -468,6 +568,8 @@ export function useCardSwipe(options: Options) {
       cancelFrame();
       setSwiping(false);
       if (exitTimer.current !== null) window.clearTimeout(exitTimer.current);
+      ghosts.current.forEach((g) => { if (g.parentElement !== document.body) g.remove(); });
+      ghosts.current.clear();
     },
     [],
   );

@@ -43,3 +43,15 @@ export const disablePrivacyScreen = async (): Promise<void> => {
     // Best effort.
   }
 };
+
+// Returning users: switch the protection on at module load - the moment the JS bundle starts - when a saved
+// session exists (the native session store is mirrored to localStorage, so this is a synchronous check). Before,
+// protection waited for auth to resolve and the first screens rendered unprotected for a moment. If the session turns
+// out to be invalid, Index.tsx disables it again as soon as auth settles.
+if (isNative) {
+  try {
+    if (window.localStorage?.getItem('supabase.auth.token')) void enablePrivacyScreen();
+  } catch {
+    // storage unavailable - Index.tsx enables it once auth resolves
+  }
+}

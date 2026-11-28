@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PrivacyScreen } from '@capacitor-community/privacy-screen';
 
@@ -19,7 +19,8 @@ import { PrivacyScreen } from '@capacitor-community/privacy-screen';
  * effective on.
  */
 export const useAllowScreenshots = (active: boolean = true) => {
-  useEffect(() => {
+  // Layout effect: protection comes back in the same commit the screen is left, before the next frame paints.
+  useLayoutEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (!active) return;
 
